@@ -1,6 +1,5 @@
 
 "use client";
-// This page can be a directory of stores or redirect to admin/stores
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -12,13 +11,6 @@ import { Building } from 'lucide-react';
 
 export default function StorePortalPage() {
   const router = useRouter();
-
-  // For now, redirect to /admin/stores where admin can find store links.
-  // This page could be developed further to list public store terminals if desired.
-  useEffect(() => {
-    // router.replace('/admin/stores'); 
-    // Decided to make this a simple info page instead of redirect for now.
-  }, [router]);
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-6 text-center">

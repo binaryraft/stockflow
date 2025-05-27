@@ -28,16 +28,15 @@ export default function AdminLayout({
     const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
     if (adminLoggedIn === 'true') {
       setIsAuthenticated(true);
+      setIsLoadingAuth(false); 
     } else {
       setIsAuthenticated(false); // Explicitly set to false
       router.replace('/admin/login');
+      setIsLoadingAuth(false); 
     }
-    setIsLoadingAuth(false); 
   }, [router, hasMounted]);
 
-  if (!hasMounted) { 
-    // Minimal loader for the very first client render pass to avoid hydration issues
-    // if server rendered something different or nothing.
+  if (!hasMounted || isLoadingAuth) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -48,34 +47,16 @@ export default function AdminLayout({
           className="mb-6 rounded-xl shadow-lg animate-pulse"
           data-ai-hint="logo company"
         />
-        <p className="text-lg text-muted-foreground">Initializing Admin Portal...</p>
-      </div>
-    );
-  }
-
-  if (isLoadingAuth) { 
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={80} 
-          height={80} 
-          className="mb-6 rounded-xl shadow-lg animate-pulse"
-          data-ai-hint="logo company"
-        />
-        <p className="text-lg text-muted-foreground">Checking authentication...</p>
+        <p className="text-lg text-muted-foreground">
+          {!hasMounted ? "Initializing Admin Portal..." : "Checking authentication..."}
+        </p>
       </div>
     );
   }
 
   if (!isAuthenticated) {
-    // If not authenticated, the useEffect above should have initiated a redirect.
-    // Returning null here means this layout renders nothing while navigation occurs.
-    // This prevents a flash of "Redirecting..." if the redirect is quick.
     return null; 
   }
 
-  // If we reach here, hasMounted is true, isLoadingAuth is false, AND isAuthenticated is true.
   return <AppShell>{children}</AppShell>;
 }

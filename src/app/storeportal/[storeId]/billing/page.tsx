@@ -61,15 +61,14 @@ export default function StoreBillingPage() {
         try {
           const parsedStaff: Staff = JSON.parse(sessionStaffData);
           const verifiedStaff = getStaffById(parsedStaff.id);
-          // Check if staff exists, is allowed for this store, and the store allows this staff member
           if (verifiedStaff && 
               (verifiedStaff.accessibleStoreIds.length === 0 || verifiedStaff.accessibleStoreIds.includes(storeId)) &&
               (store.allowedStaffIds.length === 0 || store.allowedStaffIds.includes(verifiedStaff.id))
           ) {
             setCurrentStaff(verifiedStaff);
-            setIsEmployeeAuthDialogOpen(false); // Ensure dialog is closed if staff is valid
+            setIsEmployeeAuthDialogOpen(false); 
           } else {
-            sessionStorage.removeItem(`currentStaff_${storeId}`); // Invalidate inconsistent session staff
+            sessionStorage.removeItem(`currentStaff_${storeId}`); 
             setCurrentStaff(null);
             setIsEmployeeAuthDialogOpen(true);
           }
@@ -79,18 +78,17 @@ export default function StoreBillingPage() {
           setCurrentStaff(null);
           setIsEmployeeAuthDialogOpen(true);
         }
-      } else { // No staff in session, prompt for passkey
+      } else { 
         setCurrentStaff(null);
         setIsEmployeeAuthDialogOpen(true);
       }
-    } else { // Store not authenticated
+    } else { 
       setIsStoreAuthenticated(false);
       router.replace(`/storeportal/${storeId}/login`);
     }
     setIsLoading(false); 
   }, [storeId, router, getStoreById, getStaffById, hasMounted]);
 
-  // This effect handles redirection based on allowed operations *after* authentication is confirmed.
   useEffect(() => {
     if (!hasMounted || isLoading || !isStoreAuthenticated || !currentStaff || !currentStore || !storeId) {
       return; 
@@ -100,9 +98,6 @@ export default function StoreBillingPage() {
     const allowedOps = currentStore.allowedOperations || [];
     
     if (allowedOps.length === 0) {
-      // This case should ideally be prevented by store configuration (requiring at least one op)
-      // But as a fallback, if no operations, redirect to a safe state or show error.
-      // For now, default to 'sell' for URL consistency if this happens.
       console.warn(`Store ${storeId} has no allowed operations. Defaulting to sell for URL.`);
       if (currentMode !== 'sell') {
         router.replace(`/storeportal/${storeId}/billing?mode=sell`);
@@ -110,9 +105,9 @@ export default function StoreBillingPage() {
       return;
     }
 
-    if (!currentMode) { // If no mode in URL, set to the first allowed operation
+    if (!currentMode) { 
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
-    } else if (!allowedOps.includes(currentMode)) { // If current mode not allowed, redirect
+    } else if (!allowedOps.includes(currentMode)) { 
       console.warn(`Mode ${currentMode} not allowed for store ${storeId}. Redirecting to ${allowedOps[0]}.`);
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     }
@@ -121,7 +116,7 @@ export default function StoreBillingPage() {
 
   const handleEmployeeAuthenticated = (staff: Staff) => {
     setCurrentStaff(staff);
-    if (hasMounted && storeId) { // Ensure storeId is available
+    if (hasMounted && storeId) { 
       sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify(staff));
     }
     setIsEmployeeAuthDialogOpen(false);
@@ -134,7 +129,7 @@ export default function StoreBillingPage() {
     }
     setCurrentStaff(null);
     setIsStoreAuthenticated(false);
-    setIsEmployeeAuthDialogOpen(false); // Ensure dialog is closed
+    setIsEmployeeAuthDialogOpen(false); 
     if (storeId) router.push(`/storeportal/${storeId}/login`);
     else router.push('/storeportal');
   };
@@ -144,10 +139,9 @@ export default function StoreBillingPage() {
       sessionStorage.removeItem(`currentStaff_${storeId}`);
     }
     setCurrentStaff(null);
-    setIsEmployeeAuthDialogOpen(true); // Open dialog to re-authenticate
+    setIsEmployeeAuthDialogOpen(true); 
   };
 
-  // Initial loading state before any checks are done client-side
   if (!hasMounted || (!storeId && hasMounted)) { 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -164,7 +158,6 @@ export default function StoreBillingPage() {
     );
   }
   
-  // Master loading state for the page after mount and storeId is available
   if (isLoading) {
      return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -181,8 +174,6 @@ export default function StoreBillingPage() {
     );
   }
 
-  // Post-loading checks:
-  // These fallbacks should ideally not be hit if the useEffect handles redirects correctly.
   if (!currentStore) { 
      return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -215,13 +206,12 @@ export default function StoreBillingPage() {
     );
   }
 
-  if (!currentStaff) { // Awaiting employee passkey entry
+  if (!currentStaff) { 
     return (
       <>
         <EmployeePasskeyDialog
           isOpen={isEmployeeAuthDialogOpen}
           onOpenChange={(open) => {
-            // Prevent closing dialog if no staff is authenticated and dialog was meant to be open
             if(!open && !currentStaff && isEmployeeAuthDialogOpen) { 
                 setIsEmployeeAuthDialogOpen(true); 
             } else { 
@@ -250,11 +240,10 @@ export default function StoreBillingPage() {
     );
   }
   
-  // If all authenticated and loaded:
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 h-screen">
+    <div className="flex flex-col gap-6 p-4 md:p-6"> {/* Removed h-screen to allow natural flow */}
       <PageTitle 
         title={`${currentStore.name} - Billing Terminal`}
         icon={ShoppingCart} 

@@ -37,7 +37,7 @@ export default function StoreLoginPage() {
     if (!storeId) {
       toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
       router.replace('/storeportal');
-      setInitialLoading(false); // Stop loading as we are redirecting
+      setInitialLoading(false); 
       return;
     }
 
@@ -46,7 +46,6 @@ export default function StoreLoginPage() {
       setStoreName(store.name);
       if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
         router.replace(`/storeportal/${storeId}/billing`);
-        // No need to setInitialLoading(false) here as it will redirect and unmount
         return; 
       }
     } else {
@@ -56,10 +55,10 @@ export default function StoreLoginPage() {
         description: "The requested store does not exist.",
       });
       router.replace('/storeportal'); 
-      setInitialLoading(false); // Stop loading
+      setInitialLoading(false); 
       return;
     }
-    setInitialLoading(false); // Store info loaded, not redirecting yet
+    setInitialLoading(false); 
   }, [storeId, getStoreById, router, toast, hasMounted]);
 
 
@@ -104,7 +103,7 @@ export default function StoreLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4"> {/* Page handles its own full-screen centering */}
       <div className="flex flex-col items-center mb-8">
         <Image 
           src="https://placehold.co/128x128.png" 

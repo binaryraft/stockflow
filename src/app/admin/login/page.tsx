@@ -32,15 +32,12 @@ export default function AdminLoginPage() {
 
     setIsSubmitting(true);
     localStorage.setItem('isAdminLoggedIn', 'true');
-    // No need for setIsAuthenticated(true) here as AdminLayout will handle it
     router.push('/admin'); 
-    // No need to setIsSubmitting(false) here as the page will redirect and unmount.
   };
   
   if (!hasMounted) {
-    // Render a minimal loading state or null to prevent rendering form before checks
     return (
-       <div className="flex flex-col items-center justify-center min-h-screen p-4">
+       <div className="flex flex-col items-center justify-center min-h-screen p-4"> {/* Keep centering for this specific loading state */}
          <Image 
           src="https://placehold.co/128x128.png" 
           alt={`${APP_NAME} Logo`} 
@@ -54,11 +51,8 @@ export default function AdminLoginPage() {
     );
   }
 
-  // If hasMounted is true, but still redirecting from the useEffect above, this part might not be reached.
-  // If we are here, it means not logged in yet.
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+    <> {/* Layout handles centering now */}
       <div className="flex flex-col items-center mb-8">
         <Image 
           src="https://placehold.co/128x128.png" 
@@ -88,6 +82,6 @@ export default function AdminLoginPage() {
           </Button>
         </CardFooter>
       </Card>
-    </div>
+    </>
   );
 }
