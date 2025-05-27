@@ -1,4 +1,3 @@
-
 "use client";
 
 import { create } from 'zustand';
@@ -61,6 +60,7 @@ interface InventoryState {
   deleteStaff: (staffId: string) => void;
   getStaffById: (staffId: string) => Staff | undefined;
   getAllStaff: () => Staff[];
+  getStaffDetailsByIds: (staffIds: string[]) => Staff[];
 
   // Store CRUD
   addStore: (storeData: Omit<Store, 'id' | 'allowedOperations'> & { allowedOperations?: BillMode[] }) => Store | null; 
@@ -135,7 +135,7 @@ export const useInventoryStore = create<InventoryState>()(
       stores: [],
       userProfile: {
         companyName: DEFAULT_COMPANY_NAME,
-        activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ENTERPRISE, 
+        activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY, // Changed to a valid default
       },
       messagesByStore: {},
 
@@ -255,7 +255,7 @@ export const useInventoryStore = create<InventoryState>()(
             } else { 
               updatedSku.quantityInStock += quantityChange; 
             }
-          } else if (isPurchase) {
+          } else if (isPurchase) { // Non-tracked item, but update prices on purchase
              updatedSku.costPrice = costPrice; 
              updatedSku.sellPrice = sellPrice;
           }
@@ -334,9 +334,11 @@ export const useInventoryStore = create<InventoryState>()(
           if (!itemData.productId.startsWith('SERVICE_ITEM_') && product) {
             const isPurchase = billData.type === 'buy';
             let qtyModifier = 0;
-            if (billData.type === 'sell') qtyModifier = -itemData.quantity;
-            else if (billData.type === 'buy') qtyModifier = itemData.quantity;
-            else if (billData.type === 'return' && !itemData.isDefective) qtyModifier = itemData.quantity;
+            if (product.trackQuantity) {
+              if (billData.type === 'sell') qtyModifier = -itemData.quantity;
+              else if (billData.type === 'buy') qtyModifier = itemData.quantity;
+              else if (billData.type === 'return' && !itemData.isDefective) qtyModifier = itemData.quantity;
+            }
 
             const targetSKU = get().findOrCreateProductSKU(
               itemData.productId,
@@ -381,7 +383,7 @@ export const useInventoryStore = create<InventoryState>()(
         const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
 
         const newBill: Bill = {
-          id: format(currentDate, 'ddMMyyHHmmssS'), 
+          id: format(currentDate, 'ddMMyyHHmmss'), 
           ...billData,
           date: currentDate.toISOString(),
           timestamp: currentDate.getTime(),
@@ -447,6 +449,10 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getStaffById: (staffId) => get().staffs.find((s) => s.id === staffId),
       getAllStaff: () => get().staffs,
+      getStaffDetailsByIds: (staffIds: string[]) => {
+        const allStaff = get().staffs;
+        return staffIds.map(id => allStaff.find(s => s.id === id)).filter(s => s !== undefined) as Staff[];
+      },
 
       addStore: (storeData) => {
         const plan = get().getActiveSubscriptionPlan();
@@ -691,12 +697,17 @@ export const useInventoryStore = create<InventoryState>()(
           });
 
           if (!state.userProfile || typeof state.userProfile !== 'object') {
-            set({ userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ENTERPRISE }});
+            set({ userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY }});
+            console.log("UserProfile hydrated with default values because it was missing or invalid.");
             updated = true;
           } else {
             let profileChanged = false;
-            if (!state.userProfile.activeSubscriptionId) {
-              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.ENTERPRISE;
+            const currentSubId = state.userProfile.activeSubscriptionId;
+            const isValidSubId = SUBSCRIPTION_PLANS.some(p => p.id === currentSubId);
+
+            if (!currentSubId || !isValidSubId) {
+              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY; // Default if invalid or missing
+              console.log(`UserProfile activeSubscriptionId was invalid ('${currentSubId}'), defaulted to ADMIN_ONLY.`);
               profileChanged = true;
             }
             if (!state.userProfile.companyName) {
@@ -704,7 +715,7 @@ export const useInventoryStore = create<InventoryState>()(
               profileChanged = true;
             }
             if (profileChanged) {
-              set({ userProfile: { ...state.userProfile } });
+              set({ userProfile: { ...state.userProfile } }); // Ensure new reference
               updated = true;
             }
           }
@@ -720,13 +731,14 @@ export const useInventoryStore = create<InventoryState>()(
           if (updated) console.log("Inventory store hydrated/updated with new structure and defaults.");
         } catch (error) {
           console.error("Critical error during inventory store hydration:", error);
+          // Fallback to a known good initial state if hydration fails catastrophically
           set({
             products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
             bills: [],
             categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
             staffs: [],
             stores: [],
-            userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ENTERPRISE },
+            userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY },
             messagesByStore: {}
           });
         }
@@ -742,8 +754,9 @@ export const useInventoryStore = create<InventoryState>()(
   )
 );
 
-if (typeof window !== 'undefined') {
-  useInventoryStore.getState()._hydrate();
+// Ensure _hydrate is called once on initial client load if not using onRehydrateStorage for this exact purpose
+if (typeof window !== 'undefined' && !useInventoryStore.getState().products.length && initialProducts.length > 0) {
+  // Check if products array is empty but initialProducts isn't, suggesting store hasn't been properly initialized/hydrated by persist yet.
+  // This specific check might be redundant if onRehydrateStorage works as expected.
+  // useInventoryStore.getState()._hydrate(); 
 }
-
-    
