@@ -36,18 +36,18 @@ interface BillingFormProps {
   billedByStaffId?: string;
   storeId?: string;
   allowedModes?: BillMode[];
-  initialModeProp?: BillMode | null; 
+  initialModeProp?: BillMode | null;
 }
 
 export function BillingForm({ billedByStaffId, storeId, allowedModes, initialModeProp }: BillingFormProps) {
   const router = useRouter();
-  const searchParams = useSearchParams(); 
+  const searchParams = useSearchParams();
   const { toast } = useToast();
   const { getProductByName, addBill, searchProducts, getProductById } = useInventoryStore();
 
   const determineMode = useCallback((): BillMode => {
     const urlMode = searchParams.get('mode') as BillMode | null;
-    
+
     if (urlMode && ['sell', 'buy', 'return'].includes(urlMode)) {
         if (!allowedModes || (allowedModes && allowedModes.includes(urlMode))) {
             return urlMode;
@@ -65,23 +65,13 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
   }, [initialModeProp, allowedModes, searchParams]);
 
   const [mode, setMode] = useState<BillMode>(determineMode());
-  
-  useEffect(() => {
-    const newDeterminedMode = determineMode();
-    if (newDeterminedMode !== mode) {
-      setMode(newDeterminedMode);
-      // No router.push here; parent component handles URL based on mode prop for initial load
-      resetFullForm();
-    }
-  }, [determineMode, mode, resetFullForm]);
-
 
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [isPaid, setIsPaid] = useState(true);
-  
+
   const [productNameQuery, setProductNameQuery] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
   const [costPrice, setCostPrice] = useState<number | string>('');
@@ -114,10 +104,6 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
   const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
   const serviceAmountInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setTimeout(() => productNameInputRef.current?.focus(), 0);
-  }, []); 
-
   const resetFormFields = useCallback((focusProductName = true) => {
     setProductNameQuery('');
     setQuantity(1);
@@ -142,9 +128,22 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     setIsPaid(true);
     setServiceDescription('');
     setServiceAmount('');
-    resetFormFields(true); 
+    resetFormFields(true);
   }, [resetFormFields]);
-  
+
+  useEffect(() => {
+    const newDeterminedMode = determineMode();
+    if (newDeterminedMode !== mode) {
+      setMode(newDeterminedMode);
+      resetFullForm();
+    }
+  }, [determineMode, mode, resetFullForm]);
+
+
+  useEffect(() => {
+    setTimeout(() => productNameInputRef.current?.focus(), 0);
+  }, []);
+
 
   const handleProductSelect = (product: Product) => {
     setProductNameQuery(product.name);
@@ -152,7 +151,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     setSelectedVariantOptions({});
     setVariantDropdownOpenState({});
     setProductNotFoundHint('');
-    setCurrentSkuStock(null); // Reset current SKU stock display
+    setCurrentSkuStock(null);
 
     if (!product.variants || product.variants.length === 0) {
         const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
@@ -161,36 +160,35 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             setSellPrice(mode === 'buy' ? (defaultSku.sellPrice || '') : defaultSku.sellPrice);
             if(product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock);
         } else { setCostPrice(''); setSellPrice(''); }
-        
-        setTimeout(() => { // Ensure focus moves after state updates
+
+        setTimeout(() => {
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
         }, 50);
 
-    } else { // Product has variants
-        setCostPrice(''); // Clear prices until variant is fully selected
+    } else {
+        setCostPrice('');
         setSellPrice('');
         const firstVariantId = product.variants[0].id;
-        setVariantDropdownOpenState({ [firstVariantId]: true }); 
-        // Focus will be handled by useEffect watching currentProductForSelection and variantDropdownOpenState
+        setVariantDropdownOpenState({ [firstVariantId]: true });
     }
   };
-  
-  useEffect(() => { // Handles focusing the first variant select when a product with variants is chosen
+
+  useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
         if (firstOpenVariantId) {
             const firstVariantRef = variantSelectRefs.current[firstOpenVariantId];
-            setTimeout(() => { 
+            setTimeout(() => {
                 const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (elToFocus as HTMLElement)?.focus();
-            }, 100); // Increased delay slightly for stability
+            }, 100);
         }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
 
 
-  useEffect(() => { // Handles focus to quantity after last variant is selected
+  useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
       const allVariantsSelected = currentProductForSelection.variants.every(
         (v) => selectedVariantOptions[v.name]
@@ -198,7 +196,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
       if (allVariantsSelected) {
         const targetSku = currentProductForSelection.productSKUs.find(
-          sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) === 
+          sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) ===
                  JSON.stringify(Object.entries(selectedVariantOptions).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
         );
 
@@ -209,9 +207,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         } else {
           setCostPrice('');
           setSellPrice('');
-          setCurrentSkuStock(0); // Indicate no stock for this specific (possibly new) variant combination
+          setCurrentSkuStock(0);
         }
-        
+
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
         if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
             setTimeout(() => {
@@ -242,7 +240,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       setIsNewProductDialogOpen(true);
       return;
     }
-    
+
     if (product.variants && product.variants.length > 0) {
       const allVariantsSelected = product.variants.every(
         (v) => selectedVariantOptions[v.name]
@@ -257,10 +255,10 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         return;
       }
     }
-    
+
     const targetOptionValues = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
     const targetSku = product.productSKUs.find(
-      sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) === 
+      sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) ===
              JSON.stringify(Object.entries(targetOptionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
     );
 
@@ -271,16 +269,16 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         return;
       }
     }
-    
+
     let itemCostPrice: number;
     let itemSellPrice: number;
 
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
       itemSellPrice = parseFloat(sellPrice.toString()) || 0;
-    } else { // Sell or Return mode
-      itemCostPrice = targetSku?.costPrice || 0; // Prices from the specific SKU
-      itemSellPrice = targetSku?.sellPrice || 0;
+    } else {
+      itemCostPrice = targetSku?.costPrice ?? 0;
+      itemSellPrice = targetSku?.sellPrice ?? 0;
     }
 
     const newItem: BillItem = {
@@ -295,16 +293,16 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     };
 
     setCurrentBillItems(prevItems => [...prevItems, newItem]);
-    resetFormFields(true); 
+    resetFormFields(true);
   };
-  
+
   const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice') => {
     if (currentField === 'productName') {
        const productsFound = searchProducts(productNameQuery);
-       if (productsFound.length === 1 && !currentProductForSelection && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) { 
-            handleProductSelect(productsFound[0]); 
-       } else { 
-            if (productNotFoundHint === productNameQuery && !currentProductForSelection) { 
+       if (productsFound.length === 1 && !currentProductForSelection && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
+            handleProductSelect(productsFound[0]);
+       } else {
+            if (productNotFoundHint === productNameQuery && !currentProductForSelection) {
                 setNewProductDialogInitialValues({
                     name: productNameQuery,
                     quantity: mode === 'buy' ? (typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1) : undefined,
@@ -312,19 +310,19 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                     sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? parseFloat(sellPrice) || 0 : sellPrice || 0) : undefined,
                   });
                 setIsNewProductDialogOpen(true);
-                setProductNotFoundHint(''); 
+                setProductNotFoundHint('');
             } else if (!currentProductForSelection && productNameQuery.trim() !== '') {
-                setProductNotFoundHint(productNameQuery); 
-            } else if (currentProductForSelection) { 
+                setProductNotFoundHint(productNameQuery);
+            } else if (currentProductForSelection) {
                 if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
                      quantityInputRef.current?.focus();
                      quantityInputRef.current?.select();
-                } else { 
+                } else {
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
                         setTimeout(() => document.getElementById(`variant-select-${firstUnselectedVariant.id}-trigger`)?.focus(), 50);
-                    } else { 
+                    } else {
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
                     }
@@ -332,19 +330,19 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             }
        }
     } else if (currentField === 'quantity') {
-      if (mode === 'buy') { 
+      if (mode === 'buy') {
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       } else if (mode === 'sell' || mode === 'return') {
-        handleAddNewItem(); 
+        handleAddNewItem();
       }
     } else if (currentField === 'costPrice') {
-      if (mode === 'buy') { 
+      if (mode === 'buy') {
         sellPriceInputRef.current?.focus();
         sellPriceInputRef.current?.select();
       }
     } else if (currentField === 'sellPrice') {
-      if (mode === 'buy') handleAddNewItem(); 
+      if (mode === 'buy') handleAddNewItem();
     }
   };
 
@@ -358,11 +356,11 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       })
     );
   };
-  
+
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
     if (mode !== 'buy') return;
     setCurrentBillItems(prevItems =>
-      prevItems.map(item => 
+      prevItems.map(item =>
         item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
       )
     );
@@ -378,7 +376,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       return acc + (price * item.quantity);
     }, 0);
   };
-  
+
   const calculatePotentialSellTotalForBuy = () => {
     if (mode !== 'buy') return 0;
     return currentBillItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
@@ -392,7 +390,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      productName: item.productName, 
+      productName: item.productName,
       quantity: item.quantity,
       costPrice: item.costPrice,
       sellPrice: item.sellPrice,
@@ -400,54 +398,58 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       selectedVariantOptions: item.selectedVariantOptions,
     }));
 
+    const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
+
+
     addBill({
       type: mode,
       vendorOrCustomerName: customerVendorName,
       customerPhone: customerPhone,
       notes: notes,
-      paymentStatus: (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined,
-      billedByStaffId: billedByStaffId, 
-      storeId: storeId, 
+      paymentStatus: billPaymentStatus,
+      billedByStaffId: billedByStaffId,
+      storeId: storeId,
     }, billItemsForStore);
-    
+
     setLastSavedBillMode(mode);
     setIsSavingAnimationVisible(true);
-    // Form reset and redirect are handled by handleAnimationClose
+    setServiceDescription('');
+    setServiceAmount('');
   };
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
-    resetFullForm(); 
-    if (!storeId) { // If in admin view
+    resetFullForm();
+    if (!storeId) {
       const currentQueryModeInUrl = searchParams.get('mode');
-      if (currentQueryModeInUrl) { 
-        router.push('/admin/billing'); 
+      if (currentQueryModeInUrl) {
+         router.push(mode === 'sell' ? '/admin/billing' : `/admin/billing?mode=${mode}`); // Keep mode for non-sell admin
       } else {
          setTimeout(() => productNameInputRef.current?.focus(), 0);
       }
-    } else { // If in store view, stay on page, focus product name
+    } else {
        setTimeout(() => productNameInputRef.current?.focus(), 0);
     }
   };
-  
+
   const onNewProductAddedFromDialog = (product: Product) => {
-    handleProductSelect(product); 
-    setTimeout(() => productNameInputRef.current?.focus(),50); 
+    handleProductSelect(product);
+    setTimeout(() => productNameInputRef.current?.focus(),50);
   };
 
   const handleModeChange = (newModeString: string) => {
     const newMode = newModeString as BillMode;
     if (allowedModes && allowedModes.length > 0 && !allowedModes.includes(newMode)) {
         toast({variant: "destructive", title: "Mode Not Allowed", description: `This terminal is not configured for ${newMode} operations.`});
-        return; 
+        return;
     }
 
     if (newMode !== mode) {
-        setMode(newMode); 
+        setMode(newMode);
         const basePath = storeId ? `/storeportal/${storeId}/billing` : '/admin/billing';
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
-        resetFullForm(); 
+        resetFullForm();
     }
   };
 
@@ -467,7 +469,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     const amount = parseFloat(serviceAmount.toString());
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, 
+      productId: `SERVICE_ITEM_${uuidv4()}`,
       productName: serviceDescription,
       quantity: 1,
       costPrice: mode === 'buy' ? amount : 0,
@@ -490,7 +492,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
   return (
     <div className="flex flex-col gap-6">
-      <BillSaveAnimation 
+      <BillSaveAnimation
         show={isSavingAnimationVisible}
         billMode={lastSavedBillMode}
         onClose={handleAnimationClose}
@@ -499,27 +501,27 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1">
             {displayModes.includes('sell') && (
-              <TabsTrigger 
-                value="sell" 
+              <TabsTrigger
+                value="sell"
                 className={cn("flex items-center gap-2", mode === 'sell' ? activeModeConfig.sell.color : "")}
               >
-                <Send size={18}/>Sales
+                <activeModeConfig.sell.icon size={18}/>{activeModeConfig.sell.label}
               </TabsTrigger>
             )}
             {displayModes.includes('buy') && (
-              <TabsTrigger 
-                value="buy" 
+              <TabsTrigger
+                value="buy"
                 className={cn("flex items-center gap-2", mode === 'buy' ? activeModeConfig.buy.color : "")}
               >
-                <ShoppingBag size={18}/>Expense
+                <activeModeConfig.buy.icon size={18}/>{activeModeConfig.buy.label}
               </TabsTrigger>
             )}
             {displayModes.includes('return') && (
-              <TabsTrigger 
-                value="return" 
+              <TabsTrigger
+                value="return"
                 className={cn("flex items-center gap-2", mode === 'return' ? activeModeConfig.return.color : "")}
               >
-                <RotateCcw size={18}/>Return
+                <activeModeConfig.return.icon size={18}/>{activeModeConfig.return.label}
               </TabsTrigger>
             )}
           </TabsList>
@@ -531,8 +533,8 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
           setIsNewProductDialogOpen(open);
           if (!open) {
             setNewProductDialogInitialValues({ name: '' });
-            setEditingProductFromBill(null); 
-            setTimeout(() => productNameInputRef.current?.focus(), 50); 
+            setEditingProductFromBill(null);
+            setTimeout(() => productNameInputRef.current?.focus(), 50);
           }
         }}
         editingProduct={editingProductFromBill}
@@ -543,7 +545,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary"> 
+      <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
           {/* Item Entry Section START */}
           <div className="space-y-4 pb-4 border-b border-dashed mb-4">
@@ -551,9 +553,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
             </h3>
             <div className={cn(
-              "grid gap-4 items-baseline", 
-              "grid-cols-1", 
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]" 
+              "grid gap-4 items-baseline",
+              "grid-cols-1",
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]"
             )}>
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name</Label>
@@ -588,7 +590,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                 )}
               </div>
 
-              <div className="space-y-1.5 w-full md:w-24"> 
+              <div className="space-y-1.5 w-full md:w-24">
                 <Label htmlFor="quantityGlobal">Quantity</Label>
                 <Input
                   id="quantityGlobal"
@@ -603,7 +605,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               </div>
               {mode === 'buy' && (
                 <>
-                  <div className="space-y-1.5 w-full md:w-32">  
+                  <div className="space-y-1.5 w-full md:w-32">
                     <Label htmlFor="costPrice">Cost Price/Unit</Label>
                     <Input
                       id="costPrice"
@@ -616,7 +618,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                       step="0.01" min="0"
                     />
                   </div>
-                  <div className="space-y-1.5 w-full md:w-32">  
+                  <div className="space-y-1.5 w-full md:w-32">
                     <Label htmlFor="sellPrice">Sell Price/Unit</Label>
                     <Input
                       id="sellPrice"
@@ -635,7 +637,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                 <PlusCircle className="mr-2 h-4 w-4" /> Add
               </Button>
             </div>
-              
+
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
               <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
                 {currentProductForSelection.variants.map((variant, index) => {
@@ -653,16 +655,16 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { 
+                                setTimeout(() => {
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
                                   variantSelectRefs.current[nextVariantId]?.current?.focus();
                                 }, 50);
-                            } else { 
+                            } else {
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -670,18 +672,14 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                             }
                         }}
                       >
-                        <SelectTrigger 
+                        <SelectTrigger
                           id={`variant-select-${variant.id}-trigger`}
                           ref={variantSelectRefs.current[variant.id]}
-                          className="w-full select-trigger-class" 
+                          className="w-full select-trigger-class"
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) {
                                 e.preventDefault();
                                 setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
-                            } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
-                                // If open, Enter should select, which Radix handles. 
-                                // If it's the last variant, Radix selection will trigger onValueChange, then focus quantity.
-                                // If not last, it focuses next variant via onValueChange.
                             }
                           }}
                         >
@@ -702,9 +700,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
             {mode === 'return' && (
               <div className="flex items-center space-x-2 pt-2">
-                <Switch 
-                  id="isDefective" 
-                  checked={returnItemIsDefective} 
+                <Switch
+                  id="isDefective"
+                  checked={returnItemIsDefective}
                   onCheckedChange={setReturnItemIsDefective}
                 />
                 <Label htmlFor="isDefective">Item is defective</Label>
@@ -712,7 +710,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             )}
           </div>
           {/* Item Entry Section END */}
-            
+
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">
@@ -740,9 +738,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               />
             </div>
           </div>
-            
+
           {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
-          <ScrollArea className="flex-1 -mx-6 px-6"> 
+          <ScrollArea className="flex-1 -mx-6 px-6">
             {currentBillItems.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
             ) : (
@@ -769,7 +767,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
                 <div className="space-y-1.5">
                   <Label htmlFor="serviceDescription">Description</Label>
-                  <Input 
+                  <Input
                     id="serviceDescription"
                     ref={serviceDescriptionInputRef}
                     value={serviceDescription}
@@ -780,14 +778,14 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="serviceAmount">Amount</Label>
-                  <Input 
+                  <Input
                     id="serviceAmount"
                     ref={serviceAmountInputRef}
                     type="number"
                     value={serviceAmount}
                     onChange={(e) => setServiceAmount(parseFloat(e.target.value) || '')}
                     placeholder="Amount"
-                    step="0.01" 
+                    step="0.01"
                     min="0"
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddServiceItem())}
                     onFocus={(e) => e.target.select()}
@@ -814,18 +812,18 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
           )}
           <div className="space-y-1.5">
             <Label htmlFor="notes">Notes</Label>
-            <Input 
-              id="notes" 
-              value={notes} 
-              onChange={(e) => setNotes(e.target.value)} 
-              placeholder="Add any notes for this bill (optional)" 
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any notes for this bill (optional)"
             />
           </div>
            {(mode === 'sell' || mode === 'buy') && (
             <div className="flex items-center space-x-2 pt-2">
-              <Switch 
-                id="paymentStatus" 
-                checked={isPaid} 
+              <Switch
+                id="paymentStatus"
+                checked={isPaid}
                 onCheckedChange={setIsPaid}
                 className={cn(isPaid ? "data-[state=checked]:bg-green-500" : "data-[state=unchecked]:bg-destructive")}
               />
@@ -847,3 +845,5 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     </div>
   );
 }
+
+    
