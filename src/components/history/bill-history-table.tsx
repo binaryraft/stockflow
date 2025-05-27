@@ -15,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Bill } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -45,7 +45,7 @@ export function BillHistoryTable() {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        bill.type.toLowerCase().includes(lowerSearchTerm) ||
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Use getBillTypeName for searching
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm))
@@ -60,7 +60,11 @@ export function BillHistoryTable() {
         if (sortConfig.key === 'date') {
             valA = a.timestamp;
             valB = b.timestamp;
+        } else if (sortConfig.key === 'type') {
+            valA = getBillTypeName(a); // Sort by the displayed name
+            valB = getBillTypeName(b);
         }
+
 
         let comparison = 0;
         if (typeof valA === 'string' && typeof valB === 'string') {
@@ -95,27 +99,37 @@ export function BillHistoryTable() {
     toast({ title: "Print Bill", description: `Printing bill ${billId}. (Not implemented)` });
   };
 
-  const getBillTypeIcon = (type: Bill['type']) => {
-    if (type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Expense
-    if (type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Sales
-    if (type === 'return') return <RotateCcw className="h-4 w-4 text-yellow-500" />;
+  const getBillTypeIcon = (bill: Bill) => {
+    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />;
+    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />;
+    if (bill.type === 'return') {
+      if (bill.items.some(item => item.isDefective === true)) {
+        return <AlertTriangle className="h-4 w-4 text-red-500" />; // Red icon for defective returns
+      }
+      return <RotateCcw className="h-4 w-4 text-yellow-600" />; // Darker yellow for better contrast on yellow badge
+    }
     return null;
   };
   
   const getBillTypeBadgeVariant = (type: Bill['type']): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
-    if (type === 'buy') return 'destructive'; // Expense (Red)
-    if (type === 'sell') { // Sales (Green) - Using 'default' which should be themed to green or use a custom green variant
+    if (type === 'buy') return 'destructive'; 
+    if (type === 'sell') { 
       return 'default'; 
     }
-    if (type === 'return') return 'secondary'; // Return (Yellow-ish)
+    if (type === 'return') return 'secondary'; 
     return 'outline';
   };
 
-  const getBillTypeName = (type: Bill['type']): string => {
-    if (type === 'buy') return 'Expense';
-    if (type === 'sell') return 'Sales';
-    if (type === 'return') return 'Return';
-    return type;
+  const getBillTypeName = (bill: Bill): string => {
+    if (bill.type === 'buy') return 'Expense';
+    if (bill.type === 'sell') return 'Sales';
+    if (bill.type === 'return') {
+      if (bill.items.some(item => item.isDefective === true)) {
+        return 'Return (Defective)';
+      }
+      return 'Return';
+    }
+    return bill.type;
   }
 
 
@@ -132,7 +146,7 @@ export function BillHistoryTable() {
             <DialogHeader>
               <DialogTitle>Bill Details (ID: {selectedBill.id})</DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill.type)} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
+                {getBillTypeName(selectedBill)} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh] p-1 -mx-1">
@@ -171,7 +185,7 @@ export function BillHistoryTable() {
                           item.isDefective ? (
                             <Badge variant="destructive" className="ml-2 text-xs">Defective</Badge>
                           ) : (
-                            <Badge variant="secondary" className="ml-2 text-xs">Restocked</Badge>
+                            <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-700">Restocked</Badge>
                           )
                         )}
                       </TableCell>
@@ -253,10 +267,14 @@ export function BillHistoryTable() {
                     <TableCell>
                       <Badge 
                         variant={getBillTypeBadgeVariant(bill.type)} 
-                        className={`capitalize flex items-center gap-1 w-fit ${bill.type === 'sell' ? 'bg-green-600 hover:bg-green-700 text-white' : bill.type === 'buy' ? 'bg-red-600 hover:bg-red-700 text-white' : bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' }`}
+                        className={`capitalize flex items-center gap-1 w-fit min-w-[80px] justify-center ${
+                          bill.type === 'sell' ? 'bg-green-600 hover:bg-green-700 text-white' : 
+                          bill.type === 'buy' ? 'bg-red-600 hover:bg-red-700 text-white' : 
+                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' 
+                        }`}
                       >
-                        {getBillTypeIcon(bill.type)}
-                        {getBillTypeName(bill.type)}
+                        {getBillTypeIcon(bill)}
+                        {getBillTypeName(bill)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -300,3 +318,4 @@ export function BillHistoryTable() {
     </>
   );
 }
+
