@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Mail, Phone, MapPin } from "lucide-react";
-import { APP_NAME } from "@/lib/constants";
+import { APP_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from "@/lib/constants";
 
 export function ContactSection() {
   const handleSubmit = (e: React.FormEvent) => {
@@ -14,6 +14,13 @@ export function ContactSection() {
     // Handle form submission logic here (e.g., send email, API call)
     alert("Message submitted! (This is a demo)");
   };
+
+  // Extract email and phone from COMPANY_CONTACT for cleaner display
+  const emailMatch = COMPANY_CONTACT.match(/Email: ([\w.-]+@[\w.-]+\.\w+)/);
+  const phoneMatch = COMPANY_CONTACT.match(/Phone: ([\(\)\d\s-]+)/);
+  const displayEmail = emailMatch ? emailMatch[1] : `contact@${APP_NAME.toLowerCase().replace(/\s+/g, '')}.com`;
+  const displayPhone = phoneMatch ? phoneMatch[1] : '(555) 000-0000';
+
 
   return (
     <section id="contact" className="py-16 md:py-24 bg-background">
@@ -29,43 +36,43 @@ export function ContactSection() {
         <div className="grid md:grid-cols-2 gap-12 items-start">
           <div className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-primary mb-2">Contact Information</h3>
-              <div className="space-y-2 text-muted-foreground">
-                <p className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-primary" />
-                  123 Inventory Lane, Business City, ST 54321
+              <h3 className="text-xl font-semibold text-primary mb-3">Contact Information</h3>
+              <div className="space-y-3 text-muted-foreground">
+                <p className="flex items-center gap-3">
+                  <MapPin className="h-5 w-5 text-primary shrink-0" />
+                  {COMPANY_ADDRESS}
                 </p>
-                <p className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-primary" />
-                  contact@{APP_NAME.toLowerCase().replace(/\s+/g, '')}.com
+                <p className="flex items-center gap-3">
+                  <Mail className="h-5 w-5 text-primary shrink-0" />
+                  <a href={`mailto:${displayEmail}`} className="hover:text-primary transition-colors">{displayEmail}</a>
                 </p>
-                <p className="flex items-center gap-2">
-                  <Phone className="h-5 w-5 text-primary" />
-                  (555) 123-4567
+                <p className="flex items-center gap-3">
+                  <Phone className="h-5 w-5 text-primary shrink-0" />
+                  <a href={`tel:${displayPhone.replace(/[^\d+]/g, '')}`} className="hover:text-primary transition-colors">{displayPhone}</a>
                 </p>
               </div>
             </div>
-            <div>
-              <h3 className="text-xl font-semibold text-primary mb-2">Office Hours</h3>
-              <p className="text-muted-foreground">Monday - Friday: 9 AM - 6 PM</p>
-              <p className="text-muted-foreground">Saturday: 10 AM - 3 PM</p>
+            <div className="pt-4">
+              <h3 className="text-xl font-semibold text-primary mb-3">Office Hours</h3>
+              <p className="text-muted-foreground">Monday - Friday: 9:00 AM - 6:00 PM</p>
+              <p className="text-muted-foreground">Saturday: 10:00 AM - 3:00 PM</p>
               <p className="text-muted-foreground">Sunday: Closed</p>
             </div>
           </div>
-          <form onSubmit={handleSubmit} className="space-y-6 p-6 md:p-8 bg-card rounded-lg shadow-lg border border-border">
+          <form onSubmit={handleSubmit} className="space-y-6 p-6 md:p-8 bg-card rounded-lg shadow-lg border-t-2 border-t-primary">
             <div>
-              <Label htmlFor="name" className="text-foreground">Full Name</Label>
-              <Input id="name" type="text" placeholder="Your Name" required className="mt-1" />
+              <Label htmlFor="contact-name" className="text-foreground">Full Name</Label>
+              <Input id="contact-name" type="text" placeholder="Your Name" required className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="email" className="text-foreground">Email Address</Label>
-              <Input id="email" type="email" placeholder="you@example.com" required className="mt-1" />
+              <Label htmlFor="contact-email" className="text-foreground">Email Address</Label>
+              <Input id="contact-email" type="email" placeholder="you@example.com" required className="mt-1" />
             </div>
             <div>
-              <Label htmlFor="message" className="text-foreground">Message</Label>
-              <Textarea id="message" placeholder="How can we help you?" required rows={5} className="mt-1" />
+              <Label htmlFor="contact-message" className="text-foreground">Message</Label>
+              <Textarea id="contact-message" placeholder="How can we help you?" required rows={5} className="mt-1" />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground py-3 text-base">
               Send Message
             </Button>
           </form>

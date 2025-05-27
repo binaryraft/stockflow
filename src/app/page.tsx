@@ -8,6 +8,7 @@ import { PricingSectionLanding } from '@/components/landing/PricingSectionLandin
 import { OtherSection } from '@/components/landing/OtherSection';
 import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
+import { CallToActionSection } from '@/components/landing/call-to-action-section'; // Ensure this is imported
 
 export default function HomePage() {
   return (
@@ -18,6 +19,7 @@ export default function HomePage() {
         <FeaturesSection />
         <PricingSectionLanding />
         <OtherSection />
+        <CallToActionSection /> {/* Added CallToActionSection here */}
         <ContactSection />
       </main>
       <LandingFooter />
