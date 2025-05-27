@@ -9,10 +9,10 @@ import { LogIn, Building } from 'lucide-react';
 
 interface HeroSectionProps {
   onAdminLoginClick: () => void;
-  // onStoreLoginClick: () => void; // Add later
+  onStoreSelectClick: () => void;
 }
 
-export function HeroSection({ onAdminLoginClick }: HeroSectionProps) {
+export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSectionProps) {
   return (
     <section className="relative py-20 md:py-32 bg-gradient-to-br from-primary/10 via-background to-background">
       <div className="container mx-auto px-4 md:px-6 text-center">
@@ -37,7 +37,7 @@ export function HeroSection({ onAdminLoginClick }: HeroSectionProps) {
           <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg transition-shadow px-8 py-3" onClick={onAdminLoginClick}>
             <LogIn className="mr-2 h-5 w-5" /> Admin Dashboard Access
           </Button>
-          <Button variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow border-primary/50 hover:border-primary text-primary hover:bg-primary/5 px-8 py-3" onClick={() => alert('Store login via homepage - coming soon!')}>
+          <Button variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow border-primary/50 hover:border-primary text-primary hover:bg-primary/5 px-8 py-3" onClick={onStoreSelectClick}>
             <Building className="mr-2 h-5 w-5" /> Access Store Terminal
           </Button>
         </div>

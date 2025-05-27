@@ -9,10 +9,10 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 interface LandingHeaderProps {
   onAdminLoginClick: () => void;
-  // onStoreLoginClick: () => void; // Add later for store login
+  onStoreSelectClick: () => void;
 }
 
-export function LandingHeader({ onAdminLoginClick }: LandingHeaderProps) {
+export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: LandingHeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur-sm">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
@@ -36,7 +36,7 @@ export function LandingHeader({ onAdminLoginClick }: LandingHeaderProps) {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button variant="outline" size="sm" onClick={() => alert('Store login via homepage - coming soon!')}>
+          <Button variant="outline" size="sm" onClick={onStoreSelectClick}>
             <StoreIcon className="mr-2 h-4 w-4" /> Store Login
           </Button>
           <Button size="sm" onClick={onAdminLoginClick}>

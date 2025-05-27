@@ -10,9 +10,10 @@ import { OtherSection } from '@/components/landing/OtherSection';
 import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/call-to-action-section';
-import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded'; // New component
+import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
+import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded'; // New component
 
-type UIMode = 'landing' | 'adminLogin'; // Add more modes later if needed
+type UIMode = 'landing' | 'adminLogin' | 'storeSelect';
 
 export default function HomePage() {
   const [uiMode, setUiMode] = useState<UIMode>('landing');
@@ -20,13 +21,16 @@ export default function HomePage() {
   const showAdminLogin = () => setUiMode('adminLogin');
   const hideAdminLogin = () => setUiMode('landing');
 
+  const showStoreSelect = () => setUiMode('storeSelect');
+  const hideStoreSelect = () => setUiMode('landing');
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       {uiMode === 'landing' && (
         <>
-          <LandingHeader onAdminLoginClick={showAdminLogin} />
+          <LandingHeader onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelect} />
           <main className="flex-grow">
-            <HeroSection onAdminLoginClick={showAdminLogin} />
+            <HeroSection onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelect} />
             <FeaturesSection />
             <PricingSectionLanding />
             <OtherSection />
@@ -39,6 +43,10 @@ export default function HomePage() {
 
       {uiMode === 'adminLogin' && (
         <AdminLoginEmbedded onLoginSuccess={hideAdminLogin} onCancel={hideAdminLogin} />
+      )}
+
+      {uiMode === 'storeSelect' && (
+        <StoreSelectorEmbedded onCancel={hideStoreSelect} />
       )}
     </div>
   );
