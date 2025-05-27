@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Store, Staff } from '@/types';
+import type { Store, Staff, BillMode } from '@/types';
+import { Separator } from '@/components/ui/separator';
+
+const billModeSchema = z.enum(['sell', 'buy', 'return']);
 
 const storeFormSchema = z.object({
   name: z.string().min(2, { message: "Store name must be at least 2 characters." }),
@@ -30,6 +33,7 @@ const storeFormSchema = z.object({
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
   passkey: z.string().min(4, { message: "Passkey must be at least 4 characters." }),
   allowedStaffIds: z.array(z.string()).optional().default([]),
+  allowedOperations: z.array(billModeSchema).min(1, "At least one operation must be allowed.").default(['sell', 'buy', 'return']),
 });
 
 type StoreFormData = z.infer<typeof storeFormSchema>;
@@ -41,6 +45,12 @@ interface StoreFormDialogProps {
   editingStore?: Store | null;
   allStaff: Staff[];
 }
+
+const operationOptions: { id: BillMode; label: string }[] = [
+  { id: 'sell', label: 'Sales Transactions' },
+  { id: 'buy', label: 'Expense Transactions (Purchases)' },
+  { id: 'return', label: 'Returns Processing' },
+];
 
 export function StoreFormDialog({ 
   isOpen, 
@@ -61,10 +71,12 @@ export function StoreFormDialog({
       phone: '',
       passkey: '',
       allowedStaffIds: [],
+      allowedOperations: ['sell', 'buy', 'return'],
     },
   });
 
   const selectedStaffIds = watch('allowedStaffIds') || [];
+  const selectedOperations = watch('allowedOperations') || [];
 
   useEffect(() => {
     if (isOpen) {
@@ -74,8 +86,9 @@ export function StoreFormDialog({
           location: editingStore.location,
           email: editingStore.email,
           phone: editingStore.phone,
-          passkey: editingStore.passkey, // Consider security implications for prefilling passkey
+          passkey: editingStore.passkey, 
           allowedStaffIds: editingStore.allowedStaffIds || [],
+          allowedOperations: editingStore.allowedOperations || ['sell', 'buy', 'return'],
         });
       } else {
         reset({
@@ -85,6 +98,7 @@ export function StoreFormDialog({
           phone: '',
           passkey: '',
           allowedStaffIds: [],
+          allowedOperations: ['sell', 'buy', 'return'],
         });
       }
     }
@@ -141,11 +155,47 @@ export function StoreFormDialog({
             {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
           </div>
 
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>Allowed Operations*</Label>
+            <p className="text-xs text-muted-foreground">
+              Select which types of transactions are permitted at this store terminal.
+            </p>
+            {operationOptions.map((op) => (
+              <div key={op.id} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`operation-${op.id}`}
+                  checked={selectedOperations.includes(op.id)}
+                  onCheckedChange={(checked) => {
+                    const currentOps = selectedOperations;
+                    if (checked) {
+                      setValue('allowedOperations', [...currentOps, op.id]);
+                    } else {
+                      // Ensure at least one operation remains selected
+                      if (currentOps.length > 1) {
+                        setValue('allowedOperations', currentOps.filter(id => id !== op.id));
+                      } else {
+                        toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed."});
+                      }
+                    }
+                  }}
+                />
+                <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm">
+                  {op.label}
+                </Label>
+              </div>
+            ))}
+            {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
+          </div>
+
+          <Separator />
+
           {allStaff.length > 0 && (
             <div className="space-y-2">
               <Label>Allowed Staff (Optional)</Label>
               <p className="text-xs text-muted-foreground">
-                Select staff members allowed to operate this store. If none selected, any staff can (if they have access to this store).
+                Select staff members allowed to operate this store. If none selected, any staff with general access to this store can operate it.
               </p>
               <ScrollArea className="h-32 border rounded-md p-2 bg-tertiary">
                  <div className="space-y-1">

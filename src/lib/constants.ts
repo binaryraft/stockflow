@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare } from 'lucide-react'; // Added MessageSquare
+import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
 import type { SubscriptionPlan } from '@/types';
 
 export interface NavLink {
@@ -16,24 +16,22 @@ export const NAV_LINKS: NavLink[] = [
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/staff', label: 'Staff', icon: Users },
   { href: '/admin/stores', label: 'Stores', icon: Building },
-  { href: '/admin/chat', label: 'Chat', icon: MessageSquare }, // Added Chat link
+  { href: '/admin/chat', label: 'Chat', icon: MessageSquare },
   { href: '/admin/profile', label: 'Profile', icon: UserIcon },
   { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export const APP_NAME = "StockFlow";
 
-// Default Categories and Company Details remain unchanged from previous state
 export const DEFAULT_CATEGORIES: string[] = [
   "Electronics", "Groceries", "Clothing", "Books", "Home Goods", "Toys", "Sports", "Automotive", "Health", "Beauty", "Services", "Other"
 ];
 
-export const DEFAULT_COMPANY_NAME = "StockFlow Solutions"; // Slightly more descriptive
+export const DEFAULT_COMPANY_NAME = "StockFlow Solutions";
 export const COMPANY_ADDRESS = "123 Commerce Way, Business City, ST 54321";
 export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow.app";
 
 
-// Subscription Plans
 export const SUBSCRIPTION_PLAN_IDS = {
   ADMIN_ONLY: 'plan_admin_only',
   MULTI_STORE: 'plan_multi_store',

@@ -27,9 +27,6 @@ export function SidebarNav() {
     setActivePlanId(plan?.id);
   }, [getActiveSubscriptionPlan]);
 
-  // NAV_LINKS now have /admin prefixes
-  // Pathname also includes /admin, so direct comparison works
-
   return (
     <Sidebar className="border-r" collapsible="icon">
       <SidebarHeader>
@@ -80,13 +77,13 @@ export function SidebarNav() {
                   size="default"
                   isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
                   tooltip={link.label}
-                  aria-disabled={isDisabledBySubscription && hasMounted} 
-                  className={cn(isDisabledBySubscription && hasMounted && "opacity-50 cursor-not-allowed")}
+                  aria-disabled={hasMounted ? isDisabledBySubscription : false}
+                  className={cn(hasMounted && isDisabledBySubscription && "opacity-50 cursor-not-allowed")}
                 >
                   <Link
-                    href={isDisabledBySubscription && hasMounted ? "#" : link.href}
-                    className={cn("flex items-center gap-3", isDisabledBySubscription && hasMounted && "pointer-events-none")}
-                    onClick={(e) => { if (isDisabledBySubscription && hasMounted) e.preventDefault(); }}
+                    href={(hasMounted && isDisabledBySubscription) ? "#" : link.href}
+                    className={cn("flex items-center gap-3", (hasMounted && isDisabledBySubscription) && "pointer-events-none")}
+                    onClick={(e) => { if (hasMounted && isDisabledBySubscription) e.preventDefault(); }}
                   >
                     <link.icon className={cn("h-5 w-5 shrink-0")} />
                     {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
@@ -96,7 +93,7 @@ export function SidebarNav() {
 
               return (
                 <SidebarMenuItem key={link.href}>
-                  {isDisabledBySubscription && sidebarState === 'expanded' && hasMounted ? (
+                  {(hasMounted && isDisabledBySubscription && sidebarState === 'expanded') ? (
                     <Tooltip>
                       <TooltipTrigger asChild>{menuItemContent}</TooltipTrigger>
                       <TooltipContent side="right" align="start">

@@ -15,7 +15,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -36,7 +36,7 @@ interface BillingFormProps {
   billedByStaffId?: string;
   storeId?: string;
   allowedModes?: BillMode[];
-  initialModeProp?: BillMode | null; // New prop from parent based on URL
+  initialModeProp?: BillMode | null; 
 }
 
 export function BillingForm({ billedByStaffId, storeId, allowedModes, initialModeProp }: BillingFormProps) {
@@ -46,16 +46,23 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
   const { getProductByName, addBill, searchProducts, getProductById } = useInventoryStore();
 
   const determineMode = useCallback((): BillMode => {
-    if (initialModeProp && ['sell', 'buy', 'return'].includes(initialModeProp)) {
-        if (!allowedModes || (allowedModes && allowedModes.includes(initialModeProp))) {
-            return initialModeProp;
+    const urlMode = searchParams.get('mode') as BillMode | null;
+    
+    if (urlMode && ['sell', 'buy', 'return'].includes(urlMode)) {
+        if (!allowedModes || (allowedModes && allowedModes.includes(urlMode))) {
+            return urlMode;
         }
+    }
+    if (initialModeProp && ['sell', 'buy', 'return'].includes(initialModeProp)) {
+      if (!allowedModes || (allowedModes && allowedModes.includes(initialModeProp))) {
+        return initialModeProp;
+      }
     }
     if (allowedModes && allowedModes.length > 0) {
       return allowedModes[0];
     }
     return 'sell'; // Overall default
-  }, [initialModeProp, allowedModes]);
+  }, [initialModeProp, allowedModes, searchParams]);
 
   const [mode, setMode] = useState<BillMode>(determineMode());
   
@@ -63,14 +70,17 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     const newDeterminedMode = determineMode();
     if (newDeterminedMode !== mode) {
       setMode(newDeterminedMode);
+      // No router.push here; parent component handles URL based on mode prop for initial load
+      resetFullForm();
     }
-  }, [determineMode, mode]);
+  }, [determineMode, mode, resetFullForm]);
 
 
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [isPaid, setIsPaid] = useState(true);
   
   const [productNameQuery, setProductNameQuery] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
@@ -129,6 +139,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     setCustomerVendorName('');
     setCustomerPhone('');
     setNotes('');
+    setIsPaid(true);
     setServiceDescription('');
     setServiceAmount('');
     resetFormFields(true); 
@@ -141,7 +152,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     setSelectedVariantOptions({});
     setVariantDropdownOpenState({});
     setProductNotFoundHint('');
-    setCurrentSkuStock(null);
+    setCurrentSkuStock(null); // Reset current SKU stock display
 
     if (!product.variants || product.variants.length === 0) {
         const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
@@ -151,20 +162,21 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             if(product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock);
         } else { setCostPrice(''); setSellPrice(''); }
         
-        setTimeout(() => {
+        setTimeout(() => { // Ensure focus moves after state updates
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
-        }, 0);
+        }, 50);
 
-    } else {
-        setCostPrice(''); 
+    } else { // Product has variants
+        setCostPrice(''); // Clear prices until variant is fully selected
         setSellPrice('');
         const firstVariantId = product.variants[0].id;
         setVariantDropdownOpenState({ [firstVariantId]: true }); 
+        // Focus will be handled by useEffect watching currentProductForSelection and variantDropdownOpenState
     }
   };
   
-  useEffect(() => {
+  useEffect(() => { // Handles focusing the first variant select when a product with variants is chosen
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
         if (firstOpenVariantId) {
@@ -172,14 +184,14 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             setTimeout(() => { 
                 const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (elToFocus as HTMLElement)?.focus();
-            }, 50);
+            }, 100); // Increased delay slightly for stability
         }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
 
 
-  useEffect(() => {
-    if (currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
+  useEffect(() => { // Handles focus to quantity after last variant is selected
+    if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
       const allVariantsSelected = currentProductForSelection.variants.every(
         (v) => selectedVariantOptions[v.name]
       );
@@ -197,7 +209,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
         } else {
           setCostPrice('');
           setSellPrice('');
-          setCurrentSkuStock(0);
+          setCurrentSkuStock(0); // Indicate no stock for this specific (possibly new) variant combination
         }
         
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
@@ -266,8 +278,8 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
       itemSellPrice = parseFloat(sellPrice.toString()) || 0;
-    } else {
-      itemCostPrice = targetSku?.costPrice || 0;
+    } else { // Sell or Return mode
+      itemCostPrice = targetSku?.costPrice || 0; // Prices from the specific SKU
       itemSellPrice = targetSku?.sellPrice || 0;
     }
 
@@ -311,6 +323,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
+                        setTimeout(() => document.getElementById(`variant-select-${firstUnselectedVariant.id}-trigger`)?.focus(), 50);
                     } else { 
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
@@ -392,36 +405,35 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       vendorOrCustomerName: customerVendorName,
       customerPhone: customerPhone,
       notes: notes,
+      paymentStatus: (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined,
       billedByStaffId: billedByStaffId, 
       storeId: storeId, 
     }, billItemsForStore);
     
     setLastSavedBillMode(mode);
     setIsSavingAnimationVisible(true);
-    setServiceDescription('');
-    setServiceAmount('');
+    // Form reset and redirect are handled by handleAnimationClose
   };
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
     resetFullForm(); 
-    if (!storeId) { 
+    if (!storeId) { // If in admin view
       const currentQueryModeInUrl = searchParams.get('mode');
-      if (currentQueryModeInUrl) { // If we were on a specific mode (e.g. /admin/billing?mode=sell)
-        router.push('/admin/billing'); // Navigate to history view
+      if (currentQueryModeInUrl) { 
+        router.push('/admin/billing'); 
       } else {
-        // Already on history view or no mode was in URL, just ensure focus
          setTimeout(() => productNameInputRef.current?.focus(), 0);
       }
-    } else { 
+    } else { // If in store view, stay on page, focus product name
        setTimeout(() => productNameInputRef.current?.focus(), 0);
     }
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
     handleProductSelect(product); 
-    setTimeout(() => productNameInputRef.current?.focus(),50); // Ensure focus back
+    setTimeout(() => productNameInputRef.current?.focus(),50); 
   };
 
   const handleModeChange = (newModeString: string) => {
@@ -432,11 +444,10 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     }
 
     if (newMode !== mode) {
-        setMode(newMode); // Set internal state first
-        const basePath = storeId ? `/store/${storeId}/billing` : '/admin/billing';
-        // Update URL, which might cause a remount if key in parent changes
+        setMode(newMode); 
+        const basePath = storeId ? `/storeportal/${storeId}/billing` : '/admin/billing';
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
-        resetFullForm(); // Reset form for the new mode
+        resetFullForm(); 
     }
   };
 
@@ -470,8 +481,12 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     serviceDescriptionInputRef.current?.focus();
   };
 
-  // Determine which tabs to display based on allowedModes or default to all for admin
   const displayModes = allowedModes || ['sell', 'buy', 'return'];
+  const activeModeConfig = {
+    sell: { icon: Send, color: "bg-primary hover:bg-primary/90 text-primary-foreground", label: "Sales" },
+    buy: { icon: ShoppingBag, color: "bg-destructive hover:bg-destructive/90 text-destructive-foreground", label: "Expense" },
+    return: { icon: RotateCcw, color: "bg-amber-400 hover:bg-amber-400/90 text-amber-900 dark:bg-amber-500 dark:hover:bg-amber-500/90 dark:text-amber-950", label: "Return" },
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -486,7 +501,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('sell') && (
               <TabsTrigger 
                 value="sell" 
-                className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
+                className={cn("flex items-center gap-2", mode === 'sell' ? activeModeConfig.sell.color : "")}
               >
                 <Send size={18}/>Sales
               </TabsTrigger>
@@ -494,7 +509,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('buy') && (
               <TabsTrigger 
                 value="buy" 
-                className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground dark:data-[state=active]:bg-destructive dark:data-[state=active]:text-destructive-foreground"
+                className={cn("flex items-center gap-2", mode === 'buy' ? activeModeConfig.buy.color : "")}
               >
                 <ShoppingBag size={18}/>Expense
               </TabsTrigger>
@@ -502,7 +517,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('return') && (
               <TabsTrigger 
                 value="return" 
-                className="flex items-center gap-2 data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950"
+                className={cn("flex items-center gap-2", mode === 'return' ? activeModeConfig.return.color : "")}
               >
                 <RotateCcw size={18}/>Return
               </TabsTrigger>
@@ -530,14 +545,17 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary"> 
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
+          {/* Item Entry Section START */}
           <div className="space-y-4 pb-4 border-b border-dashed mb-4">
-            <h3 className="text-lg font-medium text-foreground">Add Item / Product</h3>
+            <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
+            </h3>
             <div className={cn(
-              "grid gap-4 items-baseline", // ensures labels align, inputs then align if their internal spacing is same
+              "grid gap-4 items-baseline", 
               "grid-cols-1", 
               mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]" 
             )}>
-              <div className="space-y-1.5 flex-grow"> {/* Takes up remaining space */}
+              <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name</Label>
                 <div className="flex items-center gap-2">
                   <ProductSearchInput
@@ -570,7 +588,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                 )}
               </div>
 
-              <div className="space-y-1.5 w-full md:w-24"> {/* Fixed width for quantity */}
+              <div className="space-y-1.5 w-full md:w-24"> 
                 <Label htmlFor="quantityGlobal">Quantity</Label>
                 <Input
                   id="quantityGlobal"
@@ -585,7 +603,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               </div>
               {mode === 'buy' && (
                 <>
-                  <div className="space-y-1.5 w-full md:w-32">  {/* Fixed width for cost price */}
+                  <div className="space-y-1.5 w-full md:w-32">  
                     <Label htmlFor="costPrice">Cost Price/Unit</Label>
                     <Input
                       id="costPrice"
@@ -598,7 +616,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                       step="0.01" min="0"
                     />
                   </div>
-                  <div className="space-y-1.5 w-full md:w-32">  {/* Fixed width for sell price */}
+                  <div className="space-y-1.5 w-full md:w-32">  
                     <Label htmlFor="sellPrice">Sell Price/Unit</Label>
                     <Input
                       id="sellPrice"
@@ -613,7 +631,6 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                   </div>
                 </>
               )}
-              {/* Add to Bill Button - part of the grid, self-end for vertical alignment with inputs */}
               <Button onClick={handleAddNewItem} className="w-full md:w-auto mt-4 md:mt-0 self-end bg-primary hover:bg-primary/90" variant="default">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add
               </Button>
@@ -636,16 +653,16 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current dropdown
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { // Use timeout to ensure DOM updates before focus/open
+                                setTimeout(() => { 
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
                                   variantSelectRefs.current[nextVariantId]?.current?.focus();
                                 }, 50);
-                            } else { // Last variant selected
+                            } else { 
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -658,10 +675,13 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                           ref={variantSelectRefs.current[variant.id]}
                           className="w-full select-trigger-class" 
                           onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              // Toggle the specific dropdown's open state
-                              setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: !prev[variant.id] }));
+                            if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) {
+                                e.preventDefault();
+                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
+                            } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
+                                // If open, Enter should select, which Radix handles. 
+                                // If it's the last variant, Radix selection will trigger onValueChange, then focus quantity.
+                                // If not last, it focuses next variant via onValueChange.
                             }
                           }}
                         >
@@ -691,6 +711,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               </div>
             )}
           </div>
+          {/* Item Entry Section END */}
             
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -742,7 +763,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
           {(mode === 'sell' || mode === 'buy') && (
             <div className="pt-4 border-t border-dashed mt-4 space-y-3">
-              <h3 className="text-md font-medium text-foreground">Add Ad-hoc Service / Charge</h3>
+              <h3 className="text-md font-medium text-foreground flex items-center gap-2">
+                <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
                 <div className="space-y-1.5">
                   <Label htmlFor="serviceDescription">Description</Label>
@@ -771,7 +794,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
                   />
                 </div>
                 <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
-                  <CircleDollarSign className="mr-2 h-4 w-4" /> Add Service
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Service
                 </Button>
               </div>
             </div>
@@ -798,6 +821,19 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               placeholder="Add any notes for this bill (optional)" 
             />
           </div>
+           {(mode === 'sell' || mode === 'buy') && (
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch 
+                id="paymentStatus" 
+                checked={isPaid} 
+                onCheckedChange={setIsPaid}
+                className={cn(isPaid ? "data-[state=checked]:bg-green-500" : "data-[state=unchecked]:bg-destructive")}
+              />
+              <Label htmlFor="paymentStatus" className={cn("font-medium", isPaid ? "text-green-600 dark:text-green-500" : "text-destructive")}>
+                {isPaid ? 'Paid' : 'Unpaid'}
+              </Label>
+            </div>
+          )}
           <div className="flex gap-3 mt-2">
             <Button variant="outline" onClick={resetFullForm} className="flex-1">
               <Eraser className="mr-2 h-4 w-4" /> Clear Bill
@@ -811,4 +847,3 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     </div>
   );
 }
-

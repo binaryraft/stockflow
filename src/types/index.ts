@@ -10,35 +10,44 @@ export interface ProductVariant {
   options: ProductOption[]; 
 }
 
+export interface ProductSKU {
+  id: string;
+  optionValues: Record<string, string>; // e.g., {"Color": "Red", "Size": "M"}
+  costPrice: number;
+  sellPrice: number;
+  quantityInStock: number;
+  skuIdentifier?: string; // e.g., PNAME-RED-M
+}
+
 export interface Product {
   id: string;
   name: string;
   category?: string;
   trackQuantity: boolean;
-  sku?: string;
+  sku?: string; // Base SKU for non-variant products, or general product code
   expiryDate?: string; 
-  quantityInStock: number;
-  costPrice: number; 
-  sellPrice: number; 
   imageUrl?: string; 
   description?: string; 
   variants?: ProductVariant[]; 
+  productSKUs: ProductSKU[]; // Holds all stock keeping units for this product
 }
+
+export type BillMode = 'buy' | 'sell' | 'return';
 
 export interface BillItem {
   id: string; 
-  productId: string;
-  productName: string; 
+  productId: string; // Refers to the main Product ID
+  productName: string; // Denormalized for easy display
   quantity: number;
-  costPrice: number; 
-  sellPrice: number; 
+  costPrice: number; // Price at the time of this transaction
+  sellPrice: number; // Price at the time of this transaction
   isDefective?: boolean; 
   selectedVariantOptions?: Record<string, string>; 
 }
 
 export interface Bill {
   id:string;
-  type: 'buy' | 'sell' | 'return'; 
+  type: BillMode; 
   date: string; 
   timestamp: number; 
   vendorOrCustomerName?: string;
@@ -46,6 +55,7 @@ export interface Bill {
   items: BillItem[];
   totalAmount: number; 
   notes?: string;
+  paymentStatus?: 'paid' | 'unpaid';
   billedByStaffId?: string;
   billedByStaffName?: string; // Denormalized for easier display
   storeId?: string;
@@ -57,15 +67,12 @@ export interface Category {
   name: string;
 }
 
-export type BillMode = 'buy' | 'sell' | 'return';
-
-// New Types for Staff and Store Management
 export interface Staff {
   id: string;
   name: string;
   email: string;
   phone: string;
-  passkey: string; // For simplicity, plain text in this prototype
+  passkey: string; 
   accessibleStoreIds: string[];
 }
 
@@ -75,23 +82,32 @@ export interface Store {
   location: string;
   phone: string;
   email: string;
-  passkey: string; // For simplicity, plain text in this prototype
+  passkey: string; 
   allowedStaffIds: string[];
+  allowedOperations: BillMode[]; // e.g., ['sell', 'return']
 }
 
-// Subscription and Profile Types
 export interface SubscriptionPlan {
   id: string;
   name: string;
-  price: number; // Monthly price
-  priceSuffix: string; // e.g., "/ month"
+  price: number; 
+  priceSuffix: string; 
   features: string[];
-  maxStores: number; // Use Infinity for unlimited
-  maxEmployees: number; // Use Infinity for unlimited
+  maxStores: number; 
+  maxEmployees: number; 
   isPopular?: boolean;
 }
 
 export interface UserProfile {
   companyName: string;
   activeSubscriptionId: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  storeId: string;
+  senderId: 'admin' | string; // 'admin' or staffId
+  senderName: string; // "Admin" or staff's name
+  text: string;
+  timestamp: number;
 }

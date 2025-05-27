@@ -170,6 +170,7 @@ export function StoresTable() {
                 Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="py-3 px-4">Allowed Staff</TableHead>
+              <TableHead className="py-3 px-4">Operations</TableHead>
               <TableHead className="text-right py-3 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -187,6 +188,9 @@ export function StoresTable() {
                       : <span className="text-muted-foreground">All staff with access</span> 
                     }
                   </TableCell>
+                  <TableCell className="py-3 px-4 text-xs capitalize">
+                    {store.allowedOperations.join(', ')}
+                  </TableCell>
                   <TableCell className="text-right py-3 px-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -198,7 +202,7 @@ export function StoresTable() {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                          <DropdownMenuItem asChild>
-                          <Link href={`/store/${store.id}/login`}>
+                          <Link href={`/storeportal/${store.id}/login`}>
                             <LogIn className="mr-2 h-4 w-4" /> View Store Terminal
                           </Link>
                         </DropdownMenuItem>
@@ -237,7 +241,7 @@ export function StoresTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={6} className="h-24 text-center">
+                <TableCell colSpan={7} className="h-24 text-center">
                   No stores found. {isAdminOnlyPlan && "Store management is not available on your current plan."}
                 </TableCell>
               </TableRow>

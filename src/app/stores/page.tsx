@@ -1,16 +1,9 @@
-
-import { Suspense } from 'react';
-import { PageTitle } from '@/components/common/page-title';
-import { StoresTable } from '@/components/stores/stores-table';
-import { Building } from 'lucide-react';
-
-export default function StoresPage() {
-  return (
-    <div className="flex flex-col gap-6">
-      <PageTitle title="Store Management" icon={Building} />
-      <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Stores...</div>}>
-        <StoresTable />
-      </Suspense>
-    </div>
-  );
+// This file is deprecated. Store management is now at /admin/stores.
+// Public store portal entry is at /storeportal.
+// This file can be removed or left as a redirect.
+export default function DeprecatedStoresPage() {
+  if (typeof window !== 'undefined') {
+    window.location.href = '/admin/stores';
+  }
+  return null;
 }

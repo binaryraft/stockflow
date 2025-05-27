@@ -78,13 +78,13 @@ export function HeaderMain() {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/admin/profile"> {/* Prefixed with /admin */}
+              <Link href="/admin/profile"> 
                 <UserIcon className="mr-2 h-4 w-4" />
                 Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/admin/settings"> {/* Prefixed with /admin */}
+              <Link href="/admin/settings"> 
                 <SettingsIcon className="mr-2 h-4 w-4" />
                 Settings
               </Link>
