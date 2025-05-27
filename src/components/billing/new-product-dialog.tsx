@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useForm, Controller, useFieldArray, FormProvider } from 'react-hook-form';
+import { useForm, Controller, useFieldArray, FormProvider, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -53,7 +53,6 @@ type NewProductFormData = z.infer<typeof newProductSchema>;
 interface VariantFormSectionProps {
   variantIndex: number;
   removeVariant: (index: number) => void;
-  // We don't need to pass control, register, etc. if VariantFormSection uses useFormContext
 }
 
 const VariantFormSection: React.FC<VariantFormSectionProps> = ({
@@ -236,28 +235,24 @@ export function NewProductDialog({
   const trackQuantityValue = watch('trackQuantity');
 
   const onSubmit = (data: NewProductFormData) => {
-    // The variants data from the form is already in the desired structure:
-    // { name: string, options: { value: string }[] }
-    // The store will handle adding IDs.
-
     const productPayload = {
         name: data.name,
         description: data.description,
         category: data.category,
         trackQuantity: data.trackQuantity,
-        initialStock: data.trackQuantity ? data.initialStock : 0, // For new products
-        quantityInStock: data.trackQuantity ? data.initialStock : 0, // For updates, initialStock field holds the value
+        initialStock: data.trackQuantity ? data.initialStock : 0, 
+        quantityInStock: data.trackQuantity ? data.initialStock : 0,
         costPrice: data.costPrice || 0,
         sellPrice: data.sellPrice || 0,
         sku: data.sku,
         expiryDate: data.expiryDate,
-        variants: data.variants, // Pass the form's variants structure
+        variants: data.variants, 
     };
 
     if (editingProduct) {
       updateProduct(editingProduct.id, productPayload as Partial<Omit<Product, 'id' | 'imageUrl'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      onProductAdd?.( { ...editingProduct, ...productPayload } as Product); // Call with potentially updated product
+      onProductAdd?.( { ...editingProduct, ...productPayload } as Product);
     } else {
       const addedProduct = addProduct(productPayload as Omit<Product, 'id' | 'imageUrl'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
@@ -269,7 +264,7 @@ export function NewProductDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
-        formReset(); // Reset form when dialog is closed without submit
+        formReset(); 
       }
       onOpenChange(open);
     }}>
@@ -280,7 +275,7 @@ export function NewProductDialog({
             Fill in the details for the product. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <FormProvider {...form}> {/* Provide form context for VariantFormSection */}
+        <FormProvider {...form}> 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
               <Label htmlFor="name">Product Name*</Label>
