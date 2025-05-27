@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card'; 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -112,8 +111,7 @@ export function ProductsTable() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-      <Card className="shadow-lg border-t-2 border-t-primary">
-       <CardContent className="p-0">
+      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
           <TableHeader>
             <TableRow>
@@ -152,7 +150,7 @@ export function ProductsTable() {
                   <TableCell className="font-medium">
                     <div>{product.name}</div>
                     {product.variants && product.variants.length > 0 && (
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                         {product.variants.map(v => `${v.name} (${v.options.length})`).join(', ')}
                       </div>
                     )}
@@ -222,8 +220,7 @@ export function ProductsTable() {
             )}
           </TableBody>
         </Table>
-       </CardContent>
-      </Card>
+      </div>
     </>
   );
 }

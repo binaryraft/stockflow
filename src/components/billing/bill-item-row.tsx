@@ -40,7 +40,7 @@ export function BillItemRow({
   };
   
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-start gap-2 py-2 border-b border-dashed"> {/* items-start for multi-line content */}
+    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-start gap-2 py-2 border-b border-dashed"> 
       <div>
         <span className="truncate text-sm font-medium">{item.productName}</span>
         {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (

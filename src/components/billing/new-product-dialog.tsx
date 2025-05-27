@@ -108,6 +108,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
                   e.preventDefault(); 
                   appendOption({ value: '' });
                   setTimeout(() => {
+                     // Ensure focus lands on the newly appended input. Length will be +1
                      setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
                   }, 0);
                 }
@@ -381,7 +382,7 @@ export function NewProductDialog({
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit">{editingProduct ? 'Save Changes' : 'Add Product'}</Button>
+              <Button type="submit" variant="default">{editingProduct ? 'Save Changes' : 'Add Product'}</Button>
             </DialogFooter>
           </form>
         </FormProvider>

@@ -13,7 +13,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -194,7 +193,7 @@ export function BillHistoryTable() {
                         <TableCell>
                           <div>{item.productName}</div>
                           {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-muted-foreground mt-0.5">
                               {Object.entries(item.selectedVariantOptions)
                                 .map(([key, value]) => `${key}: ${value}`)
                                 .join(', ')}
@@ -265,80 +264,78 @@ export function BillHistoryTable() {
           className="max-w-md"
         />
       </div>
-      <Card className="shadow-lg border-t-2 border-t-primary">
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead onClick={() => requestSort('date')} className="cursor-pointer hover:bg-muted/50">
-                  Date <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-                </TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50">
-                  Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-                </TableHead>
-                <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50">
-                  Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-                </TableHead>
-                <TableHead className="text-right">Items</TableHead>
-                <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('totalAmount')} >
-                  Total Amount <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-                </TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedBills.length > 0 ? (
-                filteredAndSortedBills.map((bill) => (
-                  <TableRow key={bill.id}>
-                    <TableCell>{format(new Date(bill.date), 'PPp')}</TableCell>
-                    <TableCell className="font-mono text-xs">{bill.id}</TableCell>
-                    <TableCell>
-                      <Badge 
-                        className={cn("capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", getBillTypeBadgeClassName(bill))}
-                      >
-                        {getBillTypeIcon(bill)}
-                        {getBillTypeName(bill)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                        {bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}
-                        {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
-                    </TableCell>
-                    <TableCell className="text-right">{bill.items.length}</TableCell>
-                    <TableCell className="text-right font-semibold">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                            <Eye className="mr-2 h-4 w-4" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintBill(bill.id)}>
-                            <Printer className="mr-2 h-4 w-4" /> Print Bill
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center">
-                    No bills found.
+      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead onClick={() => requestSort('date')} className="cursor-pointer hover:bg-muted/50">
+                Date <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead>ID</TableHead>
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50">
+                Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50">
+                Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead className="text-right">Items</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('totalAmount')} >
+                Total Amount <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredAndSortedBills.length > 0 ? (
+              filteredAndSortedBills.map((bill) => (
+                <TableRow key={bill.id}>
+                  <TableCell>{format(new Date(bill.date), 'PPp')}</TableCell>
+                  <TableCell className="font-mono text-xs">{bill.id}</TableCell>
+                  <TableCell>
+                    <Badge 
+                      className={cn("capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", getBillTypeBadgeClassName(bill))}
+                    >
+                      {getBillTypeIcon(bill)}
+                      {getBillTypeName(bill)}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                      {bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}
+                      {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
+                  </TableCell>
+                  <TableCell className="text-right">{bill.items.length}</TableCell>
+                  <TableCell className="text-right font-semibold">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleViewBill(bill)}>
+                          <Eye className="mr-2 h-4 w-4" /> View Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePrintBill(bill.id)}>
+                          <Printer className="mr-2 h-4 w-4" /> Print Bill
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={7} className="h-24 text-center">
+                  No bills found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </>
   );
 }
