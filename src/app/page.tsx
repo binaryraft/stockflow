@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { PlusCircle, PackageSearch, History, ShoppingBag, Send } from 'lucide-react';
+import { SalesExpensesOverviewChart } from '@/components/dashboard/sales-expenses-overview-chart';
+import { TopProductsChart } from '@/components/dashboard/top-products-chart';
 
 export default function DashboardPage() {
   return (
@@ -12,6 +14,27 @@ export default function DashboardPage() {
       <PageTitle title="Dashboard" />
       
       <OverviewStats />
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
+          <CardHeader>
+            <CardTitle>Sales & Expenses (Last 7 Days)</CardTitle>
+            <CardDescription>Daily overview of sales and expenses.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px] pt-4">
+            <SalesExpensesOverviewChart />
+          </CardContent>
+        </Card>
+        <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
+          <CardHeader>
+            <CardTitle>Top 5 Selling Products (by Revenue)</CardTitle>
+            <CardDescription>Products generating the most revenue.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px] pt-4">
+            <TopProductsChart />
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
@@ -82,3 +105,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

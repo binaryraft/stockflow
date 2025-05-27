@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
+import { format, subDays, startOfDay } from 'date-fns';
 
 const generateId = () => uuidv4();
 
@@ -19,23 +19,27 @@ interface InventoryState {
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
   searchProducts: (searchTerm: string) => Product[];
-  getLowStockProductCount: (threshold: number) => number; // New selector
+  getLowStockProductCount: (threshold: number) => number;
   
   addBill: (billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount'>, items: Omit<BillItem, 'id'|'productName'>[]) => Bill;
   getBillById: (billId: string) => Bill | undefined;
   
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
+
+  // Selectors for dashboard charts
+  getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
+  getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
   
   _hydrate: () => void; 
 }
 
 const initialProducts: Product[] = [
-  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 3, costPrice: 0.5, sellPrice: 1, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
-  { id: generateId(), name: 'Whole Wheat Bread', category: 'Bakery', trackQuantity: true, quantityInStock: 30, costPrice: 1.5, sellPrice: 3, description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
-  { id: generateId(), name: 'Laptop Pro 15-inch', category: 'Electronics', trackQuantity: true, quantityInStock: 10, costPrice: 800, sellPrice: 1200, description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
-  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 2, costPrice: 5, sellPrice: 8.5, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`, variants: []},
-  { id: generateId(), name: 'Service Charge', category: 'Services', trackQuantity: false, quantityInStock: 0, costPrice: 0, sellPrice: 10, description: "Standard service charge for repairs.", variants: [] },
+  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 3, costPrice: 20, sellPrice: 40, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Whole Wheat Bread', category: 'Bakery', trackQuantity: true, quantityInStock: 30, costPrice: 30, sellPrice: 50, description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Laptop Pro 15-inch', category: 'Electronics', trackQuantity: true, quantityInStock: 10, costPrice: 80000, sellPrice: 120000, description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 2, costPrice: 300, sellPrice: 450, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`, variants: []},
+  { id: generateId(), name: 'Service Charge', category: 'Services', trackQuantity: false, quantityInStock: 0, costPrice: 0, sellPrice: 100, description: "Standard service charge for repairs.", variants: [] },
 ];
 
 const initialCategories: Category[] = [
@@ -91,11 +95,9 @@ export const useInventoryStore = create<InventoryState>()(
       updateProduct: (productId, productData) => {
         const productVariants: ProductVariantType[] | undefined = productData.variants 
           ? productData.variants.map((variantData, variantIdx) => ({
-              // Ensure existing variant IDs are preserved if they exist, generate for new ones
               id: (get().products.find(p => p.id === productId)?.variants?.find(v => v.name === variantData.name)?.id) || `variant-${generateId()}-${variantIdx}`,
               name: variantData.name,
               options: variantData.options.map((optData, optIdx) => ({
-                // Ensure existing option IDs are preserved if they exist, generate for new ones
                 id: (get().products.find(p => p.id === productId)?.variants?.find(v => v.name === variantData.name)?.options.find(o => o.value === optData.value)?.id) || `option-${generateId()}-${variantIdx}-${optIdx}`,
                 value: optData.value,
               })),
@@ -108,8 +110,7 @@ export const useInventoryStore = create<InventoryState>()(
             ? { 
                 ...p, 
                 ...productData, 
-                variants: productVariants || p.variants, 
-                // Ensure quantityInStock is correctly updated when trackQuantity changes or initialStock is modified
+                variants: productData.variants ? productVariants : p.variants, // only update variants if productData.variants is provided
                 quantityInStock: productData.trackQuantity === false ? 0 : (productData.initialStock !== undefined ? productData.initialStock : p.quantityInStock)
               } 
             : p
@@ -133,7 +134,9 @@ export const useInventoryStore = create<InventoryState>()(
         if (!searchTerm) return [];
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().products.filter((p) =>
-          p.name.toLowerCase().includes(lowerSearchTerm)
+          p.name.toLowerCase().includes(lowerSearchTerm) ||
+          (p.category && p.category.toLowerCase().includes(lowerSearchTerm)) ||
+          (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm))
         );
       },
 
@@ -147,7 +150,7 @@ export const useInventoryStore = create<InventoryState>()(
           const product = get().getProductById(itemData.productId);
           return {
             id: generateId(),
-            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? itemData.productName : 'Unknown Product'), // Handle service item name
+            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? itemData.productName : 'Unknown Product'),
             productId: itemData.productId,
             quantity: itemData.quantity,
             costPrice: itemData.costPrice,
@@ -175,7 +178,7 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (billData.type === 'buy') {
           newBillItems.forEach(item => {
-            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; 
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
@@ -186,7 +189,7 @@ export const useInventoryStore = create<InventoryState>()(
           });
         } else if (billData.type === 'sell') {
           newBillItems.forEach(item => {
-            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; 
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: Math.max(0, product.quantityInStock - item.quantity) });
@@ -194,7 +197,7 @@ export const useInventoryStore = create<InventoryState>()(
           });
         } else if (billData.type === 'return') {
            newBillItems.forEach(item => {
-            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; 
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity && !item.isDefective) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
@@ -226,6 +229,49 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a,b) => a.localeCompare(b));
       },
       
+      getDailySalesAndExpenses: (days) => {
+        const bills = get().bills;
+        const dailyData: Array<{ date: string; sales: number; expenses: number }> = [];
+        for (let i = 0; i < days; i++) {
+          const targetDate = startOfDay(subDays(new Date(), i));
+          const dateStr = format(targetDate, 'MMM d');
+          let sales = 0;
+          let expenses = 0;
+
+          bills.forEach(bill => {
+            if (startOfDay(new Date(bill.date)).getTime() === targetDate.getTime()) {
+              if (bill.type === 'sell') {
+                sales += bill.totalAmount;
+              } else if (bill.type === 'buy') {
+                expenses += bill.totalAmount;
+              }
+            }
+          });
+          dailyData.unshift({ date: dateStr, sales, expenses }); // unshift to have oldest first
+        }
+        return dailyData;
+      },
+
+      getTopSellingProductsByRevenue: (limit) => {
+        const bills = get().bills;
+        const productRevenue: Record<string, { name: string; revenue: number }> = {};
+
+        bills.forEach(bill => {
+          if (bill.type === 'sell') {
+            bill.items.forEach(item => {
+              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+              if (!productRevenue[item.productId]) {
+                productRevenue[item.productId] = { name: item.productName, revenue: 0 };
+              }
+              productRevenue[item.productId].revenue += item.sellPrice * item.quantity;
+            });
+          }
+        });
+        return Object.values(productRevenue)
+          .sort((a, b) => b.revenue - a.revenue)
+          .slice(0, limit);
+      },
+
       _hydrate: () => {
         const state = get();
         let updated = false;
@@ -270,3 +316,4 @@ export const useInventoryStore = create<InventoryState>()(
 );
 
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
+

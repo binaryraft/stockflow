@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
+import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown, Pencil } from 'lucide-react';
 import Image from 'next/image';
 import type { Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -21,18 +21,66 @@ import { NewProductDialog } from '../billing/new-product-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { cn } from '@/lib/utils';
 
-type SortableColumns = keyof Pick<Product, 'name' | 'category' | 'quantityInStock' | 'sellPrice'>;
-
+type SortableColumns = keyof Pick<Product, 'name' | 'category' | 'quantityInStock' | 'costPrice' | 'sellPrice'>;
+type EditablePriceField = 'costPrice' | 'sellPrice';
 
 export function ProductsTable() {
-  const { products, updateProduct: storeUpdateProduct, addProduct: storeAddProduct } = useInventoryStore();
+  const { products, updateProduct } = useInventoryStore();
   const { toast } = useToast();
   
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumns; direction: 'ascending' | 'descending' } | null>(null);
+
+  const [editingCell, setEditingCell] = useState<{ productId: string; field: EditablePriceField } | null>(null);
+  const [currentEditValue, setCurrentEditValue] = useState<string>("");
+  const editInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editingCell && editInputRef.current) {
+      editInputRef.current.focus();
+      editInputRef.current.select();
+    }
+  }, [editingCell]);
+
+  const handlePriceEdit = (product: Product, field: EditablePriceField) => {
+    setEditingCell({ productId: product.id, field });
+    setCurrentEditValue(product[field].toString());
+  };
+
+  const handleSavePrice = () => {
+    if (!editingCell) return;
+
+    const numericValue = parseFloat(currentEditValue);
+    if (isNaN(numericValue) || numericValue < 0) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Price",
+        description: "Price must be a non-negative number.",
+      });
+      // Optionally, revert or keep input focused
+      setEditingCell(null); // Exit edit mode on error or let user correct
+      return;
+    }
+
+    updateProduct(editingCell.productId, { [editingCell.field]: numericValue });
+    toast({
+      title: "Price Updated",
+      description: `Product ${editingCell.field === 'costPrice' ? 'cost' : 'sell'} price updated.`,
+    });
+    setEditingCell(null);
+  };
+
+  const handleEditKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter') {
+      handleSavePrice();
+    } else if (event.key === 'Escape') {
+      setEditingCell(null);
+    }
+  };
 
 
   const filteredAndSortedProducts = useMemo(() => {
@@ -73,14 +121,16 @@ export function ProductsTable() {
     setSortConfig({ key, direction });
   };
 
-  const handleEditProduct = (product: Product) => {
+  const handleOpenEditDialog = (product: Product) => {
     setEditingProduct(product); 
     setIsNewProductDialogOpen(true); 
   };
 
   const handleDeleteProduct = (productId: string) => {
-    toast({ title: "Delete Product", description: `Product with ID ${productId} would be deleted. (Not implemented)` });
+    // Actual delete logic would go here, e.g., calling a method from useInventoryStore
+    toast({ title: "Delete Product Action", description: `Product with ID ${productId} would be deleted. (Functionality not fully implemented in demo)` });
     console.log("Deleting product:", productId);
+    // Example: deleteProduct(productId);
   };
 
   const onProductDialogSubmit = (product: Product) => { 
@@ -125,7 +175,7 @@ export function ProductsTable() {
               <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('quantityInStock')}>
                 Stock <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right">Cost</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('costPrice')}>Cost <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
               <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('sellPrice')}>
                 Sell Price <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
@@ -161,10 +211,52 @@ export function ProductsTable() {
                   <TableCell className="text-right">
                     {product.trackQuantity ? product.quantityInStock : <span className="text-muted-foreground">N/A</span>}
                   </TableCell>
-                  <TableCell className="text-right">₹{product.costPrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">₹{product.sellPrice.toFixed(2)}</TableCell>
+                  <TableCell 
+                    className="text-right group relative cursor-pointer" 
+                    onClick={() => editingCell?.productId !== product.id && handlePriceEdit(product, 'costPrice')}
+                  >
+                    {editingCell?.productId === product.id && editingCell?.field === 'costPrice' ? (
+                      <Input
+                        ref={editInputRef}
+                        type="number"
+                        value={currentEditValue}
+                        onChange={(e) => setCurrentEditValue(e.target.value)}
+                        onBlur={handleSavePrice}
+                        onKeyDown={handleEditKeyDown}
+                        className="h-8 w-20 text-right text-sm tabular-nums"
+                        step="0.01"
+                      />
+                    ) : (
+                      <>
+                        <span>₹{product.costPrice.toFixed(2)}</span>
+                        <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </>
+                    )}
+                  </TableCell>
+                  <TableCell 
+                    className="text-right group relative cursor-pointer"
+                    onClick={() => editingCell?.productId !== product.id && handlePriceEdit(product, 'sellPrice')}
+                  >
+                     {editingCell?.productId === product.id && editingCell?.field === 'sellPrice' ? (
+                      <Input
+                        ref={editInputRef}
+                        type="number"
+                        value={currentEditValue}
+                        onChange={(e) => setCurrentEditValue(e.target.value)}
+                        onBlur={handleSavePrice}
+                        onKeyDown={handleEditKeyDown}
+                        className="h-8 w-20 text-right text-sm tabular-nums"
+                        step="0.01"
+                      />
+                    ) : (
+                      <>
+                        <span>₹{product.sellPrice.toFixed(2)}</span>
+                        <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </>
+                    )}
+                  </TableCell>
                   <TableCell>
-                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={product.trackQuantity ? "bg-primary/80 hover:bg-primary" : ""}>
+                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/80 hover:bg-primary" : "", "cursor-default")}>
                         {product.trackQuantity ? 'Yes' : 'No'}
                      </Badge>
                   </TableCell>
@@ -178,7 +270,7 @@ export function ProductsTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleEditProduct(product)}>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(product)}>
                           <Edit3 className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem disabled> 
@@ -224,3 +316,4 @@ export function ProductsTable() {
     </>
   );
 }
+
