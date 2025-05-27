@@ -25,12 +25,12 @@ export default function DashboardPage() {
           <CardContent className="flex flex-col gap-3 pt-4"> {/* Added pt-4 for consistency */}
             <Button asChild variant="default" className="w-full justify-start">
               <Link href="/billing?mode=sell">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Sale Bill
+                <PlusCircle className="mr-2 h-4 w-4" /> New Sales Bill
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/billing?mode=buy">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Purchase Bill
+                <PlusCircle className="mr-2 h-4 w-4" /> New Expense Bill
               </Link>
             </Button>
              <Button asChild variant="outline" className="w-full justify-start">
@@ -82,3 +82,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

@@ -33,6 +33,7 @@ export function BillingForm() {
   const { toast } = useToast();
   const { getProductByName, addBill, searchProducts } = useInventoryStore();
 
+  // Internal mode state will still use 'sell', 'buy', 'return' for logic
   const [mode, setMode] = useState<BillMode>((searchParams.get('mode') as BillMode) || 'sell');
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
@@ -77,8 +78,8 @@ export function BillingForm() {
       setSellPrice(product.sellPrice);
       quantityInputRef.current?.focus();
     } else if (mode === 'buy') {
-      setCostPrice(product.costPrice); // Keep existing cost if user typed it
-      setSellPrice(product.sellPrice); // Keep existing sell if user typed it
+      setCostPrice(product.costPrice); 
+      setSellPrice(product.sellPrice); 
       quantityInputRef.current?.focus();
     }
   };
@@ -181,17 +182,18 @@ export function BillingForm() {
     }));
 
     addBill({
-      type: mode,
+      type: mode, // Internal mode 'sell', 'buy', 'return'
       vendorOrCustomerName: customerVendorName,
       notes: notes,
     }, billItemsForStore);
-
-    toast({ title: "Bill Saved", description: `Bill (${mode.toUpperCase()}) has been successfully saved.` });
+    
+    const modeDisplay = mode === 'sell' ? 'Sales' : mode === 'buy' ? 'Expense' : 'Return';
+    toast({ title: "Bill Saved", description: `${modeDisplay} Bill has been successfully saved.` });
     setCurrentBillItems([]);
     setCustomerVendorName('');
     setNotes('');
     resetFormFields();
-    router.push('/billing');
+    router.push('/billing'); 
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
@@ -206,13 +208,22 @@ export function BillingForm() {
     quantityInputRef.current?.focus();
   };
 
+  // Function to handle mode change from Tabs
+  const handleModeChange = (newMode: string) => {
+    // newMode will be 'sell', 'buy', or 'return' from TabsTrigger value
+    setMode(newMode as BillMode);
+    router.push(`/billing?action=new&mode=${newMode}`, { scroll: false });
+    resetFormFields(); // Reset fields when mode changes
+  };
+
+
   return (
     <div className="flex flex-col gap-6">
       <NewProductDialog
         isOpen={isNewProductDialogOpen}
         onOpenChange={(open) => {
           setIsNewProductDialogOpen(open);
-          if (!open) setNewProductDialogInitialValues({ name: '' }); // Reset when closing
+          if (!open) setNewProductDialogInitialValues({ name: '' });
         }}
         initialProductName={newProductDialogInitialValues.name}
         initialQuantityForDialog={newProductDialogInitialValues.quantity}
@@ -221,20 +232,20 @@ export function BillingForm() {
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      <div className="flex justify-center">
-        <Tabs value={mode} onValueChange={(val) => setMode(val as BillMode)} className="w-auto">
+      <div className="flex justify-center mb-2"> {/* Adjusted margin */}
+        <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1">
             <TabsTrigger 
               value="sell" 
-              className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-700 dark:data-[state=active]:text-white"
+              className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-700 dark:data-[state=active]:text-white"
             >
-              <Send size={18}/>Sell
+              <Send size={18}/>Sales
             </TabsTrigger>
             <TabsTrigger 
               value="buy" 
-              className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-700 dark:data-[state=active]:text-white"
+              className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-700 dark:data-[state=active]:text-white"
             >
-              <ShoppingBag size={18}/>Buy
+              <ShoppingBag size={18}/>Expense
             </TabsTrigger>
             <TabsTrigger 
               value="return" 
@@ -246,129 +257,121 @@ export function BillingForm() {
         </Tabs>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        <Card className="flex-1 lg:max-w-md xl:max-w-lg shadow-lg">
+      <Card className="w-full shadow-lg flex flex-col"> 
           <CardHeader>
-            <CardTitle className="text-xl">Add Item to Bill</CardTitle>
-            <CardDescription>
-              {mode === 'buy' ? 'Enter details for purchased items.' : 
-               mode === 'sell' ? 'Enter items being sold.' : 
-               'Enter items being returned.'}
-            </CardDescription>
+              <CardTitle className="text-xl">Current Bill</CardTitle>
+              <CardDescription>
+                {mode === 'sell' ? 'Enter items for sales.' : 
+                 mode === 'buy' ? 'Enter details for expenses.' : 
+                 'Enter items being returned.'}
+              </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 pt-4">
-            {mode === 'sell' ? (
-              <div className="grid md:grid-cols-[2fr_1fr] gap-4 items-end">
-                <div className="space-y-1.5">
-                  <Label htmlFor="productNameSell">Product Name</Label>
-                  <ProductSearchInput
-                    inputRef={productNameInputRef}
-                    value={productNameQuery}
-                    onValueChange={setProductNameQuery}
-                    onProductSelect={handleProductSelect}
-                    onEnterWithoutSelection={() => handleEnterNavigation('productName')}
-                    placeholder="Scan or type product name"
-                    id="productNameSell"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="quantitySell">Quantity</Label>
-                  <Input
-                    id="quantitySell"
-                    ref={quantityInputRef}
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
-                    min="1"
-                  />
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="productName">Product Name</Label>
-                  <ProductSearchInput
-                    inputRef={productNameInputRef}
-                    value={productNameQuery}
-                    onValueChange={setProductNameQuery}
-                    onProductSelect={handleProductSelect}
-                    onEnterWithoutSelection={() => handleEnterNavigation('productName')}
-                    placeholder={mode === 'return' ? 'Search product being returned' : 'Scan or type product name'}
-                    id="productName"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="quantity">Quantity</Label>
-                  <Input
-                    id="quantity"
-                    ref={quantityInputRef}
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
-                    min="1"
-                  />
-                </div>
-              </>
-            )}
-            
-            {mode === 'buy' && (
-              <>
-                <div className="space-y-1.5">
-                  <Label htmlFor="costPrice">Cost Price (per unit)</Label>
-                  <Input
-                    id="costPrice"
-                    ref={costPriceInputRef}
-                    type="number"
-                    value={costPrice}
-                    onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
-                    step="0.01" min="0"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="sellPrice">Sell Price (per unit)</Label>
-                  <Input
-                    id="sellPrice"
-                    ref={sellPriceInputRef}
-                    type="number"
-                    value={sellPrice}
-                    onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
-                    step="0.01" min="0"
-                  />
-                </div>
-              </>
-            )}
-            
-            {mode === 'return' && (
-              <div className="flex items-center space-x-2 pt-2">
-                <Switch 
-                  id="isDefective" 
-                  checked={returnItemIsDefective} 
-                  onCheckedChange={setReturnItemIsDefective}
-                />
-                <Label htmlFor="isDefective">Item is defective</Label>
-              </div>
-            )}
-
-            <Button onClick={handleAddNewItem} className="w-full mt-2">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="flex-[2] shadow-lg flex flex-col"> 
-          <CardHeader>
-              <div className="flex justify-between items-start">
-                  <div>
-                      <CardTitle className="text-xl">Current Bill</CardTitle>
-                      <CardDescription>Review items before saving the bill.</CardDescription>
+          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 pt-4">
+            {/* Item Entry Section - Moved Here */}
+            <div className="space-y-4 pb-4 border-b border-dashed mb-4">
+              <h3 className="text-lg font-medium">Add Item</h3>
+              {mode === 'sell' ? (
+                <div className="grid md:grid-cols-[2fr_1fr] gap-4 items-end">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="productNameSell">Product Name</Label>
+                    <ProductSearchInput
+                      inputRef={productNameInputRef}
+                      value={productNameQuery}
+                      onValueChange={setProductNameQuery}
+                      onProductSelect={handleProductSelect}
+                      onEnterWithoutSelection={() => handleEnterNavigation('productName')}
+                      placeholder="Scan or type product name"
+                      id="productNameSell"
+                    />
                   </div>
-              </div>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-3 pt-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quantitySell">Quantity</Label>
+                    <Input
+                      id="quantitySell"
+                      ref={quantityInputRef}
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
+                      min="1"
+                    />
+                  </div>
+                </div>
+              ) : ( // Buy or Return mode
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="productName">Product Name</Label>
+                    <ProductSearchInput
+                      inputRef={productNameInputRef}
+                      value={productNameQuery}
+                      onValueChange={setProductNameQuery}
+                      onProductSelect={handleProductSelect}
+                      onEnterWithoutSelection={() => handleEnterNavigation('productName')}
+                      placeholder={mode === 'return' ? 'Search product being returned' : 'Scan or type product name'}
+                      id="productName"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="quantity">Quantity</Label>
+                    <Input
+                      id="quantity"
+                      ref={quantityInputRef}
+                      type="number"
+                      value={quantity}
+                      onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
+                      min="1"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {mode === 'buy' && (
+                <>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="costPrice">Cost Price (per unit)</Label>
+                    <Input
+                      id="costPrice"
+                      ref={costPriceInputRef}
+                      type="number"
+                      value={costPrice}
+                      onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
+                      step="0.01" min="0"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="sellPrice">Sell Price (per unit)</Label>
+                    <Input
+                      id="sellPrice"
+                      ref={sellPriceInputRef}
+                      type="number"
+                      value={sellPrice}
+                      onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
+                      step="0.01" min="0"
+                    />
+                  </div>
+                </>
+              )}
+              
+              {mode === 'return' && (
+                <div className="flex items-center space-x-2 pt-2">
+                  <Switch 
+                    id="isDefective" 
+                    checked={returnItemIsDefective} 
+                    onCheckedChange={setReturnItemIsDefective}
+                  />
+                  <Label htmlFor="isDefective">Item is defective</Label>
+                </div>
+              )}
+
+              <Button onClick={handleAddNewItem} className="w-full mt-2">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
+              </Button>
+            </div>
+            {/* End of Item Entry Section */}
+
             <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">
                 {mode === 'buy' ? 'Vendor Name' : 'Customer Name'}
@@ -433,7 +436,7 @@ export function BillingForm() {
             </div>
           </CardFooter>
         </Card>
-      </div>
     </div>
   );
 }
+

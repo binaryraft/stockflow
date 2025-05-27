@@ -8,7 +8,7 @@ import { BillingForm } from '@/components/billing/billing-form';
 import { BillHistoryTable } from '@/components/history/bill-history-table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { DollarSign, PlusCircle, History as HistoryIcon } from 'lucide-react'; // Renamed History to avoid conflict
+import { DollarSign, PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw } from 'lucide-react'; // Renamed History to avoid conflict
 
 function BillingContent() {
   const searchParams = useSearchParams();
@@ -19,15 +19,23 @@ function BillingContent() {
 
   if (isNewBillAction) {
     let title = "New Bill";
-    if (mode === 'buy') title = "New Purchase Bill";
-    else if (mode === 'sell') title = "New Sale Bill";
-    else if (mode === 'return') title = "New Return Entry";
+    let icon = DollarSign;
+    if (mode === 'buy') {
+      title = "New Expense Bill";
+      icon = ShoppingBag; // Corresponds to Expense (formerly Buy)
+    } else if (mode === 'sell') {
+      title = "New Sales Bill";
+      icon = Send; // Corresponds to Sales (formerly Sell)
+    } else if (mode === 'return') {
+      title = "New Return Entry";
+      icon = RotateCcw;
+    }
     
     return (
       <>
         <PageTitle
           title={title}
-          icon={DollarSign}
+          icon={icon}
           actions={
             <Button asChild variant="outline">
               <Link href="/billing">
@@ -48,7 +56,7 @@ function BillingContent() {
         icon={HistoryIcon}
         actions={
           <Button asChild>
-            <Link href="/billing?action=new&mode=sell"> {/* Default to new sale */}
+            <Link href="/billing?action=new&mode=sell"> {/* Default to new sales bill */}
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Bill
             </Link>
           </Button>
@@ -68,3 +76,4 @@ export default function BillingPage() {
     </div>
   );
 }
+
