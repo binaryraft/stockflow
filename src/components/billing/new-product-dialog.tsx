@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -44,16 +45,27 @@ interface NewProductDialogProps {
   onOpenChange: (open: boolean) => void;
   onProductAdd?: (product: Product) => void;
   initialProductName?: string;
+  initialQuantityForDialog?: number;
+  initialCostPriceForDialog?: number;
+  initialSellPriceForDialog?: number;
 }
 
-export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialProductName }: NewProductDialogProps) {
+export function NewProductDialog({ 
+  isOpen, 
+  onOpenChange, 
+  onProductAdd, 
+  initialProductName,
+  initialQuantityForDialog,
+  initialCostPriceForDialog,
+  initialSellPriceForDialog 
+}: NewProductDialogProps) {
   const { addProduct, categories: existingCategories, addCategory } = useInventoryStore();
   const { toast } = useToast();
   
   const form = useForm<NewProductFormData>({
     resolver: zodResolver(newProductSchema),
     defaultValues: {
-      name: initialProductName || '',
+      name: '',
       description: '',
       category: '',
       trackQuantity: false,
@@ -66,10 +78,28 @@ export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialPr
   });
 
   useEffect(() => {
-    if (initialProductName) {
-      form.reset({ ...form.getValues(), name: initialProductName });
+    if (isOpen) {
+      const shouldTrack = initialQuantityForDialog !== undefined; // Track if quantity is passed, even if 0
+      form.reset({
+        name: initialProductName || '',
+        description: '', // Reset other fields for a new product
+        category: '',
+        trackQuantity: shouldTrack,
+        initialStock: initialQuantityForDialog || 0,
+        costPrice: initialCostPriceForDialog || 0,
+        sellPrice: initialSellPriceForDialog || 0,
+        sku: '',
+        expiryDate: '',
+      });
     }
-  }, [initialProductName, form]);
+  }, [
+    isOpen, 
+    initialProductName, 
+    initialQuantityForDialog, 
+    initialCostPriceForDialog, 
+    initialSellPriceForDialog, 
+    form
+  ]);
 
   const trackQuantity = form.watch('trackQuantity');
 
@@ -90,7 +120,7 @@ export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialPr
     if (onProductAdd) {
       onProductAdd(addedProduct);
     }
-    form.reset();
+    // form.reset(); // Reset is handled by useEffect when isOpen changes or by parent on dialog close
     onOpenChange(false);
   };
 
@@ -125,7 +155,7 @@ export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialPr
                 name="category"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ''}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a category" />
                     </SelectTrigger>

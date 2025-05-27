@@ -20,11 +20,18 @@ import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '../ui/separator';
 
+interface NewProductDialogInitialValues {
+  name: string;
+  quantity?: number;
+  costPrice?: number;
+  sellPrice?: number;
+}
+
 export function BillingForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { getProductByName, getProductById, addBill, searchProducts } = useInventoryStore();
+  const { getProductByName, addBill, searchProducts } = useInventoryStore();
 
   const [mode, setMode] = useState<BillMode>((searchParams.get('mode') as BillMode) || 'sell');
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
@@ -37,7 +44,7 @@ export function BillingForm() {
   const [sellPrice, setSellPrice] = useState<number | string>('');
 
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
-  const [newProductInitialName, setNewProductInitialName] = useState('');
+  const [newProductDialogInitialValues, setNewProductDialogInitialValues] = useState<NewProductDialogInitialValues>({ name: '' });
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
@@ -70,8 +77,8 @@ export function BillingForm() {
       setSellPrice(product.sellPrice);
       quantityInputRef.current?.focus();
     } else if (mode === 'buy') {
-      setCostPrice(product.costPrice);
-      setSellPrice(product.sellPrice);
+      setCostPrice(product.costPrice); // Keep existing cost if user typed it
+      setSellPrice(product.sellPrice); // Keep existing sell if user typed it
       quantityInputRef.current?.focus();
     }
   };
@@ -85,7 +92,12 @@ export function BillingForm() {
     let product = getProductByName(productNameQuery);
 
     if (!product) {
-      setNewProductInitialName(productNameQuery);
+      setNewProductDialogInitialValues({
+        name: productNameQuery,
+        quantity: mode === 'buy' ? (typeof quantity === 'string' ? parseInt(quantity) || 0 : quantity || 0) : undefined,
+        costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? parseFloat(costPrice) || 0 : costPrice || 0) : undefined,
+        sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? parseFloat(sellPrice) || 0 : sellPrice || 0) : undefined,
+      });
       setIsNewProductDialogOpen(true);
       return;
     }
@@ -195,15 +207,20 @@ export function BillingForm() {
   };
 
   return (
-    <div className="flex flex-col gap-6"> {/* Parent container for Tabs and Cards, increased gap */}
+    <div className="flex flex-col gap-6">
       <NewProductDialog
         isOpen={isNewProductDialogOpen}
-        onOpenChange={setIsNewProductDialogOpen}
-        initialProductName={newProductInitialName}
+        onOpenChange={(open) => {
+          setIsNewProductDialogOpen(open);
+          if (!open) setNewProductDialogInitialValues({ name: '' }); // Reset when closing
+        }}
+        initialProductName={newProductDialogInitialValues.name}
+        initialQuantityForDialog={newProductDialogInitialValues.quantity}
+        initialCostPriceForDialog={newProductDialogInitialValues.costPrice}
+        initialSellPriceForDialog={newProductDialogInitialValues.sellPrice}
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      {/* Bill Mode Tabs - Moved to top center */}
       <div className="flex justify-center">
         <Tabs value={mode} onValueChange={(val) => setMode(val as BillMode)} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1">
@@ -229,9 +246,7 @@ export function BillingForm() {
         </Tabs>
       </div>
 
-      {/* Main content: Item Entry and Current Bill cards */}
       <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Panel: Item Entry */}
         <Card className="flex-1 lg:max-w-md xl:max-w-lg shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl">Add Item to Bill</CardTitle>
@@ -241,10 +256,10 @@ export function BillingForm() {
                'Enter items being returned.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 pt-4"> {/* Added pt-4 */}
+          <CardContent className="space-y-4 pt-4">
             {mode === 'sell' ? (
               <div className="grid md:grid-cols-[2fr_1fr] gap-4 items-end">
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="productNameSell">Product Name</Label>
                   <ProductSearchInput
                     inputRef={productNameInputRef}
@@ -256,7 +271,7 @@ export function BillingForm() {
                     id="productNameSell"
                   />
                 </div>
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="quantitySell">Quantity</Label>
                   <Input
                     id="quantitySell"
@@ -271,7 +286,7 @@ export function BillingForm() {
               </div>
             ) : (
               <>
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="productName">Product Name</Label>
                   <ProductSearchInput
                     inputRef={productNameInputRef}
@@ -283,7 +298,7 @@ export function BillingForm() {
                     id="productName"
                   />
                 </div>
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="quantity">Quantity</Label>
                   <Input
                     id="quantity"
@@ -300,7 +315,7 @@ export function BillingForm() {
             
             {mode === 'buy' && (
               <>
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="costPrice">Cost Price (per unit)</Label>
                   <Input
                     id="costPrice"
@@ -312,7 +327,7 @@ export function BillingForm() {
                     step="0.01" min="0"
                   />
                 </div>
-                <div className="space-y-1.5"> {/* Increased space-y */}
+                <div className="space-y-1.5">
                   <Label htmlFor="sellPrice">Sell Price (per unit)</Label>
                   <Input
                     id="sellPrice"
@@ -338,13 +353,12 @@ export function BillingForm() {
               </div>
             )}
 
-            <Button onClick={handleAddNewItem} className="w-full mt-2"> {/* Added mt-2 */}
+            <Button onClick={handleAddNewItem} className="w-full mt-2">
               <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
             </Button>
           </CardContent>
         </Card>
 
-        {/* Right Panel: Current Bill & Actions */}
         <Card className="flex-[2] shadow-lg flex flex-col"> 
           <CardHeader>
               <div className="flex justify-between items-start">
@@ -354,8 +368,8 @@ export function BillingForm() {
                   </div>
               </div>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-3 pt-4"> {/* Added pt-4 */}
-            <div className="space-y-1.5"> {/* Increased space-y */}
+          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-3 pt-4">
+            <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">
                 {mode === 'buy' ? 'Vendor Name' : 'Customer Name'}
               </Label>
@@ -388,8 +402,8 @@ export function BillingForm() {
               )}
             </ScrollArea>
           </CardContent>
-          <Separator className="my-0"/> {/* Ensure separator is between content and footer */}
-          <CardFooter className="flex-col items-stretch gap-4 pt-4"> {/* Increased gap */}
+          <Separator className="my-0"/>
+          <CardFooter className="flex-col items-stretch gap-4 pt-4">
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total:</span>
                 <span>${calculateTotal().toFixed(2)}</span>
@@ -400,7 +414,7 @@ export function BillingForm() {
                   <span>${calculatePotentialSellTotalForBuy().toFixed(2)}</span>
                 </div>
               )}
-               <div className="space-y-1.5"> {/* Increased space-y */}
+               <div className="space-y-1.5">
                   <Label htmlFor="notes">Notes</Label>
                   <Input 
                       id="notes" 
@@ -409,7 +423,7 @@ export function BillingForm() {
                       placeholder="Add any notes for this bill (optional)" 
                   />
               </div>
-            <div className="flex gap-3 mt-2"> {/* Increased gap */}
+            <div className="flex gap-3 mt-2">
               <Button variant="outline" onClick={() => { setCurrentBillItems([]); resetFormFields(); setCustomerVendorName(''); setNotes('')}} className="flex-1">
                 <Eraser className="mr-2 h-4 w-4" /> Clear Bill
               </Button>
