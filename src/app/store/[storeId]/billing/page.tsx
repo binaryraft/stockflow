@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from 'react';
-import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation'; // useSearchParams from next/navigation
+import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { BillingForm } from '@/components/billing/billing-form';
 import { EmployeePasskeyDialog } from '@/components/billing/employee-passkey-dialog';
@@ -17,9 +17,9 @@ export default function StoreBillingPage() {
   const router = useRouter();
   const params = useParams();
   const storeId = params.storeId as string;
-  const nextSearchParams = useNextSearchParams(); // Use the one from next/navigation
+  const nextSearchParams = useNextSearchParams();
 
-  const { getStoreById, getStaffById } = useInventoryStore(); // Added getStaffById
+  const { getStoreById, getStaffById } = useInventoryStore(); 
   
   const [isStoreAuthenticated, setIsStoreAuthenticated] = useState(false);
   const [isEmployeeAuthDialogOpen, setIsEmployeeAuthDialogOpen] = useState(false);
@@ -49,7 +49,6 @@ export default function StoreBillingPage() {
       if (sessionStaffData) {
         try {
             const parsedStaff: Staff = JSON.parse(sessionStaffData);
-            // Verify staff exists and has access, in case data is stale
             const verifiedStaff = getStaffById(parsedStaff.id);
             if (verifiedStaff && (verifiedStaff.accessibleStoreIds.length === 0 || verifiedStaff.accessibleStoreIds.includes(storeId))) {
                  if(store.allowedStaffIds.length === 0 || store.allowedStaffIds.includes(verifiedStaff.id)) {
@@ -57,16 +56,19 @@ export default function StoreBillingPage() {
                  } else {
                     console.warn("Staff member from session no longer has access to this store's operations.");
                     sessionStorage.removeItem(`currentStaff_${storeId}`); 
+                    setCurrentStaff(null);
                     setIsEmployeeAuthDialogOpen(true);
                  }
             } else {
                 console.warn("Staff member from session no longer exists or has access to this store.");
                 sessionStorage.removeItem(`currentStaff_${storeId}`); 
+                setCurrentStaff(null);
                 setIsEmployeeAuthDialogOpen(true);
             }
         } catch (error) {
             console.error("Error parsing staff data from session storage:", error);
             sessionStorage.removeItem(`currentStaff_${storeId}`); 
+            setCurrentStaff(null);
             setIsEmployeeAuthDialogOpen(true);
         }
       } else {
@@ -79,21 +81,18 @@ export default function StoreBillingPage() {
   }, [storeId, router, getStoreById, getStaffById, hasMounted]);
 
   useEffect(() => {
-    if (hasMounted && storeId && isStoreAuthenticated) {
+    if (hasMounted && storeId && isStoreAuthenticated && currentStaff) { // Ensure currentStaff is present
       const currentMode = nextSearchParams.get('mode');
       const allowedOps = currentStore?.allowedOperations || [];
       
-      if (!currentMode && currentStaff) { // Only redirect if staff is authenticated
+      if (!currentMode) { // Only redirect if staff is authenticated and no mode is set
         if (allowedOps.length > 0) {
           router.replace(`/store/${storeId}/billing?mode=${allowedOps[0]}`);
         } else {
-          // No operations allowed for this store, though this case should ideally be prevented by admin settings
-          console.warn(`Store ${storeId} has no allowed operations configured.`);
-           // Fallback, perhaps show a message or default to sell if that's a universal fallback.
-           // For now, let's default to sell or do nothing if allowedOps is empty.
-           if(!currentMode){ router.replace(`/store/${storeId}/billing?mode=sell`);}
+           console.warn(`Store ${storeId} has no allowed operations configured.`);
+           if(!currentMode){ router.replace(`/store/${storeId}/billing?mode=sell`);} // Fallback default
         }
-      } else if (currentMode && allowedOps.length > 0 && !allowedOps.includes(currentMode as any) && currentStaff) {
+      } else if (currentMode && allowedOps.length > 0 && !allowedOps.includes(currentMode as any)) {
         // If current mode is not allowed, redirect to the first allowed mode
         router.replace(`/store/${storeId}/billing?mode=${allowedOps[0]}`);
       }
@@ -121,7 +120,7 @@ export default function StoreBillingPage() {
     setIsEmployeeAuthDialogOpen(true);
   };
 
-  if (!hasMounted || isLoading || !currentStore) { // Added !currentStore to initial loading check
+  if (!hasMounted || isLoading || !currentStore) { 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
@@ -130,7 +129,7 @@ export default function StoreBillingPage() {
     );
   }
   
-  if (!isStoreAuthenticated) { // Handles case where store auth is lost but component tries to render
+  if (!isStoreAuthenticated) { 
     return (
          <div className="flex min-h-screen flex-col items-center justify-center p-4">
             <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
@@ -139,15 +138,13 @@ export default function StoreBillingPage() {
     );
   }
 
-
   if (!currentStaff) {
     return (
       <>
         <EmployeePasskeyDialog
           isOpen={isEmployeeAuthDialogOpen}
           onOpenChange={(open) => {
-            // Prevent closing dialog by clicking outside if no staff is authenticated yet
-            if(!open && !currentStaff) { /* Do nothing or setIsEmployeeAuthDialogOpen(true) to force it open */ }
+            if(!open && !currentStaff) { setIsEmployeeAuthDialogOpen(true); }
             else { setIsEmployeeAuthDialogOpen(open); }
           }}
           storeId={storeId}

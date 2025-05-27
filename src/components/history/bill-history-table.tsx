@@ -16,13 +16,13 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill } from '@/types';
+import type { Bill, Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants'; // Removed COMPANY_NAME as it comes from store
+import { COMPANY_ADDRESS, COMPANY_CONTACT, DEFAULT_COMPANY_NAME } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
@@ -31,7 +31,7 @@ type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
 
 
 export function BillHistoryTable() {
-  const { bills, getStaffById, getStoreById, userProfile } = useInventoryStore(); // Added userProfile for companyName
+  const { bills, getStaffById, getStoreById, userProfile, getProductById } = useInventoryStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -108,20 +108,20 @@ export function BillHistoryTable() {
   const handlePrintBill = (billToPrint: Bill | null) => {
     if (!billToPrint) return;
 
-    const printWindow = window.open('', '_blank', 'height=600,width=800');
+    const printWindow = window.open('', '_blank', 'height=800,width=600');
     if (printWindow) {
       printWindow.document.write('<html><head><title>Print Bill</title>');
       
       const styles =
         "<style>\n" +
-        "  body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 10pt; }\n" +
+        "  body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 10pt; line-height: 1.4; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { width: 100%; margin: 0; padding:0; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; page-break-inside: avoid; }\n" +
         "  .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 20px; }\n" +
         "  .header h1 { margin: 0 0 3px 0; font-size: 16pt; font-weight: bold; }\n" +
         "  .header p { margin: 0; font-size: 9pt; color: #333; }\n" +
-        "  h2, h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px; }\n" +
+        "  h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px; }\n" +
         "  h4 { font-size: 11pt; }\n" +
         "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
         "  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
@@ -143,7 +143,7 @@ export function BillHistoryTable() {
       printWindow.document.write('<div class="print-container">');
 
       printWindow.document.write('<div class="header">');
-      printWindow.document.write(`<h1>${userProfile.companyName}</h1>`);
+      printWindow.document.write(`<h1>${userProfile.companyName || DEFAULT_COMPANY_NAME}</h1>`);
       printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
       printWindow.document.write('</div>');
@@ -257,6 +257,18 @@ export function BillHistoryTable() {
     return 'Name';
   };
 
+  const findProductSKU = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
+    const product = getProductById(productId);
+    if (!product) return undefined;
+    if (!selectedOptions || Object.keys(selectedOptions).length === 0) {
+      return product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
+    }
+    return product.productSKUs.find(sku => 
+      JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) === 
+      JSON.stringify(Object.entries(selectedOptions).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
+    );
+  };
+
 
   return (
     <>
@@ -276,7 +288,7 @@ export function BillHistoryTable() {
             <div className="space-y-6 py-2 px-2">
 
               <div className="p-4 border rounded-md bg-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile.companyName}</h3>
+                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile.companyName || DEFAULT_COMPANY_NAME}</h3>
                   <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
                   <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
               </div>
@@ -356,7 +368,9 @@ export function BillHistoryTable() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedBill.items.map(item => (
+                    {selectedBill.items.map(item => {
+                      const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
+                      return (
                       <TableRow key={item.id || item.productId}> 
                         <TableCell className="py-3">
                           <div>{item.productName}</div>
@@ -374,13 +388,18 @@ export function BillHistoryTable() {
                               <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                             )
                           )}
+                          {selectedBill.type === 'buy' && currentSKU && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Purchased: {item.quantity} | Current SKU Stock: {currentSKU.quantityInStock}
+                            </div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right py-3">{item.quantity}</TableCell>
                         <TableCell className="text-right py-3">₹{item.costPrice.toFixed(2)}</TableCell>
                         <TableCell className="text-right py-3">₹{item.sellPrice.toFixed(2)}</TableCell>
                         <TableCell className="text-right font-medium py-3">₹{(item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</TableCell>
                       </TableRow>
-                    ))}
+                    )})}
                   </TableBody>
                 </Table>
               </div>
@@ -473,7 +492,7 @@ export function BillHistoryTable() {
                 <TableRow key={bill.id}>
                   <TableCell className="py-2 px-3 w-[150px]">
                     <div className="flex flex-col items-start leading-tight">
-                      <span className="text-lg font-bold text-primary">{format(billDate, 'EEE')}</span>
+                      <span className="text-lg font-bold text-primary">{format(billDate, 'EEE').toUpperCase()}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'MMM dd, yyyy')}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
                     </div>

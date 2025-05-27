@@ -26,7 +26,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 type SortableStoreColumns = keyof Pick<Store, 'name' | 'location' | 'email' | 'phone'>;
 
 export function StoresTable() {
-  const { stores, deleteStore, getAllStaff, canAddStore, getActiveSubscriptionPlan } = useInventoryStore();
+  const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan } = useInventoryStore();
   const { toast } = useToast();
   
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -35,8 +35,8 @@ export function StoresTable() {
   const [sortConfig, setSortConfig] = useState<{ key: SortableStoreColumns; direction: 'ascending' | 'descending' } | null>(null);
 
   const staffMembers = getAllStaff(); 
-  const userCanAddStore = canAddStore();
   const activePlan = getActiveSubscriptionPlan();
+  const userCanAddStore = activePlan ? stores.length < activePlan.maxStores : false;
   const isAdminOnlyPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
 
 
@@ -125,7 +125,7 @@ export function StoresTable() {
         />
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="inline-block"> {/* Wrapper for Tooltip when button is disabled */}
+            <div className="inline-block"> 
               <Button 
                 onClick={() => { 
                   if (isAdminOnlyPlan) {
@@ -147,7 +147,7 @@ export function StoresTable() {
             </div>
           </TooltipTrigger>
           {(!userCanAddStore || isAdminOnlyPlan) && (
-            <TooltipContent>
+            <TooltipContent side="bottom" align="end">
               <p>{addStoreButtonTooltipContent}</p>
             </TooltipContent>
           )}
@@ -157,20 +157,20 @@ export function StoresTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('location')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('location')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Location <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('email')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('email')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Email <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('phone')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('phone')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead>Allowed Staff</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="py-3 px-4">Allowed Staff</TableHead>
+              <TableHead className="text-right py-3 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

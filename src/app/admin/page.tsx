@@ -1,6 +1,6 @@
 
 "use client";
-import React, { useState, useEffect } from 'react'; // Added React, useState, useEffect
+import React, { useState, useEffect } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 
-type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice'; // Adjusted for new data structure
+type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice';
 type EditablePriceField = 'costPrice' | 'sellPrice';
 
 export function ProductsTable() {
@@ -47,7 +47,7 @@ export function ProductsTable() {
   }, [editingCell]);
 
   const handlePriceEdit = (product: Product, sku: ProductSKU, field: EditablePriceField) => {
-    if (product.variants && product.variants.length > 0) { // Disable inline editing for variant products for now
+    if (product.variants && product.variants.length > 0) { 
         toast({ title: "Info", description: "Edit variant prices via the main 'Edit' product dialog." });
         return;
     }
@@ -109,7 +109,6 @@ export function ProductsTable() {
             valA = a.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
             valB = b.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
         } else if (sortConfig.key === 'costPrice' || sortConfig.key === 'sellPrice') {
-            // For simplicity, sort by the first SKU's price or a default if no SKUs
             valA = a.productSKUs[0]?.[sortConfig.key] ?? 0;
             valB = b.productSKUs[0]?.[sortConfig.key] ?? 0;
         } else {
@@ -146,9 +145,7 @@ export function ProductsTable() {
   };
 
   const handleDeleteProduct = (productId: string) => {
-    // Actual delete logic is in useInventoryStore, this is just a placeholder action if needed
     toast({ title: "Delete Product Action", description: `Product with ID ${productId} would be deleted. (Functionality not fully implemented in demo)` });
-    // deleteProduct(productId); // This would be the actual call
   };
 
   const onProductDialogSubmit = (product: Product) => { 
@@ -158,17 +155,22 @@ export function ProductsTable() {
 
   const getProductStockDisplay = (product: Product): string | number => {
     if (!product.trackQuantity) return <span className="text-muted-foreground">N/A</span>;
+    if (product.productSKUs.length === 0 && product.variants && product.variants.length > 0) return 0; // Variant product, no SKUs yet
     return product.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
   };
 
   const getProductPriceDisplay = (product: Product, field: 'costPrice' | 'sellPrice'): string => {
     if (product.productSKUs.length === 0) return "N/A";
-    if (product.productSKUs.length === 1) return `₹${product.productSKUs[0][field].toFixed(2)}`;
     
     const prices = product.productSKUs.map(sku => sku[field]);
+    if (prices.length === 0) return "N/A"; // Should not happen if productSKUs is not empty, but a safeguard
+    
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
+
+    if (minPrice === 0 && maxPrice === 0 && prices.length > 0) return `₹0.00`; // All SKUs are priced at 0
     if (minPrice === maxPrice) return `₹${minPrice.toFixed(2)}`;
+    
     return `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
   };
 

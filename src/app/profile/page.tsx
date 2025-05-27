@@ -47,7 +47,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <PageTitle title="Profile & Subscription" icon={User} />
 
       <Card className="shadow-md border-t-2 border-t-primary">
