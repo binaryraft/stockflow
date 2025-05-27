@@ -80,7 +80,6 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-          {/* Add more profile fields here if needed in the future, e.g., address, contact person */}
            <div className="space-y-1">
             <Label>Your Name (Placeholder)</Label>
             <p className="text-sm text-muted-foreground p-2 border border-transparent rounded-md">

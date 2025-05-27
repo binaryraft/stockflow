@@ -36,13 +36,12 @@ export default function StoreLoginPage() {
           title: "Store Not Found",
           description: "The requested store does not exist.",
         });
-        router.push('/'); // Redirect if store not found
+        router.push('/'); 
       }
     }
   }, [storeId, getStoreById, router, toast]);
 
   useEffect(() => {
-    // Check if already authenticated for this store
     if (storeId && sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
       router.replace(`/store/${storeId}/billing`);
     }
@@ -78,7 +77,7 @@ export default function StoreLoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted/40 p-4">
       <div className="flex flex-col items-center mb-8">
-        <Image src="/_next/static/media/gyByhwUxId8gMEwcGFWNOITd-s.p.da1ebef7.woff2" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3" data-ai-hint="logo company"/>
+        <Image src="https://placehold.co/128x128.png" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" data-ai-hint="logo company"/>
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Store Terminal Access</p>
       </div>
