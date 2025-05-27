@@ -2,17 +2,12 @@
 export interface ProductOption {
   id: string;
   value: string;
-  // Future: quantityInStock?: number; // For variant-level stock
-  // Future: costPrice?: number;      // For variant-level pricing
-  // Future: sellPrice?: number;      // For variant-level pricing
-  // Future: sku?: string;            // For variant-level SKU
-  // Future: imageUrl?: string;       // For variant-level image
 }
 
 export interface ProductVariant {
   id: string;
-  name: string; // e.g., "Color", "Size"
-  options: ProductOption[]; // e.g., [{id: '1', value: "Red"}, {id: '2', value: "Blue"}]
+  name: string; 
+  options: ProductOption[]; 
 }
 
 export interface Product {
@@ -21,36 +16,40 @@ export interface Product {
   category?: string;
   trackQuantity: boolean;
   sku?: string;
-  expiryDate?: string; // Store as ISO string
+  expiryDate?: string; 
   quantityInStock: number;
-  costPrice: number; // Default/Average cost price
-  sellPrice: number; // Default sell price
-  imageUrl?: string; // Optional image URL
-  description?: string; // For general info
-  variants?: ProductVariant[]; // Max 2 variants
+  costPrice: number; 
+  sellPrice: number; 
+  imageUrl?: string; 
+  description?: string; 
+  variants?: ProductVariant[]; 
 }
 
 export interface BillItem {
-  id: string; // Unique ID for the bill item
+  id: string; 
   productId: string;
-  productName: string; // Denormalized for display
+  productName: string; 
   quantity: number;
-  costPrice: number; // Price at which it was bought (for buy/return) or current cost (for sell)
-  sellPrice: number; // Price at which it was sold/intended to be sold
-  isDefective?: boolean; // For return items
-  selectedVariantOptions?: Record<string, string>; // e.g. { "Color": "Red", "Size": "M" }
+  costPrice: number; 
+  sellPrice: number; 
+  isDefective?: boolean; 
+  selectedVariantOptions?: Record<string, string>; 
 }
 
 export interface Bill {
   id:string;
-  type: 'buy' | 'sell' | 'return'; // 'buy' is now 'Expense', 'sell' is now 'Sales'
-  date: string; // Store as ISO string
-  timestamp: number; // For sorting
+  type: 'buy' | 'sell' | 'return'; 
+  date: string; 
+  timestamp: number; 
   vendorOrCustomerName?: string;
   customerPhone?: string;
   items: BillItem[];
-  totalAmount: number; // Total cost for 'buy', total revenue for 'sell'
+  totalAmount: number; 
   notes?: string;
+  billedByStaffId?: string;
+  billedByStaffName?: string; // Denormalized for easier display
+  storeId?: string;
+  storeName?: string; // Denormalized for easier display
 }
 
 export interface Category {
@@ -59,3 +58,23 @@ export interface Category {
 }
 
 export type BillMode = 'buy' | 'sell' | 'return';
+
+// New Types for Staff and Store Management
+export interface Staff {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  passkey: string; // For simplicity, plain text in this prototype
+  accessibleStoreIds: string[];
+}
+
+export interface Store {
+  id: string;
+  name: string;
+  location: string;
+  phone: string;
+  email: string;
+  passkey: string; // For simplicity, plain text in this prototype
+  allowedStaffIds: string[];
+}

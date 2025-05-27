@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption, Staff, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay } from 'date-fns';
 
@@ -14,6 +14,9 @@ interface InventoryState {
   products: Product[];
   bills: Bill[];
   categories: Category[];
+  staffs: Staff[];
+  stores: Store[];
+
   addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => Product;
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => void;
   getProductById: (productId: string) => Product | undefined;
@@ -21,11 +24,31 @@ interface InventoryState {
   searchProducts: (searchTerm: string) => Product[];
   getLowStockProductCount: (threshold: number) => number;
   
-  addBill: (billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount'>, items: Omit<BillItem, 'id'|'productName'>[]) => Bill;
+  addBill: (
+    billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName'>, 
+    items: Omit<BillItem, 'id'|'productName'>[],
+    staffId?: string, // Optional staffId for the bill
+    storeId?: string  // Optional storeId for the bill
+  ) => Bill;
   getBillById: (billId: string) => Bill | undefined;
   
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
+
+  // Staff CRUD
+  addStaff: (staffData: Omit<Staff, 'id'>) => Staff;
+  updateStaff: (staffId: string, staffData: Partial<Omit<Staff, 'id'>>) => void;
+  deleteStaff: (staffId: string) => void;
+  getStaffById: (staffId: string) => Staff | undefined;
+  getAllStaff: () => Staff[];
+
+
+  // Store CRUD
+  addStore: (storeData: Omit<Store, 'id'>) => Store;
+  updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id'>>) => void;
+  deleteStore: (storeId: string) => void;
+  getStoreById: (storeId: string) => Store | undefined;
+  getAllStores: () => Store[];
 
   // Selectors for dashboard charts
   getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
@@ -60,6 +83,8 @@ export const useInventoryStore = create<InventoryState>()(
       products: initialProducts,
       bills: [],
       categories: initialCategories,
+      staffs: [],
+      stores: [],
 
       addProduct: (productData) => {
         const productVariants: ProductVariantType[] = (productData.variants || []).map((variantData, variantIdx) => ({
@@ -110,7 +135,7 @@ export const useInventoryStore = create<InventoryState>()(
             ? { 
                 ...p, 
                 ...productData, 
-                variants: productData.variants ? productVariants : p.variants, // only update variants if productData.variants is provided
+                variants: productData.variants ? productVariants : p.variants,
                 quantityInStock: productData.trackQuantity === false ? 0 : (productData.initialStock !== undefined ? productData.initialStock : p.quantityInStock)
               } 
             : p
@@ -144,7 +169,7 @@ export const useInventoryStore = create<InventoryState>()(
         return get().products.filter(p => p.trackQuantity && p.quantityInStock < threshold).length;
       },
 
-      addBill: (billData, billItemsData) => {
+      addBill: (billData, billItemsData, staffId, storeId) => {
         const currentDate = new Date();
         const newBillItems: BillItem[] = billItemsData.map(itemData => {
           const product = get().getProductById(itemData.productId);
@@ -165,6 +190,9 @@ export const useInventoryStore = create<InventoryState>()(
           totalAmount += item.quantity * (billData.type === 'buy' ? item.costPrice : item.sellPrice);
         });
         
+        const staffMember = staffId ? get().getStaffById(staffId) : undefined;
+        const storeLocation = storeId ? get().getStoreById(storeId) : undefined;
+
         const newBill: Bill = {
           id: format(currentDate, 'ddMMyyHHmmss'),
           ...billData,
@@ -172,6 +200,10 @@ export const useInventoryStore = create<InventoryState>()(
           timestamp: currentDate.getTime(),
           items: newBillItems,
           totalAmount,
+          billedByStaffId: staffId,
+          billedByStaffName: staffMember?.name,
+          storeId: storeId,
+          storeName: storeLocation?.name,
         };
 
         set((state) => ({ bills: [newBill, ...state.bills] }));
@@ -229,6 +261,54 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a,b) => a.localeCompare(b));
       },
       
+      // Staff CRUD
+      addStaff: (staffData) => {
+        const newStaff: Staff = { id: generateId(), ...staffData };
+        set((state) => ({ staffs: [...state.staffs, newStaff] }));
+        return newStaff;
+      },
+      updateStaff: (staffId, staffData) => {
+        set((state) => ({
+          staffs: state.staffs.map((s) => (s.id === staffId ? { ...s, ...staffData } : s)),
+        }));
+      },
+      deleteStaff: (staffId) => {
+        set((state) => ({
+          staffs: state.staffs.filter((s) => s.id !== staffId),
+          // Also remove this staff from any store's allowedStaffIds
+          stores: state.stores.map(store => ({
+            ...store,
+            allowedStaffIds: store.allowedStaffIds.filter(id => id !== staffId)
+          }))
+        }));
+      },
+      getStaffById: (staffId) => get().staffs.find((s) => s.id === staffId),
+      getAllStaff: () => get().staffs,
+
+      // Store CRUD
+      addStore: (storeData) => {
+        const newStore: Store = { id: generateId(), ...storeData };
+        set((state) => ({ stores: [...state.stores, newStore] }));
+        return newStore;
+      },
+      updateStore: (storeId, storeData) => {
+        set((state) => ({
+          stores: state.stores.map((s) => (s.id === storeId ? { ...s, ...storeData } : s)),
+        }));
+      },
+      deleteStore: (storeId) => {
+        set((state) => ({
+          stores: state.stores.filter((s) => s.id !== storeId),
+          // Also remove this store from any staff's accessibleStoreIds
+          staffs: state.staffs.map(staff => ({
+            ...staff,
+            accessibleStoreIds: staff.accessibleStoreIds.filter(id => id !== storeId)
+          }))
+        }));
+      },
+      getStoreById: (storeId) => get().stores.find((s) => s.id === storeId),
+      getAllStores: () => get().stores,
+
       getDailySalesAndExpenses: (days) => {
         const bills = get().bills;
         const dailyData: Array<{ date: string; sales: number; expenses: number }> = [];
@@ -247,7 +327,7 @@ export const useInventoryStore = create<InventoryState>()(
               }
             }
           });
-          dailyData.unshift({ date: dateStr, sales, expenses }); // unshift to have oldest first
+          dailyData.unshift({ date: dateStr, sales, expenses }); 
         }
         return dailyData;
       },
@@ -259,7 +339,7 @@ export const useInventoryStore = create<InventoryState>()(
         bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+              if (item.productId.startsWith('SERVICE_ITEM_')) return; 
               if (!productRevenue[item.productId]) {
                 productRevenue[item.productId] = { name: item.productName, revenue: 0 };
               }
@@ -316,4 +396,3 @@ export const useInventoryStore = create<InventoryState>()(
 );
 
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
-

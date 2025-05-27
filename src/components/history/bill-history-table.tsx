@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Bill } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -31,7 +31,7 @@ type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
 
 
 export function BillHistoryTable() {
-  const { bills } = useInventoryStore();
+  const { bills, getStaffById, getStoreById } = useInventoryStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -43,12 +43,10 @@ export function BillHistoryTable() {
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
 
-    // 1. Filter by type
     if (filterType !== 'all') {
       processBills = processBills.filter(bill => bill.type === filterType);
     }
 
-    // 2. Filter by search term
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
       processBills = processBills.filter(bill =>
@@ -58,11 +56,12 @@ export function BillHistoryTable() {
         getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) ||
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
-        bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm))
+        bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm)) ||
+        (bill.billedByStaffName && bill.billedByStaffName.toLowerCase().includes(lowerSearchTerm)) ||
+        (bill.storeName && bill.storeName.toLowerCase().includes(lowerSearchTerm))
       );
     }
 
-    // 3. Sort
     if (sortConfig !== null) {
         processBills.sort((a, b) => {
         let valA = a[sortConfig.key];
@@ -87,7 +86,7 @@ export function BillHistoryTable() {
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
-        processBills.sort((a,b) => b.timestamp - a.timestamp); // Default sort: newest first
+        processBills.sort((a,b) => b.timestamp - a.timestamp); 
     }
 
     return processBills;
@@ -118,7 +117,7 @@ export function BillHistoryTable() {
         "  body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { width: 100%; margin: 0; padding:0; }\n" +
-        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section { margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; page-break-inside: avoid; }\n" +
+        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; page-break-inside: avoid; }\n" +
         "  .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 20px; }\n" +
         "  .header h1 { margin: 0 0 3px 0; font-size: 16pt; font-weight: bold; }\n" +
         "  .header p { margin: 0; font-size: 9pt; color: #333; }\n" +
@@ -143,14 +142,12 @@ export function BillHistoryTable() {
       printWindow.document.write('</head><body>');
       printWindow.document.write('<div class="print-container">');
 
-      // Company Header
       printWindow.document.write('<div class="header">');
       printWindow.document.write(`<h1>${COMPANY_NAME}</h1>`);
       printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
       printWindow.document.write('</div>');
 
-      // Bill Info & Party Details
       printWindow.document.write('<table><tr><td style="width:50%; vertical-align:top;">');
       if (billToPrint.vendorOrCustomerName || billToPrint.customerPhone) {
         printWindow.document.write('<div class="bill-to">');
@@ -168,8 +165,14 @@ export function BillHistoryTable() {
       printWindow.document.write('</div>');
       printWindow.document.write('</td></tr></table>');
 
+      if (billToPrint.billedByStaffName || billToPrint.storeName) {
+        printWindow.document.write('<div class="billed-by-section">');
+        printWindow.document.write(`<h4>Transaction Details</h4>`);
+        if (billToPrint.billedByStaffName) printWindow.document.write(`<p><strong>Billed by:</strong> ${billToPrint.billedByStaffName}</p>`);
+        if (billToPrint.storeName) printWindow.document.write(`<p><strong>Store:</strong> ${billToPrint.storeName}</p>`);
+        printWindow.document.write('</div>');
+      }
 
-      // Items Table
       printWindow.document.write('<div class="items-section">');
       printWindow.document.write('<h3>Items</h3>');
       printWindow.document.write('<table><thead><tr><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
@@ -198,7 +201,6 @@ export function BillHistoryTable() {
       printWindow.document.write('</tbody></table>');
       printWindow.document.write('</div>');
 
-      // Notes
       if (billToPrint.notes) {
         printWindow.document.write('<div class="notes-section">');
         printWindow.document.write('<h4>Notes</h4>');
@@ -206,7 +208,6 @@ export function BillHistoryTable() {
         printWindow.document.write('</div>');
       }
 
-      // Summary
       printWindow.document.write('<div class="summary-section">');
       printWindow.document.write('<h4>Summary</h4>');
       printWindow.document.write(`<table><tr class="total-row"><td><strong>Total Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
@@ -217,7 +218,7 @@ export function BillHistoryTable() {
       printWindow.document.write('</div>');
 
 
-      printWindow.document.write('</div>'); // End print-container
+      printWindow.document.write('</div>'); 
       printWindow.document.write('</body></html>');
       printWindow.document.close();
       printWindow.focus();
@@ -319,6 +320,28 @@ export function BillHistoryTable() {
                 </div>
               </div>
 
+              {(selectedBill.billedByStaffName || selectedBill.storeName) && (
+                <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                  <h4 className="text-md font-semibold text-foreground mb-1">Transaction Details</h4>
+                  {selectedBill.billedByStaffName && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Billed by</p>
+                      <p className="font-medium text-sm flex items-center gap-1.5">
+                        <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
+                      </p>
+                    </div>
+                  )}
+                  {selectedBill.storeName && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Store</p>
+                      <p className="font-medium text-sm flex items-center gap-1.5">
+                        <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
 
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
@@ -403,7 +426,7 @@ export function BillHistoryTable() {
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
         <Input
-          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Product)..."
+          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Product, Staff, Store)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto"
@@ -504,5 +527,3 @@ export function BillHistoryTable() {
     </>
   );
 }
-
-    

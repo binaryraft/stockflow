@@ -1,0 +1,200 @@
+
+"use client";
+
+import React, { useState, useMemo } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, LogIn } from 'lucide-react';
+import type { Store } from '@/types';
+import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { StoreFormDialog } from './store-form-dialog';
+import { useToast } from '@/hooks/use-toast';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import Link from 'next/link';
+
+type SortableStoreColumns = keyof Pick<Store, 'name' | 'location' | 'email' | 'phone'>;
+
+export function StoresTable() {
+  const { stores, deleteStore, getAllStaff } = useInventoryStore();
+  const { toast } = useToast();
+  
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [editingStore, setEditingStore] = useState<Store | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState<{ key: SortableStoreColumns; direction: 'ascending' | 'descending' } | null>(null);
+
+  const staffMembers = getAllStaff(); // For the form dialog
+
+  const filteredAndSortedStores = useMemo(() => {
+    let sortableStores = [...stores];
+    if (searchTerm) {
+      sortableStores = sortableStores.filter(store =>
+        store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        store.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        store.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        store.phone.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    if (sortConfig !== null) {
+      sortableStores.sort((a, b) => {
+        const valA = a[sortConfig.key];
+        const valB = b[sortConfig.key];
+        let comparison = 0;
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
+        } else if (typeof valA === 'number' && typeof valB === 'number') {
+          comparison = valA - valB;
+        }
+        return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
+      });
+    }
+    return sortableStores;
+  }, [stores, searchTerm, sortConfig]);
+
+  const requestSort = (key: SortableStoreColumns) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
+    }
+    setSortConfig({ key, direction });
+  };
+
+  const handleOpenEditDialog = (store: Store) => {
+    setEditingStore(store); 
+    setIsFormDialogOpen(true); 
+  };
+
+  const handleDeleteStore = (storeId: string, storeName: string) => {
+    deleteStore(storeId);
+    toast({ title: "Store Deleted", description: `${storeName} has been removed.` });
+  };
+
+  const onFormDialogSubmit = () => { 
+    setIsFormDialogOpen(false);
+    setEditingStore(null); 
+  };
+
+  return (
+    <>
+      <StoreFormDialog 
+        isOpen={isFormDialogOpen} 
+        onOpenChange={(open) => {
+          if (!open) setEditingStore(null); 
+          setIsFormDialogOpen(open);
+        }}
+        editingStore={editingStore} 
+        onFormSubmit={onFormDialogSubmit}
+        allStaff={staffMembers}
+      />
+      <div className="flex items-center justify-between mb-4 gap-2">
+        <Input
+          placeholder="Search stores (name, location, email, phone)..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-sm"
+        />
+        <Button onClick={() => { setEditingStore(null); setIsFormDialogOpen(true); }}>
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Store
+        </Button>
+      </div>
+      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50">
+                Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead onClick={() => requestSort('location')} className="cursor-pointer hover:bg-muted/50">
+                Location <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead onClick={() => requestSort('email')} className="cursor-pointer hover:bg-muted/50">
+                Email <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead onClick={() => requestSort('phone')} className="cursor-pointer hover:bg-muted/50">
+                Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead>Allowed Staff</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredAndSortedStores.length > 0 ? (
+              filteredAndSortedStores.map((store) => (
+                <TableRow key={store.id}>
+                  <TableCell className="font-medium py-3 px-4">{store.name}</TableCell>
+                  <TableCell className="py-3 px-4">{store.location}</TableCell>
+                  <TableCell className="py-3 px-4">{store.email}</TableCell>
+                  <TableCell className="py-3 px-4">{store.phone}</TableCell>
+                   <TableCell className="py-3 px-4 text-xs">
+                    {store.allowedStaffIds.length > 0 
+                      ? `${store.allowedStaffIds.length} staff member(s)`
+                      : <span className="text-muted-foreground">All staff with access</span> 
+                    }
+                  </TableCell>
+                  <TableCell className="text-right py-3 px-4">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <span className="sr-only">Open menu</span>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                         <DropdownMenuItem asChild>
+                          <Link href={`/store/${store.id}/login`}>
+                            <LogIn className="mr-2 h-4 w-4" /> View Store Terminal
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(store)}>
+                          <Edit3 className="mr-2 h-4 w-4" /> Edit
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the store "{store.name}".
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteStore(store.id, store.name)} className="bg-destructive hover:bg-destructive/90">
+                                    Delete
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} className="h-24 text-center">
+                  No stores found.
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
+  );
+}

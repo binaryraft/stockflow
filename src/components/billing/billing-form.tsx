@@ -31,7 +31,12 @@ interface NewProductDialogInitialValues {
   sellPrice?: number;
 }
 
-export function BillingForm() {
+interface BillingFormProps {
+  billedByStaffId?: string;
+  storeId?: string;
+}
+
+export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
@@ -71,7 +76,6 @@ export function BillingForm() {
   const customerVendorNameInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneInputRef = useRef<HTMLInputElement>(null);
 
-  // For Ad-hoc Service
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState<number | string>('');
   const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
@@ -122,7 +126,7 @@ export function BillingForm() {
     if (mode === 'sell' || mode === 'return') {
       setCostPrice(product.costPrice);
       setSellPrice(product.sellPrice);
-    } else if (mode === 'buy') { // Expense mode
+    } else if (mode === 'buy') { 
       setCostPrice(product.costPrice);
       setSellPrice(product.sellPrice);
     }
@@ -130,26 +134,25 @@ export function BillingForm() {
     if (product.variants && product.variants.length > 0) {
       const firstVariantId = product.variants[0].id;
       setVariantDropdownOpenState({ [firstVariantId]: true });
-      // Focus will be handled by the useEffect for variantDropdownOpenState
     } else {
       quantityInputRef.current?.focus();
       quantityInputRef.current?.select();
     }
   };
   
-  useEffect(() => {
+   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
-      const firstVariant = currentProductForSelection.variants[0];
-      if (firstVariant && variantDropdownOpenState[firstVariant.id]) {
-        const firstVariantRef = variantSelectRefs.current[firstVariant.id];
-        setTimeout(() => { // Timeout helps ensure the element is rendered and focusable
+      const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
+      if (firstOpenVariantId) {
+        const firstVariantRef = variantSelectRefs.current[firstOpenVariantId];
+        setTimeout(() => { 
             if (firstVariantRef?.current) {
                 firstVariantRef.current.focus();
-            } else { // Fallback if ref not ready, though less ideal
-                const el = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
+            } else { 
+                const el = document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (el as HTMLElement)?.focus();
             }
-        }, 0);
+        }, 50); // Small delay
       }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
@@ -165,7 +168,6 @@ export function BillingForm() {
         const activeElement = document.activeElement;
         const isQuantityFocused = activeElement?.id === quantityInputRef.current?.id;
 
-        // Check if focus is NOT on a variant select trigger
         const isVariantSelectFocused = currentProductForSelection.variants.some(variant => 
             activeElement?.id === `variant-select-${variant.id}-trigger`
         );
@@ -207,7 +209,6 @@ export function BillingForm() {
         const firstUnselectedVariant = product.variants.find(v => !selectedVariantOptions[v.name]);
         if (firstUnselectedVariant) {
             setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-            // Focus will be handled by useEffect for variant dropdown open state
         }
         return;
       }
@@ -264,7 +265,6 @@ export function BillingForm() {
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-                        // Focus will be handled by useEffect for variant dropdown open state
                     } else { 
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
@@ -273,18 +273,18 @@ export function BillingForm() {
             }
        }
     } else if (currentField === 'quantity') {
-      if (mode === 'buy') { // Expense mode
+      if (mode === 'buy') { 
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       }
       else handleAddNewItem(); 
     } else if (currentField === 'costPrice') {
-      if (mode === 'buy') { // Expense mode
+      if (mode === 'buy') { 
         sellPriceInputRef.current?.focus();
         sellPriceInputRef.current?.select();
       }
     } else if (currentField === 'sellPrice') {
-      if (mode === 'buy') handleAddNewItem(); // Expense mode
+      if (mode === 'buy') handleAddNewItem(); 
     }
   };
 
@@ -331,6 +331,8 @@ export function BillingForm() {
       vendorOrCustomerName: customerVendorName,
       customerPhone: customerPhone,
       notes: notes,
+      billedByStaffId: billedByStaffId, // Pass staffId if available
+      storeId: storeId, // Pass storeId if available
     }, billItemsForStore);
     
     const modeDisplay = mode === 'sell' ? 'Sales' : mode === 'buy' ? 'Expense' : 'Return';
@@ -338,23 +340,31 @@ export function BillingForm() {
     
     setLastSavedBillMode(mode);
     setIsSavingAnimationVisible(true);
-    // Resetting form and redirecting will now happen in handleAnimationClose
   };
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
     resetFullForm();
-    router.push('/billing'); 
+    // For general billing page, redirect to history. Store view might stay on the form.
+    if (!storeId) {
+      router.push('/billing'); 
+    } else {
+      // In store view, just reset form, focus product name for next entry
+      productNameInputRef.current?.focus();
+    }
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
     handleProductSelect(product); 
+    productNameInputRef.current?.focus();
   };
 
   const handleModeChange = (newMode: string) => {
     setMode(newMode as BillMode);
-    router.push(`/billing?action=new&mode=${newMode}`, { scroll: false });
+    // Preserve store context if in store view
+    const basePath = storeId ? `/store/${storeId}/billing` : '/billing';
+    router.push(`${basePath}?action=new&mode=${newMode}`, { scroll: false });
     resetFullForm();
   };
 
@@ -376,7 +386,7 @@ export function BillingForm() {
       productId: `SERVICE_ITEM_${uuidv4()}`, 
       productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0, // Cost is amount for expense, 0 for sales
+      costPrice: mode === 'buy' ? amount : 0, 
       sellPrice: amount, 
       isDefective: undefined,
       selectedVariantOptions: undefined,
@@ -444,11 +454,10 @@ export function BillingForm() {
               <h3 className="text-lg font-medium text-foreground">Add Item</h3>
               <div className={cn(
                 "grid gap-4 items-baseline",
-                "grid-cols-1", // Mobile default
-                mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto]" : "md:grid-cols-[1fr_auto]" // Desktop: 4 cols for buy, 2 for sell/return
+                "grid-cols-1", 
+                mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto]" : "md:grid-cols-[1fr_auto]" 
               )}>
-                  {/* Column 1: Product Name + Edit Button */}
-                  <div className="space-y-1.5"> {/* Container for product name and its label/hints */}
+                  <div className="space-y-1.5"> 
                     <Label htmlFor="productNameGlobal">Product Name</Label>
                     <div className="flex items-center gap-2">
                         <ProductSearchInput
@@ -476,8 +485,7 @@ export function BillingForm() {
                     )}
                   </div>
 
-                  {/* Column 2: Quantity */}
-                  <div className="space-y-1.5 w-full md:w-24"> {/* Full width on mobile, fixed on md+ */}
+                  <div className="space-y-1.5 w-full md:w-24"> 
                     <Label htmlFor="quantityGlobal">Quantity</Label>
                     <Input
                       id="quantityGlobal"
@@ -490,10 +498,9 @@ export function BillingForm() {
                       min="1"
                     />
                   </div>
-                  {/* Column 3 & 4: Cost & Sell Price (Buy/Expense mode only) */}
                   {mode === 'buy' && (
                     <>
-                    <div className="space-y-1.5 w-full md:w-32">  {/* Full width on mobile, fixed on md+ */}
+                    <div className="space-y-1.5 w-full md:w-32">  
                         <Label htmlFor="costPrice">Cost Price</Label>
                         <Input
                         id="costPrice"
@@ -506,7 +513,7 @@ export function BillingForm() {
                         step="0.01" min="0"
                         />
                     </div>
-                    <div className="space-y-1.5 w-full md:w-32">  {/* Full width on mobile, fixed on md+ */}
+                    <div className="space-y-1.5 w-full md:w-32">  
                         <Label htmlFor="sellPrice">Sell Price</Label>
                         <Input
                         id="sellPrice"
@@ -546,7 +553,6 @@ export function BillingForm() {
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
                                 setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                // Focus for next variant is handled by useEffect
                             } else {
                                 quantityInputRef.current?.focus();
                                 quantityInputRef.current?.select();
@@ -562,9 +568,7 @@ export function BillingForm() {
                                     e.preventDefault();
                                     if (!variantDropdownOpenState[variant.id]) { 
                                         setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
-                                    } else { // If dropdown is open, Enter on trigger doesn't select. User needs to tab or arrow down.
-                                        // This logic block can be for navigating away if already open, if needed.
-                                        // For now, let Radix handle open state and user selection via keyboard.
+                                    } else { 
                                         const currentIndex = currentProductForSelection!.variants!.findIndex(v => v.id === variant.id);
                                         if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                             const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
