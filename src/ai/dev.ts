@@ -1,4 +1,4 @@
 import { config } from 'dotenv';
 config();
 
-import '@/ai/flows/ai-categorize-product.ts';
+// Removed: import '@/ai/flows/ai-categorize-product.ts';

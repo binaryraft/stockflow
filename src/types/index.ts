@@ -10,7 +10,7 @@ export interface Product {
   costPrice: number; // Default/Average cost price
   sellPrice: number; // Default sell price
   imageUrl?: string; // Optional image URL
-  description?: string; // For AI categorization and general info
+  description?: string; // For general info
 }
 
 export interface BillItem {
@@ -41,11 +41,4 @@ export interface Category {
 
 export type BillMode = 'buy' | 'sell' | 'return';
 
-export const EXAMPLE_PRODUCTS_FOR_AI = [
-  { name: "Organic Apples", description: "Fresh, crispy organic apples, sourced locally.", category: "Fruits" },
-  { name: "Whole Wheat Bread", description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", category: "Bakery" },
-  { name: "Laptop Pro 15-inch", description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", category: "Electronics" },
-  { name: "Sparkling Mineral Water 1L", description: "Natural sparkling mineral water, bottled at source.", category: "Beverages" },
-  { name: "Men's Cotton T-Shirt", description: "Comfortable and durable 100% cotton t-shirt for men, various colors.", category: "Apparel" },
-  { name: "Stainless Steel Cooking Pot", description: "Durable 5-quart stainless steel cooking pot with lid, oven safe.", category: "Kitchenware" },
-];
+// Removed EXAMPLE_PRODUCTS_FOR_AI as it's no longer used

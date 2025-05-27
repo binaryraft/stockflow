@@ -33,7 +33,7 @@ export default function DashboardPage() {
               </Link>
             </Button>
              <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/products?action=add">
+              <Link href="/products?action=add"> {/* Assuming products page can handle ?action=add to open dialog */}
                 <PackageSearch className="mr-2 h-4 w-4" /> Add New Product
               </Link>
             </Button>
@@ -73,7 +73,7 @@ export default function DashboardPage() {
               <Link href="/products">View All Products</Link>
             </Button>
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
-              <Link href="/history">View Bill History</Link>
+              <Link href="/billing">View Bill History</Link> {/* Updated Link */}
             </Button>
           </CardContent>
         </Card>

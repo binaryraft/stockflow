@@ -20,11 +20,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { categorizeProduct, CategorizeProductInput } from '@/ai/flows/ai-categorize-product';
-import { Wand2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types';
-import { DEFAULT_CATEGORIES, EXAMPLE_PRODUCTS_FOR_AI } from '@/lib/constants';
+import { DEFAULT_CATEGORIES } from '@/lib/constants';
 
 
 const newProductSchema = z.object({
@@ -51,7 +49,6 @@ interface NewProductDialogProps {
 export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialProductName }: NewProductDialogProps) {
   const { addProduct, categories: existingCategories, addCategory } = useInventoryStore();
   const { toast } = useToast();
-  const [isCategorizing, setIsCategorizing] = useState(false);
   
   const form = useForm<NewProductFormData>({
     resolver: zodResolver(newProductSchema),
@@ -95,39 +92,6 @@ export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialPr
     }
     form.reset();
     onOpenChange(false);
-  };
-
-  const handleAiCategorize = async () => {
-    const productName = form.getValues("name");
-    const productDescription = form.getValues("description") || "";
-
-    if (!productName) {
-      toast({ variant: "destructive", title: "Cannot Suggest Category", description: "Please enter a product name first." });
-      return;
-    }
-    setIsCategorizing(true);
-    try {
-      const input: CategorizeProductInput = {
-        productName,
-        productDescription,
-        exampleProducts: EXAMPLE_PRODUCTS_FOR_AI,
-      };
-      const result = await categorizeProduct(input);
-      if (result.suggestedCategory) {
-        form.setValue("category", result.suggestedCategory);
-        toast({ title: "AI Suggestion", description: `Suggested category: ${result.suggestedCategory} (Confidence: ${Math.round(result.confidence * 100)}%)` });
-        if (!existingCategories.find(c => c.name === result.suggestedCategory) && !DEFAULT_CATEGORIES.includes(result.suggestedCategory)) {
-          // Optionally auto-add category or prompt user
-        }
-      } else {
-        toast({ variant: "destructive", title: "AI Suggestion Failed", description: "Could not suggest a category." });
-      }
-    } catch (error) {
-      console.error("AI Categorization error:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to get AI category suggestion." });
-    } finally {
-      setIsCategorizing(false);
-    }
   };
 
   const uniqueCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories.map(c => c.name)]));
@@ -174,9 +138,6 @@ export function NewProductDialog({ isOpen, onOpenChange, onProductAdd, initialPr
                 )}
               />
             </div>
-            <Button type="button" variant="outline" size="icon" onClick={handleAiCategorize} disabled={isCategorizing} aria-label="Suggest Category with AI">
-              {isCategorizing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
-            </Button>
           </div>
 
 
