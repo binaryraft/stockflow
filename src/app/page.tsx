@@ -1,3 +1,4 @@
+
 import { PageTitle } from '@/components/common/page-title';
 import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,7 +74,7 @@ export default function DashboardPage() {
               <Link href="/products">View All Products</Link>
             </Button>
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
-              <Link href="/billing">View Bill History</Link> {/* Updated Link */}
+              <Link href="/billing">View Bill History</Link>
             </Button>
           </CardContent>
         </Card>
