@@ -30,7 +30,7 @@ export function HeaderMain() {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/'); // Redirect to dashboard
+    router.push('/welcome'); // Redirect to the new landing page
     // Optionally, show a toast message for logout
   };
 
