@@ -119,11 +119,10 @@ body {
   body {
     @apply bg-background text-foreground;
     min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+    /* Removed display:flex and flex-direction: column from here; RootLayout handles it */
   }
   main {
-    flex: 1;
+    flex: 1; /* This can stay if RootLayout's child uses flex-direction: column */
   }
   /* Specific styling for input fields */
   input[type="text"], 
@@ -144,6 +143,4 @@ body {
   .dark .select-trigger-class {
      @apply bg-input-background border-input-border;
   }
-
 }
-
