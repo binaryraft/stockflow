@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
@@ -15,6 +16,7 @@ interface ProductSearchInputProps {
   placeholder?: string;
   className?: string;
   inputRef?: React.RefObject<HTMLInputElement>;
+  id?: string; // Added id prop
 }
 
 export function ProductSearchInput({
@@ -24,7 +26,8 @@ export function ProductSearchInput({
   onEnterWithoutSelection,
   placeholder = "Type product name...",
   className,
-  inputRef
+  inputRef,
+  id // Consumed id prop
 }: ProductSearchInputProps) {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -82,7 +85,6 @@ export function ProductSearchInput({
         setShowSuggestions(false);
       }
     } else if (e.key === 'Enter') {
-      // If no suggestions are shown or suggestions list is empty
       e.preventDefault();
       if (onEnterWithoutSelection) {
         onEnterWithoutSelection();
@@ -91,7 +93,6 @@ export function ProductSearchInput({
   };
   
   useEffect(() => {
-    // Scroll active item into view
     const activeItem = document.getElementById(`suggestion-${activeIndex}`);
     if (activeItem) {
       activeItem.scrollIntoView({ block: 'nearest' });
@@ -102,6 +103,7 @@ export function ProductSearchInput({
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
       <Input
+        id={id} // Applied id prop
         ref={inputRef}
         type="text"
         value={value}
@@ -124,15 +126,15 @@ export function ProductSearchInput({
                     "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
                     index === activeIndex && "bg-accent text-accent-foreground"
                   )}
-                  onMouseDown={(e) => { // Use onMouseDown to fire before onBlur of input
-                     e.preventDefault(); // Prevent input from losing focus immediately
+                  onMouseDown={(e) => { 
+                     e.preventDefault(); 
                      handleSelectProduct(product);
                   }}
                 >
                   <div className="flex justify-between">
                     <span>{product.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      {product.trackQuantity ? `Stock: ${product.quantityInStock}` : ''} Price: ${product.sellPrice.toFixed(2)}
+                      {product.trackQuantity ? `Stock: ${product.quantityInStock}` : ''} Price: ₹{product.sellPrice.toFixed(2)}
                     </span>
                   </div>
                   {product.category && <div className="text-xs text-muted-foreground">{product.category}</div>}

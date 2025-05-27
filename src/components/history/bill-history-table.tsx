@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card'; // Added CardContent
+import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -92,11 +92,19 @@ export function BillHistoryTable() {
   };
 
   const getBillTypeIcon = (type: Bill['type']) => {
-    if (type === 'buy') return <ShoppingBag className="h-4 w-4 text-blue-500" />;
-    if (type === 'sell') return <Send className="h-4 w-4 text-green-500" />;
-    if (type === 'return') return <RotateCcw className="h-4 w-4 text-orange-500" />;
+    if (type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Changed to red for Expense
+    if (type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Changed to green for Sales
+    if (type === 'return') return <RotateCcw className="h-4 w-4 text-yellow-500" />; // Stays yellow for Return
     return null;
   };
+  
+  const getBillTypeBadgeVariant = (type: Bill['type']): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
+    if (type === 'buy') return 'destructive'; // Red for Expense
+    if (type === 'sell') return 'default'; // Green (using default primary for now, can adjust theme)
+    if (type === 'return') return 'secondary'; // Yellow-ish (using secondary, can adjust theme)
+    return 'outline';
+  };
+
 
   const calculatePotentialSellTotal = (bill: Bill): number | null => {
     if (bill.type !== 'buy') return null;
@@ -109,13 +117,13 @@ export function BillHistoryTable() {
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh]">
             <DialogHeader>
-              <DialogTitle>Bill Details (ID: {selectedBill.id.substring(0,8)})</DialogTitle>
+              <DialogTitle>Bill Details (ID: {selectedBill.id})</DialogTitle>
               <DialogDescription>
-                {selectedBill.type.toUpperCase()} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
+                {selectedBill.type === 'sell' ? 'Sales' : selectedBill.type === 'buy' ? 'Expense' : 'Return'} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh] p-1 -mx-1">
-            <div className="space-y-4 py-4 px-2"> {/* Added px-2 */}
+            <div className="space-y-4 py-4 px-2">
               {selectedBill.vendorOrCustomerName && (
                 <div className="mb-3">
                     <p className="text-sm text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor' : 'Customer'}</p>
@@ -147,20 +155,20 @@ export function BillHistoryTable() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">${item.costPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">${item.sellPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">${(item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">₹{item.costPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">₹{item.sellPrice.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">₹{(item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
               <Separator className="my-3"/>
               <div className="text-right font-semibold text-lg">
-                Total: ${selectedBill.totalAmount.toFixed(2)}
+                Total: ₹{selectedBill.totalAmount.toFixed(2)}
               </div>
               {selectedBill.type === 'buy' && calculatePotentialSellTotal(selectedBill) !== null && (
                 <div className="text-right text-sm text-muted-foreground mt-1">
-                    Potential Sell Value: ${calculatePotentialSellTotal(selectedBill)!.toFixed(2)}
+                    Potential Sell Value: ₹{calculatePotentialSellTotal(selectedBill)!.toFixed(2)}
                 </div>
               )}
               {selectedBill.notes && (
@@ -193,8 +201,8 @@ export function BillHistoryTable() {
           className="max-w-sm"
         />
       </div>
-      <Card className="shadow-lg"> {/* Increased shadow */}
-        <CardContent className="p-0"> {/* Remove CardContent padding if Table handles it */}
+      <Card className="shadow-lg">
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
@@ -220,18 +228,19 @@ export function BillHistoryTable() {
                 filteredAndSortedBills.map((bill) => (
                   <TableRow key={bill.id}>
                     <TableCell>{format(new Date(bill.date), 'PPp')}</TableCell>
-                    <TableCell className="font-mono text-xs">{bill.id.substring(0,8)}...</TableCell>
+                    <TableCell className="font-mono text-xs">{bill.id}</TableCell>
                     <TableCell>
-                      <Badge variant={
-                        bill.type === 'buy' ? 'default' : bill.type === 'sell' ? 'secondary' : 'outline'
-                      } className="capitalize flex items-center gap-1 w-fit">
+                      <Badge 
+                        variant={getBillTypeBadgeVariant(bill.type)} 
+                        className="capitalize flex items-center gap-1 w-fit"
+                      >
                         {getBillTypeIcon(bill.type)}
-                        {bill.type}
+                        {bill.type === 'sell' ? 'Sales' : bill.type === 'buy' ? 'Expense' : 'Return'}
                       </Badge>
                     </TableCell>
                     <TableCell>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</TableCell>
                     <TableCell className="text-right">{bill.items.length}</TableCell>
-                    <TableCell className="text-right font-semibold">${bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold">₹{bill.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

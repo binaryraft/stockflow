@@ -12,13 +12,13 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card'; // Added CardContent
+import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
 import type { Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { NewProductDialog } from '../billing/new-product-dialog'; // Re-use for editing/adding
+import { NewProductDialog } from '../billing/new-product-dialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -73,32 +73,18 @@ export function ProductsTable() {
   };
 
   const handleEditProduct = (product: Product) => {
-    // For simplicity, we'll use the NewProductDialog for editing by pre-filling it.
-    // A dedicated edit dialog might be better for complex scenarios.
-    setEditingProduct(product); // This would be used to prefill a dialog
+    setEditingProduct(product); 
     toast({ title: "Edit Product", description: "Editing via New Product Dialog for now. Save will update."});
-    // Ideally, open a dialog prefilled with 'product' data
-    // For now, let's just log and open the new product dialog as a placeholder for edit functionality
-    console.log("Editing product:", product);
-    // To properly edit, you'd pass `product` to `NewProductDialog` and have it handle update logic
-    // This is a simplified approach:
-    // 1. Open NewProductDialog
-    // 2. User manually re-enters data or it's pre-filled (requires NewProductDialog modification)
-    // 3. On submit, if editingProduct is set, call updateProduct instead of addProduct.
-    // This needs NewProductDialog to support an 'editMode' and initialData.
-    // For now, we'll just re-use the 'add' functionality for demo.
     setIsNewProductDialogOpen(true); 
   };
 
   const handleDeleteProduct = (productId: string) => {
-    // This would typically call a store action like `deleteProduct(productId)`
-    // For now, it's a placeholder.
     toast({ title: "Delete Product", description: `Product with ID ${productId} would be deleted. (Not implemented)` });
     console.log("Deleting product:", productId);
   };
 
   const onProductFormSubmit = (data: Product) => {
-    if (editingProduct) { // This logic needs to be in the dialog or passed via callback
+    if (editingProduct) { 
       updateProduct(editingProduct.id, data);
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
       setEditingProduct(null);
@@ -114,8 +100,11 @@ export function ProductsTable() {
       <NewProductDialog 
         isOpen={isNewProductDialogOpen} 
         onOpenChange={setIsNewProductDialogOpen}
-        onProductAdd={onProductFormSubmit} // This dialog only adds, edit needs modification
-        initialProductName={editingProduct ? editingProduct.name : undefined} // Basic prefill
+        onProductAdd={onProductFormSubmit} 
+        initialProductName={editingProduct ? editingProduct.name : undefined}
+        initialCostPriceForDialog={editingProduct ? editingProduct.costPrice : undefined}
+        initialSellPriceForDialog={editingProduct ? editingProduct.sellPrice : undefined}
+        initialQuantityForDialog={editingProduct ? editingProduct.quantityInStock : undefined}
       />
       <div className="flex items-center justify-between mb-4 gap-2">
         <Input
@@ -128,8 +117,8 @@ export function ProductsTable() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-      <Card className="shadow-lg"> {/* Increased shadow */}
-       <CardContent className="p-0"> {/* Remove CardContent padding if Table handles it */}
+      <Card className="shadow-lg">
+       <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
@@ -172,8 +161,8 @@ export function ProductsTable() {
                   <TableCell className="text-right">
                     {product.trackQuantity ? product.quantityInStock : <span className="text-muted-foreground">N/A</span>}
                   </TableCell>
-                  <TableCell className="text-right">${product.costPrice.toFixed(2)}</TableCell>
-                  <TableCell className="text-right">${product.sellPrice.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">₹{product.costPrice.toFixed(2)}</TableCell>
+                  <TableCell className="text-right">₹{product.sellPrice.toFixed(2)}</TableCell>
                   <TableCell>
                      <Badge variant={product.trackQuantity ? "default" : "outline"}>
                         {product.trackQuantity ? 'Yes' : 'No'}
@@ -192,7 +181,7 @@ export function ProductsTable() {
                         <DropdownMenuItem onClick={() => handleEditProduct(product)}>
                           <Edit3 className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem disabled> {/* View details page not implemented */}
+                        <DropdownMenuItem disabled> 
                           <Eye className="mr-2 h-4 w-4" /> View Details
                         </DropdownMenuItem>
                         <AlertDialog>

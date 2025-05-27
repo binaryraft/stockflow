@@ -3,11 +3,11 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, BillMode } from '@/types';
+import type { Product, Bill, BillItem, Category } from '@/types'; // BillMode removed as it's not used here
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns'; // Added for Bill ID formatting
 
 // Helper to generate unique IDs (if not using a library like uuid)
-// const generateId = () => Math.random().toString(36).substr(2, 9);
 const generateId = () => uuidv4();
 
 
@@ -27,8 +27,7 @@ interface InventoryState {
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[]; // Returns array of category names
   
-  // Example data for initial state
-  _hydrate: () => void; // for initial hydration if needed
+  _hydrate: () => void; 
 }
 
 const initialProducts: Product[] = [
@@ -97,10 +96,11 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       addBill: (billData, billItemsData) => {
+        const currentDate = new Date();
         const newBillItems: BillItem[] = billItemsData.map(itemData => {
           const product = get().getProductById(itemData.productId);
           return {
-            id: generateId(),
+            id: generateId(), // BillItem ID remains UUID
             ...itemData,
             productName: product?.name || 'Unknown Product',
           };
@@ -112,10 +112,10 @@ export const useInventoryStore = create<InventoryState>()(
         });
         
         const newBill: Bill = {
-          id: generateId(),
+          id: format(currentDate, 'ddMMyyHHmmss'), // New Bill ID format
           ...billData,
-          date: new Date().toISOString(),
-          timestamp: Date.now(),
+          date: currentDate.toISOString(),
+          timestamp: currentDate.getTime(),
           items: newBillItems,
           totalAmount,
         };
@@ -129,7 +129,6 @@ export const useInventoryStore = create<InventoryState>()(
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
             }
-            // Also update product's cost and sell price if they were changed during purchase
             if (product && (product.costPrice !== item.costPrice || product.sellPrice !== item.sellPrice)) {
                 get().updateProduct(item.productId, { costPrice: item.costPrice, sellPrice: item.sellPrice });
             }
@@ -147,7 +146,6 @@ export const useInventoryStore = create<InventoryState>()(
             if (product && product.trackQuantity && !item.isDefective) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
             }
-            // Defective items handling can be extended, e.g., adding to a separate defectives list
           });
         }
         return newBill;
@@ -161,7 +159,7 @@ export const useInventoryStore = create<InventoryState>()(
         const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
         if (existingCategory) return existingCategory;
 
-        const newCategory: Category = { id: generateId(), name: categoryName };
+        const newCategory: Category = { id: generateId(), name: categoryName }; // Category ID remains UUID
         set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
       },
@@ -176,8 +174,6 @@ export const useInventoryStore = create<InventoryState>()(
       },
       
       _hydrate: () => {
-        // This can be used to set initial state if not using the default values above
-        // For example, if you want to ensure some data exists on first load after clearing storage
         const state = get();
         let updated = false;
         if (state.products.length === 0) {
@@ -188,14 +184,12 @@ export const useInventoryStore = create<InventoryState>()(
           set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
           updated = true;
         } else {
-          // Ensure categories are sorted
           const sortedCategories = [...state.categories].sort((a,b) => a.name.localeCompare(b.name));
           if (JSON.stringify(sortedCategories) !== JSON.stringify(state.categories)) {
             set({ categories: sortedCategories });
             updated = true;
           }
         }
-        // Ensure default categories exist
         DEFAULT_CATEGORIES.forEach(catName => {
           if(!state.categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
             get().addCategory(catName);
@@ -203,12 +197,11 @@ export const useInventoryStore = create<InventoryState>()(
           }
         });
         if (updated) console.log("Inventory store hydrated/updated with initial/default data.");
-
       }
     }),
     {
-      name: 'stockflow-inventory-storage', // name of the item in the storage (must be unique)
-      storage: createJSONStorage(() => localStorage), // (optional) by default, 'localStorage' is used
+      name: 'stockflow-inventory-storage',
+      storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         if (state) state._hydrate();
       }
@@ -216,10 +209,4 @@ export const useInventoryStore = create<InventoryState>()(
   )
 );
 
-// Ensure _hydrate is called once, perhaps on client mount in AppShell or a similar top-level client component.
-// useInventoryStore.getState()._hydrate(); // This can cause issues if called prematurely.
-// The onRehydrateStorage callback is a better place for this.
-
-
-// Import DEFAULT_CATEGORIES here if needed for _hydrate logic, or pass it if required.
 import { DEFAULT_CATEGORIES } from '@/lib/constants';

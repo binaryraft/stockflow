@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useEffect, useState } from 'react';
@@ -79,14 +80,14 @@ export function OverviewStats() {
       />
       <StatCard
         title="Today's Sales"
-        value={`$${stats.salesToday.toFixed(2)}`}
+        value={`₹${stats.salesToday.toFixed(2)}`}
         icon={DollarSign}
         description="Total revenue from sales today"
         isLoading={isLoading}
       />
       <StatCard
         title="Today's Purchases"
-        value={`$${stats.purchasesToday.toFixed(2)}`}
+        value={`₹${stats.purchasesToday.toFixed(2)}`}
         icon={ShoppingCart}
         description="Total cost of purchases today"
         isLoading={isLoading}
@@ -94,7 +95,7 @@ export function OverviewStats() {
       <StatCard
         title="Today's Transactions"
         value={stats.transactionsToday}
-        icon={Users} // Using Users icon for transactions/customers
+        icon={Users} 
         description="Total bills processed today"
         isLoading={isLoading}
       />

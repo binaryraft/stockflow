@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { BillItem, BillMode } from '@/types';
@@ -77,8 +78,8 @@ export function BillItemRow({
         </>
       ) : ( // Sell or Return mode
         <>
-          <span className="text-sm text-muted-foreground text-right">${item.costPrice.toFixed(2)}</span>
-          <span className="text-sm text-foreground font-semibold text-right">${item.sellPrice.toFixed(2)}</span>
+          <span className="text-sm text-muted-foreground text-right">₹{item.costPrice.toFixed(2)}</span>
+          <span className="text-sm text-foreground font-semibold text-right">₹{item.sellPrice.toFixed(2)}</span>
         </>
       )}
       
@@ -104,4 +105,3 @@ export function BillItemHeader({ mode }: { mode: BillMode }) {
     </div>
   );
 }
-

@@ -33,7 +33,6 @@ export function BillingForm() {
   const { toast } = useToast();
   const { getProductByName, addBill, searchProducts } = useInventoryStore();
 
-  // Internal mode state will still use 'sell', 'buy', 'return' for logic
   const [mode, setMode] = useState<BillMode>((searchParams.get('mode') as BillMode) || 'sell');
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
@@ -182,7 +181,7 @@ export function BillingForm() {
     }));
 
     addBill({
-      type: mode, // Internal mode 'sell', 'buy', 'return'
+      type: mode,
       vendorOrCustomerName: customerVendorName,
       notes: notes,
     }, billItemsForStore);
@@ -208,12 +207,10 @@ export function BillingForm() {
     quantityInputRef.current?.focus();
   };
 
-  // Function to handle mode change from Tabs
   const handleModeChange = (newMode: string) => {
-    // newMode will be 'sell', 'buy', or 'return' from TabsTrigger value
     setMode(newMode as BillMode);
     router.push(`/billing?action=new&mode=${newMode}`, { scroll: false });
-    resetFormFields(); // Reset fields when mode changes
+    resetFormFields(); 
   };
 
 
@@ -232,7 +229,7 @@ export function BillingForm() {
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      <div className="flex justify-center mb-2"> {/* Adjusted margin */}
+      <div className="flex justify-center mb-2">
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1">
             <TabsTrigger 
@@ -267,7 +264,6 @@ export function BillingForm() {
               </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 pt-4">
-            {/* Item Entry Section - Moved Here */}
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
               <h3 className="text-lg font-medium">Add Item</h3>
               {mode === 'sell' ? (
@@ -297,7 +293,7 @@ export function BillingForm() {
                     />
                   </div>
                 </div>
-              ) : ( // Buy or Return mode
+              ) : ( 
                 <>
                   <div className="space-y-1.5">
                     <Label htmlFor="productName">Product Name</Label>
@@ -370,7 +366,6 @@ export function BillingForm() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
               </Button>
             </div>
-            {/* End of Item Entry Section */}
 
             <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">
@@ -409,12 +404,12 @@ export function BillingForm() {
           <CardFooter className="flex-col items-stretch gap-4 pt-4">
               <div className="flex justify-between text-lg font-semibold">
                 <span>Total:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
+                <span>₹{calculateTotal().toFixed(2)}</span>
               </div>
               {mode === 'buy' && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Potential Sell Value:</span>
-                  <span>${calculatePotentialSellTotalForBuy().toFixed(2)}</span>
+                  <span>₹{calculatePotentialSellTotalForBuy().toFixed(2)}</span>
                 </div>
               )}
                <div className="space-y-1.5">
@@ -439,4 +434,3 @@ export function BillingForm() {
     </div>
   );
 }
-
