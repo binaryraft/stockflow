@@ -83,7 +83,7 @@ export function BillingForm() {
   const handleProductSelect = (product: Product) => {
     setProductNameQuery(product.name);
     setCurrentProductForSelection(product);
-    setSelectedVariantOptions({}); // Reset variant selections
+    setSelectedVariantOptions({}); 
 
     if (mode === 'sell' || mode === 'return') {
       setCostPrice(product.costPrice); 
@@ -262,19 +262,19 @@ export function BillingForm() {
             <TabsList className="grid w-full grid-cols-3 gap-1">
                 <TabsTrigger 
                 value="sell" 
-                className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white dark:data-[state=active]:bg-green-600 dark:data-[state=active]:text-white"
+                className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                 >
                 <Send size={18}/>Sales
                 </TabsTrigger>
                 <TabsTrigger 
                 value="buy" 
-                className="flex items-center gap-2 data-[state=active]:bg-red-500 data-[state=active]:text-white dark:data-[state=active]:bg-red-600 dark:data-[state=active]:text-white"
+                className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground"
                 >
                 <ShoppingBag size={18}/>Expense
                 </TabsTrigger>
                 <TabsTrigger 
                 value="return" 
-                className="flex items-center gap-2 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-900 dark:data-[state=active]:bg-yellow-500 dark:data-[state=active]:text-yellow-950"
+                className="flex items-center gap-2 data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950"
                 >
                 <RotateCcw size={18}/>Return
                 </TabsTrigger>
@@ -296,16 +296,16 @@ export function BillingForm() {
 
       <Card className="w-full shadow-md flex flex-col"> 
           <CardHeader>
-              <CardTitle className="text-xl">Current Bill</CardTitle>
+              <CardTitle>Current Bill</CardTitle> {/* Updated to use primary color from CardTitle's default style */}
               <CardDescription>
                 {mode === 'sell' ? 'Enter items for sales.' : 
                  mode === 'buy' ? 'Enter details for expenses.' : 
                  'Enter items being returned.'}
               </CardDescription>
           </CardHeader>
-          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 pt-4">
+          <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
-              <h3 className="text-lg font-medium">Add Item</h3>
+              <h3 className="text-lg font-medium text-foreground">Add Item</h3>
               <div className={`grid ${mode === 'sell' || mode === 'return' ? 'md:grid-cols-[2fr_1fr]' : 'grid-cols-1 md:grid-cols-2'} gap-4 items-end`}>
                   <div className="space-y-1.5">
                     <Label htmlFor="productNameGlobal">Product Name</Label>
@@ -344,7 +344,7 @@ export function BillingForm() {
                           setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }))
                         }
                       >
-                        <SelectTrigger id={`variant-select-${variant.id}`} className="w-full">
+                        <SelectTrigger id={`variant-select-${variant.id}`} className="w-full select-trigger-class">
                           <SelectValue placeholder={`Select ${variant.name}`} />
                         </SelectTrigger>
                         <SelectContent>
@@ -455,8 +455,8 @@ export function BillingForm() {
             </ScrollArea>
           </CardContent>
           <Separator className="my-0"/>
-          <CardFooter className="flex-col items-stretch gap-4 pt-4">
-              <div className="flex justify-between text-lg font-semibold">
+          <CardFooter className="flex-col items-stretch gap-4 pt-6">
+              <div className="flex justify-between text-lg font-semibold text-foreground">
                 <span>Total:</span>
                 <span>₹{calculateTotal().toFixed(2)}</span>
               </div>

@@ -29,7 +29,7 @@ export default {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
   			},
-        tertiary: { // Added tertiary
+        tertiary: { 
   				DEFAULT: 'hsl(var(--tertiary))',
   				foreground: 'hsl(var(--tertiary-foreground))'
   			},
@@ -46,7 +46,11 @@ export default {
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
   			border: 'hsl(var(--border))',
-  			input: 'hsl(var(--input))',
+  			input: { // Changed to allow 'input-background' and 'input-border'
+          DEFAULT: 'hsl(var(--input-border))', // Default input now refers to border
+          background: 'hsl(var(--input-background))',
+          border: 'hsl(var(--input-border))'
+        },
   			ring: 'hsl(var(--ring))',
   			chart: {
   				'1': 'hsl(var(--chart-1))',

@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* White */
+    --background: 0 0% 98%; /* Off-White */
     --foreground: 240 10% 3.9%; /* Near Black */
 
     --card: 0 0% 100%; /* White */
@@ -18,19 +18,20 @@ body {
     --popover: 0 0% 100%; /* White */
     --popover-foreground: 240 10% 3.9%; /* Near Black */
 
-    --primary: 240 5.9% 10%; /* Dark Gray/Almost Black for primary actions */
-    --primary-foreground: 0 0% 98%; /* Light Gray for text on primary */
+    /* Primary is now Royal Green */
+    --primary: 145 60% 35%; /* Royal Green */
+    --primary-foreground: 145 25% 95%; /* Very Light Greenish White */
 
-    /* Secondary color is now green */
-    --secondary: 130 40% 50%; /* Green */
-    --secondary-foreground: 0 0% 100%; /* White */
+    /* Secondary is now Muted Dark Blue */
+    --secondary: 220 30% 40%; /* Muted Dark Blue */
+    --secondary-foreground: 220 20% 95%; /* Light Bluish White */
+    
+    /* Tertiary for subtle backgrounds/accents - Warm Beige/Gray */
+    --tertiary: 45 30% 96%; /* Very Light Warm Beige */
+    --tertiary-foreground: 45 10% 35%; /* Dark Warm Gray */
 
-    /* Tertiary color for subtle backgrounds/accents */
-    --tertiary: 220 15% 96%; /* Very light cool gray */
-    --tertiary-foreground: 220 10% 25%; /* Dark cool gray text */
-
-    --muted: 240 4.8% 95.9%; /* Light Gray for less prominent elements - warmer than tertiary */
-    --muted-foreground: 240 3.8% 46.1%; /* Muted text color */
+    --muted: 240 5% 90%; /* Light Gray for less prominent elements */
+    --muted-foreground: 240 5% 45%; /* Muted text color */
 
     --accent: 210 100% 56%; /* Vibrant Blue for highlights, focus rings */
     --accent-foreground: 0 0% 100%; /* White text on accent */
@@ -38,9 +39,10 @@ body {
     --destructive: 0 84.2% 60.2%; /* Standard destructive red */
     --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
-    --border: 240 5.9% 90%; /* Light Gray for borders */
-    --input: 0 0% 100%; /* White for input backgrounds (can also use a very light gray if needed) */
-    --ring: 210 100% 56%; /* Accent blue for focus rings */
+    --border: 240 5% 85%; /* Softer Light Gray for borders */
+    --input-background: 0 0% 100%; /* White for input backgrounds */
+    --input-border: 240 5% 80%; /* Slightly darker gray for input borders */
+    --ring: 145 60% 45%; /* Brighter Green for focus rings */
 
     --radius: 0.5rem;
 
@@ -51,60 +53,62 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Sidebar specific colors - kept as is, since sidebar design is good */
+    /* Sidebar specific colors - Keep these consistent with provided good design */
     --sidebar-background: 0 0% 96%;
     --sidebar-foreground: 240 10% 3.9%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-primary: 145 60% 35%; /* Align sidebar primary with new app primary */
+    --sidebar-primary-foreground: 145 25% 95%;
     --sidebar-accent: 240 4.8% 90%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 240 5.9% 85%;
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-ring: 145 60% 45%; /* Align sidebar ring with new app ring */
   }
 
   .dark {
-    --background: 240 10% 3.9%; /* Near Black */
-    --foreground: 0 0% 98%; /* Light Gray */
+    --background: 220 15% 12%; /* Very Dark Cool Blue/Gray */
+    --foreground: 0 0% 95%; /* Light Gray */
 
-    --card: 240 5% 11%; /* Very Dark Gray */
-    --card-foreground: 0 0% 98%; /* Light Gray */
+    --card: 220 15% 18%; /* Dark Cool Blue/Gray, slightly lighter */
+    --card-foreground: 0 0% 95%; 
 
-    --popover: 240 5% 11%; /* Very Dark Gray */
-    --popover-foreground: 0 0% 98%; /* Light Gray */
+    --popover: 220 15% 18%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 0 0% 98%; /* Light Gray for primary actions in dark mode */
-    --primary-foreground: 240 10% 3.9%; /* Near Black text on primary */
+    /* Primary is Royal Green (dark mode) */
+    --primary: 145 55% 48%; /* Brighter Royal Green */
+    --primary-foreground: 145 30% 96%; /* Very Light Greenish White */
     
-    /* Secondary color is now green */
-    --secondary: 130 40% 30%; /* Darker Green */
-    --secondary-foreground: 0 0% 95%; /* Light text */
+    /* Secondary is Muted Blue (dark mode) */
+    --secondary: 220 25% 50%; /* Lighter Muted Blue */
+    --secondary-foreground: 220 15% 96%; /* Light Bluish White */
 
-    /* Tertiary color for subtle backgrounds/accents */
-    --tertiary: 220 10% 12%; /* Very dark cool gray */
-    --tertiary-foreground: 220 5% 75%; /* Lighter cool gray text */
+    /* Tertiary for subtle backgrounds/accents - Dark Warm Gray */
+    --tertiary: 45 8% 22%; /* Dark Warm Gray */
+    --tertiary-foreground: 45 15% 75%; /* Light Warm Gray */
 
-    --muted: 240 3.7% 15.9%; /* Darker gray for secondary */
-    --muted-foreground: 240 5% 64.9%; /* Lighter muted text */
+    --muted: 240 4% 30%; 
+    --muted-foreground: 240 4% 65%; 
 
-    --accent: 210 100% 56%; /* Keep Vibrant Blue */
-    --accent-foreground: 0 0% 100%; /* White text on accent */
+    --accent: 210 100% 66%; /* Brighter Vibrant Blue */
+    --accent-foreground: 210 100% 10%; /* Dark Blue text on Accent */
 
-    --destructive: 0 70% 45%; /* Adjusted dark destructive red */
-    --destructive-foreground: 0 0% 98%; /* Light text on destructive */
+    --destructive: 0 70% 50%; /* Adjusted dark destructive red */
+    --destructive-foreground: 0 0% 98%; 
 
-    --border: 240 3.7% 20%; /* Dark Gray for borders */
-    --input: 240 3.7% 15.9%; /* Dark Gray for input backgrounds */
-    --ring: 210 100% 56%; /* Accent blue for focus rings */
+    --border: 220 10% 35%; /* Dark Cool Gray Border */
+    --input-background: 220 10% 25%; /* Dark Cool Gray for input backgrounds */
+    --input-border: 220 10% 35%; /* Dark Cool Gray for input borders */
+    --ring: 145 55% 58%; /* Brighter green for focus rings */
     
-    /* Sidebar specific colors for dark theme - kept as is */
+    /* Sidebar specific colors for dark theme - Keep these consistent, primary aligned */
     --sidebar-background: 240 6% 10%;
     --sidebar-foreground: 0 0% 95%;
-    --sidebar-primary: 0 0% 98%; 
-    --sidebar-primary-foreground: 240 10% 3.9%; 
+    --sidebar-primary: 145 55% 48%; /* Align sidebar primary with new app primary */
+    --sidebar-primary-foreground: 145 30% 96%; 
     --sidebar-accent: 240 3.7% 20%; 
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 3.7% 20%; 
-    --sidebar-ring: 210 100% 56%;
+    --sidebar-ring: 145 55% 58%; /* Align sidebar ring with new app ring */
   }
 }
 
@@ -121,4 +125,24 @@ body {
   main {
     flex: 1;
   }
+  /* Specific styling for input fields */
+  input[type="text"], 
+  input[type="number"], 
+  input[type="tel"], 
+  input[type="search"],
+  input[type="date"],
+  textarea,
+  .select-trigger-class { /* Add a common class to SelectTrigger if direct targeting is hard */
+    @apply bg-input-background border-input-border;
+  }
+  .dark input[type="text"], 
+  .dark input[type="number"], 
+  .dark input[type="tel"], 
+  .dark input[type="search"],
+  .dark input[type="date"],
+  .dark textarea,
+  .dark .select-trigger-class {
+     @apply bg-input-background border-input-border;
+  }
+
 }

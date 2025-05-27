@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardHeader, CardTitle, CardDescription
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -100,22 +100,22 @@ export function BillHistoryTable() {
   };
 
   const getBillTypeIcon = (bill: Bill) => {
-    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; 
-    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />; 
+    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-destructive-foreground" />; 
+    if (bill.type === 'sell') return <Send className="h-4 w-4 text-primary-foreground" />; 
     if (bill.type === 'return') {
       if (bill.items.some(item => item.isDefective === true)) {
-        return <AlertTriangle className="h-4 w-4 text-red-500" />; 
+        return <AlertTriangle className="h-4 w-4 text-amber-900 dark:text-amber-950" />; // Use warning color for defective return icon
       }
-      return <RotateCcw className="h-4 w-4 text-yellow-600" />; 
+      return <RotateCcw className="h-4 w-4 text-amber-900 dark:text-amber-950" />; 
     }
     return null;
   };
   
-  const getBillTypeBadgeVariant = (bill: Bill): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
-    if (bill.type === 'buy') return 'destructive'; 
-    if (bill.type === 'sell') return 'default'; // Will be styled green via TabTriggers
-    if (bill.type === 'return') return 'secondary'; // Will be styled yellow via TabTriggers
-    return 'outline';
+  const getBillTypeBadgeClassName = (bill: Bill): string => {
+    if (bill.type === 'buy') return 'bg-destructive text-destructive-foreground hover:bg-destructive/90'; 
+    if (bill.type === 'sell') return 'bg-primary text-primary-foreground hover:bg-primary/90'; 
+    if (bill.type === 'return') return 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600';
+    return 'bg-muted text-muted-foreground';
   };
 
   const getBillTypeName = (bill: Bill): string => {
@@ -190,7 +190,7 @@ export function BillHistoryTable() {
                           item.isDefective ? (
                             <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/30 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-700/40">Restocked</Badge>
+                            <Badge variant="outline" className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                           )
                         )}
                       </TableCell>
@@ -203,7 +203,7 @@ export function BillHistoryTable() {
                 </TableBody>
               </Table>
               <Separator className="my-3"/>
-              <div className="text-right font-semibold text-lg">
+              <div className="text-right font-semibold text-lg text-foreground">
                 Total: ₹{selectedBill.totalAmount.toFixed(2)}
               </div>
               {selectedBill.type === 'buy' && calculatePotentialSellTotal(selectedBill) !== null && (
@@ -213,7 +213,7 @@ export function BillHistoryTable() {
               )}
               {selectedBill.notes && (
                 <div className="pt-3 mt-2 border-t">
-                    <p className="font-semibold text-sm mb-1">Notes:</p>
+                    <p className="font-semibold text-sm mb-1 text-foreground">Notes:</p>
                     <p className="text-sm text-muted-foreground p-3 border rounded-md bg-tertiary whitespace-pre-wrap">
                         {selectedBill.notes}
                     </p>
@@ -271,12 +271,7 @@ export function BillHistoryTable() {
                     <TableCell className="font-mono text-xs">{bill.id}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={getBillTypeBadgeVariant(bill)} 
-                        className={`capitalize flex items-center gap-1 w-fit min-w-[80px] justify-center ${
-                          bill.type === 'sell' ? 'bg-green-500 hover:bg-green-600 text-white dark:bg-green-600 dark:hover:bg-green-700' : 
-                          bill.type === 'buy' ? 'bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700' : 
-                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900 dark:bg-yellow-500 dark:hover:bg-yellow-600 dark:text-yellow-950' : ''
-                        }`}
+                        className={`capitalize flex items-center gap-1 w-fit min-w-[100px] justify-center ${getBillTypeBadgeClassName(bill)}`}
                       >
                         {getBillTypeIcon(bill)}
                         {getBillTypeName(bill)}

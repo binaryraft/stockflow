@@ -351,7 +351,7 @@ export function NewProductDialog({
             </div>
 
             <Separator/>
-            <Label className="text-lg font-semibold">Variants (Max 2)</Label>
+            <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
             {formState.errors.variants?.root && <p className="text-sm text-destructive mt-1">{formState.errors.variants.root.message}</p>}
 
             {variantFields.map((variantField, variantIndex) => (

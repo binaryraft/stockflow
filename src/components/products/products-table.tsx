@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Ensure Card and CardContent are imported
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -158,7 +158,7 @@ export function ProductsTable() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {product.category ? <Badge variant="secondary">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
+                    {product.category ? <Badge variant="outline" className="bg-tertiary text-tertiary-foreground border-tertiary-foreground/30">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell className="text-right">
                     {product.trackQuantity ? product.quantityInStock : <span className="text-muted-foreground">N/A</span>}

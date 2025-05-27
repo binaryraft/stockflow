@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,7 +15,7 @@ export function StatCard({ title, value, icon: Icon, description, isLoading = fa
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium text-muted-foreground"> {/* Title uses muted-foreground */}
           {title}
         </CardTitle>
         <Icon className="h-5 w-5 text-muted-foreground" />
@@ -23,7 +24,7 @@ export function StatCard({ title, value, icon: Icon, description, isLoading = fa
         {isLoading ? (
           <Skeleton className="h-8 w-3/4" />
         ) : (
-          <div className="text-2xl font-bold text-foreground">{value}</div>
+          <div className="text-2xl font-bold text-primary">{value}</div> /* Value uses text-primary */
         )}
         {description && !isLoading && (
           <p className="text-xs text-muted-foreground pt-1">{description}</p>
