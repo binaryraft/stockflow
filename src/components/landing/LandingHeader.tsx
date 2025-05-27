@@ -3,11 +3,16 @@
 
 import Link from 'next/link';
 import { APP_NAME } from '@/lib/constants';
-import { Package2, LogIn, Store as StoreIcon } from 'lucide-react'; // Added StoreIcon
+import { Package2, LogIn, Store as StoreIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 
-export function LandingHeader() {
+interface LandingHeaderProps {
+  onAdminLoginClick: () => void;
+  // onStoreLoginClick: () => void; // Add later for store login
+}
+
+export function LandingHeader({ onAdminLoginClick }: LandingHeaderProps) {
   return (
     <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur-sm">
       <div className="container mx-auto flex h-16 items-center justify-between px-4 md:px-6">
@@ -31,15 +36,11 @@ export function LandingHeader() {
         </nav>
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild variant="outline" size="sm">
-            <Link href="/admin/stores">
-              <StoreIcon className="mr-2 h-4 w-4" /> Store Login
-            </Link>
+          <Button variant="outline" size="sm" onClick={() => alert('Store login via homepage - coming soon!')}>
+            <StoreIcon className="mr-2 h-4 w-4" /> Store Login
           </Button>
-          <Button asChild size="sm">
-            <Link href="/admin">
-              <LogIn className="mr-2 h-4 w-4" /> Admin Login
-            </Link>
+          <Button size="sm" onClick={onAdminLoginClick}>
+            <LogIn className="mr-2 h-4 w-4" /> Admin Login
           </Button>
         </div>
       </div>

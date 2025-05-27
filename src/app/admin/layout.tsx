@@ -23,7 +23,6 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!hasMounted) {
-      // Don't access localStorage or router until mounted
       return;
     }
 
@@ -35,9 +34,8 @@ export default function AdminLayout({
       setIsLoadingAuth(false);
     } else {
       setIsAuthenticated(false);
-      // Important: Initiate redirect BEFORE setting isLoadingAuth to false if possible,
-      // or ensure the subsequent render path handles this.
-      router.replace('/admin/login');
+      // Redirect to landing page for login, not /admin/login
+      router.replace('/'); 
       setIsLoadingAuth(false); 
     }
   }, [router, hasMounted]);
@@ -61,8 +59,8 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // If not authenticated and loading is done, router.replace should have been called.
-    // Return null to let the router handle the redirect and prevent rendering AppShell.
+    // This state should ideally be brief as router.replace('/') would have been called.
+    // Returning null lets the router handle the redirect.
     return null; 
   }
 
