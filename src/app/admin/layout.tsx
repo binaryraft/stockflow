@@ -5,7 +5,7 @@ import { AppShell } from '@/components/layout/app-shell';
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image'; // For loading state
+import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 
 export default function AdminLayout({
@@ -22,28 +22,22 @@ export default function AdminLayout({
     setHasMounted(true);
   }, []);
 
-  // Ensure Zustand store is hydrated on client for admin section
-  useEffect(() => {
-    // Zustand's persist middleware handles rehydration automatically.
-  }, []);
-
   useEffect(() => {
     if (!hasMounted) return; // Only run auth check on client after mount
 
+    setIsLoadingAuth(true); // Indicate start of auth check
     const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
     if (adminLoggedIn === 'true') {
       setIsAuthenticated(true);
-      setIsLoadingAuth(false);
+      setIsLoadingAuth(false); // Auth check complete, user is authenticated
     } else {
       router.replace('/admin/login');
-      // It's important to set isLoadingAuth to false even after redirect
-      // so the component knows it's done checking.
-      // isAuthenticated will remain false.
-      setIsLoadingAuth(false); 
+      // Even if redirecting, set loading to false so UI doesn't hang on "Checking..."
+      setIsLoadingAuth(false); // Auth check complete, user is not authenticated
     }
   }, [router, hasMounted]);
 
-  if (isLoadingAuth || !hasMounted) { // Also wait for hasMounted
+  if (!hasMounted || isLoadingAuth) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -60,8 +54,8 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // This state might be visible briefly if router.replace is not instantaneous,
-    // or if hasMounted is true but localStorage check already happened.
+    // This state implies isLoadingAuth is false & isAuthenticated is false.
+    // router.replace should have been called. This UI is a fallback.
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 

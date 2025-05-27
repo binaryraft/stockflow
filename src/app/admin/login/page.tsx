@@ -5,15 +5,13 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input'; // Placeholder if you want actual inputs later
-import { Label } from '@/components/ui/label'; // Placeholder
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { LogIn } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // Renamed from isLoading for clarity
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -30,17 +28,12 @@ export default function AdminLoginPage() {
   }, [router, hasMounted]);
 
   const handleLogin = () => {
-    if (!hasMounted) return; // Should not happen if button is clickable
+    if (!hasMounted) return;
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     localStorage.setItem('isAdminLoggedIn', 'true');
-    
-    // Use router.push to ensure it adds to history, allowing back button if needed
-    // router.replace might be too aggressive if user lands here by mistake.
-    // However, for login, typically push is fine.
     router.push('/admin'); 
-    
-    // No need to setIsLoading(false) here as the page will redirect and unmount.
+    // No need to setIsSubmitting(false) here as the page will redirect and unmount.
   };
   
   if (!hasMounted) {
@@ -53,13 +46,15 @@ export default function AdminLoginPage() {
           width={64} 
           height={64} 
           className="mb-3 rounded-lg shadow-md animate-pulse"
-          data-ai-hint="logo company" 
+          data-ai-hint="logo company"
         />
         <p className="text-muted-foreground">Loading login...</p>
       </div>
     );
   }
 
+  // If hasMounted is true, but still redirecting from the useEffect above, this part might not be reached.
+  // If we are here, it means not logged in yet.
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -70,7 +65,7 @@ export default function AdminLoginPage() {
           width={64} 
           height={64} 
           className="mb-3 rounded-lg shadow-md"
-          data-ai-hint="logo company" 
+          data-ai-hint="logo company"
         />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Admin Portal</p>
@@ -86,9 +81,9 @@ export default function AdminLoginPage() {
           </p>
         </CardContent>
         <CardFooter>
-          <Button onClick={handleLogin} className="w-full" disabled={isLoading}>
+          <Button onClick={handleLogin} className="w-full" disabled={isSubmitting}>
             <LogIn className="mr-2 h-5 w-5" />
-            {isLoading ? 'Logging In...' : 'Login as Admin'}
+            {isSubmitting ? 'Logging In...' : 'Login as Admin'}
           </Button>
         </CardFooter>
       </Card>

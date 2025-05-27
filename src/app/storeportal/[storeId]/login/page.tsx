@@ -22,9 +22,10 @@ export default function StoreLoginPage() {
   const { toast } = useToast();
 
   const [passkey, setPasskey] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [hasMounted, setHasMounted] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // To manage initial data fetch
 
   useEffect(() => {
     setHasMounted(true);
@@ -38,6 +39,8 @@ export default function StoreLoginPage() {
         // If already authenticated for this store, redirect to billing
         if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
           router.replace(`/storeportal/${storeId}/billing`);
+          // No need to setInitialLoading(false) here as it will redirect
+          return;
         }
       } else {
         toast({
@@ -46,8 +49,18 @@ export default function StoreLoginPage() {
           description: "The requested store does not exist.",
         });
         router.replace('/storeportal'); 
+        // No need to setInitialLoading(false) here
+        return;
       }
+      setInitialLoading(false); // Store info loaded, not redirecting yet
+    } else if (hasMounted && !storeId) {
+      // If mounted but no storeId, means URL is wrong or params not ready
+      toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
+      router.replace('/storeportal');
+      // No need to setInitialLoading(false) here
+      return;
     }
+    // If !hasMounted, initialLoading remains true implicitly.
   }, [storeId, getStoreById, router, toast, hasMounted]);
 
 
@@ -55,7 +68,7 @@ export default function StoreLoginPage() {
     e.preventDefault();
     if (!hasMounted) return;
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     const store = getStoreById(storeId);
 
     if (store && store.passkey === passkey) {
@@ -71,11 +84,11 @@ export default function StoreLoginPage() {
         title: "Login Failed",
         description: "Invalid store passkey. Please try again.",
       });
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
   
-  if (!hasMounted || !storeId) {
+  if (!hasMounted || initialLoading) { // Show loading if not mounted or still fetching store info
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Image 
@@ -84,12 +97,16 @@ export default function StoreLoginPage() {
           width={64} 
           height={64} 
           className="mb-3 rounded-lg shadow-md animate-pulse"
-          data-ai-hint="logo company" 
+          data-ai-hint="logo company"
         />
         <p className="text-lg text-muted-foreground">Loading store information...</p>
       </div>
     );
   }
+
+  // If here, hasMounted is true and initialLoading is false.
+  // This means either store was found and user is not session-authenticated, or store was not found (and redirect is in progress).
+  // The form should only render if a storeName is set.
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
@@ -128,8 +145,8 @@ export default function StoreLoginPage() {
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              <LogIn className="mr-2 h-5 w-5" /> {isLoading ? 'Verifying...' : 'Access Terminal'}
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <LogIn className="mr-2 h-5 w-5" /> {isSubmitting ? 'Verifying...' : 'Access Terminal'}
             </Button>
           </CardFooter>
         </form>
