@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -18,18 +18,18 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
+import { CategorySearchInput } from './category-search-input';
 
 
 const newProductSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
-  category: z.string().optional(),
+  category: z.string().optional().default(''), // Default to empty string
   trackQuantity: z.boolean().default(false),
   initialStock: z.coerce.number().min(0).optional().default(0),
   costPrice: z.coerce.number().min(0).optional().default(0),
@@ -59,7 +59,7 @@ export function NewProductDialog({
   initialCostPriceForDialog,
   initialSellPriceForDialog 
 }: NewProductDialogProps) {
-  const { addProduct, categories: existingCategories, addCategory } = useInventoryStore();
+  const { addProduct } = useInventoryStore();
   const { toast } = useToast();
   
   const form = useForm<NewProductFormData>({
@@ -79,11 +79,11 @@ export function NewProductDialog({
 
   useEffect(() => {
     if (isOpen) {
-      const shouldTrack = initialQuantityForDialog !== undefined; // Track if quantity is passed, even if 0
+      const shouldTrack = initialQuantityForDialog !== undefined; 
       form.reset({
         name: initialProductName || '',
-        description: '', // Reset other fields for a new product
-        category: '',
+        description: '', 
+        category: '', // Reset category on open, user will type or select
         trackQuantity: shouldTrack,
         initialStock: initialQuantityForDialog || 0,
         costPrice: initialCostPriceForDialog || 0,
@@ -107,7 +107,7 @@ export function NewProductDialog({
     const newProductData = {
         name: data.name,
         description: data.description,
-        category: data.category,
+        category: data.category, // This will be the string from CategorySearchInput
         trackQuantity: data.trackQuantity,
         initialStock: data.trackQuantity ? data.initialStock : 0,
         costPrice: data.costPrice || 0,
@@ -120,12 +120,8 @@ export function NewProductDialog({
     if (onProductAdd) {
       onProductAdd(addedProduct);
     }
-    // form.reset(); // Reset is handled by useEffect when isOpen changes or by parent on dialog close
     onOpenChange(false);
   };
-
-  const uniqueCategories = Array.from(new Set([...DEFAULT_CATEGORIES, ...existingCategories.map(c => c.name)]));
-
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -151,22 +147,20 @@ export function NewProductDialog({
           <div className="flex items-end gap-2">
             <div className="flex-grow">
               <Label htmlFor="category">Category</Label>
-               <Controller
+              <Controller
                 name="category"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value || ''}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {uniqueCategories.map((catName) => (
-                        <SelectItem key={catName} value={catName}>{catName}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CategorySearchInput
+                    id="category"
+                    value={field.value || ''}
+                    onValueChange={(value) => field.onChange(value)} // Update form value on text change
+                    onCategorySelect={(categoryName) => field.onChange(categoryName)} // Ensure form value is set on selection
+                    placeholder="Type or select category"
+                  />
                 )}
               />
+               {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
             </div>
           </div>
 

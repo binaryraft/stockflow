@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -24,6 +25,7 @@ interface InventoryState {
   getBillById: (billId: string) => Bill | undefined;
   
   addCategory: (categoryName: string) => Category;
+  searchCategories: (searchTerm: string) => string[]; // Returns array of category names
   
   // Example data for initial state
   _hydrate: () => void; // for initial hydration if needed
@@ -64,7 +66,7 @@ export const useInventoryStore = create<InventoryState>()(
           imageUrl: productData.imageUrl || `https://placehold.co/100x100.png`,
         };
         set((state) => ({ products: [...state.products, newProduct] }));
-        if (productData.category && !get().categories.find(c => c.name === productData.category)) {
+        if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
           get().addCategory(productData.category!);
         }
         return newProduct;
@@ -127,6 +129,10 @@ export const useInventoryStore = create<InventoryState>()(
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
             }
+            // Also update product's cost and sell price if they were changed during purchase
+            if (product && (product.costPrice !== item.costPrice || product.sellPrice !== item.sellPrice)) {
+                get().updateProduct(item.productId, { costPrice: item.costPrice, sellPrice: item.sellPrice });
+            }
           });
         } else if (billData.type === 'sell') {
           newBillItems.forEach(item => {
@@ -156,19 +162,48 @@ export const useInventoryStore = create<InventoryState>()(
         if (existingCategory) return existingCategory;
 
         const newCategory: Category = { id: generateId(), name: categoryName };
-        set((state) => ({ categories: [...state.categories, newCategory] }));
+        set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
+      },
+
+      searchCategories: (searchTerm: string) => {
+        if (!searchTerm) return get().categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
+        const lowerSearchTerm = searchTerm.toLowerCase();
+        return get().categories
+          .filter(c => c.name.toLowerCase().includes(lowerSearchTerm))
+          .map(c => c.name)
+          .sort((a,b) => a.localeCompare(b));
       },
       
       _hydrate: () => {
         // This can be used to set initial state if not using the default values above
         // For example, if you want to ensure some data exists on first load after clearing storage
-        if (get().products.length === 0) {
+        const state = get();
+        let updated = false;
+        if (state.products.length === 0) {
           set({ products: initialProducts });
+          updated = true;
         }
-        if (get().categories.length === 0) {
-          set({ categories: initialCategories });
+        if (state.categories.length === 0) {
+          set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
+          updated = true;
+        } else {
+          // Ensure categories are sorted
+          const sortedCategories = [...state.categories].sort((a,b) => a.name.localeCompare(b.name));
+          if (JSON.stringify(sortedCategories) !== JSON.stringify(state.categories)) {
+            set({ categories: sortedCategories });
+            updated = true;
+          }
         }
+        // Ensure default categories exist
+        DEFAULT_CATEGORIES.forEach(catName => {
+          if(!state.categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
+            get().addCategory(catName);
+            updated = true;
+          }
+        });
+        if (updated) console.log("Inventory store hydrated/updated with initial/default data.");
+
       }
     }),
     {
@@ -181,9 +216,10 @@ export const useInventoryStore = create<InventoryState>()(
   )
 );
 
-// Call _hydrate on initial load if needed, though persist middleware handles rehydration
-// useInventoryStore.getState()._hydrate();
+// Ensure _hydrate is called once, perhaps on client mount in AppShell or a similar top-level client component.
+// useInventoryStore.getState()._hydrate(); // This can cause issues if called prematurely.
+// The onRehydrateStorage callback is a better place for this.
 
-// Add uuid to dependencies
-// npm install uuid
-// npm install @types/uuid --save-dev
+
+// Import DEFAULT_CATEGORIES here if needed for _hydrate logic, or pass it if required.
+import { DEFAULT_CATEGORIES } from '@/lib/constants';
