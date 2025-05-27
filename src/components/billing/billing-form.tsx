@@ -127,13 +127,14 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
       setCostPrice(product.costPrice);
       setSellPrice(product.sellPrice);
     } else if (mode === 'buy') { 
-      setCostPrice(product.costPrice);
-      setSellPrice(product.sellPrice);
+      setCostPrice(product.costPrice); // Pre-fill with existing if available
+      setSellPrice(product.sellPrice); // Pre-fill with existing if available
     }
   
     if (product.variants && product.variants.length > 0) {
       const firstVariantId = product.variants[0].id;
       setVariantDropdownOpenState({ [firstVariantId]: true });
+      // Focus logic moved to useEffect below for reliability
     } else {
       quantityInputRef.current?.focus();
       quantityInputRef.current?.select();
@@ -152,7 +153,7 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
                 const el = document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (el as HTMLElement)?.focus();
             }
-        }, 50); // Small delay
+        }, 50); 
       }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
@@ -163,19 +164,16 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
       const allVariantsSelected = currentProductForSelection.variants.every(
         (v) => selectedVariantOptions[v.name]
       );
-      if (allVariantsSelected) {
-        const anyDropdownOpen = Object.values(variantDropdownOpenState).some(isOpen => isOpen);
-        const activeElement = document.activeElement;
-        const isQuantityFocused = activeElement?.id === quantityInputRef.current?.id;
+      
+      const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
+      const isLastVariantDropdownClosedOrNotFocused = !variantDropdownOpenState[lastVariantId] && 
+                                                     document.activeElement?.id !== `variant-select-${lastVariantId}-trigger`;
 
-        const isVariantSelectFocused = currentProductForSelection.variants.some(variant => 
-            activeElement?.id === `variant-select-${variant.id}-trigger`
-        );
-
-        if (!anyDropdownOpen && !isVariantSelectFocused && !isQuantityFocused) {
-             quantityInputRef.current?.focus();
-             quantityInputRef.current?.select();
-        }
+      if (allVariantsSelected && isLastVariantDropdownClosedOrNotFocused && document.activeElement?.id !== quantityInputRef.current?.id) {
+        setTimeout(() => {
+            quantityInputRef.current?.focus();
+            quantityInputRef.current?.select();
+        }, 0); // Small delay to ensure DOM updates
       }
     }
   }, [selectedVariantOptions, currentProductForSelection, variantDropdownOpenState]);
@@ -244,6 +242,7 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
        if (productsFound.length === 1 && !currentProductForSelection) { 
             handleProductSelect(productsFound[0]); 
        } else if (productsFound.length > 1 && !currentProductForSelection) {
+            // User might want to see suggestions, so keep focus
             productNameInputRef.current?.focus(); 
        } else { 
             if (productNotFoundHint === productNameQuery && !currentProductForSelection) { 
@@ -265,6 +264,7 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
+                        // Focus logic is handled by useEffect for variant dropdown open
                     } else { 
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
@@ -276,8 +276,9 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
       if (mode === 'buy') { 
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
+      } else if (mode === 'sell' || mode === 'return') {
+        handleAddNewItem(); 
       }
-      else handleAddNewItem(); 
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') { 
         sellPriceInputRef.current?.focus();
@@ -331,12 +332,9 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
       vendorOrCustomerName: customerVendorName,
       customerPhone: customerPhone,
       notes: notes,
-      billedByStaffId: billedByStaffId, // Pass staffId if available
-      storeId: storeId, // Pass storeId if available
+      billedByStaffId: billedByStaffId, 
+      storeId: storeId, 
     }, billItemsForStore);
-    
-    const modeDisplay = mode === 'sell' ? 'Sales' : mode === 'buy' ? 'Expense' : 'Return';
-    toast({ title: "Bill Saved", description: `${modeDisplay} Bill has been successfully saved.` });
     
     setLastSavedBillMode(mode);
     setIsSavingAnimationVisible(true);
@@ -346,23 +344,20 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
     resetFullForm();
-    // For general billing page, redirect to history. Store view might stay on the form.
     if (!storeId) {
       router.push('/billing'); 
     } else {
-      // In store view, just reset form, focus product name for next entry
       productNameInputRef.current?.focus();
     }
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
     handleProductSelect(product); 
-    productNameInputRef.current?.focus();
+    productNameInputRef.current?.focus(); // Ensure focus returns after dialog
   };
 
   const handleModeChange = (newMode: string) => {
     setMode(newMode as BillMode);
-    // Preserve store context if in store view
     const basePath = storeId ? `/store/${storeId}/billing` : '/billing';
     router.push(`${basePath}?action=new&mode=${newMode}`, { scroll: false });
     resetFullForm();
@@ -553,9 +548,13 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
                                 setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
+                                // Focus logic for next select handled by useEffect
                             } else {
-                                quantityInputRef.current?.focus();
-                                quantityInputRef.current?.select();
+                                // Last variant selected, focus quantity
+                                setTimeout(() => {
+                                   quantityInputRef.current?.focus();
+                                   quantityInputRef.current?.select();
+                                },0);
                             }
                         }}
                       >
@@ -569,15 +568,11 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
                                     if (!variantDropdownOpenState[variant.id]) { 
                                         setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
                                     } else { 
-                                        const currentIndex = currentProductForSelection!.variants!.findIndex(v => v.id === variant.id);
-                                        if (currentIndex < currentProductForSelection!.variants!.length - 1) {
-                                            const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false, [nextVariantId]: true }));
-                                        } else {
-                                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
-                                            quantityInputRef.current?.focus();
-                                            quantityInputRef.current?.select();
-                                        }
+                                        // If dropdown is open, Enter selects highlighted. 
+                                        // Focus moves via onValueChange after selection.
+                                        // If user presses Enter on trigger to close, Radix handles it.
+                                        // If they press Enter to open a *closed* trigger, it opens.
+                                        // The primary goal here is to allow Radix to handle Enter when dropdown is open for selection.
                                     }
                                 }
                             }}
@@ -708,7 +703,7 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
                 <span>Total:</span>
                 <span>₹{calculateTotal().toFixed(2)}</span>
               </div>
-              {mode === 'buy' && (
+              {mode === 'buy' && currentBillItems.length > 0 && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Potential Sell Value:</span>
                   <span>₹{calculatePotentialSellTotalForBuy().toFixed(2)}</span>
@@ -736,3 +731,6 @@ export function BillingForm({ billedByStaffId, storeId }: BillingFormProps) {
     </div>
   );
 }
+
+
+    
