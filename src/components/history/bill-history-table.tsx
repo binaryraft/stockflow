@@ -194,7 +194,24 @@ export function BillHistoryTable() {
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.costPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
-      } else { // Sales or Return Bill Print Items
+      } else if (billToPrint.type === 'sell') { // Sales Bill Print Items
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
+        billToPrint.items.forEach((item, index) => {
+            printWindow.document.write('<tr>');
+            printWindow.document.write(`<td>${index + 1}</td>`);
+            printWindow.document.write(`<td>${item.productName}`);
+            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
+              printWindow.document.write('<span class="variant-options">');
+              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
+              printWindow.document.write('</span>');
+            }
+            printWindow.document.write('</td>');
+            printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
+            printWindow.document.write(`<td class="text-right">₹${item.sellPrice.toFixed(2)}</td>`);
+            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.sellPrice).toFixed(2)}</td>`);
+            printWindow.document.write('</tr>');
+        });
+      } else { // Return Bill Print Items
         printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             printWindow.document.write('<tr>');
@@ -205,12 +222,10 @@ export function BillHistoryTable() {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-            if (billToPrint.type === 'return') {
-              if (item.isDefective) {
-                printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
-              } else {
-                printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
-              }
+            if (item.isDefective) {
+              printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
+            } else {
+              printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
             }
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
@@ -244,7 +259,6 @@ export function BillHistoryTable() {
         printWindow.document.write(`<tr><td style="text-align:right;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor};">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') { // Sales Bill
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Sales Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        // COGS and Profit removed for Sales bills as per request
       } else { // Return Bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Return Value:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
@@ -404,7 +418,6 @@ export function BillHistoryTable() {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -422,11 +435,7 @@ export function BillHistoryTable() {
                                 <div className="text-xs text-muted-foreground mt-1">
                                     Purchased: {item.quantity}
                                 </div>
-                                {currentSKU && 
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                        Current SKU Stock: {currentSKU.quantityInStock}
-                                    </div>
-                                }
+                                {/* Removed Current SKU Stock display for simplification based on feedback */}
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
@@ -436,7 +445,39 @@ export function BillHistoryTable() {
                         })}
                       </TableBody>
                     </>
-                  ) : ( // Sales or Return Bill
+                  ) : selectedBill.type === 'sell' ? ( // Sales Bill
+                    <>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          {/* Cost/Unit column removed for Sales Bill */}
+                          <TableHead className="text-right">Price/Unit</TableHead>
+                          <TableHead className="text-right">Item Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedBill.items.map(item => (
+                          <TableRow key={item.id || item.productId}>
+                            <TableCell className="py-3 align-top">
+                              <div>{item.productName}</div>
+                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {Object.entries(item.selectedVariantOptions)
+                                    .map(([key, value]) => `${key}: ${value}`)
+                                    .join('; ')}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
+                            {/* Cost/Unit cell removed for Sales Bill */}
+                            <TableCell className="text-right py-3 align-top">₹{item.sellPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </>
+                  ) : ( // Return Bill
                     <>
                       <TableHeader>
                         <TableRow>
@@ -459,12 +500,10 @@ export function BillHistoryTable() {
                                     .join('; ')}
                                 </div>
                               )}
-                              {selectedBill.type === 'return' && (
-                                item.isDefective ? (
-                                  <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                                ) : (
-                                  <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
-                                )
+                              {item.isDefective ? (
+                                <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
+                              ) : (
+                                <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                               )}
                             </TableCell>
                             <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
@@ -522,7 +561,6 @@ export function BillHistoryTable() {
                                 <span className="text-muted-foreground">Total Sales Amount:</span>
                                 <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
                             </div>
-                            {/* Cost of Goods Sold and Profit removed for Sales bills as per request */}
                         </>
                     ) : ( // Return Bill
                         <div className="flex justify-between">
@@ -656,3 +694,4 @@ export function BillHistoryTable() {
     
 
     
+
