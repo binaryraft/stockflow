@@ -6,13 +6,16 @@ import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, PackageSearch, History, ShoppingBag, Send, RotateCcw, DollarSign } from 'lucide-react';
+import { PlusCircle, PackageSearch, DollarSign, ShoppingBag, Send, RotateCcw, Users, Building } from 'lucide-react';
 import { SalesExpensesOverviewChart } from '@/components/dashboard/sales-expenses-overview-chart';
 import { TopProductsChart } from '@/components/dashboard/top-products-chart';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import type { Bill } from '@/types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { ExpenseTrackerCard } from '@/components/dashboard/expense-tracker-card';
+import { ExpenseSummaryStats } from '@/components/dashboard/expense-summary-stats';
+
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
     if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-destructive', name: 'Expense' };
@@ -39,7 +42,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8">
-      <PageTitle title="Dashboard" />
+      <PageTitle title="Admin Dashboard" />
       
       <OverviewStats />
 
@@ -63,6 +66,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      
+      <ExpenseSummaryStats />
+      <ExpenseTrackerCard />
+
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
@@ -75,12 +82,12 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <Button asChild variant="default" className="w-full justify-start">
-              <Link href="/admin/billing?action=new&mode=sell">
+              <Link href="/admin/billing?mode=sell">
                 <Send className="mr-2 h-4 w-4" /> New Sales Bill
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/admin/billing?action=new&mode=buy">
+              <Link href="/admin/billing?mode=buy">
                 <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
               </Link>
             </Button>
@@ -95,7 +102,7 @@ export default function DashboardPage() {
         <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5 text-primary" />
+              <Users className="h-5 w-5 text-primary" /> {/* Changed icon to Users for recent activity context */}
               Recent Activity
             </CardTitle>
             <CardDescription>Latest bills processed.</CardDescription>
@@ -143,9 +150,17 @@ export default function DashboardPage() {
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
               <Link href="/admin/billing">View Bill History</Link>
             </Button>
+            <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
+              <Link href="/admin/staff">Manage Staff</Link>
+            </Button>
+             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
+              <Link href="/admin/stores">Manage Stores</Link>
+            </Button>
           </CardContent>
         </Card>
       </div>
     </div>
   );
 }
+
+    
