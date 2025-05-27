@@ -16,6 +16,11 @@ export default function AdminLayout({
   const router = useRouter();
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   // Ensure Zustand store is hydrated on client for admin section
   useEffect(() => {
@@ -23,19 +28,22 @@ export default function AdminLayout({
   }, []);
 
   useEffect(() => {
-    const checkAuth = () => {
-      const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
-      if (adminLoggedIn === 'true') {
-        setIsAuthenticated(true);
-      } else {
-        router.replace('/admin/login');
-      }
-      setIsLoadingAuth(false);
-    };
-    checkAuth();
-  }, [router]);
+    if (!hasMounted) return; // Only run auth check on client after mount
 
-  if (isLoadingAuth) {
+    const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
+    if (adminLoggedIn === 'true') {
+      setIsAuthenticated(true);
+      setIsLoadingAuth(false);
+    } else {
+      router.replace('/admin/login');
+      // It's important to set isLoadingAuth to false even after redirect
+      // so the component knows it's done checking.
+      // isAuthenticated will remain false.
+      setIsLoadingAuth(false); 
+    }
+  }, [router, hasMounted]);
+
+  if (isLoadingAuth || !hasMounted) { // Also wait for hasMounted
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -52,7 +60,8 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // This will typically not be seen due to the redirect, but it's a fallback.
+    // This state might be visible briefly if router.replace is not instantaneous,
+    // or if hasMounted is true but localStorage check already happened.
     return (
        <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -68,5 +77,6 @@ export default function AdminLayout({
     );
   }
 
+  // If we reach here, isLoadingAuth is false, hasMounted is true, AND isAuthenticated is true.
   return <AppShell>{children}</AppShell>;
 }

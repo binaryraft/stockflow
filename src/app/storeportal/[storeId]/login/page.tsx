@@ -24,32 +24,37 @@ export default function StoreLoginPage() {
   const [passkey, setPasskey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [storeName, setStoreName] = useState('');
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    if (storeId) {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && storeId) {
       const store = getStoreById(storeId);
       if (store) {
         setStoreName(store.name);
+        // If already authenticated for this store, redirect to billing
+        if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
+          router.replace(`/storeportal/${storeId}/billing`);
+        }
       } else {
         toast({
           variant: "destructive",
           title: "Store Not Found",
           description: "The requested store does not exist.",
         });
-        router.push('/storeportal'); 
+        router.replace('/storeportal'); 
       }
     }
-  }, [storeId, getStoreById, router, toast]);
-
-  useEffect(() => {
-    if (storeId && sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
-      router.replace(`/storeportal/${storeId}/billing`);
-    }
-  }, [storeId, router]);
+  }, [storeId, getStoreById, router, toast, hasMounted]);
 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!hasMounted) return;
+
     setIsLoading(true);
     const store = getStoreById(storeId);
 
@@ -70,14 +75,33 @@ export default function StoreLoginPage() {
     }
   };
   
-  if (!storeId) {
-    return <div className="flex-1 flex items-center justify-center">Loading store information...</div>;
+  if (!hasMounted || !storeId) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <Image 
+          src="https://placehold.co/128x128.png" 
+          alt={`${APP_NAME} Logo`} 
+          width={64} 
+          height={64} 
+          className="mb-3 rounded-lg shadow-md animate-pulse"
+          data-ai-hint="logo company" 
+        />
+        <p className="text-lg text-muted-foreground">Loading store information...</p>
+      </div>
+    );
   }
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="flex flex-col items-center mb-8">
-        <Image src="https://placehold.co/128x128.png" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" data-ai-hint="logo company"/>
+        <Image 
+          src="https://placehold.co/128x128.png" 
+          alt={`${APP_NAME} Logo`} 
+          width={64} 
+          height={64} 
+          className="mb-3 rounded-lg shadow-md"
+          data-ai-hint="logo company"
+        />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Store Terminal Access</p>
       </div>

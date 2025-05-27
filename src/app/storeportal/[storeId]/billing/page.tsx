@@ -6,7 +6,7 @@ import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'ne
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { BillingForm } from '@/components/billing/billing-form';
 import { EmployeePasskeyDialog } from '@/components/billing/employee-passkey-dialog';
-import type { Staff, Store } from '@/types';
+import type { Staff, Store, BillMode } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
 import { LogOut, ShoppingCart, MessageSquare } from 'lucide-react'; 
@@ -27,99 +27,122 @@ export default function StoreBillingPage() {
   const [isEmployeeAuthDialogOpen, setIsEmployeeAuthDialogOpen] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Master loading state for the page
   const [hasMounted, setHasMounted] = useState(false);
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
-
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
   useEffect(() => {
-    if (!hasMounted || !storeId) return;
-    setIsLoading(true);
+    if (!hasMounted || !storeId) {
+      if (storeId) setIsLoading(true); // Set loading if storeId is present but not mounted
+      return;
+    }
+
+    setIsLoading(true); // Start loading
     const store = getStoreById(storeId);
+
     if (!store) {
-      router.replace('/storeportal'); 
+      router.replace('/storeportal');
+      setIsLoading(false); // Stop loading as we are redirecting
       return;
     }
     setCurrentStore(store);
 
-    const authenticatedStore = sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true';
-    if (authenticatedStore) {
+    const authenticatedStoreSession = sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true';
+    if (authenticatedStoreSession) {
       setIsStoreAuthenticated(true);
       const sessionStaffData = sessionStorage.getItem(`currentStaff_${storeId}`);
       if (sessionStaffData) {
         try {
-            const parsedStaff: Staff = JSON.parse(sessionStaffData);
-            const verifiedStaff = getStaffById(parsedStaff.id);
-            if (verifiedStaff && (verifiedStaff.accessibleStoreIds.length === 0 || verifiedStaff.accessibleStoreIds.includes(storeId))) {
-                 if(store.allowedStaffIds.length === 0 || store.allowedStaffIds.includes(verifiedStaff.id)) {
-                    setCurrentStaff(verifiedStaff);
-                 } else {
-                    console.warn("Staff member from session no longer has access to this store's operations.");
-                    sessionStorage.removeItem(`currentStaff_${storeId}`); 
-                    setCurrentStaff(null);
-                    setIsEmployeeAuthDialogOpen(true);
-                 }
-            } else {
-                console.warn("Staff member from session no longer exists or has access to this store.");
-                sessionStorage.removeItem(`currentStaff_${storeId}`); 
-                setCurrentStaff(null);
-                setIsEmployeeAuthDialogOpen(true);
-            }
-        } catch (error) {
-            console.error("Error parsing staff data from session storage:", error);
-            sessionStorage.removeItem(`currentStaff_${storeId}`); 
+          const parsedStaff: Staff = JSON.parse(sessionStaffData);
+          const verifiedStaff = getStaffById(parsedStaff.id);
+          // Check if staff exists and has access to *this specific store* or all stores.
+          // Also, check if the store itself explicitly allows this staff member or allows all staff.
+          if (verifiedStaff && 
+              (verifiedStaff.accessibleStoreIds.length === 0 || verifiedStaff.accessibleStoreIds.includes(storeId)) &&
+              (store.allowedStaffIds.length === 0 || store.allowedStaffIds.includes(verifiedStaff.id))
+          ) {
+            setCurrentStaff(verifiedStaff);
+            setIsEmployeeAuthDialogOpen(false); // Ensure dialog is closed if staff is found
+          } else {
+            console.warn("Staff member from session no longer exists or has access to this store's operations.");
+            sessionStorage.removeItem(`currentStaff_${storeId}`);
             setCurrentStaff(null);
             setIsEmployeeAuthDialogOpen(true);
+          }
+        } catch (error) {
+          console.error("Error parsing staff data from session storage:", error);
+          sessionStorage.removeItem(`currentStaff_${storeId}`);
+          setCurrentStaff(null);
+          setIsEmployeeAuthDialogOpen(true);
         }
       } else {
+        // Store authenticated, but no employee in session, prompt for employee passkey
+        setCurrentStaff(null);
         setIsEmployeeAuthDialogOpen(true);
       }
     } else {
+      // Store not authenticated, redirect to store login
       router.replace(`/storeportal/${storeId}/login`);
     }
-    setIsLoading(false);
+    setIsLoading(false); // Stop loading after all checks
   }, [storeId, router, getStoreById, getStaffById, hasMounted]);
 
+  // This effect handles redirection based on allowed operations *after* authentication is confirmed.
   useEffect(() => {
-    if (hasMounted && storeId && isStoreAuthenticated && currentStaff && currentStore) {
-      const currentMode = nextSearchParams.get('mode');
-      const allowedOps = currentStore.allowedOperations || [];
-      
-      if (!currentMode) {
-        if (allowedOps.length > 0) {
-          router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
-        } else {
-           console.warn(`Store ${storeId} has no allowed operations configured. Defaulting to sell.`);
-           router.replace(`/storeportal/${storeId}/billing?mode=sell`);
-        }
-      } else if (currentMode && allowedOps.length > 0 && !allowedOps.includes(currentMode as any)) {
-        console.warn(`Mode ${currentMode} not allowed for store ${storeId}. Redirecting to ${allowedOps[0]}.`);
-        router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
-      }
+    if (!hasMounted || isLoading || !isStoreAuthenticated || !currentStaff || !currentStore) {
+      return; // Don't run if still loading or not fully authenticated
     }
-  }, [storeId, isStoreAuthenticated, currentStaff, nextSearchParams, router, currentStore, hasMounted]);
+
+    const currentMode = nextSearchParams.get('mode') as BillMode | null;
+    const allowedOps = currentStore.allowedOperations || [];
+    
+    if (allowedOps.length === 0) {
+      // This case should ideally be prevented by validation in StoreFormDialog (must select at least one op)
+      // Fallback: if no operations allowed, maybe show a message or default to 'sell' but form will restrict.
+      console.warn(`Store ${storeId} has no allowed operations configured. Defaulting to sell for URL.`);
+      if (currentMode !== 'sell') {
+        router.replace(`/storeportal/${storeId}/billing?mode=sell`);
+      }
+      return;
+    }
+
+    if (!currentMode) { // If no mode in URL, redirect to the first allowed operation
+      router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
+    } else if (!allowedOps.includes(currentMode)) { // If current URL mode is not allowed
+      console.warn(`Mode ${currentMode} not allowed for store ${storeId}. Redirecting to ${allowedOps[0]}.`);
+      router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
+    }
+    // If currentMode is present and allowed, no redirection is needed from this effect.
+  }, [storeId, isStoreAuthenticated, currentStaff, currentStore, nextSearchParams, router, hasMounted, isLoading]);
 
 
   const handleEmployeeAuthenticated = (staff: Staff) => {
     setCurrentStaff(staff);
-    sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify(staff)); 
+    if (hasMounted && storeId) {
+      sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify(staff));
+    }
     setIsEmployeeAuthDialogOpen(false);
   };
 
   const handleStoreLogout = () => {
-    sessionStorage.removeItem(`authenticatedStore_${storeId}`);
-    sessionStorage.removeItem(`currentStaff_${storeId}`);
+    if (hasMounted && storeId) {
+      sessionStorage.removeItem(`authenticatedStore_${storeId}`);
+      sessionStorage.removeItem(`currentStaff_${storeId}`);
+    }
     setCurrentStaff(null);
     setIsStoreAuthenticated(false);
-    router.push(`/storeportal/${storeId}/login`);
+    if (storeId) router.push(`/storeportal/${storeId}/login`);
+    else router.push('/storeportal');
   };
   
   const handleEmployeeSwitch = () => {
-    sessionStorage.removeItem(`currentStaff_${storeId}`);
+    if (hasMounted && storeId) {
+      sessionStorage.removeItem(`currentStaff_${storeId}`);
+    }
     setCurrentStaff(null);
     setIsEmployeeAuthDialogOpen(true);
   };
@@ -127,35 +150,62 @@ export default function StoreBillingPage() {
   if (!hasMounted || isLoading) { 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
+        <Image 
+          src="https://placehold.co/64x64.png" 
+          alt={`${APP_NAME} Logo`} 
+          width={48} 
+          height={48} 
+          className="mb-2 rounded-lg animate-pulse" 
+          data-ai-hint="logo company"
+        />
         <p className="text-lg text-muted-foreground">Loading Store Terminal...</p>
       </div>
     );
   }
   
+  // This covers the case where store isn't authenticated yet or doesn't exist after loading
   if (!isStoreAuthenticated || !currentStore) { 
     return (
          <div className="flex min-h-screen flex-col items-center justify-center p-4">
-            <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
+            <Image 
+              src="https://placehold.co/64x64.png" 
+              alt={`${APP_NAME} Logo`} 
+              width={48} 
+              height={48} 
+              className="mb-2 rounded-lg" 
+              data-ai-hint="logo company"
+            />
             <p className="text-lg text-muted-foreground mb-4">Redirecting to store login...</p>
          </div>
     );
   }
 
+  // This covers the case where employee isn't authenticated yet
   if (!currentStaff) {
     return (
       <>
         <EmployeePasskeyDialog
           isOpen={isEmployeeAuthDialogOpen}
           onOpenChange={(open) => {
-            if(!open && !currentStaff) { setIsEmployeeAuthDialogOpen(true); } // Force open if no staff
-            else { setIsEmployeeAuthDialogOpen(open); }
+            // Prevent closing if no staff and dialog is supposed to be open
+            if(!open && !currentStaff && isEmployeeAuthDialogOpen) { 
+                setIsEmployeeAuthDialogOpen(true); 
+            } else { 
+                setIsEmployeeAuthDialogOpen(open); 
+            }
           }}
           storeId={storeId}
           onAuthenticated={handleEmployeeAuthenticated}
         />
          <div className="flex min-h-screen flex-col items-center justify-center p-4">
-          <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
+          <Image 
+            src="https://placehold.co/64x64.png" 
+            alt={`${APP_NAME} Logo`} 
+            width={48} 
+            height={48} 
+            className="mb-2 rounded-lg" 
+            data-ai-hint="logo company"
+          />
           <p className="text-lg text-muted-foreground mb-4">Awaiting Employee Authentication for {currentStore.name}...</p>
           <Button onClick={() => setIsEmployeeAuthDialogOpen(true)}>Enter Employee Passkey</Button>
           <Button variant="link" onClick={handleStoreLogout} className="mt-6 text-sm">
@@ -166,10 +216,10 @@ export default function StoreBillingPage() {
     );
   }
   
-  const modeFromUrl = nextSearchParams.get('mode') as any;
+  const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6 h-screen"> {/* Ensure full height for chat layout */}
+    <div className="flex flex-col gap-6 p-4 md:p-6 h-screen">
       <PageTitle 
         title={`${currentStore.name} - Billing Terminal`}
         icon={ShoppingCart} 
@@ -201,12 +251,19 @@ export default function StoreBillingPage() {
 
       <Suspense fallback={
         <div className="flex-1 flex items-center justify-center">
-            <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
+            <Image 
+              src="https://placehold.co/64x64.png" 
+              alt={`${APP_NAME} Logo`} 
+              width={48} 
+              height={48} 
+              className="mb-2 rounded-lg animate-pulse" 
+              data-ai-hint="logo company"
+            />
             <p className="text-lg text-muted-foreground">Loading Billing Interface...</p>
         </div>
       }>
         <BillingForm 
-            key={modeFromUrl || 'default_store_bill_form'} // Ensure remount if mode changes
+            key={modeFromUrl || currentStore.id} // Key changes if mode or storeId changes, forcing remount
             initialModeProp={modeFromUrl}
             billedByStaffId={currentStaff.id}
             storeId={currentStore.id}
