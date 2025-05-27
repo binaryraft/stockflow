@@ -28,17 +28,32 @@ export default function AdminLayout({
     const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
     if (adminLoggedIn === 'true') {
       setIsAuthenticated(true);
-      setIsLoadingAuth(false); 
     } else {
+      setIsAuthenticated(false); // Explicitly set to false
       router.replace('/admin/login');
-      // It's important to set isLoadingAuth to false even when redirecting,
-      // so the "Redirecting to login..." message can appear if needed,
-      // rather than being stuck on "Checking authentication...".
-      setIsLoadingAuth(false); 
     }
+    setIsLoadingAuth(false); 
   }, [router, hasMounted]);
 
-  if (!hasMounted || isLoadingAuth) { 
+  if (!hasMounted) { 
+    // Minimal loader for the very first client render pass to avoid hydration issues
+    // if server rendered something different or nothing.
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Image 
+          src="https://placehold.co/128x128.png" 
+          alt={`${APP_NAME} Logo`} 
+          width={80} 
+          height={80} 
+          className="mb-6 rounded-xl shadow-lg animate-pulse"
+          data-ai-hint="logo company"
+        />
+        <p className="text-lg text-muted-foreground">Initializing Admin Portal...</p>
+      </div>
+    );
+  }
+
+  if (isLoadingAuth) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -55,23 +70,12 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // This state implies isLoadingAuth is false & isAuthenticated is false.
-    // router.replace should have been called. This UI is a fallback.
-    return (
-       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={80} 
-          height={80} 
-          className="mb-6 rounded-xl shadow-lg"
-          data-ai-hint="logo company"
-        />
-        <p className="text-lg text-muted-foreground">Redirecting to login...</p>
-      </div>
-    );
+    // If not authenticated, the useEffect above should have initiated a redirect.
+    // Returning null here means this layout renders nothing while navigation occurs.
+    // This prevents a flash of "Redirecting..." if the redirect is quick.
+    return null; 
   }
 
-  // If we reach here, isLoadingAuth is false, hasMounted is true, AND isAuthenticated is true.
+  // If we reach here, hasMounted is true, isLoadingAuth is false, AND isAuthenticated is true.
   return <AppShell>{children}</AppShell>;
 }
