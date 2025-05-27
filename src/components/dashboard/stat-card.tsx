@@ -2,6 +2,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
 
 interface StatCardProps {
   title: string;
@@ -9,13 +10,14 @@ interface StatCardProps {
   icon: LucideIcon;
   description?: string;
   isLoading?: boolean;
+  valueClassName?: string; // Added for custom value styling
 }
 
-export function StatCard({ title, value, icon: Icon, description, isLoading = false }: StatCardProps) {
+export function StatCard({ title, value, icon: Icon, description, isLoading = false, valueClassName }: StatCardProps) {
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground"> {/* Title uses muted-foreground */}
+        <CardTitle className="text-sm font-medium text-muted-foreground">
           {title}
         </CardTitle>
         <Icon className="h-5 w-5 text-muted-foreground" />
@@ -24,7 +26,7 @@ export function StatCard({ title, value, icon: Icon, description, isLoading = fa
         {isLoading ? (
           <Skeleton className="h-8 w-3/4" />
         ) : (
-          <div className="text-2xl font-bold text-primary">{value}</div> /* Value uses text-primary */
+          <div className={cn("text-2xl font-bold text-primary", valueClassName)}>{value}</div> 
         )}
         {description && !isLoading && (
           <p className="text-xs text-muted-foreground pt-1">{description}</p>

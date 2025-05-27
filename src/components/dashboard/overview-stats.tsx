@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { StatCard } from './stat-card';
-import { Package, DollarSign, ShoppingCart, AlertTriangle, Users } from 'lucide-react';
+import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive } from 'lucide-react'; // Added ReceiptText, Archive
 import { format } from 'date-fns';
 
 interface DailyStats {
@@ -13,12 +13,16 @@ interface DailyStats {
   purchasesToday: number;
   transactionsToday: number;
   defectivesToday: number;
+  lowStockCount: number; // Added for low stock
 }
 
+const LOW_STOCK_THRESHOLD = 5; // Define low stock threshold
+
 export function OverviewStats() {
-  const { products, bills } = useInventoryStore((state) => ({
+  const { products, bills, getLowStockProductCount } = useInventoryStore((state) => ({
     products: state.products,
     bills: state.bills,
+    getLowStockProductCount: state.getLowStockProductCount,
   }));
 
   const [stats, setStats] = useState<DailyStats>({
@@ -27,6 +31,7 @@ export function OverviewStats() {
     purchasesToday: 0,
     transactionsToday: 0,
     defectivesToday: 0,
+    lowStockCount: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -58,6 +63,7 @@ export function OverviewStats() {
     });
     
     const totalTrackedProducts = products.filter(p => p.trackQuantity).length;
+    const lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
 
     setStats({
       totalProducts: totalTrackedProducts,
@@ -65,12 +71,13 @@ export function OverviewStats() {
       purchasesToday: purchases,
       transactionsToday: transactions,
       defectivesToday: defectives,
+      lowStockCount: lowStock,
     });
     setIsLoading(false);
-  }, [products, bills]);
+  }, [products, bills, getLowStockProductCount]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"> {/* Adjusted for new stat card */}
       <StatCard
         title="Total Products"
         value={stats.totalProducts}
@@ -95,9 +102,17 @@ export function OverviewStats() {
       <StatCard
         title="Today's Transactions"
         value={stats.transactionsToday}
-        icon={Users} 
+        icon={ReceiptText} // Changed icon
         description="Total bills processed today"
         isLoading={isLoading}
+      />
+      <StatCard
+        title="Low Stock Products"
+        value={stats.lowStockCount}
+        icon={Archive} // Using Archive as a placeholder for low stock
+        description={`Products below ${LOW_STOCK_THRESHOLD} units`}
+        isLoading={isLoading}
+        valueClassName={stats.lowStockCount > 0 ? "text-destructive" : undefined} // Highlight if low stock
       />
       <StatCard
         title="Defectives Today"
@@ -105,6 +120,7 @@ export function OverviewStats() {
         icon={AlertTriangle}
         description="Items marked defective in returns today"
         isLoading={isLoading}
+        valueClassName={stats.defectivesToday > 0 ? "text-amber-600 dark:text-amber-500" : undefined} // Highlight if defectives
       />
     </div>
   );

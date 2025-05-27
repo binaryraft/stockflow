@@ -9,8 +9,8 @@ import { cn } from '@/lib/utils';
 
 interface CategorySearchInputProps {
   value: string;
-  onValueChange: (value: string) => void; // Used to update the form field
-  onCategorySelect?: (categoryName: string) => void; // Called when a suggestion is selected
+  onValueChange: (value: string) => void;
+  onCategorySelect?: (categoryName: string) => void;
   placeholder?: string;
   className?: string;
   inputRef?: React.RefObject<HTMLInputElement>;
@@ -33,7 +33,6 @@ export function CategorySearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Fetch suggestions when input has focus and value changes, or just on focus if value is empty
     if (showSuggestions) { 
       const foundCategories = searchCategories(value);
       setSuggestions(foundCategories);
@@ -44,11 +43,11 @@ export function CategorySearchInput({
   }, [value, searchCategories, showSuggestions]);
 
   const handleSelectCategory = useCallback((categoryName: string) => {
-    onValueChange(categoryName); // Update the form field directly
+    onValueChange(categoryName); 
     onCategorySelect?.(categoryName);
     setShowSuggestions(false);
     setSuggestions([]);
-    inputRef?.current?.blur(); // Optional: blur input after selection
+    inputRef?.current?.blur(); 
   }, [onValueChange, onCategorySelect, inputRef]);
   
   useEffect(() => {
@@ -60,6 +59,14 @@ export function CategorySearchInput({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement as Node)) {
+        setShowSuggestions(false);
+      }
+    }, 150); // Delay to allow click on suggestion to register
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showSuggestions && suggestions.length > 0) {
@@ -73,9 +80,9 @@ export function CategorySearchInput({
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < suggestions.length) {
           handleSelectCategory(suggestions[activeIndex]);
+        } else if (suggestions.length > 0) {
+          handleSelectCategory(suggestions[0]); // Auto-select first if no active index
         } else {
-          // If Enter is pressed without a suggestion selected, accept the current input value
-          // The onValueChange has already updated the form, so just hide suggestions
           setShowSuggestions(false);
           inputRef?.current?.blur();
         }
@@ -84,7 +91,6 @@ export function CategorySearchInput({
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      // If no suggestions shown, accept current input value
       setShowSuggestions(false);
       inputRef?.current?.blur();
     }
@@ -107,12 +113,12 @@ export function CategorySearchInput({
         onChange={(e) => onValueChange(e.target.value)}
         onFocus={() => {
             setShowSuggestions(true);
-            // Fetch initial suggestions when focusing, even if input is empty
-             const foundCategories = searchCategories(value);
-             setSuggestions(foundCategories);
-             setActiveIndex(-1);
+            const foundCategories = searchCategories(value);
+            setSuggestions(foundCategories);
+            setActiveIndex(-1);
         }}
         onKeyDown={handleKeyDown}
+        onBlur={handleInputBlur} // Added onBlur handler
         placeholder={placeholder}
         autoComplete="off"
         className="w-full"

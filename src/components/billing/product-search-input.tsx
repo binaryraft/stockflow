@@ -12,11 +12,11 @@ interface ProductSearchInputProps {
   value: string;
   onValueChange: (value: string) => void;
   onProductSelect: (product: Product) => void;
-  onEnterWithoutSelection?: () => void; // Called when Enter is pressed and no suggestion is active/selected
+  onEnterWithoutSelection?: () => void;
   placeholder?: string;
   className?: string;
   inputRef?: React.RefObject<HTMLInputElement>;
-  id?: string; // Added id prop
+  id?: string;
 }
 
 export function ProductSearchInput({
@@ -27,7 +27,7 @@ export function ProductSearchInput({
   placeholder = "Type product name...",
   className,
   inputRef,
-  id // Consumed id prop
+  id
 }: ProductSearchInputProps) {
   const [suggestions, setSuggestions] = useState<Product[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -40,7 +40,7 @@ export function ProductSearchInput({
       const foundProducts = searchProducts(value);
       setSuggestions(foundProducts);
       setShowSuggestions(true);
-      setActiveIndex(-1); // Reset active index on new suggestions
+      setActiveIndex(-1); 
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -48,11 +48,10 @@ export function ProductSearchInput({
   }, [value, searchProducts]);
 
   const handleSelectProduct = useCallback((product: Product) => {
-    onProductSelect(product); // This will call BillingForm's handleProductSelect
-    onValueChange(product.name); // Update input to selected product name
+    onProductSelect(product); 
+    onValueChange(product.name); 
     setShowSuggestions(false);
     setSuggestions([]);
-    // Focus is managed by the parent component (BillingForm) after selection
   }, [onProductSelect, onValueChange]);
   
   useEffect(() => {
@@ -65,6 +64,13 @@ export function ProductSearchInput({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    setTimeout(() => {
+      if (containerRef.current && !containerRef.current.contains(document.activeElement as Node)) {
+        setShowSuggestions(false);
+      }
+    }, 150); // Delay to allow click on suggestion to register
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (showSuggestions && suggestions.length > 0) {
@@ -77,22 +83,17 @@ export function ProductSearchInput({
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < suggestions.length) {
-          // User explicitly selected a suggestion with arrow keys
           handleSelectProduct(suggestions[activeIndex]);
         } else if (suggestions.length > 0) { 
-          // No explicit selection, but suggestions exist. Auto-select the first one.
-          handleSelectProduct(suggestions[0]); 
+          handleSelectProduct(suggestions[0]); // Auto-select the first suggestion
         } 
-        // Note: Removed the 'else if (onEnterWithoutSelection)' from here.
-        // onEnterWithoutSelection will be called if suggestions.length is 0 (see below)
-        // or if the specific logic in BillingForm decides it's a "not found" scenario.
       } else if (e.key === 'Escape') {
         setShowSuggestions(false);
       }
-    } else if (e.key === 'Enter') { // No suggestions were visible (suggestions.length === 0)
+    } else if (e.key === 'Enter') { 
       e.preventDefault();
       if (onEnterWithoutSelection) {
-        onEnterWithoutSelection(); // This triggers "product not found / add new" flow in BillingForm
+        onEnterWithoutSelection(); 
       }
     }
   };
@@ -108,13 +109,14 @@ export function ProductSearchInput({
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
       <Input
-        id={id} // Applied id prop
+        id={id} 
         ref={inputRef}
         type="text"
         value={value}
         onChange={(e) => onValueChange(e.target.value)}
-        onFocus={() => value && searchProducts(value).length > 0 && setShowSuggestions(true)} // Re-check suggestions on focus
+        onFocus={() => value && searchProducts(value).length > 0 && setShowSuggestions(true)} 
         onKeyDown={handleKeyDown}
+        onBlur={handleInputBlur} // Added onBlur handler
         placeholder={placeholder}
         autoComplete="off"
         className="w-full"
@@ -131,7 +133,7 @@ export function ProductSearchInput({
                     "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
                     index === activeIndex && "bg-accent text-accent-foreground"
                   )}
-                  onMouseDown={(e) => { // Using onMouseDown to ensure it fires before onBlur
+                  onMouseDown={(e) => { 
                      e.preventDefault(); 
                      handleSelectProduct(product);
                   }}

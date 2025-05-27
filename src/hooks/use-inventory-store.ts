@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption } from '@/types'; // Renamed ProductVariant to ProductVariantType
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
@@ -19,6 +19,7 @@ interface InventoryState {
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
   searchProducts: (searchTerm: string) => Product[];
+  getLowStockProductCount: (threshold: number) => number; // New selector
   
   addBill: (billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount'>, items: Omit<BillItem, 'id'|'productName'>[]) => Bill;
   getBillById: (billId: string) => Bill | undefined;
@@ -30,10 +31,10 @@ interface InventoryState {
 }
 
 const initialProducts: Product[] = [
-  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 50, costPrice: 0.5, sellPrice: 1, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 3, costPrice: 0.5, sellPrice: 1, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
   { id: generateId(), name: 'Whole Wheat Bread', category: 'Bakery', trackQuantity: true, quantityInStock: 30, costPrice: 1.5, sellPrice: 3, description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
   { id: generateId(), name: 'Laptop Pro 15-inch', category: 'Electronics', trackQuantity: true, quantityInStock: 10, costPrice: 800, sellPrice: 1200, description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
-  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 20, costPrice: 5, sellPrice: 8.5, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`, variants: []},
+  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 2, costPrice: 5, sellPrice: 8.5, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`, variants: []},
   { id: generateId(), name: 'Service Charge', category: 'Services', trackQuantity: false, quantityInStock: 0, costPrice: 0, sellPrice: 10, description: "Standard service charge for repairs.", variants: [] },
 ];
 
@@ -90,26 +91,31 @@ export const useInventoryStore = create<InventoryState>()(
       updateProduct: (productId, productData) => {
         const productVariants: ProductVariantType[] | undefined = productData.variants 
           ? productData.variants.map((variantData, variantIdx) => ({
-              id: `variant-${generateId()}-${variantIdx}`, // Consider keeping old IDs if possible for complex updates
+              // Ensure existing variant IDs are preserved if they exist, generate for new ones
+              id: (get().products.find(p => p.id === productId)?.variants?.find(v => v.name === variantData.name)?.id) || `variant-${generateId()}-${variantIdx}`,
               name: variantData.name,
               options: variantData.options.map((optData, optIdx) => ({
-                id: `option-${generateId()}-${variantIdx}-${optIdx}`, // Same ID consideration
+                // Ensure existing option IDs are preserved if they exist, generate for new ones
+                id: (get().products.find(p => p.id === productId)?.variants?.find(v => v.name === variantData.name)?.options.find(o => o.value === optData.value)?.id) || `option-${generateId()}-${variantIdx}-${optIdx}`,
                 value: optData.value,
               })),
             }))
           : undefined;
-
+      
         set((state) => ({
           products: state.products.map((p) =>
             p.id === productId 
             ? { 
                 ...p, 
                 ...productData, 
-                variants: productVariants || p.variants // If productData.variants is undefined, keep existing p.variants
+                variants: productVariants || p.variants, 
+                // Ensure quantityInStock is correctly updated when trackQuantity changes or initialStock is modified
+                quantityInStock: productData.trackQuantity === false ? 0 : (productData.initialStock !== undefined ? productData.initialStock : p.quantityInStock)
               } 
             : p
           ),
         }));
+
         if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
           get().addCategory(productData.category!);
         }
@@ -131,13 +137,17 @@ export const useInventoryStore = create<InventoryState>()(
         );
       },
 
+      getLowStockProductCount: (threshold: number) => {
+        return get().products.filter(p => p.trackQuantity && p.quantityInStock < threshold).length;
+      },
+
       addBill: (billData, billItemsData) => {
         const currentDate = new Date();
         const newBillItems: BillItem[] = billItemsData.map(itemData => {
           const product = get().getProductById(itemData.productId);
           return {
             id: generateId(),
-            productName: product?.name || 'Unknown Product',
+            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? itemData.productName : 'Unknown Product'), // Handle service item name
             productId: itemData.productId,
             quantity: itemData.quantity,
             costPrice: itemData.costPrice,
@@ -165,6 +175,7 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (billData.type === 'buy') {
           newBillItems.forEach(item => {
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });
@@ -175,6 +186,7 @@ export const useInventoryStore = create<InventoryState>()(
           });
         } else if (billData.type === 'sell') {
           newBillItems.forEach(item => {
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity) {
               get().updateProduct(item.productId, { quantityInStock: Math.max(0, product.quantityInStock - item.quantity) });
@@ -182,6 +194,7 @@ export const useInventoryStore = create<InventoryState>()(
           });
         } else if (billData.type === 'return') {
            newBillItems.forEach(item => {
+            if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip stock update for service items
             const product = get().getProductById(item.productId);
             if (product && product.trackQuantity && !item.isDefective) {
               get().updateProduct(item.productId, { quantityInStock: product.quantityInStock + item.quantity });

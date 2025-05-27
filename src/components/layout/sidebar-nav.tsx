@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils';
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package2 } from 'lucide-react'; 
+import { Package2, ChevronRight, PanelLeftOpen } from 'lucide-react'; 
+import { Button } from '@/components/ui/button';
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -17,13 +18,35 @@ export function SidebarNav() {
     <Sidebar className="border-r" collapsible="icon"> 
       <SidebarHeader>
         <div className={cn("flex items-center", sidebarState === 'expanded' ? "justify-between" : "justify-center")}>
-            <Link href="/" className={cn("flex items-center gap-2 font-semibold text-lg text-primary hover:text-primary/80", sidebarState === 'collapsed' && "w-full justify-center")}>
+          {sidebarState === 'expanded' ? (
+            <Link href="/" className="flex items-center gap-2 font-semibold text-lg text-primary hover:text-primary/80">
               <Package2 className="h-7 w-7" />
-              {sidebarState === 'expanded' && <span className="truncate">{APP_NAME}</span>}
+              <span className="truncate">{APP_NAME}</span>
             </Link>
+          ) : (
+            // When collapsed, header logo acts as expand button
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-10 w-10 text-primary hover:text-primary/80" // Ensure icon color
+              onClick={toggleSidebar}
+              aria-label="Expand sidebar"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </Button>
+          )}
+          
           {/* Desktop sidebar toggle button - shown when expanded to allow collapsing */}
           {sidebarState === 'expanded' && (
-            <SidebarTrigger className="ml-auto hidden md:flex" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 ml-auto hidden md:flex" 
+              onClick={toggleSidebar}
+              aria-label="Collapse sidebar"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </Button>
           )}
         </div>
       </SidebarHeader>
