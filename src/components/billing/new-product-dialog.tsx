@@ -21,11 +21,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, ProductSKU } from '@/types';
 import { CategorySearchInput } from './category-search-input';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+
 
 const productOptionSchema = z.object({
   value: z.string().min(1, "Option value cannot be empty"),
@@ -41,10 +43,10 @@ const newProductSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  initialStock: z.coerce.number().min(0).optional().default(0),
-  costPrice: z.coerce.number().min(0).optional().default(0),
-  sellPrice: z.coerce.number().min(0).optional().default(0),
-  sku: z.string().optional(),
+  initialStock: z.coerce.number().min(0).optional().default(0), // For default SKU if no variants
+  costPrice: z.coerce.number().min(0).optional().default(0),    // For default SKU if no variants
+  sellPrice: z.coerce.number().min(0).optional().default(0),    // For default SKU if no variants
+  sku: z.string().optional(), // Base SKU, individual SKUs generated
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -86,7 +88,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
           appendOption({ value: '' });
           setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
         } else {
-          setFocus(`variants.${variantIndex}.options.0.value`);
+          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
         }
       }
   }
@@ -95,9 +97,14 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     <div className="space-y-3 border border-primary/20 p-4 rounded-md bg-tertiary">
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium">Variant {variantIndex + 1}</Label>
-        <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant">
-          <Trash2 className="h-4 w-4 text-destructive"/>
-        </Button>
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant">
+                    <Trash2 className="h-4 w-4 text-destructive"/>
+                </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Remove this variant type</p></TooltipContent>
+        </Tooltip>
       </div>
       <Input 
         {...register(`variants.${variantIndex}.name`)} 
@@ -118,9 +125,14 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
-              <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option">
-                <Trash2 className="h-3 w-3 text-destructive"/>
-              </Button>
+               <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option">
+                        <Trash2 className="h-3 w-3 text-destructive"/>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Remove this option</p></TooltipContent>
+              </Tooltip>
             )}
           </div>
         ))}
@@ -197,14 +209,19 @@ export function NewProductDialog({
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
+        // For editing, productSKUs provide the source of truth for non-variant products
+        const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0) 
+                            ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) 
+                            : null;
         formReset({
           name: editingProduct.name,
           description: editingProduct.description || '',
           category: editingProduct.category || '',
           trackQuantity: editingProduct.trackQuantity,
-          initialStock: editingProduct.quantityInStock, 
-          costPrice: editingProduct.costPrice,
-          sellPrice: editingProduct.sellPrice,
+          // initialStock, costPrice, sellPrice are for the default SKU if no variants
+          initialStock: defaultSku ? defaultSku.quantityInStock : 0, 
+          costPrice: defaultSku ? defaultSku.costPrice : 0,
+          sellPrice: defaultSku ? defaultSku.sellPrice : 0,
           sku: editingProduct.sku || '',
           expiryDate: editingProduct.expiryDate || '',
           variants: editingProduct.variants?.map(v => ({
@@ -212,7 +229,7 @@ export function NewProductDialog({
             options: v.options.map(o => ({ value: o.value }))
           })) || [],
         });
-      } else {
+      } else { // Adding new product
         const shouldTrack = initialQuantityForDialog !== undefined; 
         formReset({
           name: initialProductName || '',
@@ -239,39 +256,43 @@ export function NewProductDialog({
   ]);
 
   const trackQuantityValue = watch('trackQuantity');
+  const hasVariants = watch('variants', []).length > 0;
+
 
   const onSubmit = (data: NewProductFormData) => {
-    const productPayload = {
+    const productPayloadBase = {
         name: data.name,
         description: data.description,
         category: data.category,
         trackQuantity: data.trackQuantity,
-        initialStock: data.trackQuantity ? data.initialStock : 0, 
-        quantityInStock: data.trackQuantity ? data.initialStock : 0, // quantityInStock will be initialStock for new, or existing for update
-        costPrice: data.costPrice || 0,
-        sellPrice: data.sellPrice || 0,
         sku: data.sku,
         expiryDate: data.expiryDate,
-        variants: data.variants, 
+        variants: data.variants, // This is ProductVariantFormSchema[]
     };
     
-    // When updating, ensure quantityInStock from editingProduct is used if trackQuantity is true
-    // This is crucial because initialStock in the form might be what the user types, not necessarily the current stock
-    const finalPayload = editingProduct ? {
-      ...productPayload,
-      quantityInStock: data.trackQuantity ? data.initialStock : 0 // When editing, initialStock field represents new stock value
-    } : {
-      ...productPayload,
-      quantityInStock: data.trackQuantity ? data.initialStock : 0 // For new products, initialStock is quantityInStock
-    };
-
+    let finalPayload: any;
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, finalPayload as Partial<Omit<Product, 'id' | 'imageUrl'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      // When editing, we pass the base data and variants.
+      // The store's updateProduct logic will handle SKUs based on these variants.
+      // If it's a non-variant product, we also pass the updated price/stock for its default SKU.
+      const defaultSkuUpdates = (!data.variants || data.variants.length === 0) 
+        ? { initialStock: data.initialStock, costPrice: data.costPrice, sellPrice: data.sellPrice } 
+        : {};
+
+      finalPayload = { ...productPayloadBase, ...defaultSkuUpdates };
+      updateProduct(editingProduct.id, finalPayload as Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      onProductAdd?.( { ...editingProduct, ...finalPayload } as Product);
-    } else {
-      const addedProduct = addProduct(finalPayload as Omit<Product, 'id' | 'imageUrl'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      const updatedProduct = { ...editingProduct, ...finalPayload } as Product; // This is a simplified representation for callback
+      onProductAdd?.(updatedProduct);
+    } else { // Adding new product
+        finalPayload = {
+          ...productPayloadBase,
+          initialStock: (!data.variants || data.variants.length === 0) ? data.initialStock : undefined, // only for non-variant
+          costPrice: (!data.variants || data.variants.length === 0) ? data.costPrice : undefined,       // only for non-variant
+          sellPrice: (!data.variants || data.variants.length === 0) ? data.sellPrice : undefined,       // only for non-variant
+        };
+      const addedProduct = addProduct(finalPayload as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
       onProductAdd?.(addedProduct);
     }
@@ -338,37 +359,52 @@ export function NewProductDialog({
 
             {trackQuantityValue && (
               <>
+                {!hasVariants && ( // Only show these if NOT a variant product
+                  <>
+                  <div>
+                    <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
+                    <Input id="initialStock" type="number" {...register("initialStock")} />
+                    {formState.errors.initialStock && <p className="text-sm text-destructive mt-1">{formState.errors.initialStock.message}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="costPrice">Cost Price*</Label>
+                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
+                      {formState.errors.costPrice && <p className="text-sm text-destructive mt-1">{formState.errors.costPrice.message}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="sellPrice">Sell Price*</Label>
+                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
+                      {formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{formState.errors.sellPrice.message}</p>}
+                    </div>
+                  </div>
+                  </>
+                )}
                 <div>
-                  <Label htmlFor="initialStock">{editingProduct ? 'Current Stock Quantity*' : 'Initial Stock Quantity*'}</Label>
-                  <Input id="initialStock" type="number" {...register("initialStock")} />
-                  {formState.errors.initialStock && <p className="text-sm text-destructive mt-1">{formState.errors.initialStock.message}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="sku">SKU (Stock Keeping Unit)</Label>
+                  <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional, for base product)</span></Label>
                   <Input id="sku" {...register("sku")} />
                 </div>
                 <div>
-                  <Label htmlFor="expiryDate">Expiry Date</Label>
+                  <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                   <Input id="expiryDate" type="date" {...register("expiryDate")} />
                 </div>
               </>
             )}
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="costPrice">Cost Price*</Label>
-                <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
-                {formState.errors.costPrice && <p className="text-sm text-destructive mt-1">{formState.errors.costPrice.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="sellPrice">Sell Price*</Label>
-                <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
-                {formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{formState.errors.sellPrice.message}</p>}
-              </div>
-            </div>
+            {/* Hide top-level price/stock if variants exist, as these are SKU specific */}
+            {hasVariants && trackQuantityValue && (
+                <p className="text-xs text-muted-foreground italic">
+                    For products with variants, stock and pricing are managed per specific combination (SKU) and typically set during purchase/expense bills.
+                </p>
+            )}
+
 
             <Separator/>
             <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
+            <p className="text-xs text-muted-foreground -mt-2 mb-2">
+                Define variant types like 'Color' or 'Size'. Options for each variant (e.g., Red, Blue; Small, Medium) are added below.
+                Pricing and stock for each specific combination will be set via Expense Bills.
+            </p>
             {formState.errors.variants?.root && <p className="text-sm text-destructive mt-1">{formState.errors.variants.root.message}</p>}
 
             {variantFields.map((variantField, variantIndex) => (
@@ -404,5 +440,3 @@ export function NewProductDialog({
     </Dialog>
   );
 }
-
-    
