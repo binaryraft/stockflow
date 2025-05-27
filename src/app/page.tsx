@@ -1,13 +1,13 @@
 
-"use client"; // Assuming some landing components might use client hooks eventually
+"use client";
 
-import { LandingHeader } from '@/components/landing/landing-header';
-import { HeroSection } from '@/components/landing/hero-section';
-import { FeaturesSection } from '@/components/landing/features-section';
-import { PricingSectionLanding } from '@/components/landing/pricing-section-landing';
-import { OtherSection } from '@/components/landing/other-section';
-import { ContactSection } from '@/components/landing/contact-section';
-import { LandingFooter } from '@/components/landing/landing-footer';
+import { LandingHeader } from '@/components/landing/LandingHeader';
+import { HeroSection } from '@/components/landing/HeroSection';
+import { FeaturesSection } from '@/components/landing/FeaturesSection';
+import { PricingSectionLanding } from '@/components/landing/PricingSectionLanding';
+import { OtherSection } from '@/components/landing/OtherSection';
+import { ContactSection } from '@/components/landing/ContactSection';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 
 export default function HomePage() {
   return (
