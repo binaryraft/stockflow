@@ -115,26 +115,28 @@ export function BillHistoryTable() {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; }\n" +
-        "  .print-container { max-width: 750px; margin: auto; }\n" +
-        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section { margin-bottom: 20px; padding: 15px; border: 1px solid #eee; border-radius: 8px; }\n" +
-        "  .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 25px; }\n" +
-        "  .header h1 { margin: 0 0 5px 0; color: #000; font-size: 24px; }\n" +
-        "  .header p { margin: 0; font-size: 12px; color: #555; }\n" +
-        "  h2, h3, h4 { color: #333; margin-top: 0; margin-bottom: 10px;}\n" +
-        "  h2 { font-size: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px;}\n" +
-        "  table { width: 100%; border-collapse: collapse; margin-top: 10px; }\n" +
-        "  th, td { border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 14px; }\n" +
-        "  th { background-color: #f9f9f9; font-weight: 600; }\n" +
+        "  body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 10pt; }\n" +
+        "  @page { size: auto; margin: 0.5in; }\n" +
+        "  .print-container { width: 100%; margin: 0; padding:0; }\n" +
+        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section { margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; page-break-inside: avoid; }\n" +
+        "  .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 20px; }\n" +
+        "  .header h1 { margin: 0 0 3px 0; font-size: 16pt; font-weight: bold; }\n" +
+        "  .header p { margin: 0; font-size: 9pt; color: #333; }\n" +
+        "  h2, h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px; }\n" +
+        "  h4 { font-size: 11pt; }\n" +
+        "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
+        "  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
+        "  th { background-color: #f2f2f2; font-weight: bold; }\n" +
         "  .text-right { text-align: right; }\n" +
-        "  .font-medium { font-weight: 500; }\n" +
-        "  .text-muted-foreground { color: #777; font-size: 0.9em; }\n" +
-        "  .badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.375rem; }\n" +
-        "  .badge-destructive { color: #fff; background-color: #dc3545; }\n" + // Kept for explicit print styling if needed
-        "  .badge-success { color: #fff; background-color: #28a745; } \n" + // Kept for explicit print styling if needed
-        "  .total-row td { font-weight: bold; background-color: #f9f9f9; }\n" +
-        "  .items-section .variant-options { font-size: 0.85em; color: #555; margin-left: 10px; }\n" +
-        "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #fdfdfd; padding: 10px; border-radius: 4px; }\n" +
+        "  .font-medium { font-weight: bold; }\n" +
+        "  .text-muted-foreground { color: #555; font-size: 0.9em; }\n" +
+        "  .badge { display: inline-block; padding: 0.2em 0.5em; font-size: 0.8em; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.25rem; border: 1px solid #ccc; }\n" +
+        "  .badge-destructive { color: #000; background-color: #fdd; border-color: #fbb; }\n" +
+        "  .badge-success { color: #000; background-color: #dfd; border-color: #bfb; }\n" +
+        "  .total-row td { font-weight: bold; background-color: #f2f2f2; }\n" +
+        "  .items-section .variant-options { font-size: 0.8em; color: #444; margin-left: 8px; margin-top: 2px; display: block; }\n" +
+        "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 8px; border-radius: 3px; border: 1px solid #eee; }\n" +
+        "  .no-print { display: none !important; } \n" +
         "</style>\n";
       printWindow.document.write(styles);
       
@@ -152,8 +154,8 @@ export function BillHistoryTable() {
       printWindow.document.write('<table><tr><td style="width:50%; vertical-align:top;">');
       if (billToPrint.vendorOrCustomerName || billToPrint.customerPhone) {
         printWindow.document.write('<div class="bill-to">');
-        printWindow.document.write(`<h4>${billToPrint.type === 'buy' ? 'Vendor Details' : 'Customer Details'}</h4>`);
-        if (billToPrint.vendorOrCustomerName) printWindow.document.write(`<p><strong>Name:</strong> ${billToPrint.vendorOrCustomerName}</p>`);
+        printWindow.document.write(`<h4>${getPartyDetailsTitle(billToPrint.type)}</h4>`);
+        if (billToPrint.vendorOrCustomerName) printWindow.document.write(`<p><strong>${getPartyNameLabel(billToPrint.type)}:</strong> ${billToPrint.vendorOrCustomerName}</p>`);
         if (billToPrint.customerPhone) printWindow.document.write(`<p><strong>Phone:</strong> ${billToPrint.customerPhone}</p>`);
         printWindow.document.write('</div>');
       }
@@ -259,7 +261,7 @@ export function BillHistoryTable() {
     <>
       {selectedBill && (
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh]"> {/* Increased width for better layout */}
+          <DialogContent className="sm:max-w-3xl max-h-[90vh]"> 
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
                 {React.cloneElement(getBillTypeIconAndColor(selectedBill).icon, { className: cn(getBillTypeIconAndColor(selectedBill).icon.props.className, "h-5 w-5")})}
@@ -272,7 +274,6 @@ export function BillHistoryTable() {
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
             <div className="space-y-6 py-2 px-2">
 
-              {/* Company Info Section */}
               <div className="p-4 border rounded-md bg-card shadow-sm">
                   <h3 className="text-lg font-semibold text-primary mb-2">{COMPANY_NAME}</h3>
                   <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
@@ -281,7 +282,6 @@ export function BillHistoryTable() {
               <Separator />
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                 {/* Party Details Section */}
                 {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
                     <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
                     <h4 className="text-md font-semibold text-foreground mb-1">
@@ -302,7 +302,6 @@ export function BillHistoryTable() {
                     </div>
                 )}
 
-                {/* Bill Information Section */}
                 <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
                     <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
                     <div>
@@ -321,7 +320,6 @@ export function BillHistoryTable() {
               </div>
 
 
-              {/* Items Section */}
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
                 <Table className="mt-0">
@@ -336,7 +334,7 @@ export function BillHistoryTable() {
                   </TableHeader>
                   <TableBody>
                     {selectedBill.items.map(item => (
-                      <TableRow key={item.id || item.productId}> {/* Added fallback key */}
+                      <TableRow key={item.id || item.productId}> 
                         <TableCell className="py-3">
                           <div>{item.productName}</div>
                           {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
@@ -364,7 +362,6 @@ export function BillHistoryTable() {
                 </Table>
               </div>
 
-              {/* Notes Section */}
               {selectedBill.notes && (
                 <div className="p-4 border rounded-md bg-tertiary shadow-sm">
                     <h4 className="text-md font-semibold text-tertiary-foreground mb-1">Notes:</h4>
@@ -374,7 +371,6 @@ export function BillHistoryTable() {
                 </div>
               )}
 
-              {/* Summary Section */}
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-2">Summary</h4>
                 <div className="space-y-1">
@@ -452,15 +448,15 @@ export function BillHistoryTable() {
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
-                  <TableCell className="py-2 px-3">
+                  <TableCell className="py-2 px-3 w-[150px]">
                     <div className="flex flex-col items-start leading-tight">
                       <span className="text-lg font-bold text-primary">{format(billDate, 'EEE')}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'MMM dd, yyyy')}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs py-3 px-4">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4">
+                  <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
+                  <TableCell className="py-3 px-4 w-[180px]">
                     <Badge
                       className={cn("capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", billDisplayInfo.className)}
                     >
@@ -472,9 +468,9 @@ export function BillHistoryTable() {
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
                       {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4">{bill.items.length}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary py-3 px-4">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-right py-3 px-4">
+                  <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
+                  <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right py-3 px-4 w-[80px]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">

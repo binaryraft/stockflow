@@ -102,7 +102,7 @@ export function BillingForm() {
     setProductNameQuery(product.name);
     setCurrentProductForSelection(product);
     setSelectedVariantOptions({});
-    setVariantDropdownOpenState({}); // Reset open states for variants
+    setVariantDropdownOpenState({}); 
     setProductNotFoundHint('');
   
     if (mode === 'sell' || mode === 'return') {
@@ -113,52 +113,47 @@ export function BillingForm() {
       setSellPrice(product.sellPrice);
     }
   
-    // Auto-open first variant dropdown if variants exist
     if (product.variants && product.variants.length > 0) {
       const firstVariantId = product.variants[0].id;
       setVariantDropdownOpenState({ [firstVariantId]: true });
-      // Focus will be handled by useEffect watching currentProductForSelection & variantDropdownOpenState
     } else {
-      // No variants, focus quantity
       quantityInputRef.current?.focus();
       quantityInputRef.current?.select();
     }
   };
   
-  // Effect to handle focus and opening of variant dropdowns after product selection
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
       const firstVariant = currentProductForSelection.variants[0];
-      if (firstVariant && variantDropdownOpenState[firstVariant.id]) { // Check if it's meant to be open
+      if (firstVariant && variantDropdownOpenState[firstVariant.id]) {
         const firstVariantRef = variantSelectRefs.current[firstVariant.id];
-        setTimeout(() => { // Delay to allow DOM update
-          if (firstVariantRef?.current) {
-            firstVariantRef.current.focus();
-          } else {
-            const el = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
-            (el as HTMLElement)?.focus();
-          }
+        setTimeout(() => {
+            if (firstVariantRef?.current) {
+                firstVariantRef.current.focus();
+            } else { // Fallback if ref not ready
+                const el = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
+                (el as HTMLElement)?.focus();
+            }
         }, 0);
       }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
 
 
-  // Effect to move focus to quantity after all variants are selected
   useEffect(() => {
     if (currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
       const allVariantsSelected = currentProductForSelection.variants.every(
         (v) => selectedVariantOptions[v.name]
       );
       if (allVariantsSelected) {
-        // Check if any variant dropdown is currently open or was the last active element that triggered this
         const anyDropdownOpen = Object.values(variantDropdownOpenState).some(isOpen => isOpen);
         const activeElement = document.activeElement;
         const isVariantSelectFocused = currentProductForSelection.variants.some(variant => 
             activeElement?.id === `variant-select-${variant.id}-trigger`
         );
+        const isQuantityFocused = activeElement?.id === quantityInputRef.current?.id;
 
-        if (!anyDropdownOpen && !isVariantSelectFocused && activeElement?.id !== quantityInputRef.current?.id) {
+        if (!anyDropdownOpen && !isVariantSelectFocused && !isQuantityFocused) {
              quantityInputRef.current?.focus();
              quantityInputRef.current?.select();
         }
@@ -192,7 +187,6 @@ export function BillingForm() {
       );
       if (!allVariantsSelected) {
         toast({ variant: "destructive", title: "Variant Selection Required", description: "Please select options for all product variants." });
-        // Try to focus the first unselected variant
         const firstUnselectedVariant = product.variants.find(v => !selectedVariantOptions[v.name]);
         if (firstUnselectedVariant) {
             setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
@@ -253,7 +247,7 @@ export function BillingForm() {
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-                        setTimeout(() => variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus(), 0);
+                        // Focus will be handled by useEffect for variant dropdown open state
                     } else { 
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
@@ -307,7 +301,7 @@ export function BillingForm() {
 
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      productName: item.productName, // Added for service items
+      productName: item.productName, 
       quantity: item.quantity,
       costPrice: item.costPrice,
       sellPrice: item.sellPrice,
@@ -362,11 +356,11 @@ export function BillingForm() {
     const amount = parseFloat(serviceAmount.toString());
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, // Special ID for service items
+      productId: `SERVICE_ITEM_${uuidv4()}`, 
       productName: serviceDescription,
       quantity: 1,
       costPrice: mode === 'buy' ? amount : 0,
-      sellPrice: amount, // For sell mode, sellPrice is amount. For buy, costPrice = sellPrice = amount
+      sellPrice: amount, 
       isDefective: undefined,
       selectedVariantOptions: undefined,
     };
@@ -426,8 +420,13 @@ export function BillingForm() {
             
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
               <h3 className="text-lg font-medium text-foreground">Add Item</h3>
-              <div className={cn(`grid ${mode === 'sell' || mode === 'return' ? 'grid-cols-1 md:grid-cols-[2fr_auto_1fr]' : 'grid-cols-1 md:grid-cols-[2fr_auto_1fr_1fr_1fr]'} gap-4 items-baseline`)}>
-                  <div className="space-y-1.5 flex-grow">
+              <div className={cn(
+                "grid gap-4 items-baseline",
+                "grid-cols-1", // Mobile default
+                mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto]" : "md:grid-cols-[1fr_auto]" // Desktop: 4 cols for buy, 2 for sell/return
+              )}>
+                  {/* Column 1: Product Name + Edit Button */}
+                  <div className="space-y-1.5"> {/* Container for product name and its label/hints */}
                     <Label htmlFor="productNameGlobal">Product Name</Label>
                     <div className="flex items-center gap-2">
                         <ProductSearchInput
@@ -438,6 +437,7 @@ export function BillingForm() {
                         onEnterWithoutSelection={() => handleEnterNavigation('productName')}
                         placeholder={mode === 'return' ? 'Search product being returned' : 'Scan or type product name'}
                         id="productNameGlobal"
+                        className="flex-grow"
                         />
                         {currentProductForSelection && (
                         <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
@@ -454,8 +454,8 @@ export function BillingForm() {
                     )}
                   </div>
 
-
-                  <div className="space-y-1.5 w-24 shrink-0"> 
+                  {/* Column 2: Quantity */}
+                  <div className="space-y-1.5 w-full md:w-24"> {/* Full width on mobile, fixed on md+ */}
                     <Label htmlFor="quantityGlobal">Quantity</Label>
                     <Input
                       id="quantityGlobal"
@@ -468,9 +468,10 @@ export function BillingForm() {
                       min="1"
                     />
                   </div>
+                  {/* Column 3 & 4: Cost & Sell Price (Buy mode only) */}
                   {mode === 'buy' && (
                     <>
-                    <div className="space-y-1.5 w-32 shrink-0"> 
+                    <div className="space-y-1.5 w-full md:w-32">  {/* Full width on mobile, fixed on md+ */}
                         <Label htmlFor="costPrice">Cost Price</Label>
                         <Input
                         id="costPrice"
@@ -483,7 +484,7 @@ export function BillingForm() {
                         step="0.01" min="0"
                         />
                     </div>
-                    <div className="space-y-1.5 w-32 shrink-0"> 
+                    <div className="space-y-1.5 w-full md:w-32">  {/* Full width on mobile, fixed on md+ */}
                         <Label htmlFor="sellPrice">Sell Price</Label>
                         <Input
                         id="sellPrice"
@@ -513,16 +514,11 @@ export function BillingForm() {
                         open={variantDropdownOpenState[variant.id] || false}
                         onOpenChange={(isOpen) => {
                           setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
-                          if (isOpen) { // If opening, ensure others are closed if needed (optional)
-                            // Object.keys(variantDropdownOpenState).forEach(key => {
-                            //   if (key !== variant.id) setVariantDropdownOpenState(prev => ({ ...prev, [key]: false }));
-                            // });
-                          }
                         }}
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v => v.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
@@ -530,7 +526,6 @@ export function BillingForm() {
                                 setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
                                 setTimeout(() => variantSelectRefs.current[nextVariantId]?.current?.focus(), 0);
                             } else {
-                                // All variants selected
                                 quantityInputRef.current?.focus();
                                 quantityInputRef.current?.select();
                             }
@@ -539,14 +534,26 @@ export function BillingForm() {
                         <SelectTrigger 
                             id={`variant-select-${variant.id}-trigger`}
                             ref={variantSelectRefs.current[variant.id]}
-                            className="w-full select-trigger-class"
+                            className="w-full select-trigger-class" // Added select-trigger-class
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
-                                    if (!variantDropdownOpenState[variant.id]) { // If closed, Enter opens it
+                                    if (!variantDropdownOpenState[variant.id]) { 
                                         setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
+                                    } else {
+                                        // If dropdown is open, simulate a click to select (Radix usually handles this for items)
+                                        // Or move to next actionable field if this selection mechanism is tricky
+                                        const currentIndex = currentProductForSelection!.variants!.findIndex(v => v.id === variant.id);
+                                        if (currentIndex < currentProductForSelection!.variants!.length - 1) {
+                                            const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
+                                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false, [nextVariantId]: true }));
+                                            setTimeout(() => variantSelectRefs.current[nextVariantId]?.current?.focus(), 0);
+                                        } else {
+                                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
+                                            quantityInputRef.current?.focus();
+                                            quantityInputRef.current?.select();
+                                        }
                                     }
-                                    // If open, Radix handles Enter for selection, which triggers onValueChange
                                 }
                             }}
                         >
@@ -631,7 +638,6 @@ export function BillingForm() {
               )}
             </ScrollArea>
 
-             {/* Ad-hoc Service Section */}
             {(mode === 'sell' || mode === 'buy') && (
                 <div className="pt-4 border-t border-dashed mt-4 space-y-3">
                     <h3 className="text-md font-medium text-foreground">Add Ad-hoc Service / Charge</h3>
@@ -705,3 +711,5 @@ export function BillingForm() {
     </div>
   );
 }
+
+    
