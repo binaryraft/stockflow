@@ -69,6 +69,28 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
   const variantName = watch(`variants.${variantIndex}.name`);
 
+  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, optionIndex: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      appendOption({ value: '' });
+      setTimeout(() => {
+        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`); // Focus newly added field
+      }, 0);
+    }
+  };
+  
+  const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+     if (e.key === 'Enter') {
+        e.preventDefault();
+        if (optionFields.length === 0) {
+          appendOption({ value: '' });
+          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
+        } else {
+          setFocus(`variants.${variantIndex}.options.0.value`);
+        }
+      }
+  }
+
   return (
     <div className="space-y-3 border border-primary/20 p-4 rounded-md bg-tertiary">
       <div className="flex justify-between items-center">
@@ -81,17 +103,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
         {...register(`variants.${variantIndex}.name`)} 
         placeholder="e.g. Color, Size"
         aria-label={`Variant ${variantIndex + 1} Name`}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') {
-            e.preventDefault();
-            if (optionFields.length === 0) {
-              appendOption({ value: '' });
-              setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
-            } else {
-              setFocus(`variants.${variantIndex}.options.0.value`);
-            }
-          }
-        }}
+        onKeyDown={handleVariantNameEnter}
       />
       {formState.errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{formState.errors.variants[variantIndex]?.name?.message}</p>}
       
@@ -103,16 +115,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
               placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
               aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault(); 
-                  appendOption({ value: '' });
-                  setTimeout(() => {
-                     // Ensure focus lands on the newly appended input. Length will be +1
-                     setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
-                  }, 0);
-                }
-              }}
+              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
               <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option">
@@ -244,20 +247,31 @@ export function NewProductDialog({
         category: data.category,
         trackQuantity: data.trackQuantity,
         initialStock: data.trackQuantity ? data.initialStock : 0, 
-        quantityInStock: data.trackQuantity ? data.initialStock : 0,
+        quantityInStock: data.trackQuantity ? data.initialStock : 0, // quantityInStock will be initialStock for new, or existing for update
         costPrice: data.costPrice || 0,
         sellPrice: data.sellPrice || 0,
         sku: data.sku,
         expiryDate: data.expiryDate,
         variants: data.variants, 
     };
+    
+    // When updating, ensure quantityInStock from editingProduct is used if trackQuantity is true
+    // This is crucial because initialStock in the form might be what the user types, not necessarily the current stock
+    const finalPayload = editingProduct ? {
+      ...productPayload,
+      quantityInStock: data.trackQuantity ? data.initialStock : 0 // When editing, initialStock field represents new stock value
+    } : {
+      ...productPayload,
+      quantityInStock: data.trackQuantity ? data.initialStock : 0 // For new products, initialStock is quantityInStock
+    };
+
 
     if (editingProduct) {
-      updateProduct(editingProduct.id, productPayload as Partial<Omit<Product, 'id' | 'imageUrl'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      updateProduct(editingProduct.id, finalPayload as Partial<Omit<Product, 'id' | 'imageUrl'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      onProductAdd?.( { ...editingProduct, ...productPayload } as Product);
+      onProductAdd?.( { ...editingProduct, ...finalPayload } as Product);
     } else {
-      const addedProduct = addProduct(productPayload as Omit<Product, 'id' | 'imageUrl'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      const addedProduct = addProduct(finalPayload as Omit<Product, 'id' | 'imageUrl'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
       onProductAdd?.(addedProduct);
     }
@@ -390,3 +404,5 @@ export function NewProductDialog({
     </Dialog>
   );
 }
+
+    

@@ -40,7 +40,7 @@ export function BillItemRow({
   };
   
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-start gap-2 py-2 border-b border-dashed"> 
+    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2 py-2 border-b border-dashed"> 
       <div>
         <span className="truncate text-sm font-medium">{item.productName}</span>
         {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
@@ -87,8 +87,8 @@ export function BillItemRow({
         </>
       ) : ( // Sell or Return mode
         <>
-          <span className="text-sm text-muted-foreground text-right">₹{item.costPrice.toFixed(2)}</span>
-          <span className="text-sm text-foreground font-semibold text-right">₹{item.sellPrice.toFixed(2)}</span>
+          <span className="text-sm text-muted-foreground text-right flex items-center justify-end h-8 pr-2">₹{item.costPrice.toFixed(2)}</span>
+          <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">₹{item.sellPrice.toFixed(2)}</span>
         </>
       )}
       
@@ -107,10 +107,12 @@ export function BillItemHeader({ mode }: { mode: BillMode }) {
       <span className={cn("text-xs font-semibold text-muted-foreground text-right", mode !== 'buy' && "pr-2")}>
         {mode === 'buy' ? 'Cost/Unit' : 'Cost/Unit'}
       </span>
-      <span className="text-xs font-semibold text-muted-foreground text-right">
+      <span className="text-xs font-semibold text-muted-foreground text-right pr-2">
         {mode === 'buy' ? 'Sell/Unit' : 'Price/Unit'}
       </span>
       <span className="text-xs font-semibold text-muted-foreground"></span> {/* For remove button */}
     </div>
   );
 }
+
+    
