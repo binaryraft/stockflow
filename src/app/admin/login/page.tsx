@@ -19,6 +19,7 @@ export default function AdminLoginPage() {
   }, []);
 
   useEffect(() => {
+    // This effect should only run on the client after mount
     if (hasMounted) {
       // If already logged in, redirect to dashboard
       if (localStorage.getItem('isAdminLoggedIn') === 'true') {
@@ -28,16 +29,18 @@ export default function AdminLoginPage() {
   }, [router, hasMounted]);
 
   const handleLogin = () => {
-    if (!hasMounted) return;
+    if (!hasMounted) return; // Should not be reachable if button rendered after mount
 
     setIsSubmitting(true);
+    // Simulate login
     localStorage.setItem('isAdminLoggedIn', 'true');
-    router.push('/admin'); 
+    router.push('/admin'); // Use push to add to history after explicit user action
   };
   
+  // Loading state until component has mounted and checked for existing login
   if (!hasMounted) {
     return (
-       <div className="flex flex-col items-center justify-center min-h-screen p-4"> {/* Keep centering for this specific loading state */}
+       <div className="flex flex-col items-center justify-center p-4"> {/* Centered by AdminLoginLayout */}
          <Image 
           src="https://placehold.co/128x128.png" 
           alt={`${APP_NAME} Logo`} 
@@ -51,8 +54,9 @@ export default function AdminLoginPage() {
     );
   }
 
+  // If hasMounted and not redirected by the effect above, show the login form
   return (
-    <> {/* Layout handles centering now */}
+    <> {/* The AdminLoginLayout handles the overall page centering and background */}
       <div className="flex flex-col items-center mb-8">
         <Image 
           src="https://placehold.co/128x128.png" 
