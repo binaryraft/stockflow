@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -137,11 +138,11 @@ export function ProductsTable() {
               <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50">
                 Category <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right" onClick={() => requestSort('quantityInStock')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('quantityInStock')}>
                 Stock <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right">Cost</TableHead>
-              <TableHead className="text-right" onClick={() => requestSort('sellPrice')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('sellPrice')}>
                 Sell Price <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead>Tracked</TableHead>
