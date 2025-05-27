@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill, Product, ProductSKU } from '@/types';
+import type { Bill, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -31,7 +31,7 @@ type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
 
 
 export function BillHistoryTable() {
-  const { bills, getStaffById, getStoreById, userProfile, getProductById } = useInventoryStore();
+  const { bills, getProductById, userProfile } = useInventoryStore();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -114,27 +114,27 @@ export function BillHistoryTable() {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: Arial, sans-serif; margin: 20px; color: #000; font-size: 10pt; line-height: 1.4; }\n" +
+        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
-        "  .print-container { width: 100%; margin: 0; padding:0; }\n" +
-        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; page-break-inside: avoid; }\n" +
-        "  .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 8px; margin-bottom: 20px; }\n" +
-        "  .header h1 { margin: 0 0 3px 0; font-size: 16pt; font-weight: bold; }\n" +
-        "  .header p { margin: 0; font-size: 9pt; color: #333; }\n" +
-        "  h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 3px; }\n" +
+        "  .print-container { max-width: 750px; margin: auto; }\n" +
+        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
+        "  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 25px; background-color: transparent; border-radius: 0; border-left: 0; border-right: 0; }\n" +
+        "  .header h1 { margin: 0 0 5px 0; font-size: 20pt; font-weight: bold; color: #000; }\n" +
+        "  .header p { margin: 2px 0; font-size: 9pt; color: #444; }\n" +
+        "  h3, h4 { margin-top: 0; margin-bottom: 10px; font-size: 13pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; color: #111; }\n" +
         "  h4 { font-size: 11pt; }\n" +
-        "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
-        "  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
-        "  th { background-color: #f2f2f2; font-weight: bold; }\n" +
+        "  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }\n" +
+        "  th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; vertical-align: top; }\n" +
+        "  th { background-color: #f7f7f7; font-weight: bold; color: #222; }\n" +
         "  .text-right { text-align: right; }\n" +
         "  .font-medium { font-weight: bold; }\n" +
         "  .text-muted-foreground { color: #555; font-size: 0.9em; }\n" +
-        "  .badge { display: inline-block; padding: 0.2em 0.5em; font-size: 0.8em; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.25rem; border: 1px solid #ccc; }\n" +
-        "  .badge-destructive { color: #000; background-color: #fdd; border-color: #fbb; }\n" +
-        "  .badge-success { color: #000; background-color: #dfd; border-color: #bfb; }\n" +
-        "  .total-row td { font-weight: bold; background-color: #f2f2f2; }\n" +
-        "  .items-section .variant-options { font-size: 0.8em; color: #444; margin-left: 8px; margin-top: 2px; display: block; }\n" +
-        "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 8px; border-radius: 3px; border: 1px solid #eee; }\n" +
+        "  .badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.375rem; border: 1px solid transparent; }\n" +
+        "  .badge-destructive { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }\n" +
+        "  .badge-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }\n" +
+        "  .total-row td { font-weight: bold; background-color: #f7f7f7; font-size: 10pt; }\n" +
+        "  .items-section .variant-options { font-size: 0.8em; color: #555; margin-left: 10px; margin-top: 3px; display: block; font-style: italic; }\n" +
+        "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee; }\n" +
         "  .no-print { display: none !important; } \n" +
         "</style>\n";
       printWindow.document.write(styles);
@@ -148,7 +148,7 @@ export function BillHistoryTable() {
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
       printWindow.document.write('</div>');
 
-      printWindow.document.write('<table><tr><td style="width:50%; vertical-align:top;">');
+      printWindow.document.write('<table style="width:100%; margin-bottom: 20px; border:0;"><tr><td style="width:50%; vertical-align:top; border:0;">');
       if (billToPrint.vendorOrCustomerName || billToPrint.customerPhone) {
         printWindow.document.write('<div class="bill-to">');
         printWindow.document.write(`<h4>${getPartyDetailsTitle(billToPrint.type)}</h4>`);
@@ -156,7 +156,7 @@ export function BillHistoryTable() {
         if (billToPrint.customerPhone) printWindow.document.write(`<p><strong>Phone:</strong> ${billToPrint.customerPhone}</p>`);
         printWindow.document.write('</div>');
       }
-      printWindow.document.write('</td><td style="width:50%; vertical-align:top;">');
+      printWindow.document.write('</td><td style="width:50%; vertical-align:top; border:0;">');
       printWindow.document.write('<div class="bill-info text-right">');
       printWindow.document.write(`<h4>Bill Information</h4>`);
       printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
@@ -175,14 +175,15 @@ export function BillHistoryTable() {
 
       printWindow.document.write('<div class="items-section">');
       printWindow.document.write('<h3>Items</h3>');
-      printWindow.document.write('<table><thead><tr><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
-      billToPrint.items.forEach(item => {
+      printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
+      billToPrint.items.forEach((item, index) => {
         printWindow.document.write('<tr>');
+        printWindow.document.write(`<td>${index + 1}</td>`);
         printWindow.document.write(`<td>${item.productName}`);
         if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-          printWindow.document.write('<div class="variant-options">');
+          printWindow.document.write('<span class="variant-options">');
           printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
-          printWindow.document.write('</div>');
+          printWindow.document.write('</span>');
         }
         if (billToPrint.type === 'return') {
           if (item.isDefective) {
@@ -210,9 +211,15 @@ export function BillHistoryTable() {
 
       printWindow.document.write('<div class="summary-section">');
       printWindow.document.write('<h4>Summary</h4>');
-      printWindow.document.write(`<table><tr class="total-row"><td><strong>Total Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-      if (billToPrint.type === 'buy' && calculatePotentialSellTotal(billToPrint) !== null) {
-        printWindow.document.write(`<tr><td>Potential Sell Value:</td><td class="text-right">₹${calculatePotentialSellTotal(billToPrint)!.toFixed(2)}</td></tr>`);
+      printWindow.document.write(`<table style="width: auto; margin-left: auto;">`); // Align summary table to the right
+      printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Cost:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+      
+      const potentialRevenueFromItems = calculatePotentialRevenue(billToPrint);
+      if (billToPrint.type === 'buy' && potentialRevenueFromItems !== null) {
+        const profitOrLoss = potentialRevenueFromItems - billToPrint.totalAmount;
+        const profitLossColor = profitOrLoss >= 0 ? 'green' : 'red';
+        printWindow.document.write(`<tr><td style="text-align:right;">Potential Revenue from these Items:</td><td class="text-right">₹${potentialRevenueFromItems.toFixed(2)}</td></tr>`);
+        printWindow.document.write(`<tr><td style="text-align:right;">Potential Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor};">₹${profitOrLoss.toFixed(2)}</td></tr>`);
       }
       printWindow.document.write('</table>');
       printWindow.document.write('</div>');
@@ -223,7 +230,8 @@ export function BillHistoryTable() {
       printWindow.document.close();
       printWindow.focus();
       printWindow.print();
-      printWindow.close();
+      // Not closing immediately to allow print preview to be viewed/saved
+      // printWindow.close(); 
     }
   };
 
@@ -240,8 +248,10 @@ export function BillHistoryTable() {
   }
 
 
-  const calculatePotentialSellTotal = (bill: Bill): number | null => {
-    if (bill.type !== 'buy') return null;
+  const calculatePotentialRevenue = (bill: Bill): number | null => {
+    // This calculates potential revenue based on item.sellPrice for ANY bill type,
+    // but it's most relevant for 'buy' bills.
+    if (!bill || !bill.items) return null;
     return bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
   };
 
@@ -381,7 +391,7 @@ export function BillHistoryTable() {
                                 .join('; ')}
                             </div>
                           )}
-                          {selectedBill.type === 'return' && (
+                           {selectedBill.type === 'return' && (
                             item.isDefective ? (
                               <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
                             ) : (
@@ -417,15 +427,31 @@ export function BillHistoryTable() {
                 <h4 className="text-md font-semibold text-foreground mb-2">Summary</h4>
                 <div className="space-y-1">
                     <div className="flex justify-between text-lg font-semibold text-foreground">
-                        <span>Total Amount:</span>
-                        <span className="text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                        <span>{selectedBill.type === 'buy' ? 'Total Cost (This Expense Bill):' : 'Total Amount:'}</span>
+                        <span className={cn(selectedBill.type === 'buy' ? "text-destructive" : "text-primary")}>₹{selectedBill.totalAmount.toFixed(2)}</span>
                     </div>
-                    {selectedBill.type === 'buy' && calculatePotentialSellTotal(selectedBill) !== null && (
-                        <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                            <span>Potential Sell Value:</span>
-                            <span>₹{calculatePotentialSellTotal(selectedBill)!.toFixed(2)}</span>
-                        </div>
-                    )}
+                    
+                    {selectedBill.type === 'buy' && 
+                      (() => {
+                        const potentialRevenue = calculatePotentialRevenue(selectedBill);
+                        if (potentialRevenue === null) return null;
+                        const profitOrLoss = potentialRevenue - selectedBill.totalAmount;
+                        return (
+                          <>
+                            <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                                <span>Potential Revenue from these Items:</span>
+                                <span>₹{potentialRevenue.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-sm font-medium mt-1">
+                                <span>Potential Profit/(Loss) from these Items:</span>
+                                <span className={cn(profitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
+                                    ₹{profitOrLoss.toFixed(2)}
+                                </span>
+                            </div>
+                          </>
+                        );
+                      })()
+                    }
                 </div>
               </div>
 
@@ -466,21 +492,21 @@ export function BillHistoryTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead onClick={() => requestSort('date')} className="cursor-pointer hover:bg-muted/50 w-[150px]">
+              <TableHead onClick={() => requestSort('date')} className="cursor-pointer hover:bg-muted/50 w-[150px] py-3 px-4">
                 Date / Time <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="w-[140px]">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[180px]">
+              <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[180px] py-3 px-4">
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right w-[80px]">Items</TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 w-[120px]" onClick={() => requestSort('totalAmount')} >
+              <TableHead className="text-right w-[80px] py-3 px-4">Items</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4" onClick={() => requestSort('totalAmount')} >
                 Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right w-[80px]">Actions</TableHead>
+              <TableHead className="text-right w-[80px] py-3 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -549,3 +575,4 @@ export function BillHistoryTable() {
     </>
   );
 }
+
