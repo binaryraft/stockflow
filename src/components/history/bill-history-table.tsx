@@ -100,21 +100,21 @@ export function BillHistoryTable() {
   };
 
   const getBillTypeIcon = (bill: Bill) => {
-    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Expense
-    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Sales
+    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; 
+    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />; 
     if (bill.type === 'return') {
       if (bill.items.some(item => item.isDefective === true)) {
-        return <AlertTriangle className="h-4 w-4 text-red-500" />; // Defective Return (Red icon for Alert)
+        return <AlertTriangle className="h-4 w-4 text-red-500" />; 
       }
-      return <RotateCcw className="h-4 w-4 text-yellow-600" />; // Normal Return (Darker Yellow for contrast on yellow badge)
+      return <RotateCcw className="h-4 w-4 text-yellow-600" />; 
     }
     return null;
   };
   
   const getBillTypeBadgeVariant = (bill: Bill): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
-    if (bill.type === 'buy') return 'destructive'; // Expense (Red)
-    if (bill.type === 'sell') return 'default'; // Sales (Primary, often green or blueish in themes)
-    if (bill.type === 'return') return 'secondary'; // Return (Yellow - using secondary as base, color classes will override)
+    if (bill.type === 'buy') return 'destructive'; 
+    if (bill.type === 'sell') return 'default'; 
+    if (bill.type === 'return') return 'secondary'; 
     return 'outline';
   };
 
@@ -188,9 +188,9 @@ export function BillHistoryTable() {
                         )}
                         {selectedBill.type === 'return' && (
                           item.isDefective ? (
-                            <Badge variant="destructive" className="ml-2 text-xs mt-1">Defective</Badge>
+                            <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
                           ) : (
-                            <Badge variant="secondary" className="ml-2 text-xs mt-1 bg-green-100 text-green-700">Restocked</Badge>
+                            <Badge variant="secondary" className="text-xs mt-1 bg-green-100 text-green-700 border-green-300 hover:bg-green-200">Restocked</Badge>
                           )
                         )}
                       </TableCell>
@@ -241,7 +241,7 @@ export function BillHistoryTable() {
           className="max-w-md"
         />
       </div>
-      <Card className="shadow-lg">
+      <Card className="shadow-md">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -273,9 +273,9 @@ export function BillHistoryTable() {
                       <Badge 
                         variant={getBillTypeBadgeVariant(bill)} 
                         className={`capitalize flex items-center gap-1 w-fit min-w-[80px] justify-center ${
-                          bill.type === 'sell' ? 'bg-green-600 hover:bg-green-700 text-white' : 
-                          bill.type === 'buy' ? 'bg-red-600 hover:bg-red-700 text-white' : 
-                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' // Darker text for yellow
+                          bill.type === 'sell' ? 'bg-green-500 hover:bg-green-600 text-white dark:bg-green-600 dark:hover:bg-green-700' : 
+                          bill.type === 'buy' ? 'bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700' : 
+                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900 dark:bg-yellow-500 dark:hover:bg-yellow-600 dark:text-yellow-950' : ''
                         }`}
                       >
                         {getBillTypeIcon(bill)}

@@ -52,7 +52,7 @@ export function ProductsTable() {
         const valB = b[sortConfig.key];
 
         let comparison = 0;
-        if (valA === undefined || valA === null) comparison = -1; // Put undefined/null last
+        if (valA === undefined || valA === null) comparison = -1; 
         else if (valB === undefined || valB === null) comparison = 1;
         else if (typeof valA === 'string' && typeof valB === 'string') {
           comparison = valA.localeCompare(valB);
@@ -84,11 +84,7 @@ export function ProductsTable() {
     console.log("Deleting product:", productId);
   };
 
-  // This function is called from NewProductDialog when a product is added OR updated
   const onProductDialogSubmit = (product: Product) => { 
-    // NewProductDialog's internal onSubmit calls addProduct/updateProduct from the store.
-    // This callback is mostly for refreshing local state if needed, or additional UI updates.
-    // For now, the store update should trigger re-render of this table via Zustand.
     setIsNewProductDialogOpen(false);
     setEditingProduct(null); 
   };
@@ -99,11 +95,11 @@ export function ProductsTable() {
       <NewProductDialog 
         isOpen={isNewProductDialogOpen} 
         onOpenChange={(open) => {
-          if (!open) setEditingProduct(null); // Clear editing state when dialog is closed
+          if (!open) setEditingProduct(null); 
           setIsNewProductDialogOpen(open);
         }}
-        editingProduct={editingProduct} // Pass the product being edited
-        onProductAdd={onProductDialogSubmit} // Called after dialog's internal save
+        editingProduct={editingProduct} 
+        onProductAdd={onProductDialogSubmit} 
       />
       <div className="flex items-center justify-between mb-4 gap-2">
         <Input
@@ -116,7 +112,7 @@ export function ProductsTable() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-      <Card className="shadow-lg">
+      <Card className="shadow-md">
        <CardContent className="p-0">
         <Table>
           <TableHeader>

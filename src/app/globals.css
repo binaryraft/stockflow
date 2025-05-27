@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -8,33 +9,33 @@ body {
 
 @layer base {
   :root {
-    --background: 208 100% 97.1%; /* #F0F8FF - AliceBlue */
-    --foreground: 222.2 84% 4.9%; /* Default dark for good contrast */
+    --background: 0 0% 98%; /* Light Gray */
+    --foreground: 240 10% 3.9%; /* Near Black */
 
-    --card: 0 0% 100%; /* Standard card background */
-    --card-foreground: 222.2 84% 4.9%; /* Standard card text */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 240 10% 3.9%; /* Near Black */
     
-    --popover: 0 0% 100%; /* Standard popover background */
-    --popover-foreground: 222.2 84% 4.9%; /* Standard popover text */
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 240 10% 3.9%; /* Near Black */
 
-    --primary: 210 40% 60%; /* #6699CC - Muted Blue */
-    --primary-foreground: 0 0% 100%; /* White text on primary */
+    --primary: 240 5.9% 10%; /* Dark Gray/Almost Black for primary actions */
+    --primary-foreground: 0 0% 98%; /* Light Gray for text on primary */
 
-    --secondary: 210 40% 90%; /* Lighter shade of primary */
-    --secondary-foreground: 210 40% 30%; /* Darker text for secondary */
+    --secondary: 240 4.8% 95.9%; /* Lighter gray for secondary elements */
+    --secondary-foreground: 240 5.9% 10%; /* Dark text for secondary */
 
-    --muted: 210 40% 96.1%; /* Light gray, slightly blueish */
-    --muted-foreground: 215.4 16.3% 46.9%; /* Muted text color */
+    --muted: 240 4.8% 95.9%; /* Similar to secondary, for less prominent elements */
+    --muted-foreground: 240 3.8% 46.1%; /* Muted text color */
 
-    --accent: 270 50.4% 65.1%; /* #A673D9 - Vibrant Purple */
+    --accent: 210 100% 56%; /* Vibrant Blue for highlights, focus rings */
     --accent-foreground: 0 0% 100%; /* White text on accent */
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84.2% 60.2%; /* Standard destructive red */
+    --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
-    --border: 210 30% 85%; /* Blueish gray for borders */
-    --input: 210 30% 92%; /* Lighter for input backgrounds, distinct from main bg */
-    --ring: 210 40% 60%; /* Use primary for ring focus */
+    --border: 240 5.9% 90%; /* Light Gray for borders */
+    --input: 0 0% 100%; /* White for input backgrounds */
+    --ring: 210 100% 56%; /* Accent blue for focus rings */
 
     --radius: 0.5rem;
 
@@ -46,54 +47,54 @@ body {
     --chart-5: 27 87% 67%;
 
     /* Sidebar specific colors */
-    --sidebar-background: 210 35% 94%; /* Slightly darker/different from main background */
-    --sidebar-foreground: 222.2 84% 4.9%; /* Dark text for sidebar */
-    --sidebar-primary: 210 40% 60%; /* primary for sidebar active items */
-    --sidebar-primary-foreground: 0 0% 100%; /* white for sidebar active items text */
-    --sidebar-accent: 210 40% 88%; /* accent for sidebar hover */
-    --sidebar-accent-foreground: 210 40% 25%; /* dark for sidebar hover text */
-    --sidebar-border: 210 30% 80%; /* border for sidebar */
-    --sidebar-ring: 210 40% 60%; /* ring for sidebar focus */
+    --sidebar-background: 0 0% 96%; /* Slightly darker gray than main bg for subtle separation */
+    --sidebar-foreground: 240 10% 3.9%; /* Dark text for sidebar */
+    --sidebar-primary: 240 5.9% 10%; /* primary for sidebar active items */
+    --sidebar-primary-foreground: 0 0% 98%; /* light for sidebar active items text */
+    --sidebar-accent: 240 4.8% 90%; /* accent for sidebar hover (slightly darker than input) */
+    --sidebar-accent-foreground: 240 5.9% 10%; /* dark for sidebar hover text */
+    --sidebar-border: 240 5.9% 85%; /* border for sidebar */
+    --sidebar-ring: 210 100% 56%; /* ring for sidebar focus */
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 10% 3.9%; /* Near Black */
+    --foreground: 0 0% 98%; /* Light Gray */
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 5% 11%; /* Very Dark Gray */
+    --card-foreground: 0 0% 98%; /* Light Gray */
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 5% 11%; /* Very Dark Gray */
+    --popover-foreground: 0 0% 98%; /* Light Gray */
 
-    --primary: 210 40% 60%; /* #6699CC - Muted Blue */
-    --primary-foreground: 0 0% 100%; /* White text on primary */
+    --primary: 0 0% 98%; /* Light Gray for primary actions in dark mode */
+    --primary-foreground: 240 10% 3.9%; /* Near Black text on primary */
     
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 3.7% 15.9%; /* Darker gray for secondary */
+    --secondary-foreground: 0 0% 98%; /* Light text for secondary */
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215.4 16.3% 56.9%;
+    --muted: 240 3.7% 15.9%; /* Similar to secondary */
+    --muted-foreground: 240 5% 64.9%; /* Lighter muted text */
 
-    --accent: 270 50.4% 65.1%; /* #A673D9 - Vibrant Purple */
+    --accent: 210 100% 56%; /* Keep Vibrant Blue */
     --accent-foreground: 0 0% 100%; /* White text on accent */
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%; /* Standard dark destructive red */
+    --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
-    --border: 217.2 32.6% 27.5%;
-    --input: 217.2 32.6% 22.5%;
-    --ring: 210 40% 60%;
+    --border: 240 3.7% 15.9%; /* Dark Gray for borders */
+    --input: 240 3.7% 15.9%; /* Dark Gray for input backgrounds */
+    --ring: 210 100% 56%; /* Accent blue for focus rings */
     
     /* Sidebar specific colors for dark theme */
-    --sidebar-background: 220 25% 10%;
-    --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 210 40% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 25% 15%;
-    --sidebar-accent-foreground: 210 40% 95%;
-    --sidebar-border: 220 25% 20%;
-    --sidebar-ring: 210 40% 60%;
+    --sidebar-background: 240 6% 10%; /* Slightly lighter than main dark bg */
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 0 0% 98%; 
+    --sidebar-primary-foreground: 240 10% 3.9%; 
+    --sidebar-accent: 240 3.7% 20%; 
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 20%; 
+    --sidebar-ring: 210 100% 56%;
   }
 }
 

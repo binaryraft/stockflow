@@ -86,9 +86,8 @@ export function BillingForm() {
     setSelectedVariantOptions({}); // Reset variant selections
 
     if (mode === 'sell' || mode === 'return') {
-      setCostPrice(product.costPrice); // Still set for reference, though not editable in sell mode
+      setCostPrice(product.costPrice); 
       setSellPrice(product.sellPrice);
-      // If product has no variants, focus quantity. Otherwise, user selects variants.
       if (!product.variants || product.variants.length === 0) {
         quantityInputRef.current?.focus();
       }
@@ -159,21 +158,18 @@ export function BillingForm() {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1) {
             handleProductSelect(productsFound[0]);
-            // if no variants, focus quantity, else variant selection takes precedence
             if (!productsFound[0].variants || productsFound[0].variants.length === 0) {
                 quantityInputRef.current?.focus();
             }
        } else if (productsFound.length > 1) {
             // keep focus on product name for user to refine
-       } else { // No product found by exact name or multiple results
-            // If in buy mode, we might expect new product details next
+       } else { 
             if (mode === 'buy') quantityInputRef.current?.focus();
-            // If in sell/return and no single exact match, maybe open new product dialog or focus quantity
             else quantityInputRef.current?.focus();
        }
     } else if (currentField === 'quantity') {
       if (mode === 'buy') costPriceInputRef.current?.focus();
-      else handleAddNewItem(); // In sell/return mode, add item after quantity (if variants handled)
+      else handleAddNewItem(); 
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') sellPriceInputRef.current?.focus();
     } else if (currentField === 'sellPrice') {
@@ -236,19 +232,17 @@ export function BillingForm() {
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
-    // Product is the full product object from the store
     setProductNameQuery(product.name);
-    setCurrentProductForSelection(product); // Set for variant selection
+    setCurrentProductForSelection(product); 
     setSelectedVariantOptions({});
 
     if (mode === 'buy') {
         setCostPrice(product.costPrice);
         setSellPrice(product.sellPrice);
-    } else { // sell or return
+    } else { 
         setSellPrice(product.sellPrice);
-        setCostPrice(product.costPrice); // Keep cost price for reference
+        setCostPrice(product.costPrice); 
     }
-    // If no variants, focus quantity, else user focuses on variant selection
     if (!product.variants || product.variants.length === 0) {
         quantityInputRef.current?.focus();
     }
@@ -268,13 +262,13 @@ export function BillingForm() {
             <TabsList className="grid w-full grid-cols-3 gap-1">
                 <TabsTrigger 
                 value="sell" 
-                className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-700 dark:data-[state=active]:text-white"
+                className="flex items-center gap-2 data-[state=active]:bg-green-500 data-[state=active]:text-white dark:data-[state=active]:bg-green-600 dark:data-[state=active]:text-white"
                 >
                 <Send size={18}/>Sales
                 </TabsTrigger>
                 <TabsTrigger 
                 value="buy" 
-                className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-700 dark:data-[state=active]:text-white"
+                className="flex items-center gap-2 data-[state=active]:bg-red-500 data-[state=active]:text-white dark:data-[state=active]:bg-red-600 dark:data-[state=active]:text-white"
                 >
                 <ShoppingBag size={18}/>Expense
                 </TabsTrigger>
@@ -300,7 +294,7 @@ export function BillingForm() {
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      <Card className="w-full shadow-lg flex flex-col"> 
+      <Card className="w-full shadow-md flex flex-col"> 
           <CardHeader>
               <CardTitle className="text-xl">Current Bill</CardTitle>
               <CardDescription>
@@ -310,11 +304,9 @@ export function BillingForm() {
               </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 pt-4">
-            {/* Item Entry Section - Moved inside Current Bill Card */}
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
               <h3 className="text-lg font-medium">Add Item</h3>
-              {/* Product Name and Quantity always visible */}
-              <div className={`grid ${mode === 'sell' ? 'md:grid-cols-[2fr_1fr]' : 'grid-cols-1 md:grid-cols-2'} gap-4 items-end`}>
+              <div className={`grid ${mode === 'sell' || mode === 'return' ? 'md:grid-cols-[2fr_1fr]' : 'grid-cols-1 md:grid-cols-2'} gap-4 items-end`}>
                   <div className="space-y-1.5">
                     <Label htmlFor="productNameGlobal">Product Name</Label>
                     <ProductSearchInput
@@ -341,7 +333,6 @@ export function BillingForm() {
                   </div>
               </div>
               
-              {/* Variant Selection Dropdowns */}
               {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
                 <div className={`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 2)} gap-4 mt-3`}>
                   {currentProductForSelection.variants.map((variant) => (
@@ -370,7 +361,6 @@ export function BillingForm() {
               )}
 
 
-              {/* Cost and Sell Price for Buy mode */}
               {mode === 'buy' && (
                 <div className="grid md:grid-cols-2 gap-4 mt-3">
                   <div className="space-y-1.5">
@@ -400,7 +390,6 @@ export function BillingForm() {
                 </div>
               )}
               
-              {/* Defective Switch for Return mode */}
               {mode === 'return' && (
                 <div className="flex items-center space-x-2 pt-2">
                   <Switch 
@@ -416,7 +405,6 @@ export function BillingForm() {
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
               </Button>
             </div>
-            {/* End Item Entry Section */}
 
             <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
