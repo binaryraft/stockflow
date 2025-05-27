@@ -4,7 +4,7 @@
 @tailwind utilities;
 
 body {
-  font-family: var(--font-inter), Arial, Helvetica, sans-serif; /* Changed */
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif; /* Use the --font-inter variable */
 }
 
 @layer base {

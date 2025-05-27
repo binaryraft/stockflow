@@ -1,20 +1,20 @@
 
 import type { Metadata } from 'next';
-import { Inter, Roboto_Mono } from 'next/font/google'; // Changed
+import { Inter, Roboto_Mono } from 'next/font/google'; // Ensure these are from next/font/google
 import './globals.css';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
 
-const inter = Inter({ // Changed
-  variable: '--font-inter', // Changed
+const inter = Inter({
+  variable: '--font-inter',
   subsets: ['latin'],
 });
 
-const robotoMono = Roboto_Mono({ // Changed
-  variable: '--font-roboto-mono', // Changed
+const robotoMono = Roboto_Mono({
+  variable: '--font-roboto-mono',
   subsets: ['latin'],
-  weight: ['400', '700'] // Added weight for Roboto Mono
+  weight: ['400', '700']
 });
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} ${robotoMono.variable} antialiased`}> {/* Changed */}
+      <body className={`${inter.variable} ${robotoMono.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
