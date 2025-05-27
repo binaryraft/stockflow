@@ -1,3 +1,4 @@
+
 // This file is deprecated. New path is /storeportal/[storeId]/login.
 // This file can be removed or simply redirect.
 export default function DeprecatedStoreLoginPage() {

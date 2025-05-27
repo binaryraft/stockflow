@@ -35,7 +35,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children} {/* Children will be either landing page or admin layout or store portal layout */}
+          {children} {/* Children will be the specific page content with its own layout if defined */}
           <Toaster />
         </ThemeProvider>
       </body>

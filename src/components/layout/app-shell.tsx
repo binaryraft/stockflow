@@ -7,30 +7,29 @@ import { HeaderMain } from '@/components/layout/header-main';
 import { Toaster } from '@/components/ui/toaster';
 import { useEffect } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { TooltipProvider } from '@/components/ui/tooltip'; // Added import
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   // Ensure Zustand store is hydrated on client
   useEffect(() => {
-    useInventoryStore.persist.rehydrate();
+    // Zustand's persist middleware handles rehydration automatically.
+    // The _hydrate method in the store is called via onRehydrateStorage.
   }, []);
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <TooltipProvider> {/* Added TooltipProvider here */}
-        <div className="flex min-h-screen w-full bg-muted/40"> {/* Base container */}
-          <SidebarNav /> {/* Renders the 'peer' Sidebar component */}
-          {/* SidebarInset is the main content area that respects the sidebar */}
-          <SidebarInset className="flex flex-col flex-1 overflow-x-hidden bg-background"> {/* flex-1 to take remaining space, overflow-x-hidden for safety. Added bg-background here. */}
-            <HeaderMain /> {/* Sticky header, child of SidebarInset */}
-            {/* This div is the main scrollable content area within SidebarInset */}
+      <TooltipProvider> 
+        <div className="flex min-h-screen w-full bg-muted/40">
+          <SidebarNav /> 
+          <SidebarInset className="flex flex-col flex-1 overflow-x-hidden bg-background">
+            <HeaderMain /> 
             <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
               {children}
             </div>
           </SidebarInset>
         </div>
         <Toaster />
-      </TooltipProvider> {/* Closed TooltipProvider */}
+      </TooltipProvider>
     </SidebarProvider>
   );
 }

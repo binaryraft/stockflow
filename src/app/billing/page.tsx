@@ -1,3 +1,4 @@
+
 // This file is deprecated. Admin billing is now at /admin/billing.
 // Store billing is at /storeportal/[storeId]/billing.
 // This file can be removed or left as a redirect if necessary.
