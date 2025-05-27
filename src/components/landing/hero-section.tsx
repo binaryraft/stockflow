@@ -15,10 +15,11 @@ export function HeroSection() {
           <Image
             src="https://placehold.co/128x128.png"
             alt={`${APP_NAME} Logo`}
-            width={100}
+            width={100} 
             height={100}
             className="rounded-2xl shadow-lg mb-6"
             data-ai-hint="logo company app"
+            priority // Added priority
           />
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-foreground">
             Manage Your Business with <span className="text-primary">{APP_NAME}</span>
@@ -34,7 +35,7 @@ export function HeroSection() {
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg" className="shadow-md hover:shadow-lg transition-shadow border-primary/50 hover:border-primary text-primary hover:bg-primary/5 px-8 py-3">
-            <Link href="/storeportal">
+            <Link href="/storeportal"> 
               <Building className="mr-2 h-5 w-5" /> Access Store Terminal
             </Link>
           </Button>

@@ -6,7 +6,7 @@ import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
 import { PricingSectionLanding } from '@/components/landing/PricingSectionLanding';
 import { OtherSection } from '@/components/landing/OtherSection';
-import { ContactSection } from '@/components/landing/ContactSection'; // Corrected import case
+import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/call-to-action-section';
 
