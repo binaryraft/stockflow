@@ -78,3 +78,20 @@ export interface Store {
   passkey: string; // For simplicity, plain text in this prototype
   allowedStaffIds: string[];
 }
+
+// Subscription and Profile Types
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price: number; // Monthly price
+  priceSuffix: string; // e.g., "/ month"
+  features: string[];
+  maxStores: number; // Use Infinity for unlimited
+  maxEmployees: number; // Use Infinity for unlimited
+  isPopular?: boolean;
+}
+
+export interface UserProfile {
+  companyName: string;
+  activeSubscriptionId: string;
+}

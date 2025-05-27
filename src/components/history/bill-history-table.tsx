@@ -22,7 +22,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
+import { COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants'; // Removed COMPANY_NAME as it comes from store
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
@@ -31,7 +31,7 @@ type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
 
 
 export function BillHistoryTable() {
-  const { bills, getStaffById, getStoreById } = useInventoryStore();
+  const { bills, getStaffById, getStoreById, userProfile } = useInventoryStore(); // Added userProfile for companyName
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -143,7 +143,7 @@ export function BillHistoryTable() {
       printWindow.document.write('<div class="print-container">');
 
       printWindow.document.write('<div class="header">');
-      printWindow.document.write(`<h1>${COMPANY_NAME}</h1>`);
+      printWindow.document.write(`<h1>${userProfile.companyName}</h1>`);
       printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
       printWindow.document.write('</div>');
@@ -276,7 +276,7 @@ export function BillHistoryTable() {
             <div className="space-y-6 py-2 px-2">
 
               <div className="p-4 border rounded-md bg-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-primary mb-2">{COMPANY_NAME}</h3>
+                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile.companyName}</h3>
                   <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
                   <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
               </div>
@@ -481,7 +481,10 @@ export function BillHistoryTable() {
                   <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
                   <TableCell className="py-3 px-4 w-[180px]">
                     <Badge
-                      className={cn("capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", billDisplayInfo.className)}
+                      className={cn(
+                        "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", 
+                        billDisplayInfo.className
+                      )}
                     >
                       {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1")})}
                       {billDisplayInfo.name}

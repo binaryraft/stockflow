@@ -3,9 +3,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption, Staff, Store } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption, Staff, Store, UserProfile, SubscriptionPlan } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay } from 'date-fns';
+import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
 
 const generateId = () => uuidv4();
 
@@ -16,7 +17,9 @@ interface InventoryState {
   categories: Category[];
   staffs: Staff[];
   stores: Store[];
+  userProfile: UserProfile;
 
+  // Product Methods
   addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => Product;
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => void;
   getProductById: (productId: string) => Product | undefined;
@@ -24,32 +27,40 @@ interface InventoryState {
   searchProducts: (searchTerm: string) => Product[];
   getLowStockProductCount: (threshold: number) => number;
   
+  // Bill Methods
   addBill: (
     billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName'>, 
     items: Omit<BillItem, 'id'|'productName'>[],
-    staffId?: string, // Optional staffId for the bill
-    storeId?: string  // Optional storeId for the bill
+    staffId?: string, 
+    storeId?: string  
   ) => Bill;
   getBillById: (billId: string) => Bill | undefined;
   
+  // Category Methods
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
 
   // Staff CRUD
-  addStaff: (staffData: Omit<Staff, 'id'>) => Staff;
+  addStaff: (staffData: Omit<Staff, 'id'>) => Staff | null; // Return null if limit reached
   updateStaff: (staffId: string, staffData: Partial<Omit<Staff, 'id'>>) => void;
   deleteStaff: (staffId: string) => void;
   getStaffById: (staffId: string) => Staff | undefined;
   getAllStaff: () => Staff[];
 
-
   // Store CRUD
-  addStore: (storeData: Omit<Store, 'id'>) => Store;
+  addStore: (storeData: Omit<Store, 'id'>) => Store | null; // Return null if limit reached
   updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id'>>) => void;
   deleteStore: (storeId: string) => void;
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
 
+  // User Profile & Subscription
+  updateCompanyName: (name: string) => void;
+  updateSubscription: (planId: string) => void;
+  getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
+  canAddStore: () => boolean;
+  canAddStaff: () => boolean;
+  
   // Selectors for dashboard charts
   getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
@@ -85,6 +96,10 @@ export const useInventoryStore = create<InventoryState>()(
       categories: initialCategories,
       staffs: [],
       stores: [],
+      userProfile: {
+        companyName: DEFAULT_COMPANY_NAME,
+        activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY, // Default to basic plan
+      },
 
       addProduct: (productData) => {
         const productVariants: ProductVariantType[] = (productData.variants || []).map((variantData, variantIdx) => ({
@@ -263,6 +278,7 @@ export const useInventoryStore = create<InventoryState>()(
       
       // Staff CRUD
       addStaff: (staffData) => {
+        if (!get().canAddStaff()) return null;
         const newStaff: Staff = { id: generateId(), ...staffData };
         set((state) => ({ staffs: [...state.staffs, newStaff] }));
         return newStaff;
@@ -275,7 +291,6 @@ export const useInventoryStore = create<InventoryState>()(
       deleteStaff: (staffId) => {
         set((state) => ({
           staffs: state.staffs.filter((s) => s.id !== staffId),
-          // Also remove this staff from any store's allowedStaffIds
           stores: state.stores.map(store => ({
             ...store,
             allowedStaffIds: store.allowedStaffIds.filter(id => id !== staffId)
@@ -287,6 +302,7 @@ export const useInventoryStore = create<InventoryState>()(
 
       // Store CRUD
       addStore: (storeData) => {
+        if (!get().canAddStore()) return null;
         const newStore: Store = { id: generateId(), ...storeData };
         set((state) => ({ stores: [...state.stores, newStore] }));
         return newStore;
@@ -299,7 +315,6 @@ export const useInventoryStore = create<InventoryState>()(
       deleteStore: (storeId) => {
         set((state) => ({
           stores: state.stores.filter((s) => s.id !== storeId),
-          // Also remove this store from any staff's accessibleStoreIds
           staffs: state.staffs.map(staff => ({
             ...staff,
             accessibleStoreIds: staff.accessibleStoreIds.filter(id => id !== storeId)
@@ -309,6 +324,29 @@ export const useInventoryStore = create<InventoryState>()(
       getStoreById: (storeId) => get().stores.find((s) => s.id === storeId),
       getAllStores: () => get().stores,
 
+      // User Profile & Subscription
+      updateCompanyName: (name: string) => {
+        set((state) => ({ userProfile: { ...state.userProfile, companyName: name }}));
+      },
+      updateSubscription: (planId: string) => {
+        set((state) => ({ userProfile: { ...state.userProfile, activeSubscriptionId: planId }}));
+      },
+      getActiveSubscriptionPlan: () => {
+        const { activeSubscriptionId } = get().userProfile;
+        return SUBSCRIPTION_PLANS.find(plan => plan.id === activeSubscriptionId);
+      },
+      canAddStore: () => {
+        const plan = get().getActiveSubscriptionPlan();
+        if (!plan) return false;
+        return get().stores.length < plan.maxStores;
+      },
+      canAddStaff: () => {
+        const plan = get().getActiveSubscriptionPlan();
+        if (!plan) return false;
+        return get().staffs.length < plan.maxEmployees;
+      },
+
+      // Dashboard Selectors
       getDailySalesAndExpenses: (days) => {
         const bills = get().bills;
         const dailyData: Array<{ date: string; sales: number; expenses: number }> = [];
@@ -382,6 +420,19 @@ export const useInventoryStore = create<InventoryState>()(
             updated = true; 
           }
         });
+
+        // Ensure userProfile exists and has a default plan if somehow missing
+        if (!state.userProfile || !state.userProfile.activeSubscriptionId) {
+          set({ 
+            userProfile: { 
+              companyName: state.userProfile?.companyName || DEFAULT_COMPANY_NAME, 
+              activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY 
+            }
+          });
+          updated = true;
+        }
+
+
         if (updated) console.log("Inventory store hydrated/updated.");
       }
     }),
@@ -394,5 +445,3 @@ export const useInventoryStore = create<InventoryState>()(
     }
   )
 );
-
-import { DEFAULT_CATEGORIES } from '@/lib/constants';

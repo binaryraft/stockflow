@@ -20,11 +20,13 @@ import { StoreFormDialog } from './store-form-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import Link from 'next/link';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 
 type SortableStoreColumns = keyof Pick<Store, 'name' | 'location' | 'email' | 'phone'>;
 
 export function StoresTable() {
-  const { stores, deleteStore, getAllStaff } = useInventoryStore();
+  const { stores, deleteStore, getAllStaff, canAddStore, getActiveSubscriptionPlan } = useInventoryStore();
   const { toast } = useToast();
   
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -32,7 +34,11 @@ export function StoresTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableStoreColumns; direction: 'ascending' | 'descending' } | null>(null);
 
-  const staffMembers = getAllStaff(); // For the form dialog
+  const staffMembers = getAllStaff(); 
+  const userCanAddStore = canAddStore();
+  const activePlan = getActiveSubscriptionPlan();
+  const isAdminOnlyPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
+
 
   const filteredAndSortedStores = useMemo(() => {
     let sortableStores = [...stores];
@@ -70,11 +76,19 @@ export function StoresTable() {
   };
 
   const handleOpenEditDialog = (store: Store) => {
+    if (isAdminOnlyPlan) {
+      toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+      return;
+    }
     setEditingStore(store); 
     setIsFormDialogOpen(true); 
   };
 
   const handleDeleteStore = (storeId: string, storeName: string) => {
+     if (isAdminOnlyPlan) {
+      toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+      return;
+    }
     deleteStore(storeId);
     toast({ title: "Store Deleted", description: `${storeName} has been removed.` });
   };
@@ -84,8 +98,14 @@ export function StoresTable() {
     setEditingStore(null); 
   };
 
+  const addStoreButtonTooltipContent = isAdminOnlyPlan 
+    ? "Store management is not available on the Basic Admin plan. Please upgrade."
+    : !userCanAddStore 
+    ? `You have reached the maximum of ${activePlan?.maxStores} stores for your current plan. Please upgrade.` 
+    : "Add New Store";
+
   return (
-    <>
+    <TooltipProvider>
       <StoreFormDialog 
         isOpen={isFormDialogOpen} 
         onOpenChange={(open) => {
@@ -103,9 +123,35 @@ export function StoresTable() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
         />
-        <Button onClick={() => { setEditingStore(null); setIsFormDialogOpen(true); }}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Store
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-block"> {/* Wrapper for Tooltip when button is disabled */}
+              <Button 
+                onClick={() => { 
+                  if (isAdminOnlyPlan) {
+                    toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+                    return;
+                  }
+                  if (!userCanAddStore) {
+                     toast({variant: "destructive", title: "Limit Reached", description: `Cannot add more stores. Max ${activePlan?.maxStores} allowed on current plan.`});
+                    return;
+                  }
+                  setEditingStore(null); 
+                  setIsFormDialogOpen(true); 
+                }}
+                disabled={!userCanAddStore || isAdminOnlyPlan}
+                aria-disabled={!userCanAddStore || isAdminOnlyPlan}
+              >
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Store
+              </Button>
+            </div>
+          </TooltipTrigger>
+          {(!userCanAddStore || isAdminOnlyPlan) && (
+            <TooltipContent>
+              <p>{addStoreButtonTooltipContent}</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
       <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
@@ -144,7 +190,7 @@ export function StoresTable() {
                   <TableCell className="text-right py-3 px-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="h-8 w-8 p-0" disabled={isAdminOnlyPlan} aria-disabled={isAdminOnlyPlan}>
                           <span className="sr-only">Open menu</span>
                           <MoreHorizontal className="h-4 w-4" />
                         </Button>
@@ -156,12 +202,16 @@ export function StoresTable() {
                             <LogIn className="mr-2 h-4 w-4" /> View Store Terminal
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEditDialog(store)}>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(store)} disabled={isAdminOnlyPlan}>
                           <Edit3 className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                <DropdownMenuItem 
+                                  onSelect={(e) => e.preventDefault()} 
+                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                  disabled={isAdminOnlyPlan}
+                                >
                                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                                 </DropdownMenuItem>
                             </AlertDialogTrigger>
@@ -188,13 +238,13 @@ export function StoresTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={6} className="h-24 text-center">
-                  No stores found.
+                  No stores found. {isAdminOnlyPlan && "Store management is not available on your current plan."}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-    </>
+    </TooltipProvider>
   );
 }

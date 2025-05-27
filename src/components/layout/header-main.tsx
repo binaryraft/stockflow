@@ -1,17 +1,39 @@
 
 "use client";
 
-import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, UserCircle } from 'lucide-react';
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'; // Added LogOut, SettingsIcon, UserIcon
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { Package2 } from 'lucide-react';
-import { ThemeToggle } from './theme-toggle'; // Added ThemeToggle
+import { ThemeToggle } from './theme-toggle';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useRouter } from 'next/navigation';
 
 
 export function HeaderMain() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    // Basic logout: clear session storage related to store/employee auth
+    // In a real app, this would involve clearing auth tokens, etc.
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    router.push('/'); // Redirect to dashboard
+    // Optionally, show a toast message for logout
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
         <div className="md:hidden"> {/* SidebarTrigger for small screens */}
@@ -46,14 +68,37 @@ export function HeaderMain() {
           </Sheet>
         </div>
         
-        {/* For desktop, the sidebar toggle is now part of SidebarNav's header */}
-
-      <div className="flex w-full items-center justify-end gap-2 md:ml-auto"> {/* Reduced gap for tighter packing */}
+      <div className="flex w-full items-center justify-end gap-2 md:ml-auto">
         <ThemeToggle /> 
-        <Button variant="ghost" size="icon" className="rounded-full">
-          <UserCircle className="h-6 w-6" />
-          <span className="sr-only">User Profile</span>
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="rounded-full">
+              <UserCircle className="h-6 w-6" />
+              <span className="sr-only">User Menu</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <Link href="/profile">
+                <UserIcon className="mr-2 h-4 w-4" />
+                Profile
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/settings">
+                <SettingsIcon className="mr-2 h-4 w-4" />
+                Settings
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </header>
   );
