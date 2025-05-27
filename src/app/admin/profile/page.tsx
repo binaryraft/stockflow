@@ -18,14 +18,21 @@ export default function ProfilePage() {
   const { userProfile, updateCompanyName, updateSubscription, getActiveSubscriptionPlan } = useInventoryStore();
   const { toast } = useToast();
 
-  const [companyNameInput, setCompanyNameInput] = useState(userProfile.companyName);
+  const [companyNameInput, setCompanyNameInput] = useState('');
   const [isEditingCompanyName, setIsEditingCompanyName] = useState(false);
   const [activePlan, setActivePlan] = useState<SubscriptionPlan | undefined>(undefined);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
-    setCompanyNameInput(userProfile.companyName);
-    setActivePlan(getActiveSubscriptionPlan());
-  }, [userProfile, getActiveSubscriptionPlan]);
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted) {
+      setCompanyNameInput(userProfile.companyName);
+      setActivePlan(getActiveSubscriptionPlan());
+    }
+  }, [hasMounted, userProfile, getActiveSubscriptionPlan]);
 
   const handleCompanyNameSave = () => {
     if (companyNameInput.trim() === '') {
@@ -39,11 +46,17 @@ export default function ProfilePage() {
 
   const handleSubscriptionSelect = (planId: string) => {
     updateSubscription(planId);
+    // The useEffect above will update activePlan, triggering a re-render
     toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${SUBSCRIPTION_PLANS.find(p => p.id === planId)?.name}.` });
   };
   
-  if (!activePlan) {
-    return <div className="flex-1 flex items-center justify-center">Loading profile...</div>;
+  if (!hasMounted || !activePlan) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center p-4">
+        <User className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
+        <p className="text-lg text-muted-foreground">Loading profile & subscription information...</p>
+      </div>
+    );
   }
 
   return (
@@ -67,7 +80,7 @@ export default function ProfilePage() {
                   className="flex-grow"
                 />
               ) : (
-                <p className="flex-grow p-2 border border-transparent rounded-md">{userProfile.companyName}</p>
+                <p className="flex-grow p-2 border border-input rounded-md min-h-[40px] flex items-center">{userProfile.companyName}</p>
               )}
               {isEditingCompanyName ? (
                 <Button onClick={handleCompanyNameSave} size="sm">
@@ -82,7 +95,7 @@ export default function ProfilePage() {
           </div>
            <div className="space-y-1">
             <Label>Your Name (Placeholder)</Label>
-            <p className="text-sm text-muted-foreground p-2 border border-transparent rounded-md">
+            <p className="text-sm text-muted-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center">
               Current User (Full user auth not implemented)
             </p>
           </div>
