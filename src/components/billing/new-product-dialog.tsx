@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,7 +21,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant } from '@/types';
+import type { Product, ProductVariant, ProductOption as ProductOptionType } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { CategorySearchInput } from './category-search-input';
 import { PlusCircle, Trash2 } from 'lucide-react';
@@ -33,7 +33,7 @@ const productOptionSchema = z.object({
 
 const productVariantSchema = z.object({
   name: z.string().min(1, "Variant name cannot be empty"),
-  options: z.string().min(1, "Enter comma-separated options"), // Will be parsed
+  options: z.array(productOptionSchema).min(1, "At least one option is required"),
 });
 
 const newProductSchema = z.object({
@@ -89,10 +89,13 @@ export function NewProductDialog({
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
     control: form.control,
     name: "variants",
   });
+
+  // Ref to help focus the last added option input if needed (advanced focus management)
+  const lastOptionInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -107,7 +110,7 @@ export function NewProductDialog({
         sellPrice: initialSellPriceForDialog || 0,
         sku: '',
         expiryDate: '',
-        variants: [], // Reset variants on open
+        variants: [],
       });
     }
   }, [
@@ -119,15 +122,22 @@ export function NewProductDialog({
     form
   ]);
 
+  useEffect(() => {
+    if (lastOptionInputRef.current) {
+      lastOptionInputRef.current.focus();
+      lastOptionInputRef.current = null; // Reset ref
+    }
+  }, [variantFields]); // Re-run when variantFields change, implying an option might have been added
+
   const trackQuantity = form.watch('trackQuantity');
 
   const onSubmit = (data: NewProductFormData) => {
-    const productVariants: ProductVariant[] = (data.variants || []).map((variant, index) => ({
-      id: `variant-${Date.now()}-${index}`, // Simple ID generation for variants
+    const productVariants: ProductVariant[] = (data.variants || []).map((variant, variantIdx) => ({
+      id: `variant-${Date.now()}-${variantIdx}`, 
       name: variant.name,
-      options: variant.options.split(',').map(opt => opt.trim()).filter(opt => opt).map((optValue, optIndex) => ({
-        id: `option-${Date.now()}-${index}-${optIndex}`, // Simple ID generation for options
-        value: optValue,
+      options: variant.options.map((opt, optIdx) => ({
+        id: `option-${Date.now()}-${variantIdx}-${optIdx}`,
+        value: opt.value,
       })),
     }));
 
@@ -143,7 +153,6 @@ export function NewProductDialog({
         expiryDate: data.expiryDate,
         variants: productVariants,
     };
-    // Type assertion needed if addProduct expects a more specific type without raw variants
     const addedProduct = addProduct(newProductData as Omit<Product, 'id' | 'quantityInStock' | 'imageUrl'> & { initialStock?: number; variants?: ProductVariant[] });
     toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
     if (onProductAdd) {
@@ -237,32 +246,91 @@ export function NewProductDialog({
 
           <Separator/>
           <Label>Variants (Max 2)</Label>
-          {fields.map((field, index) => (
-            <div key={field.id} className="space-y-2 border p-3 rounded-md">
-              <div className="flex justify-between items-center">
-                <Label>Variant {index + 1}</Label>
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
-                  <Trash2 className="h-4 w-4 text-destructive"/>
+          {variantFields.map((variantField, variantIndex) => {
+            const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
+              control: form.control,
+              name: `variants.${variantIndex}.options` as const,
+            });
+
+            return (
+              <div key={variantField.id} className="space-y-3 border p-4 rounded-md bg-muted/50">
+                <div className="flex justify-between items-center">
+                  <Label htmlFor={`variants.${variantIndex}.name`}>Variant {variantIndex + 1} Name (e.g., Color, Size)</Label>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)}>
+                    <Trash2 className="h-4 w-4 text-destructive"/>
+                  </Button>
+                </div>
+                <Input 
+                  {...form.register(`variants.${variantIndex}.name`)} 
+                  placeholder="e.g. Color"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      // Optionally focus first option input or "Add Option" button
+                      // For now, just prevent default behavior
+                    }
+                  }}
+                />
+                {form.formState.errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants[variantIndex]?.name?.message}</p>}
+                
+                <Label className="text-xs text-muted-foreground">Options for {form.watch(`variants.${variantIndex}.name`) || `Variant ${variantIndex+1}`}</Label>
+                <div className="space-y-2">
+                  {optionFields.map((optionValueField, optionIndex) => (
+                    <div key={optionValueField.id} className="flex items-center gap-2">
+                      <Input
+                        {...form.register(`variants.${variantIndex}.options.${optionIndex}.value`)}
+                        placeholder={`Option ${optionIndex + 1} Value`}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault(); // Prevent form submission or dialog close
+                            appendOption({ value: '' });
+                            // Basic focus attempt for next input after a short delay for DOM update
+                            // More robust focus would use refs and useEffect
+                            setTimeout(() => {
+                              const nextInput = document.querySelector(`input[name="variants.${variantIndex}.options.${optionIndex + 1}.value"]`) as HTMLInputElement;
+                              nextInput?.focus();
+                            }, 0);
+                          }
+                        }}
+                      />
+                      {optionFields.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8">
+                          <Trash2 className="h-3 w-3 text-destructive"/>
+                        </Button>
+                      )}
+                    </div>
+                  ))}
+                  {form.formState.errors.variants?.[variantIndex]?.options && !Array.isArray(form.formState.errors.variants?.[variantIndex]?.options) && <p className="text-sm text-destructive mt-1">{ (form.formState.errors.variants?.[variantIndex]?.options as any)?.message || "Error with options"}</p>}
+
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs"
+                  onClick={() => {
+                    appendOption({ value: '' });
+                    setTimeout(() => {
+                       const nextInput = document.querySelector(`input[name="variants.${variantIndex}.options.${optionFields.length}.value"]`) as HTMLInputElement;
+                       nextInput?.focus();
+                    }, 0);
+                  }}
+                >
+                  <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Option
                 </Button>
               </div>
-              <div>
-                <Label htmlFor={`variants.${index}.name`}>Variant Name (e.g., Color, Size)</Label>
-                <Input {...form.register(`variants.${index}.name`)} placeholder="e.g. Color"/>
-                {form.formState.errors.variants?.[index]?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants[index]?.name?.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor={`variants.${index}.options`}>Options (comma-separated)</Label>
-                <Input {...form.register(`variants.${index}.options`)} placeholder="e.g. Red, Green, Blue"/>
-                {form.formState.errors.variants?.[index]?.options && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants[index]?.options?.message}</p>}
-              </div>
-            </div>
-          ))}
-          {fields.length < 2 && (
-            <Button type="button" variant="outline" onClick={() => append({ name: "", options: "" })}>
-              <PlusCircle className="mr-2 h-4 w-4"/> Add Variant
+            );
+          })}
+          {variantFields.length < 2 && (
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => appendVariant({ name: "", options: [{value: ""}] })} // Add with one default option
+            >
+              <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
             </Button>
           )}
-          {form.formState.errors.variants && !form.formState.errors.variants.some(v => v.name || v.options) && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants.message}</p>}
+          {form.formState.errors.variants && typeof form.formState.errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants.message}</p>}
 
 
           <DialogFooter className="pt-4">
@@ -276,3 +344,5 @@ export function NewProductDialog({
     </Dialog>
   );
 }
+
+    
