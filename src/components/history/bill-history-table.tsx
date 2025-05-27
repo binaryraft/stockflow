@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -12,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card } from '@/components/ui/card'; // Added import
+import { Card } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -51,7 +52,6 @@ export function BillHistoryTable() {
         let valA = a[sortConfig.key];
         let valB = b[sortConfig.key];
 
-        // Special handling for date sorting (timestamp is better)
         if (sortConfig.key === 'date') {
             valA = a.timestamp;
             valB = b.timestamp;
@@ -66,10 +66,9 @@ export function BillHistoryTable() {
         
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
-    } else { // Default sort by date descending
+    } else {
         sortableBills.sort((a,b) => b.timestamp - a.timestamp);
     }
-
 
     return sortableBills;
   }, [bills, searchTerm, sortConfig]);
@@ -132,7 +131,16 @@ export function BillHistoryTable() {
                 <TableBody>
                   {selectedBill.items.map(item => (
                     <TableRow key={item.id}>
-                      <TableCell>{item.productName} {item.isDefective && <Badge variant="destructive" className="ml-1">Defective</Badge>}</TableCell>
+                      <TableCell>
+                        {item.productName}
+                        {selectedBill.type === 'return' && (
+                          item.isDefective ? (
+                            <Badge variant="destructive" className="ml-2">Defective</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="ml-2">Restocked</Badge>
+                          )
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{item.quantity}</TableCell>
                       <TableCell className="text-right">${item.costPrice.toFixed(2)}</TableCell>
                       <TableCell className="text-right">${item.sellPrice.toFixed(2)}</TableCell>
@@ -192,7 +200,7 @@ export function BillHistoryTable() {
                 Vendor/Customer <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right">Items</TableHead>
-              <TableHead className="text-right" onClick={() => requestSort('totalAmount')} > {/* Removed className from here as it was duplicated */}
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('totalAmount')} >
                 Total Amount <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -249,3 +257,5 @@ export function BillHistoryTable() {
     </>
   );
 }
+
+    
