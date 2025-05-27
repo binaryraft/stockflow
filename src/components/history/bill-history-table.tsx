@@ -40,11 +40,15 @@ export function BillHistoryTable() {
   const filteredAndSortedBills = useMemo(() => {
     let sortableBills = [...bills];
     if (searchTerm) {
+      const lowerSearchTerm = searchTerm.toLowerCase();
       sortableBills = sortableBills.filter(bill =>
-        bill.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        bill.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        format(new Date(bill.date), 'PPpp').toLowerCase().includes(searchTerm.toLowerCase())
+        bill.id.toLowerCase().includes(lowerSearchTerm) ||
+        (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
+        (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
+        bill.type.toLowerCase().includes(lowerSearchTerm) ||
+        format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
+        bill.totalAmount.toString().includes(lowerSearchTerm) ||
+        bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm))
       );
     }
     
@@ -92,18 +96,27 @@ export function BillHistoryTable() {
   };
 
   const getBillTypeIcon = (type: Bill['type']) => {
-    if (type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Changed to red for Expense
-    if (type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Changed to green for Sales
-    if (type === 'return') return <RotateCcw className="h-4 w-4 text-yellow-500" />; // Stays yellow for Return
+    if (type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Expense
+    if (type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Sales
+    if (type === 'return') return <RotateCcw className="h-4 w-4 text-yellow-500" />;
     return null;
   };
   
   const getBillTypeBadgeVariant = (type: Bill['type']): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
-    if (type === 'buy') return 'destructive'; // Red for Expense
-    if (type === 'sell') return 'default'; // Green (using default primary for now, can adjust theme)
-    if (type === 'return') return 'secondary'; // Yellow-ish (using secondary, can adjust theme)
+    if (type === 'buy') return 'destructive'; // Expense (Red)
+    if (type === 'sell') { // Sales (Green) - Using 'default' which should be themed to green or use a custom green variant
+      return 'default'; 
+    }
+    if (type === 'return') return 'secondary'; // Return (Yellow-ish)
     return 'outline';
   };
+
+  const getBillTypeName = (type: Bill['type']): string => {
+    if (type === 'buy') return 'Expense';
+    if (type === 'sell') return 'Sales';
+    if (type === 'return') return 'Return';
+    return type;
+  }
 
 
   const calculatePotentialSellTotal = (bill: Bill): number | null => {
@@ -119,17 +132,25 @@ export function BillHistoryTable() {
             <DialogHeader>
               <DialogTitle>Bill Details (ID: {selectedBill.id})</DialogTitle>
               <DialogDescription>
-                {selectedBill.type === 'sell' ? 'Sales' : selectedBill.type === 'buy' ? 'Expense' : 'Return'} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
+                {getBillTypeName(selectedBill.type)} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh] p-1 -mx-1">
             <div className="space-y-4 py-4 px-2">
-              {selectedBill.vendorOrCustomerName && (
-                <div className="mb-3">
-                    <p className="text-sm text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor' : 'Customer'}</p>
-                    <p className="font-medium">{selectedBill.vendorOrCustomerName}</p>
-                </div>
-              )}
+              <div className="grid grid-cols-2 gap-4 mb-3">
+                {selectedBill.vendorOrCustomerName && (
+                  <div>
+                      <p className="text-sm text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor' : 'Customer'}</p>
+                      <p className="font-medium">{selectedBill.vendorOrCustomerName}</p>
+                  </div>
+                )}
+                {selectedBill.customerPhone && (
+                  <div>
+                      <p className="text-sm text-muted-foreground">Phone</p>
+                      <p className="font-medium">{selectedBill.customerPhone}</p>
+                  </div>
+                )}
+              </div>
               <Separator />
               <Table className="mt-2">
                 <TableHeader>
@@ -195,10 +216,10 @@ export function BillHistoryTable() {
 
       <div className="mb-4">
         <Input
-          placeholder="Search bills (ID, Name, Type, Date)..."
+          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Product)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
+          className="max-w-md"
         />
       </div>
       <Card className="shadow-lg">
@@ -214,7 +235,7 @@ export function BillHistoryTable() {
                   Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                 </TableHead>
                 <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50">
-                  Vendor/Customer <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+                  Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
                 </TableHead>
                 <TableHead className="text-right">Items</TableHead>
                 <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('totalAmount')} >
@@ -232,13 +253,16 @@ export function BillHistoryTable() {
                     <TableCell>
                       <Badge 
                         variant={getBillTypeBadgeVariant(bill.type)} 
-                        className="capitalize flex items-center gap-1 w-fit"
+                        className={`capitalize flex items-center gap-1 w-fit ${bill.type === 'sell' ? 'bg-green-600 hover:bg-green-700 text-white' : bill.type === 'buy' ? 'bg-red-600 hover:bg-red-700 text-white' : bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' }`}
                       >
                         {getBillTypeIcon(bill.type)}
-                        {bill.type === 'sell' ? 'Sales' : bill.type === 'buy' ? 'Expense' : 'Return'}
+                        {getBillTypeName(bill.type)}
                       </Badge>
                     </TableCell>
-                    <TableCell>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</TableCell>
+                    <TableCell>
+                        {bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}
+                        {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
+                    </TableCell>
                     <TableCell className="text-right">{bill.items.length}</TableCell>
                     <TableCell className="text-right font-semibold">₹{bill.totalAmount.toFixed(2)}</TableCell>
                     <TableCell className="text-right">

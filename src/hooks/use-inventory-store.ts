@@ -3,11 +3,10 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category } from '@/types'; // BillMode removed as it's not used here
+import type { Product, Bill, BillItem, Category, ProductVariant } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns'; // Added for Bill ID formatting
+import { format } from 'date-fns';
 
-// Helper to generate unique IDs (if not using a library like uuid)
 const generateId = () => uuidv4();
 
 
@@ -15,8 +14,8 @@ interface InventoryState {
   products: Product[];
   bills: Bill[];
   categories: Category[];
-  addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl'> & { initialStock?: number }) => Product;
-  updateProduct: (productId: string, productData: Partial<Product>) => void;
+  addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl'> & { initialStock?: number; variants?: ProductVariant[] }) => Product;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'variants'>> & { variants?: ProductVariant[] }) => void;
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
   searchProducts: (searchTerm: string) => Product[];
@@ -25,17 +24,17 @@ interface InventoryState {
   getBillById: (billId: string) => Bill | undefined;
   
   addCategory: (categoryName: string) => Category;
-  searchCategories: (searchTerm: string) => string[]; // Returns array of category names
+  searchCategories: (searchTerm: string) => string[];
   
   _hydrate: () => void; 
 }
 
 const initialProducts: Product[] = [
-  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 50, costPrice: 0.5, sellPrice: 1, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png` },
-  { id: generateId(), name: 'Whole Wheat Bread', category: 'Bakery', trackQuantity: true, quantityInStock: 30, costPrice: 1.5, sellPrice: 3, description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", imageUrl: `https://placehold.co/100x100.png` },
-  { id: generateId(), name: 'Laptop Pro 15-inch', category: 'Electronics', trackQuantity: true, quantityInStock: 10, costPrice: 800, sellPrice: 1200, description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", imageUrl: `https://placehold.co/100x100.png` },
-  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 20, costPrice: 5, sellPrice: 8.5, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`},
-  { id: generateId(), name: 'Service Charge', category: 'Services', trackQuantity: false, quantityInStock: 0, costPrice: 0, sellPrice: 10, description: "Standard service charge for repairs." },
+  { id: generateId(), name: 'Organic Apples', category: 'Fruits', trackQuantity: true, quantityInStock: 50, costPrice: 0.5, sellPrice: 1, description: "Fresh, crispy organic apples, sourced locally.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Whole Wheat Bread', category: 'Bakery', trackQuantity: true, quantityInStock: 30, costPrice: 1.5, sellPrice: 3, description: "Healthy whole wheat bread, freshly baked daily, no preservatives.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Laptop Pro 15-inch', category: 'Electronics', trackQuantity: true, quantityInStock: 10, costPrice: 800, sellPrice: 1200, description: "High-performance laptop with 16GB RAM and 512GB SSD for professionals.", imageUrl: `https://placehold.co/100x100.png`, variants: [] },
+  { id: generateId(), name: 'Chicken Breast 1kg', category: 'Meat', trackQuantity: true, quantityInStock: 20, costPrice: 5, sellPrice: 8.5, description: "Fresh boneless, skinless chicken breast.", imageUrl: `https://placehold.co/100x100.png`, variants: []},
+  { id: generateId(), name: 'Service Charge', category: 'Services', trackQuantity: false, quantityInStock: 0, costPrice: 0, sellPrice: 10, description: "Standard service charge for repairs.", variants: [] },
 ];
 
 const initialCategories: Category[] = [
@@ -63,6 +62,7 @@ export const useInventoryStore = create<InventoryState>()(
           ...productData,
           quantityInStock: productData.trackQuantity ? (productData.initialStock || 0) : 0,
           imageUrl: productData.imageUrl || `https://placehold.co/100x100.png`,
+          variants: productData.variants || [],
         };
         set((state) => ({ products: [...state.products, newProduct] }));
         if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
@@ -74,7 +74,7 @@ export const useInventoryStore = create<InventoryState>()(
       updateProduct: (productId, productData) => {
         set((state) => ({
           products: state.products.map((p) =>
-            p.id === productId ? { ...p, ...productData } : p
+            p.id === productId ? { ...p, ...productData, variants: productData.variants || p.variants } : p
           ),
         }));
       },
@@ -100,7 +100,7 @@ export const useInventoryStore = create<InventoryState>()(
         const newBillItems: BillItem[] = billItemsData.map(itemData => {
           const product = get().getProductById(itemData.productId);
           return {
-            id: generateId(), // BillItem ID remains UUID
+            id: generateId(),
             ...itemData,
             productName: product?.name || 'Unknown Product',
           };
@@ -112,7 +112,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
         
         const newBill: Bill = {
-          id: format(currentDate, 'ddMMyyHHmmss'), // New Bill ID format
+          id: format(currentDate, 'ddMMyyHHmmss'),
           ...billData,
           date: currentDate.toISOString(),
           timestamp: currentDate.getTime(),
@@ -122,7 +122,6 @@ export const useInventoryStore = create<InventoryState>()(
 
         set((state) => ({ bills: [newBill, ...state.bills] }));
 
-        // Update stock based on bill type
         if (billData.type === 'buy') {
           newBillItems.forEach(item => {
             const product = get().getProductById(item.productId);
@@ -159,7 +158,7 @@ export const useInventoryStore = create<InventoryState>()(
         const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
         if (existingCategory) return existingCategory;
 
-        const newCategory: Category = { id: generateId(), name: categoryName }; // Category ID remains UUID
+        const newCategory: Category = { id: generateId(), name: categoryName };
         set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
       },
@@ -176,8 +175,16 @@ export const useInventoryStore = create<InventoryState>()(
       _hydrate: () => {
         const state = get();
         let updated = false;
+        
+        const hydratedProducts = state.products.map(p => ({ ...p, variants: p.variants || [] }));
+        if (JSON.stringify(hydratedProducts) !== JSON.stringify(state.products)) {
+            set({ products: hydratedProducts });
+            updated = true;
+        }
+
+
         if (state.products.length === 0) {
-          set({ products: initialProducts });
+          set({ products: initialProducts.map(p => ({...p, variants: p.variants || []})) });
           updated = true;
         }
         if (state.categories.length === 0) {
@@ -191,12 +198,12 @@ export const useInventoryStore = create<InventoryState>()(
           }
         }
         DEFAULT_CATEGORIES.forEach(catName => {
-          if(!state.categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
+          if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) { // Use get() to access latest categories
             get().addCategory(catName);
-            updated = true;
+            updated = true; // This flag might be set multiple times but it's okay
           }
         });
-        if (updated) console.log("Inventory store hydrated/updated with initial/default data.");
+        if (updated) console.log("Inventory store hydrated/updated.");
       }
     }),
     {

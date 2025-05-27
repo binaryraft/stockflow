@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -21,21 +21,31 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product } from '@/types';
+import type { Product, ProductVariant } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { CategorySearchInput } from './category-search-input';
+import { PlusCircle, Trash2 } from 'lucide-react';
 
+const productOptionSchema = z.object({
+  value: z.string().min(1, "Option value cannot be empty"),
+});
+
+const productVariantSchema = z.object({
+  name: z.string().min(1, "Variant name cannot be empty"),
+  options: z.string().min(1, "Enter comma-separated options"), // Will be parsed
+});
 
 const newProductSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
-  category: z.string().optional().default(''), // Default to empty string
+  category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
   initialStock: z.coerce.number().min(0).optional().default(0),
   costPrice: z.coerce.number().min(0).optional().default(0),
   sellPrice: z.coerce.number().min(0).optional().default(0),
   sku: z.string().optional(),
-  expiryDate: z.string().optional(), // Consider using a date picker
+  expiryDate: z.string().optional(),
+  variants: z.array(productVariantSchema).max(2, "Maximum of 2 variants allowed").optional(),
 });
 
 type NewProductFormData = z.infer<typeof newProductSchema>;
@@ -74,7 +84,13 @@ export function NewProductDialog({
       sellPrice: 0,
       sku: '',
       expiryDate: '',
+      variants: [],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "variants",
   });
 
   useEffect(() => {
@@ -83,13 +99,14 @@ export function NewProductDialog({
       form.reset({
         name: initialProductName || '',
         description: '', 
-        category: '', // Reset category on open, user will type or select
+        category: '',
         trackQuantity: shouldTrack,
         initialStock: initialQuantityForDialog || 0,
         costPrice: initialCostPriceForDialog || 0,
         sellPrice: initialSellPriceForDialog || 0,
         sku: '',
         expiryDate: '',
+        variants: [], // Reset variants on open
       });
     }
   }, [
@@ -104,18 +121,29 @@ export function NewProductDialog({
   const trackQuantity = form.watch('trackQuantity');
 
   const onSubmit = (data: NewProductFormData) => {
+    const productVariants: ProductVariant[] = (data.variants || []).map((variant, index) => ({
+      id: `variant-${Date.now()}-${index}`, // Simple ID generation for variants
+      name: variant.name,
+      options: variant.options.split(',').map(opt => opt.trim()).filter(opt => opt).map((optValue, optIndex) => ({
+        id: `option-${Date.now()}-${index}-${optIndex}`, // Simple ID generation for options
+        value: optValue,
+      })),
+    }));
+
     const newProductData = {
         name: data.name,
         description: data.description,
-        category: data.category, // This will be the string from CategorySearchInput
+        category: data.category,
         trackQuantity: data.trackQuantity,
         initialStock: data.trackQuantity ? data.initialStock : 0,
         costPrice: data.costPrice || 0,
         sellPrice: data.sellPrice || 0,
         sku: data.sku,
         expiryDate: data.expiryDate,
+        variants: productVariants,
     };
-    const addedProduct = addProduct(newProductData);
+    // Type assertion needed if addProduct expects a more specific type without raw variants
+    const addedProduct = addProduct(newProductData as Omit<Product, 'id' | 'quantityInStock' | 'imageUrl'> & { initialStock?: number; variants?: ProductVariant[] });
     toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
     if (onProductAdd) {
       onProductAdd(addedProduct);
@@ -154,8 +182,8 @@ export function NewProductDialog({
                   <CategorySearchInput
                     id="category"
                     value={field.value || ''}
-                    onValueChange={(value) => field.onChange(value)} // Update form value on text change
-                    onCategorySelect={(categoryName) => field.onChange(categoryName)} // Ensure form value is set on selection
+                    onValueChange={(value) => field.onChange(value)}
+                    onCategorySelect={(categoryName) => field.onChange(categoryName)}
                     placeholder="Type or select category"
                   />
                 )}
@@ -163,7 +191,6 @@ export function NewProductDialog({
                {form.formState.errors.category && <p className="text-sm text-destructive mt-1">{form.formState.errors.category.message}</p>}
             </div>
           </div>
-
 
           <div className="flex items-center space-x-2">
             <Controller
@@ -206,6 +233,36 @@ export function NewProductDialog({
               {form.formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{form.formState.errors.sellPrice.message}</p>}
             </div>
           </div>
+
+          <Separator/>
+          <Label>Variants (Max 2)</Label>
+          {fields.map((field, index) => (
+            <div key={field.id} className="space-y-2 border p-3 rounded-md">
+              <div className="flex justify-between items-center">
+                <Label>Variant {index + 1}</Label>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                  <Trash2 className="h-4 w-4 text-destructive"/>
+                </Button>
+              </div>
+              <div>
+                <Label htmlFor={`variants.${index}.name`}>Variant Name (e.g., Color, Size)</Label>
+                <Input {...form.register(`variants.${index}.name`)} placeholder="e.g. Color"/>
+                {form.formState.errors.variants?.[index]?.name && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants[index]?.name?.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor={`variants.${index}.options`}>Options (comma-separated)</Label>
+                <Input {...form.register(`variants.${index}.options`)} placeholder="e.g. Red, Green, Blue"/>
+                {form.formState.errors.variants?.[index]?.options && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants[index]?.options?.message}</p>}
+              </div>
+            </div>
+          ))}
+          {fields.length < 2 && (
+            <Button type="button" variant="outline" onClick={() => append({ name: "", options: "" })}>
+              <PlusCircle className="mr-2 h-4 w-4"/> Add Variant
+            </Button>
+          )}
+          {form.formState.errors.variants && !form.formState.errors.variants.some(v => v.name || v.options) && <p className="text-sm text-destructive mt-1">{form.formState.errors.variants.message}</p>}
+
 
           <DialogFooter className="pt-4">
             <DialogClose asChild>

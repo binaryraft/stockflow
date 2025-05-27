@@ -36,6 +36,7 @@ export function BillingForm() {
   const [mode, setMode] = useState<BillMode>((searchParams.get('mode') as BillMode) || 'sell');
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
   
   const [productNameQuery, setProductNameQuery] = useState('');
@@ -52,6 +53,8 @@ export function BillingForm() {
   const costPriceInputRef = useRef<HTMLInputElement>(null);
   const sellPriceInputRef = useRef<HTMLInputElement>(null);
   const customerVendorNameInputRef = useRef<HTMLInputElement>(null);
+  const customerPhoneInputRef = useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     const queryMode = searchParams.get('mode') as BillMode;
@@ -183,6 +186,7 @@ export function BillingForm() {
     addBill({
       type: mode,
       vendorOrCustomerName: customerVendorName,
+      customerPhone: customerPhone,
       notes: notes,
     }, billItemsForStore);
     
@@ -190,6 +194,7 @@ export function BillingForm() {
     toast({ title: "Bill Saved", description: `${modeDisplay} Bill has been successfully saved.` });
     setCurrentBillItems([]);
     setCustomerVendorName('');
+    setCustomerPhone('');
     setNotes('');
     resetFormFields();
     router.push('/billing'); 
@@ -367,17 +372,32 @@ export function BillingForm() {
               </Button>
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="customerVendorName">
-                {mode === 'buy' ? 'Vendor Name' : 'Customer Name'}
-              </Label>
-              <Input
-                id="customerVendorName"
-                ref={customerVendorNameInputRef}
-                value={customerVendorName}
-                onChange={(e) => setCustomerVendorName(e.target.value)}
-                placeholder={mode === 'buy' ? 'Enter vendor name (optional)' : 'Enter customer name (optional)'}
-              />
+            <div className="grid md:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                <Label htmlFor="customerVendorName">
+                    {mode === 'buy' ? 'Vendor Name' : 'Customer Name'}
+                </Label>
+                <Input
+                    id="customerVendorName"
+                    ref={customerVendorNameInputRef}
+                    value={customerVendorName}
+                    onChange={(e) => setCustomerVendorName(e.target.value)}
+                    placeholder={mode === 'buy' ? 'Enter vendor name (optional)' : 'Enter customer name (optional)'}
+                />
+                </div>
+                <div className="space-y-1.5">
+                <Label htmlFor="customerPhone">
+                    {mode === 'buy' ? 'Vendor Phone' : 'Customer Phone'}
+                </Label>
+                <Input
+                    id="customerPhone"
+                    ref={customerPhoneInputRef}
+                    type="tel"
+                    value={customerPhone}
+                    onChange={(e) => setCustomerPhone(e.target.value)}
+                    placeholder={mode === 'buy' ? 'Enter vendor phone (optional)' : 'Enter customer phone (optional)'}
+                />
+                </div>
             </div>
             
             {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
@@ -422,7 +442,7 @@ export function BillingForm() {
                   />
               </div>
             <div className="flex gap-3 mt-2">
-              <Button variant="outline" onClick={() => { setCurrentBillItems([]); resetFormFields(); setCustomerVendorName(''); setNotes('')}} className="flex-1">
+              <Button variant="outline" onClick={() => { setCurrentBillItems([]); resetFormFields(); setCustomerVendorName(''); setCustomerPhone(''); setNotes('')}} className="flex-1">
                 <Eraser className="mr-2 h-4 w-4" /> Clear Bill
               </Button>
               <Button onClick={handleSaveBill} className="flex-1" disabled={currentBillItems.length === 0}>
