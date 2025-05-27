@@ -26,7 +26,7 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
-type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus'>;
+type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
 type BillFilterType = 'all' | BillMode;
 
 interface BillHistoryTableProps {
@@ -205,7 +205,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-            printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
+             printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
@@ -229,8 +229,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.sellPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
-      } else { 
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
+      } else { // Return bill
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             printWindow.document.write('<tr>');
             printWindow.document.write(`<td>${index + 1}</td>`);
@@ -247,7 +247,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             }
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
-            printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.sellPrice.toFixed(2)}</td>`);
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.sellPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
@@ -269,16 +268,16 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
       if (billToPrint.type === 'buy') {
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Cost (This Bill):</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? 'green' : 'red';
-        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue from these Items:</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor}; border: none;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // Darker green/red for print
+        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
+        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') {
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       } else { 
-         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
       printWindow.document.write('</table>');
       printWindow.document.write('</div>');
@@ -450,7 +449,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -465,11 +463,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <div className="text-xs text-muted-foreground mt-1">
                                     Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                 </div>
-                                {currentSKU && getProductById(item.productId)?.trackQuantity && (
-                                    <div className="text-xs text-muted-foreground mt-1">
-                                        Purchased: {item.quantity}
-                                    </div>
-                                )}
+                                {/* Removed SKU stock from here */}
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
@@ -515,8 +509,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Cost/Unit</TableHead>
-                          <TableHead className="text-right">Price/Unit</TableHead>
+                          <TableHead className="text-right">Price/Unit</TableHead> {/* Removed Cost/Unit for Return */}
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -539,7 +532,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                               )}
                             </TableCell>
                             <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
-                            <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
                             <TableCell className="text-right py-3 align-top">₹{item.sellPrice.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
                           </TableRow>
@@ -642,8 +634,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 Date / Time
               </TableHead>
               <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[180px] py-3 px-4">
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4">
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+               <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+                Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+                Store <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
@@ -673,7 +671,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4 w-[180px]">
+                  <TableCell className="py-3 px-4 w-[120px]">
                     <Badge
                       className={cn(
                         "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", 
@@ -683,18 +681,22 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1")})}
                       {billDisplayInfo.name}
                     </Badge>
-                    {bill.billedByStaffName && (
-                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                            <Users size={12} className="text-muted-foreground" />
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                    {bill.billedByStaffName ? (
+                        <div className="text-sm flex items-center gap-1">
+                            <Users size={14} className="text-muted-foreground shrink-0" />
                             {bill.billedByStaffName}
                         </div>
-                    )}
-                    {bill.storeName && (
-                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                            <BuildingIcon size={12} className="text-muted-foreground" />
+                    ) : <span className="text-muted-foreground">-</span>}
+                  </TableCell>
+                  <TableCell className="py-3 px-4">
+                     {bill.storeName ? (
+                        <div className="text-sm flex items-center gap-1">
+                            <BuildingIcon size={14} className="text-muted-foreground shrink-0" />
                             {bill.storeName}
                         </div>
-                    )}
+                    ) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
                   <TableCell className="py-3 px-4">
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
@@ -741,7 +743,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center">
                   No bills found.
                 </TableCell>
               </TableRow>
@@ -752,5 +754,3 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
-
-    
