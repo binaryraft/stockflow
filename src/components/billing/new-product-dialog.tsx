@@ -59,7 +59,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   variantIndex,
   removeVariant
 }) => {
-  const { control, register, formState, watch } = useFormContext<NewProductFormData>(); // Use context here
+  const { control, register, formState, watch } = useFormContext<NewProductFormData>(); 
 
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
@@ -69,7 +69,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   const variantName = watch(`variants.${variantIndex}.name`);
 
   return (
-    <div className="space-y-3 border p-4 rounded-md bg-muted/50">
+    <div className="space-y-3 border p-4 rounded-md bg-tertiary">
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium">Variant {variantIndex + 1}</Label>
         <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant">
@@ -85,7 +85,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
             e.preventDefault();
             const firstOptionInput = document.querySelector(`input[name="variants.${variantIndex}.options.0.value"]`) as HTMLInputElement;
             if (firstOptionInput) firstOptionInput.focus();
-            else if (optionFields.length === 0) appendOption({ value: '' }); // Add first option if none exist
+            else if (optionFields.length === 0) appendOption({ value: '' }); 
           }
         }}
       />
@@ -196,7 +196,7 @@ export function NewProductDialog({
           description: editingProduct.description || '',
           category: editingProduct.category || '',
           trackQuantity: editingProduct.trackQuantity,
-          initialStock: editingProduct.quantityInStock, // For editing, initialStock is current stock
+          initialStock: editingProduct.quantityInStock, 
           costPrice: editingProduct.costPrice,
           sellPrice: editingProduct.sellPrice,
           sku: editingProduct.sku || '',

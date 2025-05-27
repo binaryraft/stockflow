@@ -9,7 +9,7 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 98%; /* Light Gray */
+    --background: 0 0% 100%; /* White */
     --foreground: 240 10% 3.9%; /* Near Black */
 
     --card: 0 0% 100%; /* White */
@@ -21,10 +21,15 @@ body {
     --primary: 240 5.9% 10%; /* Dark Gray/Almost Black for primary actions */
     --primary-foreground: 0 0% 98%; /* Light Gray for text on primary */
 
-    --secondary: 240 4.8% 95.9%; /* Lighter gray for secondary elements */
-    --secondary-foreground: 240 5.9% 10%; /* Dark text for secondary */
+    /* Secondary color is now green */
+    --secondary: 130 40% 50%; /* Green */
+    --secondary-foreground: 0 0% 100%; /* White */
 
-    --muted: 240 4.8% 95.9%; /* Similar to secondary, for less prominent elements */
+    /* Tertiary color for subtle backgrounds/accents */
+    --tertiary: 220 15% 96%; /* Very light cool gray */
+    --tertiary-foreground: 220 10% 25%; /* Dark cool gray text */
+
+    --muted: 240 4.8% 95.9%; /* Light Gray for less prominent elements - warmer than tertiary */
     --muted-foreground: 240 3.8% 46.1%; /* Muted text color */
 
     --accent: 210 100% 56%; /* Vibrant Blue for highlights, focus rings */
@@ -34,7 +39,7 @@ body {
     --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
     --border: 240 5.9% 90%; /* Light Gray for borders */
-    --input: 0 0% 100%; /* White for input backgrounds */
+    --input: 0 0% 100%; /* White for input backgrounds (can also use a very light gray if needed) */
     --ring: 210 100% 56%; /* Accent blue for focus rings */
 
     --radius: 0.5rem;
@@ -46,15 +51,15 @@ body {
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Sidebar specific colors */
-    --sidebar-background: 0 0% 96%; /* Slightly darker gray than main bg for subtle separation */
-    --sidebar-foreground: 240 10% 3.9%; /* Dark text for sidebar */
-    --sidebar-primary: 240 5.9% 10%; /* primary for sidebar active items */
-    --sidebar-primary-foreground: 0 0% 98%; /* light for sidebar active items text */
-    --sidebar-accent: 240 4.8% 90%; /* accent for sidebar hover (slightly darker than input) */
-    --sidebar-accent-foreground: 240 5.9% 10%; /* dark for sidebar hover text */
-    --sidebar-border: 240 5.9% 85%; /* border for sidebar */
-    --sidebar-ring: 210 100% 56%; /* ring for sidebar focus */
+    /* Sidebar specific colors - kept as is, since sidebar design is good */
+    --sidebar-background: 0 0% 96%;
+    --sidebar-foreground: 240 10% 3.9%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 90%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 85%;
+    --sidebar-ring: 210 100% 56%;
   }
 
   .dark {
@@ -70,24 +75,29 @@ body {
     --primary: 0 0% 98%; /* Light Gray for primary actions in dark mode */
     --primary-foreground: 240 10% 3.9%; /* Near Black text on primary */
     
-    --secondary: 240 3.7% 15.9%; /* Darker gray for secondary */
-    --secondary-foreground: 0 0% 98%; /* Light text for secondary */
+    /* Secondary color is now green */
+    --secondary: 130 40% 30%; /* Darker Green */
+    --secondary-foreground: 0 0% 95%; /* Light text */
 
-    --muted: 240 3.7% 15.9%; /* Similar to secondary */
+    /* Tertiary color for subtle backgrounds/accents */
+    --tertiary: 220 10% 12%; /* Very dark cool gray */
+    --tertiary-foreground: 220 5% 75%; /* Lighter cool gray text */
+
+    --muted: 240 3.7% 15.9%; /* Darker gray for secondary */
     --muted-foreground: 240 5% 64.9%; /* Lighter muted text */
 
     --accent: 210 100% 56%; /* Keep Vibrant Blue */
     --accent-foreground: 0 0% 100%; /* White text on accent */
 
-    --destructive: 0 62.8% 30.6%; /* Standard dark destructive red */
+    --destructive: 0 70% 45%; /* Adjusted dark destructive red */
     --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
-    --border: 240 3.7% 15.9%; /* Dark Gray for borders */
+    --border: 240 3.7% 20%; /* Dark Gray for borders */
     --input: 240 3.7% 15.9%; /* Dark Gray for input backgrounds */
     --ring: 210 100% 56%; /* Accent blue for focus rings */
     
-    /* Sidebar specific colors for dark theme */
-    --sidebar-background: 240 6% 10%; /* Slightly lighter than main dark bg */
+    /* Sidebar specific colors for dark theme - kept as is */
+    --sidebar-background: 240 6% 10%;
     --sidebar-foreground: 0 0% 95%;
     --sidebar-primary: 0 0% 98%; 
     --sidebar-primary-foreground: 240 10% 3.9%; 

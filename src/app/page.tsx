@@ -4,17 +4,17 @@ import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, PackageSearch, History } from 'lucide-react';
+import { PlusCircle, PackageSearch, History, ShoppingBag, Send } from 'lucide-react';
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-8"> {/* Increased gap */}
+    <div className="flex flex-col gap-8">
       <PageTitle title="Dashboard" />
       
       <OverviewStats />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="shadow-md hover:shadow-lg transition-shadow"> {/* Adjusted shadow */}
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
@@ -25,12 +25,12 @@ export default function DashboardPage() {
           <CardContent className="flex flex-col gap-3 pt-4">
             <Button asChild variant="default" className="w-full justify-start">
               <Link href="/billing?action=new&mode=sell">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Sales Bill
+                <Send className="mr-2 h-4 w-4" /> New Sales Bill
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start">
               <Link href="/billing?action=new&mode=buy">
-                <PlusCircle className="mr-2 h-4 w-4" /> New Expense Bill
+                <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
               </Link>
             </Button>
              <Button asChild variant="outline" className="w-full justify-start">
@@ -41,7 +41,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow"> {/* Adjusted shadow */}
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PackageSearch className="h-5 w-5 text-primary" />
@@ -55,13 +55,13 @@ export default function DashboardPage() {
             </p>
             {/* Placeholder for recent activity list or chart */}
             <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-xs p-2 rounded-md bg-muted/50"><span>Sold 5x Apples</span><span>₹5.00</span></div>
-              <div className="flex justify-between text-xs p-2 rounded-md bg-muted/50"><span>Purchased 10x Bread</span><span>₹15.00</span></div>
+              <div className="flex justify-between text-xs p-2 rounded-md bg-tertiary"><span>Sold 5x Apples</span><span>₹5.00</span></div>
+              <div className="flex justify-between text-xs p-2 rounded-md bg-tertiary"><span>Purchased 10x Bread</span><span>₹15.00</span></div>
             </div>
           </CardContent>
         </Card>
         
-        <Card className="shadow-md hover:shadow-lg transition-shadow"> {/* Adjusted shadow */}
+        <Card className="shadow-md hover:shadow-lg transition-shadow">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />

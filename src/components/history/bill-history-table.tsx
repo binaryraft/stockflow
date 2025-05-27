@@ -113,8 +113,8 @@ export function BillHistoryTable() {
   
   const getBillTypeBadgeVariant = (bill: Bill): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
     if (bill.type === 'buy') return 'destructive'; 
-    if (bill.type === 'sell') return 'default'; 
-    if (bill.type === 'return') return 'secondary'; 
+    if (bill.type === 'sell') return 'default'; // Will be styled green via TabTriggers
+    if (bill.type === 'return') return 'secondary'; // Will be styled yellow via TabTriggers
     return 'outline';
   };
 
@@ -190,7 +190,7 @@ export function BillHistoryTable() {
                           item.isDefective ? (
                             <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
                           ) : (
-                            <Badge variant="secondary" className="text-xs mt-1 bg-green-100 text-green-700 border-green-300 hover:bg-green-200">Restocked</Badge>
+                            <Badge variant="secondary" className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/30 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200 dark:hover:bg-green-700/40">Restocked</Badge>
                           )
                         )}
                       </TableCell>
@@ -214,7 +214,7 @@ export function BillHistoryTable() {
               {selectedBill.notes && (
                 <div className="pt-3 mt-2 border-t">
                     <p className="font-semibold text-sm mb-1">Notes:</p>
-                    <p className="text-sm text-muted-foreground p-3 border rounded-md bg-muted/30 whitespace-pre-wrap">
+                    <p className="text-sm text-muted-foreground p-3 border rounded-md bg-tertiary whitespace-pre-wrap">
                         {selectedBill.notes}
                     </p>
                 </div>
