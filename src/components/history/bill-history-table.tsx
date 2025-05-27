@@ -16,18 +16,18 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill, ProductSKU } from '@/types';
+import type { Bill, ProductSKU, BillMode } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants'; // Added COMPANY_ADDRESS, COMPANY_CONTACT
+import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName'>;
-type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
+type BillFilterType = 'all' | BillMode;
 
 
 export function BillHistoryTable() {
@@ -175,32 +175,54 @@ export function BillHistoryTable() {
 
       printWindow.document.write('<div class="items-section">');
       printWindow.document.write('<h3>Items</h3>');
-      printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
-      billToPrint.items.forEach((item, index) => {
-        printWindow.document.write('<tr>');
-        printWindow.document.write(`<td>${index + 1}</td>`);
-        printWindow.document.write(`<td>${item.productName}`);
-        if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-          printWindow.document.write('<span class="variant-options">');
-          printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
-          printWindow.document.write('</span>');
-        }
-        if (billToPrint.type === 'return') {
-          if (item.isDefective) {
-            printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
-          } else {
-            printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
-          }
-        }
-        printWindow.document.write('</td>');
-        printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
-        printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
-        printWindow.document.write(`<td class="text-right">₹${item.sellPrice.toFixed(2)}</td>`);
-        printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * (billToPrint.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</td>`);
-        printWindow.document.write('</tr>');
-      });
+      
+      if (billToPrint.type === 'buy') { // Expense Bill Print Items
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Qty Purchased</th><th>Cost/Unit</th><th>Item Total</th></tr></thead><tbody>');
+        billToPrint.items.forEach((item, index) => {
+            printWindow.document.write('<tr>');
+            printWindow.document.write(`<td>${index + 1}</td>`);
+            printWindow.document.write(`<td>${item.productName}`);
+            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
+              printWindow.document.write('<span class="variant-options">');
+              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
+              printWindow.document.write('</span>');
+            }
+            printWindow.document.write(`<div class="variant-options" style="margin-left:0; margin-top:2px;">Sell Price set: ₹${item.sellPrice.toFixed(2)}</div>`);
+            printWindow.document.write('</td>');
+            printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
+            printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
+            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.costPrice).toFixed(2)}</td>`);
+            printWindow.document.write('</tr>');
+        });
+      } else { // Sales or Return Bill Print Items
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
+        billToPrint.items.forEach((item, index) => {
+            printWindow.document.write('<tr>');
+            printWindow.document.write(`<td>${index + 1}</td>`);
+            printWindow.document.write(`<td>${item.productName}`);
+            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
+              printWindow.document.write('<span class="variant-options">');
+              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
+              printWindow.document.write('</span>');
+            }
+            if (billToPrint.type === 'return') {
+              if (item.isDefective) {
+                printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
+              } else {
+                printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
+              }
+            }
+            printWindow.document.write('</td>');
+            printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
+            printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
+            printWindow.document.write(`<td class="text-right">₹${item.sellPrice.toFixed(2)}</td>`);
+            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.sellPrice).toFixed(2)}</td>`);
+            printWindow.document.write('</tr>');
+        });
+      }
       printWindow.document.write('</tbody></table>');
       printWindow.document.write('</div>');
+
 
       if (billToPrint.notes) {
         printWindow.document.write('<div class="notes-section">');
@@ -213,21 +235,19 @@ export function BillHistoryTable() {
       printWindow.document.write('<h4>Summary</h4>');
       printWindow.document.write(`<table style="width: auto; margin-left: auto;">`);
       
-      const totalCostForBillItems = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-      // billToPrint.totalAmount is the primary value (cost for 'buy', revenue for 'sell'/'return')
-      
       if (billToPrint.type === 'buy') { // Expense Bill
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Cost (This Bill):</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        const expectedRevenue = calculateExpectedRevenue(billToPrint); // Based on sell prices set in *this* bill
+        const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
         const profitLossColor = expectedProfitOrLoss >= 0 ? 'green' : 'red';
         printWindow.document.write(`<tr><td style="text-align:right;">Expected Revenue from these Items:</td><td class="text-right">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor};">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') { // Sales Bill
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Sales Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        const profitFromSale = billToPrint.totalAmount - totalCostForBillItems; // totalAmount is revenue, totalCostForBillItems is COGS for items in this bill
+        const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+        const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
         const profitColor = profitFromSale >= 0 ? 'green' : 'red';
-        printWindow.document.write(`<tr><td style="text-align:right;">Cost of Goods Sold:</td><td class="text-right">₹${totalCostForBillItems.toFixed(2)}</td></tr>`);
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Sales Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+        printWindow.document.write(`<tr><td style="text-align:right;">Cost of Goods Sold:</td><td class="text-right">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor};">₹${profitFromSale.toFixed(2)}</td></tr>`);
       } else { // Return Bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Return Value:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
@@ -257,20 +277,18 @@ export function BillHistoryTable() {
   }
 
 
-  const calculateExpectedRevenue = (bill: Bill): number => {
-    // Calculates expected revenue based on item.sellPrice for items in THIS bill
-    // Primarily for Expense bills to see potential if items were sold at the price set during purchase.
+  const calculatePotentialRevenue = (bill: Bill): number => {
     if (!bill || !bill.items) return 0;
     return bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
   };
 
-  const getPartyDetailsTitle = (billType?: Bill['type']): string => {
+  const getPartyDetailsTitle = (billType?: BillMode): string => {
     if (billType === 'buy') return 'Vendor Details';
     if (billType === 'sell' || billType === 'return') return 'Customer Details';
     return 'Party Details';
   };
 
-  const getPartyNameLabel = (billType?: Bill['type']): string => {
+  const getPartyNameLabel = (billType?: BillMode): string => {
     if (billType === 'buy') return 'Vendor Name';
     if (billType === 'sell' || billType === 'return') return 'Customer Name';
     return 'Name';
@@ -378,56 +396,79 @@ export function BillHistoryTable() {
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
                 <Table className="mt-0">
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Product</TableHead>
-                      <TableHead className="text-right">Qty</TableHead>
-                      <TableHead className="text-right">Cost/Unit</TableHead>
-                      <TableHead className="text-right">Price/Unit</TableHead>
-                      <TableHead className="text-right">Item Total</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {selectedBill.items.map(item => {
-                      const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
-                      const itemTotal = item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice);
-                      return (
-                      <TableRow key={item.id || item.productId}> 
-                        <TableCell className="py-3 align-top">
-                          <div>{item.productName}</div>
-                          {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {Object.entries(item.selectedVariantOptions)
-                                .map(([key, value]) => `${key}: ${value}`)
-                                .join('; ')}
-                            </div>
-                          )}
-                           {selectedBill.type === 'return' && (
-                            item.isDefective ? (
-                              <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                            ) : (
-                              <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
-                            )
-                          )}
-                          {selectedBill.type === 'buy' && ( // Specific details for Expense bill items
-                            <div className="text-xs text-muted-foreground mt-2 space-y-0.5 border-t border-dashed pt-1.5">
-                                <div className="font-medium text-foreground/80">Pricing & Stock Info (this purchase):</div>
-                                <div><span className="font-medium">Units Purchased:</span> {item.quantity}</div>
-                                <div><span className="font-medium">Cost Price/unit:</span> ₹{item.costPrice.toFixed(2)}</div>
-                                <div><span className="font-medium">Sell Price set/unit:</span> ₹{item.sellPrice.toFixed(2)}</div>
-                                {currentSKU && (
-                                    <div><span className="font-medium">Current Total SKU Stock:</span> {currentSKU.quantityInStock}</div>
-                                )}
-                            </div>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
-                        <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
-                        <TableCell className="text-right py-3 align-top">₹{item.sellPrice.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-medium py-3 align-top">₹{itemTotal.toFixed(2)}</TableCell>
-                      </TableRow>
-                    )})}
-                  </TableBody>
+                 {selectedBill.type === 'buy' ? (
+                    <>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product Details</TableHead>
+                          <TableHead className="text-right">Qty Purchased</TableHead>
+                          <TableHead className="text-right">Cost/Unit</TableHead>
+                          <TableHead className="text-right">Item Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedBill.items.map(item => (
+                          <TableRow key={item.id || item.productId}>
+                            <TableCell className="py-3 align-top">
+                              <div>{item.productName}</div>
+                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {Object.entries(item.selectedVariantOptions)
+                                    .map(([key, value]) => `${key}: ${value}`)
+                                    .join('; ')}
+                                </div>
+                              )}
+                              <div className="text-xs text-muted-foreground mt-1">
+                                Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
+                            <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </>
+                  ) : ( // Sales or Return Bill
+                    <>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Product</TableHead>
+                          <TableHead className="text-right">Qty</TableHead>
+                          <TableHead className="text-right">Cost/Unit</TableHead>
+                          <TableHead className="text-right">Price/Unit</TableHead>
+                          <TableHead className="text-right">Item Total</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedBill.items.map(item => (
+                          <TableRow key={item.id || item.productId}>
+                            <TableCell className="py-3 align-top">
+                              <div>{item.productName}</div>
+                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                <div className="text-xs text-muted-foreground mt-0.5">
+                                  {Object.entries(item.selectedVariantOptions)
+                                    .map(([key, value]) => `${key}: ${value}`)
+                                    .join('; ')}
+                                </div>
+                              )}
+                              {selectedBill.type === 'return' && (
+                                item.isDefective ? (
+                                  <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
+                                ) : (
+                                  <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
+                                )
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
+                            <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right py-3 align-top">₹{item.sellPrice.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </>
+                  )}
                 </Table>
               </div>
 
@@ -443,23 +484,23 @@ export function BillHistoryTable() {
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-2">Summary</h4>
                 <div className="space-y-1 text-sm">
-                    {selectedBill.type === 'buy' ? ( // Expense Bill
+                    {selectedBill.type === 'buy' ? ( 
                         <>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
                                 <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                             </div>
                             {(() => {
-                                const expectedRevenue = calculateExpectedRevenue(selectedBill); // Based on sell prices from *this* bill
+                                const expectedRevenue = calculatePotentialRevenue(selectedBill);
                                 const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
                                 return (
                                 <>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Expected Revenue from these Items:</span>
+                                        <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
                                         <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
                                     </div>
                                     <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Expected Profit/(Loss) from these Items:</span>
+                                        <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
                                         <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
                                             ₹{expectedProfitOrLoss.toFixed(2)}
                                         </span>
@@ -468,7 +509,7 @@ export function BillHistoryTable() {
                                 );
                             })()}
                         </>
-                    ) : selectedBill.type === 'sell' ? ( // Sales Bill
+                    ) : selectedBill.type === 'sell' ? ( 
                         <>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Total Sales Amount:</span>
@@ -539,8 +580,8 @@ export function BillHistoryTable() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead onClick={() => requestSort('date')} className="cursor-pointer hover:bg-muted/50 w-[150px] py-3 px-4">
-                Date / Time <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              <TableHead className="w-[150px] py-3 px-4">
+                Date / Time
               </TableHead>
               <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
               <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[180px] py-3 px-4">
@@ -622,4 +663,6 @@ export function BillHistoryTable() {
     </>
   );
 }
+    
+
     
