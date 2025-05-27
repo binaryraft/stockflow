@@ -5,7 +5,7 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { BillingForm } from '@/components/billing/billing-form';
-import type { Staff, Store, BillMode } from '@/types';
+import type { Store, BillMode } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
 import { LogOut, ShoppingCart, MessageSquare } from 'lucide-react'; 
@@ -87,7 +87,6 @@ export default function StoreBillingPage() {
   const handleStoreLogout = () => {
     if (hasMounted && storeId) {
       sessionStorage.removeItem(`authenticatedStore_${storeId}`);
-      // No currentStaff to remove from session anymore
     }
     setIsStoreAuthenticated(false);
     if (storeId) router.push(`/storeportal/${storeId}/login`);
@@ -102,7 +101,7 @@ export default function StoreBillingPage() {
           alt={`${APP_NAME} Logo`} 
           width={48} 
           height={48} 
-          className="mb-2 rounded-lg animate-pulse" 
+          className="mb-2 rounded-lg animate-pulse"
           data-ai-hint="logo company"
         />
         <p className="text-lg text-muted-foreground">Initializing Store Portal...</p>
@@ -118,8 +117,8 @@ export default function StoreBillingPage() {
           alt={`${APP_NAME} Logo`} 
           width={48} 
           height={48} 
-          className="mb-2 rounded-lg animate-pulse" 
-          data-ai-hint="logo company"
+          className="mb-2 rounded-lg animate-pulse"
+          data-ai-hint="logo company" 
         />
         <p className="text-lg text-muted-foreground">Loading {currentStore ? currentStore.name : 'Store'} Terminal...</p>
       </div>
@@ -134,7 +133,7 @@ export default function StoreBillingPage() {
           alt={`${APP_NAME} Logo`} 
           width={48} 
           height={48} 
-          className="mb-2 rounded-lg" 
+          className="mb-2 rounded-lg"
           data-ai-hint="logo company"
         />
         <p className="text-lg text-destructive mb-4">Store not found. Redirecting...</p>
@@ -150,7 +149,7 @@ export default function StoreBillingPage() {
           alt={`${APP_NAME} Logo`} 
           width={48} 
           height={48} 
-          className="mb-2 rounded-lg" 
+          className="mb-2 rounded-lg"
           data-ai-hint="logo company"
         />
         <p className="text-lg text-muted-foreground mb-4">Redirecting to login for {currentStore.name}...</p>
@@ -160,16 +159,15 @@ export default function StoreBillingPage() {
   
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
-  // Ensure we only render BillingForm if everything is ready
   if (!currentStore || !isStoreAuthenticated) {
-    return ( // Fallback loading or redirecting state
+    return (
          <div className="flex min-h-screen flex-col items-center justify-center p-4">
             <Image 
                 src="https://placehold.co/64x64.png" 
                 alt={`${APP_NAME} Logo`} 
                 width={48} 
                 height={48} 
-                className="mb-2 rounded-lg animate-pulse" 
+                className="mb-2 rounded-lg animate-pulse"
                 data-ai-hint="logo company"
             />
             <p className="text-lg text-muted-foreground">Preparing Store Terminal...</p>
@@ -200,12 +198,6 @@ export default function StoreBillingPage() {
             <DialogTitle>Chat with Admin ({currentStore.name})</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0">
-            {/* ChatInterface needs a staff ID for sender in store view. 
-                For this transactional model, we don't have a persistent staff ID.
-                So, chat in store view will use a generic "Store Employee" sender.
-                Alternatively, chat could be disabled or use store ID as sender.
-                For simplicity, let's assume store ID as sender for now or make it more generic.
-            */}
             <ChatInterface storeId={currentStore.id} currentUserId={currentStore.id} currentUserName={currentStore.name} />
           </div>
         </DialogContent>
@@ -218,7 +210,7 @@ export default function StoreBillingPage() {
               alt={`${APP_NAME} Logo`} 
               width={48} 
               height={48} 
-              className="mb-2 rounded-lg animate-pulse" 
+              className="mb-2 rounded-lg animate-pulse"
               data-ai-hint="logo company"
             />
             <p className="text-lg text-muted-foreground">Loading Billing Interface...</p>
@@ -227,9 +219,9 @@ export default function StoreBillingPage() {
         <BillingForm 
             key={modeFromUrl || currentStore.id} 
             initialModeProp={modeFromUrl}
-            storeId={currentStore.id} // Pass storeId for context
+            storeId={currentStore.id}
             allowedModes={currentStore.allowedOperations}
-            isAdminContext={false} // Explicitly false
+            isAdminContext={false}
         />
       </Suspense>
     </div>
