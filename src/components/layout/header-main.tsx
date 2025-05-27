@@ -17,19 +17,47 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 
 export function HeaderMain() {
   const router = useRouter();
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+    if (typeof window !== 'undefined') {
+      setIsAdminLoggedIn(localStorage.getItem('isAdminLoggedIn') === 'true');
+    }
+  }, []);
 
   const handleLogout = () => {
+    // Clear admin session
+    localStorage.removeItem('isAdminLoggedIn');
+    
+    // Clear any store-specific sessions (good practice)
     Object.keys(sessionStorage).forEach(key => {
       if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/'); // Redirect to the new landing page (root)
+    router.push('/admin/login'); // Redirect to admin login page
   };
+
+  if (!hasMounted) {
+    // Render nothing or a placeholder until mount to avoid hydration issues
+    return (
+      <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
+        <div className="flex w-full items-center justify-end gap-2 md:ml-auto">
+          {/* Placeholder for theme toggle and user icon */}
+          <div className="h-8 w-8 rounded-full bg-muted"></div>
+          <div className="h-8 w-8 rounded-full bg-muted"></div>
+        </div>
+      </header>
+    );
+  }
+
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -44,7 +72,7 @@ export function HeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0">
               <nav className="grid gap-2 text-lg font-medium p-4">
                 <Link
-                  href="/admin" // Points to admin dashboard
+                  href="/admin" 
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
                   <Package2 className="h-6 w-6 text-primary" />
@@ -53,7 +81,7 @@ export function HeaderMain() {
                 {NAV_LINKS.map(link => (
                     <Link
                         key={link.href}
-                        href={link.href} // NAV_LINKS hrefs are now prefixed with /admin
+                        href={link.href} 
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                     >
                         <link.icon className="h-4 w-4" />
@@ -67,35 +95,43 @@ export function HeaderMain() {
         
       <div className="flex w-full items-center justify-end gap-2 md:ml-auto">
         <ThemeToggle /> 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <UserCircle className="h-6 w-6" />
-              <span className="sr-only">User Menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href="/admin/profile"> 
-                <UserIcon className="mr-2 h-4 w-4" />
-                Profile
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/admin/settings"> 
-                <SettingsIcon className="mr-2 h-4 w-4" />
-                Settings
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-              <LogOut className="mr-2 h-4 w-4" />
-              Logout
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {isAdminLoggedIn ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <UserCircle className="h-6 w-6" />
+                <span className="sr-only">User Menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/admin/profile"> 
+                  <UserIcon className="mr-2 h-4 w-4" />
+                  Profile
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/admin/settings"> 
+                  <SettingsIcon className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          // If admin is not logged in, AdminLayout should redirect.
+          // This part is mostly a fallback or for potential future scenarios.
+          <Button asChild variant="outline" size="sm">
+            <Link href="/admin/login">Login</Link>
+          </Button>
+        )}
       </div>
     </header>
   );
