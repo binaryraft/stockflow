@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, ProductOption } from '@/types'; // Renamed ProductVariant to ProductVariantType
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
@@ -14,8 +14,8 @@ interface InventoryState {
   products: Product[];
   bills: Bill[];
   categories: Category[];
-  addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl'> & { initialStock?: number; variants?: ProductVariant[] }) => Product;
-  updateProduct: (productId: string, productData: Partial<Omit<Product, 'variants'>> & { variants?: ProductVariant[] }) => void;
+  addProduct: (productData: Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'> & { initialStock?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => Product;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'quantityInStock' | 'imageUrl' | 'variants'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => void;
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
   searchProducts: (searchTerm: string) => Product[];
@@ -57,12 +57,28 @@ export const useInventoryStore = create<InventoryState>()(
       categories: initialCategories,
 
       addProduct: (productData) => {
+        const productVariants: ProductVariantType[] = (productData.variants || []).map((variantData, variantIdx) => ({
+          id: `variant-${generateId()}-${variantIdx}`,
+          name: variantData.name,
+          options: variantData.options.map((optData, optIdx) => ({
+            id: `option-${generateId()}-${variantIdx}-${optIdx}`,
+            value: optData.value,
+          })),
+        }));
+
         const newProduct: Product = {
           id: generateId(),
-          ...productData,
+          name: productData.name,
+          category: productData.category,
+          trackQuantity: productData.trackQuantity,
+          sku: productData.sku,
+          expiryDate: productData.expiryDate,
           quantityInStock: productData.trackQuantity ? (productData.initialStock || 0) : 0,
+          costPrice: productData.costPrice || 0,
+          sellPrice: productData.sellPrice || 0,
           imageUrl: productData.imageUrl || `https://placehold.co/100x100.png`,
-          variants: productData.variants || [],
+          description: productData.description,
+          variants: productVariants,
         };
         set((state) => ({ products: [...state.products, newProduct] }));
         if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
@@ -72,11 +88,31 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       updateProduct: (productId, productData) => {
+        const productVariants: ProductVariantType[] | undefined = productData.variants 
+          ? productData.variants.map((variantData, variantIdx) => ({
+              id: `variant-${generateId()}-${variantIdx}`, // Consider keeping old IDs if possible for complex updates
+              name: variantData.name,
+              options: variantData.options.map((optData, optIdx) => ({
+                id: `option-${generateId()}-${variantIdx}-${optIdx}`, // Same ID consideration
+                value: optData.value,
+              })),
+            }))
+          : undefined;
+
         set((state) => ({
           products: state.products.map((p) =>
-            p.id === productId ? { ...p, ...productData, variants: productData.variants || p.variants } : p
+            p.id === productId 
+            ? { 
+                ...p, 
+                ...productData, 
+                variants: productVariants || p.variants // If productData.variants is undefined, keep existing p.variants
+              } 
+            : p
           ),
         }));
+        if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
+          get().addCategory(productData.category!);
+        }
       },
 
       getProductById: (productId) => {
@@ -101,8 +137,13 @@ export const useInventoryStore = create<InventoryState>()(
           const product = get().getProductById(itemData.productId);
           return {
             id: generateId(),
-            ...itemData,
             productName: product?.name || 'Unknown Product',
+            productId: itemData.productId,
+            quantity: itemData.quantity,
+            costPrice: itemData.costPrice,
+            sellPrice: itemData.sellPrice,
+            isDefective: itemData.isDefective,
+            selectedVariantOptions: itemData.selectedVariantOptions,
           };
         });
 
@@ -182,7 +223,6 @@ export const useInventoryStore = create<InventoryState>()(
             updated = true;
         }
 
-
         if (state.products.length === 0) {
           set({ products: initialProducts.map(p => ({...p, variants: p.variants || []})) });
           updated = true;
@@ -198,9 +238,9 @@ export const useInventoryStore = create<InventoryState>()(
           }
         }
         DEFAULT_CATEGORIES.forEach(catName => {
-          if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) { // Use get() to access latest categories
+          if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) { 
             get().addCategory(catName);
-            updated = true; // This flag might be set multiple times but it's okay
+            updated = true; 
           }
         });
         if (updated) console.log("Inventory store hydrated/updated.");

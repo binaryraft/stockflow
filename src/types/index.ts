@@ -2,17 +2,17 @@
 export interface ProductOption {
   id: string;
   value: string;
-  // Future: quantityInStock?: number;
-  // Future: costPrice?: number;
-  // Future: sellPrice?: number;
-  // Future: sku?: string;
-  // Future: imageUrl?: string;
+  // Future: quantityInStock?: number; // For variant-level stock
+  // Future: costPrice?: number;      // For variant-level pricing
+  // Future: sellPrice?: number;      // For variant-level pricing
+  // Future: sku?: string;            // For variant-level SKU
+  // Future: imageUrl?: string;       // For variant-level image
 }
 
 export interface ProductVariant {
   id: string;
   name: string; // e.g., "Color", "Size"
-  options: ProductOption[]; // e.g., ["Red", "Blue"], ["S", "M", "L"]
+  options: ProductOption[]; // e.g., [{id: '1', value: "Red"}, {id: '2', value: "Blue"}]
 }
 
 export interface Product {

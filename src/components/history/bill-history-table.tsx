@@ -45,7 +45,7 @@ export function BillHistoryTable() {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Use getBillTypeName for searching
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || 
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm))
@@ -61,7 +61,7 @@ export function BillHistoryTable() {
             valA = a.timestamp;
             valB = b.timestamp;
         } else if (sortConfig.key === 'type') {
-            valA = getBillTypeName(a); // Sort by the displayed name
+            valA = getBillTypeName(a); 
             valB = getBillTypeName(b);
         }
 
@@ -76,7 +76,7 @@ export function BillHistoryTable() {
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
-        sortableBills.sort((a,b) => b.timestamp - a.timestamp);
+        sortableBills.sort((a,b) => b.timestamp - a.timestamp); // Default sort: newest first
     }
 
     return sortableBills;
@@ -100,23 +100,21 @@ export function BillHistoryTable() {
   };
 
   const getBillTypeIcon = (bill: Bill) => {
-    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />;
-    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />;
+    if (bill.type === 'buy') return <ShoppingBag className="h-4 w-4 text-red-500" />; // Expense
+    if (bill.type === 'sell') return <Send className="h-4 w-4 text-green-500" />; // Sales
     if (bill.type === 'return') {
       if (bill.items.some(item => item.isDefective === true)) {
-        return <AlertTriangle className="h-4 w-4 text-red-500" />; // Red icon for defective returns
+        return <AlertTriangle className="h-4 w-4 text-red-500" />; // Defective Return (Red icon for Alert)
       }
-      return <RotateCcw className="h-4 w-4 text-yellow-600" />; // Darker yellow for better contrast on yellow badge
+      return <RotateCcw className="h-4 w-4 text-yellow-600" />; // Normal Return (Darker Yellow for contrast on yellow badge)
     }
     return null;
   };
   
-  const getBillTypeBadgeVariant = (type: Bill['type']): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
-    if (type === 'buy') return 'destructive'; 
-    if (type === 'sell') { 
-      return 'default'; 
-    }
-    if (type === 'return') return 'secondary'; 
+  const getBillTypeBadgeVariant = (bill: Bill): "default" | "secondary" | "outline" | "destructive" | null | undefined => {
+    if (bill.type === 'buy') return 'destructive'; // Expense (Red)
+    if (bill.type === 'sell') return 'default'; // Sales (Primary, often green or blueish in themes)
+    if (bill.type === 'return') return 'secondary'; // Return (Yellow - using secondary as base, color classes will override)
     return 'outline';
   };
 
@@ -180,12 +178,19 @@ export function BillHistoryTable() {
                   {selectedBill.items.map(item => (
                     <TableRow key={item.id}>
                       <TableCell>
-                        {item.productName}
+                        <div>{item.productName}</div>
+                        {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                          <div className="text-xs text-muted-foreground">
+                            {Object.entries(item.selectedVariantOptions)
+                              .map(([key, value]) => `${key}: ${value}`)
+                              .join(', ')}
+                          </div>
+                        )}
                         {selectedBill.type === 'return' && (
                           item.isDefective ? (
-                            <Badge variant="destructive" className="ml-2 text-xs">Defective</Badge>
+                            <Badge variant="destructive" className="ml-2 text-xs mt-1">Defective</Badge>
                           ) : (
-                            <Badge variant="secondary" className="ml-2 text-xs bg-green-100 text-green-700">Restocked</Badge>
+                            <Badge variant="secondary" className="ml-2 text-xs mt-1 bg-green-100 text-green-700">Restocked</Badge>
                           )
                         )}
                       </TableCell>
@@ -266,11 +271,11 @@ export function BillHistoryTable() {
                     <TableCell className="font-mono text-xs">{bill.id}</TableCell>
                     <TableCell>
                       <Badge 
-                        variant={getBillTypeBadgeVariant(bill.type)} 
+                        variant={getBillTypeBadgeVariant(bill)} 
                         className={`capitalize flex items-center gap-1 w-fit min-w-[80px] justify-center ${
                           bill.type === 'sell' ? 'bg-green-600 hover:bg-green-700 text-white' : 
                           bill.type === 'buy' ? 'bg-red-600 hover:bg-red-700 text-white' : 
-                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' 
+                          bill.type === 'return' ? 'bg-yellow-400 hover:bg-yellow-500 text-yellow-900' : '' // Darker text for yellow
                         }`}
                       >
                         {getBillTypeIcon(bill)}
@@ -318,4 +323,3 @@ export function BillHistoryTable() {
     </>
   );
 }
-

@@ -19,6 +19,8 @@ import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw } from 'lucide-r
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '../ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 interface NewProductDialogInitialValues {
   name: string;
@@ -31,7 +33,7 @@ export function BillingForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { toast } = useToast();
-  const { getProductByName, addBill, searchProducts } = useInventoryStore();
+  const { getProductByName, addBill, searchProducts, getProductById } = useInventoryStore();
 
   const [mode, setMode] = useState<BillMode>((searchParams.get('mode') as BillMode) || 'sell');
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
@@ -47,6 +49,9 @@ export function BillingForm() {
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
   const [newProductDialogInitialValues, setNewProductDialogInitialValues] = useState<NewProductDialogInitialValues>({ name: '' });
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
+
+  const [currentProductForSelection, setCurrentProductForSelection] = useState<Product | null>(null);
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -70,19 +75,29 @@ export function BillingForm() {
     setCostPrice('');
     setSellPrice('');
     setReturnItemIsDefective(false);
+    setCurrentProductForSelection(null);
+    setSelectedVariantOptions({});
     productNameInputRef.current?.focus();
   }, []);
 
   const handleProductSelect = (product: Product) => {
     setProductNameQuery(product.name);
+    setCurrentProductForSelection(product);
+    setSelectedVariantOptions({}); // Reset variant selections
+
     if (mode === 'sell' || mode === 'return') {
-      setCostPrice(product.costPrice);
+      setCostPrice(product.costPrice); // Still set for reference, though not editable in sell mode
       setSellPrice(product.sellPrice);
-      quantityInputRef.current?.focus();
+      // If product has no variants, focus quantity. Otherwise, user selects variants.
+      if (!product.variants || product.variants.length === 0) {
+        quantityInputRef.current?.focus();
+      }
     } else if (mode === 'buy') {
       setCostPrice(product.costPrice); 
       setSellPrice(product.sellPrice); 
-      quantityInputRef.current?.focus();
+      if (!product.variants || product.variants.length === 0) {
+        quantityInputRef.current?.focus();
+      }
     }
   };
 
@@ -92,7 +107,7 @@ export function BillingForm() {
       return;
     }
 
-    let product = getProductByName(productNameQuery);
+    let product = currentProductForSelection || getProductByName(productNameQuery);
 
     if (!product) {
       setNewProductDialogInitialValues({
@@ -104,6 +119,17 @@ export function BillingForm() {
       setIsNewProductDialogOpen(true);
       return;
     }
+    
+    if (product.variants && product.variants.length > 0) {
+      const allVariantsSelected = product.variants.every(
+        (v) => selectedVariantOptions[v.name]
+      );
+      if (!allVariantsSelected) {
+        toast({ variant: "destructive", title: "Variant Selection Required", description: "Please select options for all product variants." });
+        return;
+      }
+    }
+
 
     if (mode === 'sell' && product.trackQuantity && product.quantityInStock < (typeof quantity === 'string' ? parseInt(quantity) : quantity)) {
       toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${product.quantityInStock} of ${product.name} available.` });
@@ -121,6 +147,7 @@ export function BillingForm() {
       costPrice: newItemCostPrice,
       sellPrice: newItemSellPrice,
       isDefective: mode === 'return' ? returnItemIsDefective : undefined,
+      selectedVariantOptions: (product.variants && product.variants.length > 0) ? { ...selectedVariantOptions } : undefined,
     };
 
     setCurrentBillItems(prevItems => [...prevItems, newItem]);
@@ -132,14 +159,21 @@ export function BillingForm() {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1) {
             handleProductSelect(productsFound[0]);
+            // if no variants, focus quantity, else variant selection takes precedence
+            if (!productsFound[0].variants || productsFound[0].variants.length === 0) {
+                quantityInputRef.current?.focus();
+            }
        } else if (productsFound.length > 1) {
-            // keep focus on product name
-       } else {
-            quantityInputRef.current?.focus();
+            // keep focus on product name for user to refine
+       } else { // No product found by exact name or multiple results
+            // If in buy mode, we might expect new product details next
+            if (mode === 'buy') quantityInputRef.current?.focus();
+            // If in sell/return and no single exact match, maybe open new product dialog or focus quantity
+            else quantityInputRef.current?.focus();
        }
     } else if (currentField === 'quantity') {
       if (mode === 'buy') costPriceInputRef.current?.focus();
-      else handleAddNewItem();
+      else handleAddNewItem(); // In sell/return mode, add item after quantity (if variants handled)
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') sellPriceInputRef.current?.focus();
     } else if (currentField === 'sellPrice') {
@@ -181,6 +215,7 @@ export function BillingForm() {
       costPrice: item.costPrice,
       sellPrice: item.sellPrice,
       isDefective: item.isDefective,
+      selectedVariantOptions: item.selectedVariantOptions,
     }));
 
     addBill({
@@ -201,15 +236,22 @@ export function BillingForm() {
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
+    // Product is the full product object from the store
     setProductNameQuery(product.name);
+    setCurrentProductForSelection(product); // Set for variant selection
+    setSelectedVariantOptions({});
+
     if (mode === 'buy') {
         setCostPrice(product.costPrice);
         setSellPrice(product.sellPrice);
-    } else {
+    } else { // sell or return
         setSellPrice(product.sellPrice);
-        setCostPrice(product.costPrice);
+        setCostPrice(product.costPrice); // Keep cost price for reference
     }
-    quantityInputRef.current?.focus();
+    // If no variants, focus quantity, else user focuses on variant selection
+    if (!product.variants || product.variants.length === 0) {
+        quantityInputRef.current?.focus();
+    }
   };
 
   const handleModeChange = (newMode: string) => {
@@ -221,6 +263,30 @@ export function BillingForm() {
 
   return (
     <div className="flex flex-col gap-6">
+        <div className="flex justify-center">
+            <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
+            <TabsList className="grid w-full grid-cols-3 gap-1">
+                <TabsTrigger 
+                value="sell" 
+                className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-700 dark:data-[state=active]:text-white"
+                >
+                <Send size={18}/>Sales
+                </TabsTrigger>
+                <TabsTrigger 
+                value="buy" 
+                className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-700 dark:data-[state=active]:text-white"
+                >
+                <ShoppingBag size={18}/>Expense
+                </TabsTrigger>
+                <TabsTrigger 
+                value="return" 
+                className="flex items-center gap-2 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-900 dark:data-[state=active]:bg-yellow-500 dark:data-[state=active]:text-yellow-950"
+                >
+                <RotateCcw size={18}/>Return
+                </TabsTrigger>
+            </TabsList>
+            </Tabs>
+        </div>
       <NewProductDialog
         isOpen={isNewProductDialogOpen}
         onOpenChange={(open) => {
@@ -234,31 +300,6 @@ export function BillingForm() {
         onProductAdd={onNewProductAddedFromDialog}
       />
 
-      <div className="flex justify-center mb-2">
-        <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
-          <TabsList className="grid w-full grid-cols-3 gap-1">
-            <TabsTrigger 
-              value="sell" 
-              className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-700 dark:data-[state=active]:text-white"
-            >
-              <Send size={18}/>Sales
-            </TabsTrigger>
-            <TabsTrigger 
-              value="buy" 
-              className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-700 dark:data-[state=active]:text-white"
-            >
-              <ShoppingBag size={18}/>Expense
-            </TabsTrigger>
-            <TabsTrigger 
-              value="return" 
-              className="flex items-center gap-2 data-[state=active]:bg-yellow-400 data-[state=active]:text-yellow-900 dark:data-[state=active]:bg-yellow-500 dark:data-[state=active]:text-yellow-950"
-            >
-              <RotateCcw size={18}/>Return
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
-
       <Card className="w-full shadow-lg flex flex-col"> 
           <CardHeader>
               <CardTitle className="text-xl">Current Bill</CardTitle>
@@ -269,53 +310,27 @@ export function BillingForm() {
               </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 pt-4">
+            {/* Item Entry Section - Moved inside Current Bill Card */}
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
               <h3 className="text-lg font-medium">Add Item</h3>
-              {mode === 'sell' ? (
-                <div className="grid md:grid-cols-[2fr_1fr] gap-4 items-end">
+              {/* Product Name and Quantity always visible */}
+              <div className={`grid ${mode === 'sell' ? 'md:grid-cols-[2fr_1fr]' : 'grid-cols-1 md:grid-cols-2'} gap-4 items-end`}>
                   <div className="space-y-1.5">
-                    <Label htmlFor="productNameSell">Product Name</Label>
+                    <Label htmlFor="productNameGlobal">Product Name</Label>
                     <ProductSearchInput
                       inputRef={productNameInputRef}
                       value={productNameQuery}
-                      onValueChange={setProductNameQuery}
-                      onProductSelect={handleProductSelect}
-                      onEnterWithoutSelection={() => handleEnterNavigation('productName')}
-                      placeholder="Scan or type product name"
-                      id="productNameSell"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="quantitySell">Quantity</Label>
-                    <Input
-                      id="quantitySell"
-                      ref={quantityInputRef}
-                      type="number"
-                      value={quantity}
-                      onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
-                      min="1"
-                    />
-                  </div>
-                </div>
-              ) : ( 
-                <>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="productName">Product Name</Label>
-                    <ProductSearchInput
-                      inputRef={productNameInputRef}
-                      value={productNameQuery}
-                      onValueChange={setProductNameQuery}
+                      onValueChange={(v) => { setProductNameQuery(v); if (!v) setCurrentProductForSelection(null);}}
                       onProductSelect={handleProductSelect}
                       onEnterWithoutSelection={() => handleEnterNavigation('productName')}
                       placeholder={mode === 'return' ? 'Search product being returned' : 'Scan or type product name'}
-                      id="productName"
+                      id="productNameGlobal"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label htmlFor="quantity">Quantity</Label>
+                    <Label htmlFor="quantityGlobal">Quantity</Label>
                     <Input
-                      id="quantity"
+                      id="quantityGlobal"
                       ref={quantityInputRef}
                       type="number"
                       value={quantity}
@@ -324,11 +339,40 @@ export function BillingForm() {
                       min="1"
                     />
                   </div>
-                </>
-              )}
+              </div>
               
+              {/* Variant Selection Dropdowns */}
+              {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
+                <div className={`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 2)} gap-4 mt-3`}>
+                  {currentProductForSelection.variants.map((variant) => (
+                    <div key={variant.id} className="space-y-1.5">
+                      <Label htmlFor={`variant-select-${variant.id}`}>{variant.name}</Label>
+                      <Select
+                        value={selectedVariantOptions[variant.name] || ""}
+                        onValueChange={(value) =>
+                          setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }))
+                        }
+                      >
+                        <SelectTrigger id={`variant-select-${variant.id}`} className="w-full">
+                          <SelectValue placeholder={`Select ${variant.name}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {variant.options.map((option) => (
+                            <SelectItem key={option.id} value={option.value}>
+                              {option.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+
+              {/* Cost and Sell Price for Buy mode */}
               {mode === 'buy' && (
-                <>
+                <div className="grid md:grid-cols-2 gap-4 mt-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="costPrice">Cost Price (per unit)</Label>
                     <Input
@@ -353,9 +397,10 @@ export function BillingForm() {
                       step="0.01" min="0"
                     />
                   </div>
-                </>
+                </div>
               )}
               
+              {/* Defective Switch for Return mode */}
               {mode === 'return' && (
                 <div className="flex items-center space-x-2 pt-2">
                   <Switch 
@@ -367,10 +412,11 @@ export function BillingForm() {
                 </div>
               )}
 
-              <Button onClick={handleAddNewItem} className="w-full mt-2">
+              <Button onClick={handleAddNewItem} className="w-full mt-3">
                 <PlusCircle className="mr-2 h-4 w-4" /> Add to Bill
               </Button>
             </div>
+            {/* End Item Entry Section */}
 
             <div className="grid md:grid-cols-2 gap-4">
                 <div className="space-y-1.5">

@@ -27,7 +27,7 @@ type SortableColumns = keyof Pick<Product, 'name' | 'category' | 'quantityInStoc
 
 
 export function ProductsTable() {
-  const { products, updateProduct } = useInventoryStore();
+  const { products, updateProduct: storeUpdateProduct, addProduct: storeAddProduct } = useInventoryStore();
   const { toast } = useToast();
   
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
@@ -52,7 +52,9 @@ export function ProductsTable() {
         const valB = b[sortConfig.key];
 
         let comparison = 0;
-        if (typeof valA === 'string' && typeof valB === 'string') {
+        if (valA === undefined || valA === null) comparison = -1; // Put undefined/null last
+        else if (valB === undefined || valB === null) comparison = 1;
+        else if (typeof valA === 'string' && typeof valB === 'string') {
           comparison = valA.localeCompare(valB);
         } else if (typeof valA === 'number' && typeof valB === 'number') {
           comparison = valA - valB;
@@ -74,7 +76,6 @@ export function ProductsTable() {
 
   const handleEditProduct = (product: Product) => {
     setEditingProduct(product); 
-    toast({ title: "Edit Product", description: "Editing via New Product Dialog for now. Save will update."});
     setIsNewProductDialogOpen(true); 
   };
 
@@ -83,15 +84,13 @@ export function ProductsTable() {
     console.log("Deleting product:", productId);
   };
 
-  const onProductFormSubmit = (data: Product) => {
-    if (editingProduct) { 
-      updateProduct(editingProduct.id, data);
-      toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      setEditingProduct(null);
-    } else {
-      // addProduct is handled by NewProductDialog's own submit
-    }
+  // This function is called from NewProductDialog when a product is added OR updated
+  const onProductDialogSubmit = (product: Product) => { 
+    // NewProductDialog's internal onSubmit calls addProduct/updateProduct from the store.
+    // This callback is mostly for refreshing local state if needed, or additional UI updates.
+    // For now, the store update should trigger re-render of this table via Zustand.
     setIsNewProductDialogOpen(false);
+    setEditingProduct(null); 
   };
 
 
@@ -99,12 +98,12 @@ export function ProductsTable() {
     <>
       <NewProductDialog 
         isOpen={isNewProductDialogOpen} 
-        onOpenChange={setIsNewProductDialogOpen}
-        onProductAdd={onProductFormSubmit} 
-        initialProductName={editingProduct ? editingProduct.name : undefined}
-        initialCostPriceForDialog={editingProduct ? editingProduct.costPrice : undefined}
-        initialSellPriceForDialog={editingProduct ? editingProduct.sellPrice : undefined}
-        initialQuantityForDialog={editingProduct ? editingProduct.quantityInStock : undefined}
+        onOpenChange={(open) => {
+          if (!open) setEditingProduct(null); // Clear editing state when dialog is closed
+          setIsNewProductDialogOpen(open);
+        }}
+        editingProduct={editingProduct} // Pass the product being edited
+        onProductAdd={onProductDialogSubmit} // Called after dialog's internal save
       />
       <div className="flex items-center justify-between mb-4 gap-2">
         <Input
@@ -154,7 +153,14 @@ export function ProductsTable() {
                       data-ai-hint="product item generic"
                     />
                   </TableCell>
-                  <TableCell className="font-medium">{product.name}</TableCell>
+                  <TableCell className="font-medium">
+                    <div>{product.name}</div>
+                    {product.variants && product.variants.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        {product.variants.map(v => `${v.name} (${v.options.length})`).join(', ')}
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {product.category ? <Badge variant="secondary">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
