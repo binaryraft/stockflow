@@ -65,7 +65,6 @@ export function BillingForm() {
   const sellPriceInputRef = useRef<HTMLInputElement>(null);
   const customerVendorNameInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneInputRef = useRef<HTMLInputElement>(null);
-  // const firstVariantSelectRef = useRef<HTMLButtonElement>(null); // Not used anymore
 
 
   useEffect(() => {
@@ -104,36 +103,36 @@ export function BillingForm() {
       setCostPrice(product.costPrice); 
       setSellPrice(product.sellPrice); 
     }
-    // Focus management is now handled by the useEffect hook below based on currentProductForSelection
   };
-
+  
   useEffect(() => {
-    if (currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
-      const firstVariant = currentProductForSelection.variants[0];
-      if (firstVariant) {
-        // Ensure refs are created for SelectTriggers
-        currentProductForSelection.variants.forEach(variant => {
-          if (!variantSelectRefs.current[variant.id]) {
-            variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
-          }
-        });
-        
-        // Attempt focus after a short delay to allow refs to be assigned if component re-renders
-        setTimeout(() => {
-          const firstVariantRef = variantSelectRefs.current[firstVariant.id];
-          if (firstVariantRef?.current) {
-            firstVariantRef.current.focus();
-          } else {
-            // Fallback if ref isn't immediately available
-            const firstVariantSelectTriggerEl = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
-            firstVariantSelectTriggerEl?.focus();
-          }
-        }, 0);
-      }
-    } else if (currentProductForSelection) { // No variants, product selected
-        quantityInputRef.current?.focus();
+    if (currentProductForSelection) {
+        if (currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
+            const firstVariant = currentProductForSelection.variants[0];
+            if (firstVariant) {
+                // Ensure refs are created for SelectTriggers
+                currentProductForSelection.variants.forEach(variant => {
+                    if (!variantSelectRefs.current[variant.id]) {
+                        variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
+                    }
+                });
+                
+                // Attempt focus after a short delay to allow refs to be assigned
+                setTimeout(() => {
+                    const firstVariantRef = variantSelectRefs.current[firstVariant.id];
+                    if (firstVariantRef?.current) {
+                        firstVariantRef.current.focus();
+                    } else {
+                        const firstVariantSelectTriggerEl = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
+                        firstVariantSelectTriggerEl?.focus();
+                    }
+                }, 0);
+            }
+        } else { // No variants, product selected
+            quantityInputRef.current?.focus();
+        }
     }
-  }, [currentProductForSelection?.id, currentProductForSelection?.variants]); // Rerun when product or its variants change
+  }, [currentProductForSelection?.id]); // Re-evaluate when currentProductForSelection changes
 
 
   useEffect(() => {
@@ -164,8 +163,6 @@ export function BillingForm() {
     let product = currentProductForSelection || getProductByName(productNameQuery);
 
     if (!product) {
-      // This case should be handled by onEnterWithoutSelection if user presses Enter
-      // If they click "Add to Bill" button without selecting a product, this dialog appears.
       setNewProductDialogInitialValues({
         name: productNameQuery,
         quantity: mode === 'buy' ? (typeof quantity === 'string' ? parseInt(quantity) || 0 : quantity || 0) : undefined,
@@ -210,7 +207,7 @@ export function BillingForm() {
     resetFormFields(true); 
   };
   
-  const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice') => {
+  const handleEnterNavigation = (currentField: 'productName' | 'variantSelect' | 'quantity' | 'costPrice' | 'sellPrice') => {
     if (currentField === 'productName') {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1 && !currentProductForSelection) { 
@@ -233,22 +230,20 @@ export function BillingForm() {
                 if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
                      quantityInputRef.current?.focus();
                 } else {
-                    // Focus for variants is handled by useEffect or onProductSelect
-                    // If all variants are already selected, this might try to focus quantity again.
-                    const allVariantsSelected = currentProductForSelection.variants.every(v => selectedVariantOptions[v.name]);
-                    if(allVariantsSelected) quantityInputRef.current?.focus();
-                    else { // find first unselected variant and focus it
-                        const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
-                        if(firstUnselectedVariant && variantSelectRefs.current[firstUnselectedVariant.id]?.current){
-                            variantSelectRefs.current[firstUnselectedVariant.id].current.focus();
-                        } else if (firstUnselectedVariant) {
-                            const triggerEl = document.getElementById(`variant-select-${firstUnselectedVariant.id}-trigger`);
-                            triggerEl?.focus();
-                        }
+                    const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
+                    if(firstUnselectedVariant && variantSelectRefs.current[firstUnselectedVariant.id]?.current){
+                        variantSelectRefs.current[firstUnselectedVariant.id].current.focus();
+                    } else if (firstUnselectedVariant) {
+                        const triggerEl = document.getElementById(`variant-select-${firstUnselectedVariant.id}-trigger`);
+                        triggerEl?.focus();
+                    } else { // all variants selected or no unselected ref found
+                        quantityInputRef.current?.focus();
                     }
                 }
             }
        }
+    } else if (currentField === 'variantSelect') { // This case will be triggered from onKeyDown of SelectTrigger
+        quantityInputRef.current?.focus();
     } else if (currentField === 'quantity') {
       if (mode === 'buy') costPriceInputRef.current?.focus();
       else handleAddNewItem(); 
@@ -314,10 +309,8 @@ export function BillingForm() {
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
-    // This function is called when a new product is successfully added/edited from the dialog
-    // We need to re-select it in the form
     handleProductSelect(product); 
-    // Focus will be handled by the useEffect listening to currentProductForSelection
+    // Focus is now handled by useEffect based on currentProductForSelection and its variants
   };
 
   const handleModeChange = (newMode: string) => {
@@ -379,14 +372,6 @@ export function BillingForm() {
       />
 
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary"> 
-          <CardHeader>
-              <CardTitle>Current Bill</CardTitle>
-              <CardDescription>
-                {mode === 'sell' ? 'Enter items for sales.' : 
-                 mode === 'buy' ? 'Enter details for expenses.' : 
-                 'Enter items being returned.'}
-              </CardDescription>
-          </CardHeader>
           <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
             
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
@@ -429,6 +414,7 @@ export function BillingForm() {
                       value={quantity}
                       onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
+                      onFocus={(e) => e.target.select()}
                       min="1"
                     />
                   </div>
@@ -485,7 +471,7 @@ export function BillingForm() {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
                                     if (index === currentProductForSelection!.variants!.length - 1) {
-                                        quantityInputRef.current?.focus();
+                                        handleEnterNavigation('variantSelect'); // To focus quantity
                                     } else {
                                         const nextVariantId = currentProductForSelection!.variants![index + 1].id;
                                         const nextVariantRef = variantSelectRefs.current[nextVariantId];
