@@ -126,7 +126,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.4; color: #333; font-size: 10pt; }\n" +
+        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { max-width: 750px; margin: auto; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
@@ -684,8 +684,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       {billDisplayInfo.name}
                     </Badge>
                     {bill.billedByStaffName && (
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                            Billed by: {bill.billedByStaffName}
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <Users size={12} className="text-muted-foreground" />
+                            {bill.billedByStaffName}
+                        </div>
+                    )}
+                    {bill.storeName && (
+                        <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                            <BuildingIcon size={12} className="text-muted-foreground" />
+                            {bill.storeName}
                         </div>
                     )}
                   </TableCell>
