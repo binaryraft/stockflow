@@ -80,7 +80,7 @@ export default function ProfilePage() {
                   className="flex-grow"
                 />
               ) : (
-                <p className="flex-grow p-2 border border-input rounded-md min-h-[40px] flex items-center">{userProfile.companyName}</p>
+                <p className="flex-grow p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">{userProfile.companyName}</p>
               )}
               {isEditingCompanyName ? (
                 <Button onClick={handleCompanyNameSave} size="sm">
@@ -93,9 +93,9 @@ export default function ProfilePage() {
               )}
             </div>
           </div>
-           <div className="space-y-1">
+           <div className="space-y-1.5">
             <Label>Your Name (Placeholder)</Label>
-            <p className="text-sm text-muted-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center">
+            <p className="text-sm text-muted-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">
               Current User (Full user auth not implemented)
             </p>
           </div>
@@ -159,3 +159,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
