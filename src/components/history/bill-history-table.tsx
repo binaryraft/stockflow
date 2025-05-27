@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card'; // Added import
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -191,7 +192,7 @@ export function BillHistoryTable() {
                 Vendor/Customer <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right">Items</TableHead>
-              <TableHead className="text-right" onClick={() => requestSort('totalAmount')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead className="text-right" onClick={() => requestSort('totalAmount')} > {/* Removed className from here as it was duplicated */}
                 Total Amount <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right">Actions</TableHead>
