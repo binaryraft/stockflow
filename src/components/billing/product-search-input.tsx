@@ -116,7 +116,7 @@ export function ProductSearchInput({
         onChange={(e) => onValueChange(e.target.value)}
         onFocus={() => value && searchProducts(value).length > 0 && setShowSuggestions(true)} 
         onKeyDown={handleKeyDown}
-        onBlur={handleInputBlur} // Added onBlur handler
+        onBlur={handleInputBlur}
         placeholder={placeholder}
         autoComplete="off"
         className="w-full"
@@ -125,28 +125,44 @@ export function ProductSearchInput({
         <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60">
           <ScrollArea className="max-h-60">
             <ul>
-              {suggestions.map((product, index) => (
-                <li
-                  key={product.id}
-                  id={`suggestion-${index}`}
-                  className={cn(
-                    "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                    index === activeIndex && "bg-accent text-accent-foreground"
-                  )}
-                  onMouseDown={(e) => { 
-                     e.preventDefault(); 
-                     handleSelectProduct(product);
-                  }}
-                >
-                  <div className="flex justify-between">
-                    <span>{product.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {product.trackQuantity ? `Stock: ${product.quantityInStock}` : ''} Price: ₹{product.sellPrice.toFixed(2)}
-                    </span>
-                  </div>
-                  {product.category && <div className="text-xs text-muted-foreground">{product.category}</div>}
-                </li>
-              ))}
+              {suggestions.map((product, index) => {
+                const stockInfoString = product.trackQuantity
+                  ? `Stock: ${product.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0)}`
+                  : "";
+
+                let priceString = "Price: N/A";
+                if (product.productSKUs && product.productSKUs.length > 0) {
+                  const firstSku = product.productSKUs[0];
+                  if (firstSku && typeof firstSku.sellPrice === 'number') {
+                    priceString = `Price: ₹${firstSku.sellPrice.toFixed(2)}`;
+                  }
+                }
+                
+                return (
+                  <li
+                    key={product.id}
+                    id={`suggestion-${index}`}
+                    className={cn(
+                      "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                      index === activeIndex && "bg-accent text-accent-foreground"
+                    )}
+                    onMouseDown={(e) => { 
+                       e.preventDefault(); 
+                       handleSelectProduct(product);
+                    }}
+                  >
+                    <div className="flex justify-between">
+                      <span>{product.name}</span>
+                      <span className="text-xs text-muted-foreground">
+                        {stockInfoString}
+                        {stockInfoString && priceString !== "Price: N/A" ? " " : ""} {/* Conditional space */}
+                        {priceString}
+                      </span>
+                    </div>
+                    {product.category && <div className="text-xs text-muted-foreground">{product.category}</div>}
+                  </li>
+                );
+              })}
             </ul>
           </ScrollArea>
         </div>
