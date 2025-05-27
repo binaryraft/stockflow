@@ -465,12 +465,9 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <div className="text-xs text-muted-foreground mt-1">
                                     Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                 </div>
-                                <div className="text-xs text-muted-foreground mt-1">
-                                    Purchased (this bill): {item.quantity}
-                                </div>
                                 {currentSKU && getProductById(item.productId)?.trackQuantity && (
                                     <div className="text-xs text-muted-foreground mt-1">
-                                        Current total stock for this SKU: {currentSKU.quantityInStock}
+                                        Purchased: {item.quantity}
                                     </div>
                                 )}
                                 </TableCell>
@@ -686,6 +683,11 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1")})}
                       {billDisplayInfo.name}
                     </Badge>
+                    {bill.billedByStaffName && (
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                            Billed by: {bill.billedByStaffName}
+                        </div>
+                    )}
                   </TableCell>
                   <TableCell className="py-3 px-4">
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
