@@ -25,6 +25,7 @@ import type { Product, ProductVariant } from '@/types';
 import { DEFAULT_CATEGORIES } from '@/lib/constants';
 import { CategorySearchInput } from './category-search-input';
 import { PlusCircle, Trash2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 
 const productOptionSchema = z.object({
   value: z.string().min(1, "Option value cannot be empty"),
