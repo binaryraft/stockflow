@@ -42,6 +42,18 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   const [filterType, setFilterType] = useState<BillFilterType>('all');
 
+  // Define helper functions before they are used in useMemo
+  const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
+    const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
+    if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
+    if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
+    if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
+    return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
+  };
+
+  const getBillTypeName = (bill: Bill): string => {
+    return getBillTypeIconAndColor(bill).name;
+  };
 
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
@@ -102,7 +114,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId]);
+  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId, getBillTypeName]); // Added getBillTypeName to dependencies
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -268,10 +280,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
       if (billToPrint.type === 'buy') {
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // Darker green/red for print
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c';
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') {
@@ -290,19 +302,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.print();
     }
   };
-
-  const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
-    const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
-    if (bill.type === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
-    if (bill.type === 'sell') return { icon: <Send className="h-4 w-4" />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
-    if (isDefectiveReturn) return { icon: <AlertTriangle className="h-4 w-4 text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
-    return { icon: <RotateCcw className="h-4 w-4" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
-  };
-
-  const getBillTypeName = (bill: Bill): string => {
-    return getBillTypeIconAndColor(bill).name;
-  }
-
 
   const calculatePotentialRevenue = (bill: Bill): number => {
     if (!bill || !bill.items) return 0;
@@ -449,21 +448,29 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
+                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
-                                <div>{item.productName}</div>
-                                {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                    {Object.entries(item.selectedVariantOptions)
-                                        .map(([key, value]) => `${key}: ${value}`)
-                                        .join('; ')}
-                                    </div>
-                                )}
-                                <div className="text-xs text-muted-foreground mt-1">
-                                    Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
-                                </div>
-                                {/* Removed SKU stock from here */}
+                                  <div>{item.productName}</div>
+                                  {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                      {Object.entries(item.selectedVariantOptions)
+                                          .map(([key, value]) => `${key}: ${value}`)
+                                          .join('; ')}
+                                      </div>
+                                  )}
+                                   <div className="text-xs text-muted-foreground mt-1">
+                                      Purchased: {item.quantity}
+                                  </div>
+                                  {currentSKU && (
+                                      <div className="text-xs text-muted-foreground">
+                                      Current SKU Stock: {currentSKU.quantityInStock}
+                                      </div>
+                                  )}
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                      Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
+                                  </div>
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
@@ -509,7 +516,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Price/Unit</TableHead> {/* Removed Cost/Unit for Return */}
+                          <TableHead className="text-right">Price/Unit</TableHead>
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -634,7 +641,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 Date / Time
               </TableHead>
               <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4">
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[140px] py-3 px-4">
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
                <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
@@ -671,14 +678,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4 w-[120px]">
+                  <TableCell className="py-3 px-4 w-[140px]">
                     <Badge
                       className={cn(
                         "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", 
                         billDisplayInfo.className
                       )}
                     >
-                      {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1")})}
+                      {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1 h-4 w-4")})}
                       {billDisplayInfo.name}
                     </Badge>
                   </TableCell>
@@ -754,3 +761,4 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
+
