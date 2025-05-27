@@ -8,13 +8,13 @@ import { PlusCircle, PackageSearch, History } from 'lucide-react';
 
 export default function DashboardPage() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8"> {/* Increased gap */}
       <PageTitle title="Dashboard" />
       
       <OverviewStats />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow"> {/* Increased shadow */}
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
@@ -22,7 +22,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Start common tasks quickly.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-3 pt-4"> {/* Added pt-4 for consistency */}
             <Button asChild variant="default" className="w-full justify-start">
               <Link href="/billing?mode=sell">
                 <PlusCircle className="mr-2 h-4 w-4" /> New Sale Bill
@@ -41,7 +41,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow"> {/* Increased shadow */}
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PackageSearch className="h-5 w-5 text-primary" />
@@ -49,7 +49,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Latest inventory movements and sales.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4"> {/* Added pt-4 */}
             <p className="text-sm text-muted-foreground">
               Recent activities will be shown here. This could include latest bills, low stock alerts, etc.
             </p>
@@ -61,7 +61,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card className="shadow-sm hover:shadow-md transition-shadow">
+        <Card className="shadow-lg hover:shadow-xl transition-shadow"> {/* Increased shadow */}
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
@@ -69,7 +69,7 @@ export default function DashboardPage() {
             </CardTitle>
              <CardDescription>Navigate to important sections.</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
+          <CardContent className="flex flex-col gap-3 pt-4"> {/* Added pt-4 */}
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
               <Link href="/products">View All Products</Link>
             </Button>

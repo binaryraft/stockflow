@@ -22,7 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <SidebarInset className="flex flex-col flex-1 overflow-x-hidden bg-background"> {/* flex-1 to take remaining space, overflow-x-hidden for safety. Added bg-background here. */}
           <HeaderMain /> {/* Sticky header, child of SidebarInset */}
           {/* This div is the main scrollable content area within SidebarInset */}
-          <div className="flex-1 p-4 sm:px-6 sm:py-0 md:p-6 lg:p-8 overflow-y-auto">
+          <div className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
             {children}
           </div>
         </SidebarInset>

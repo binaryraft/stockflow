@@ -61,7 +61,7 @@ function BillingContent() {
 
 export default function BillingPage() {
   return (
-    <div className="flex flex-col gap-6"> {/* Removed fixed height for better content flow, AppShell manages height */}
+    <div className="flex flex-col gap-6"> 
       <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Bill Information...</div>}>
         <BillingContent />
       </Suspense>

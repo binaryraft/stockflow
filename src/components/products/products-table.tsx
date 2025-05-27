@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo } from 'react';
@@ -11,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card'; // Added CardContent
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -127,7 +128,8 @@ export function ProductsTable() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-      <Card className="shadow-md">
+      <Card className="shadow-lg"> {/* Increased shadow */}
+       <CardContent className="p-0"> {/* Remove CardContent padding if Table handles it */}
         <Table>
           <TableHeader>
             <TableRow>
@@ -160,7 +162,7 @@ export function ProductsTable() {
                       width={48}
                       height={48}
                       className="rounded-md object-cover aspect-square"
-                      data-ai-hint="product item"
+                      data-ai-hint="product item generic"
                     />
                   </TableCell>
                   <TableCell className="font-medium">{product.name}</TableCell>
@@ -229,6 +231,7 @@ export function ProductsTable() {
             )}
           </TableBody>
         </Table>
+       </CardContent>
       </Card>
     </>
   );
