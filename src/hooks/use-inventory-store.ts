@@ -202,7 +202,6 @@ export const useInventoryStore = create<InventoryState>()(
                 : p.variants;
 
               let updatedProductSKUs = p.productSKUs;
-              // If it's a simple (non-variant) product and we are not explicitly passing productSKUs to update:
               if ((!updatedVariants || updatedVariants.length === 0) && !productData.productSKUs) {
                 const defaultSku = p.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0) || 
                                    { id: generateId(), optionValues: {}, skuIdentifier: p.name, costPrice: 0, sellPrice: 0, quantityInStock: 0 };
@@ -248,7 +247,7 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (skuIndex !== -1) { 
           updatedSku = { ...product.productSKUs[skuIndex] };
-          if (trackProductQuantity) { // Only adjust stock if tracked
+          if (trackProductQuantity) {
             if (isPurchase) { 
               updatedSku.costPrice = costPrice; 
               updatedSku.sellPrice = sellPrice; 
@@ -256,7 +255,7 @@ export const useInventoryStore = create<InventoryState>()(
             } else { 
               updatedSku.quantityInStock += quantityChange; 
             }
-          } else if (isPurchase) { // For non-tracked items, still update price on purchase
+          } else if (isPurchase) {
              updatedSku.costPrice = costPrice; 
              updatedSku.sellPrice = sellPrice;
           }
@@ -354,7 +353,7 @@ export const useInventoryStore = create<InventoryState>()(
               return; 
             }
             
-            if (!isPurchase) { // For sell/return, take prices from the existing SKU
+            if (!isPurchase) { 
               itemCostPrice = targetSKU.costPrice;
               itemSellPrice = targetSKU.sellPrice;
             }
@@ -362,7 +361,7 @@ export const useInventoryStore = create<InventoryState>()(
 
           newBillItems.push({
             id: generateId(),
-            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? (itemData as any).productName : 'Unknown Product'), // Ensure productName is passed for service items
+            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? (itemData as any).productName : 'Unknown Product'),
             productId: itemData.productId,
             quantity: itemData.quantity,
             costPrice: itemCostPrice,
@@ -388,9 +387,9 @@ export const useInventoryStore = create<InventoryState>()(
           timestamp: currentDate.getTime(),
           items: newBillItems,
           totalAmount,
-          paymentStatus: billData.paymentStatus || (billData.type === 'return' ? 'paid' : 'paid'), // Default 'paid' for returns
-          billedByStaffName: staffMember?.name,
-          storeName: storeLocation?.name,
+          paymentStatus: billData.paymentStatus || (billData.type === 'return' ? 'paid' : 'paid'),
+          billedByStaffName: staffMember?.name, 
+          storeName: storeLocation?.name, 
         };
 
         set((state) => ({ bills: [newBill, ...state.bills] }));
@@ -426,7 +425,8 @@ export const useInventoryStore = create<InventoryState>()(
       },
       
       addStaff: (staffData) => {
-        if (!get().canAddStaff()) return null;
+        const plan = get().getActiveSubscriptionPlan();
+        if (!plan || get().staffs.length >= plan.maxEmployees) return null;
         const newStaff: Staff = { id: generateId(), ...staffData };
         set((state) => ({ staffs: [...state.staffs, newStaff] }));
         return newStaff;
@@ -449,7 +449,8 @@ export const useInventoryStore = create<InventoryState>()(
       getAllStaff: () => get().staffs,
 
       addStore: (storeData) => {
-        if (!get().canAddStore()) return null;
+        const plan = get().getActiveSubscriptionPlan();
+        if (!plan || get().stores.length >= plan.maxStores) return null;
         const newStore: Store = { 
           id: generateId(), 
           ...storeData, 
@@ -483,7 +484,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getActiveSubscriptionPlan: () => {
         const { activeSubscriptionId } = get().userProfile;
-        return SUBSCRIPTION_PLANS.find(plan => plan.id === activeSubscriptionId);
+        return SUBSCRIPTION_PLANS.find(plan => plan.id === activeSubscriptionId) || undefined;
       },
       canAddStore: () => {
         const plan = get().getActiveSubscriptionPlan();
@@ -644,7 +645,6 @@ export const useInventoryStore = create<InventoryState>()(
                       quantityInStock: newP.quantityInStock ?? 0,
                       skuIdentifier: newP.name
                     });
-                    updated = true;
                  }
               }
               delete newP.costPrice;
@@ -745,3 +745,5 @@ export const useInventoryStore = create<InventoryState>()(
 if (typeof window !== 'undefined') {
   useInventoryStore.getState()._hydrate();
 }
+
+    

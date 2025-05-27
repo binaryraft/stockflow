@@ -35,7 +35,6 @@ export default function StoreBillingPage() {
     setHasMounted(true);
   }, []);
 
-  // Main Authentication and Data Fetching Effect
   useEffect(() => {
     if (!hasMounted || !storeId) {
       setIsLoading(true);
@@ -134,7 +133,7 @@ export default function StoreBillingPage() {
     else router.push('/storeportal');
   };
   
-  const handleEmployeeSwitch = () => {
+  const handleEmployeeSwitchOrLogin = () => {
     if (hasMounted && storeId) {
       sessionStorage.removeItem(`currentStaff_${storeId}`);
     }
@@ -243,7 +242,7 @@ export default function StoreBillingPage() {
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:p-6"> {/* Removed h-screen to allow natural flow */}
+    <div className="flex flex-col gap-6 p-4 md:p-6">
       <PageTitle 
         title={`${currentStore.name} - Billing Terminal`}
         icon={ShoppingCart} 
@@ -255,7 +254,7 @@ export default function StoreBillingPage() {
                 <Button variant="outline" size="icon" onClick={() => setIsChatDialogOpen(true)} aria-label="Open Chat">
                     <MessageSquare className="h-5 w-5" />
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleEmployeeSwitch}>Switch Employee</Button>
+                <Button variant="outline" size="sm" onClick={handleEmployeeSwitchOrLogin}>Switch/Re-Login Employee</Button>
                 <Button variant="destructive" size="sm" onClick={handleStoreLogout}>
                     <LogOut className="mr-2 h-4 w-4" /> Logout Store
                 </Button>
@@ -292,8 +291,11 @@ export default function StoreBillingPage() {
             billedByStaffId={currentStaff.id}
             storeId={currentStore.id}
             allowedModes={currentStore.allowedOperations}
+            isAdminContext={false}
         />
       </Suspense>
     </div>
   );
 }
+
+    

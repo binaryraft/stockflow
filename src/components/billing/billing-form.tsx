@@ -12,10 +12,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput } from './product-search-input';
 import { NewProductDialog } from './new-product-dialog';
 import { BillItemRow, BillItemHeader } from './bill-item-row';
-import type { Product, BillItem, BillMode, ProductSKU } from '@/types';
+import type { Product, BillItem, BillMode, ProductSKU, Store } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2 } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -34,16 +34,24 @@ interface NewProductDialogInitialValues {
 
 interface BillingFormProps {
   billedByStaffId?: string;
-  storeId?: string;
-  allowedModes?: BillMode[];
-  initialModeProp?: BillMode | null;
+  storeId?: string; 
+  allowedModes?: BillMode[]; 
+  initialModeProp?: BillMode | null; 
+  isAdminContext?: boolean; 
 }
 
-export function BillingForm({ billedByStaffId, storeId, allowedModes, initialModeProp }: BillingFormProps) {
+export function BillingForm({ 
+  billedByStaffId, 
+  storeId: storeIdFromProp, 
+  allowedModes, 
+  initialModeProp,
+  isAdminContext = false 
+}: BillingFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
-  const { getProductByName, addBill, searchProducts, getProductById } = useInventoryStore();
+  const { getProductByName, addBill, searchProducts, getProductById, getAllStores } = useInventoryStore();
+  const allStores = getAllStores();
 
   const determineMode = useCallback((): BillMode => {
     const urlMode = searchParams.get('mode') as BillMode | null;
@@ -61,10 +69,14 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     if (allowedModes && allowedModes.length > 0) {
       return allowedModes[0];
     }
-    return 'sell'; // Overall default
+    return 'sell'; 
   }, [initialModeProp, allowedModes, searchParams]);
 
   const [mode, setMode] = useState<BillMode>(determineMode());
+  const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(
+    isAdminContext && allStores.length === 1 ? allStores[0].id : undefined
+  );
+
 
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
@@ -174,7 +186,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
         if (firstOpenVariantId) {
@@ -388,9 +400,15 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       return;
     }
 
+    const finalStoreId = isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
+    if(isAdminContext && allStores.length > 1 && !finalStoreId) {
+      toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
+      return;
+    }
+
+
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      productName: item.productName,
       quantity: item.quantity,
       costPrice: item.costPrice,
       sellPrice: item.sellPrice,
@@ -408,7 +426,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
       notes: notes,
       paymentStatus: billPaymentStatus,
       billedByStaffId: billedByStaffId,
-      storeId: storeId,
+      storeId: finalStoreId,
     }, billItemsForStore);
 
     setLastSavedBillMode(mode);
@@ -421,14 +439,15 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
     resetFullForm();
-    if (!storeId) {
+    if (!storeIdFromProp) { 
       const currentQueryModeInUrl = searchParams.get('mode');
-      if (currentQueryModeInUrl) {
-         router.push(mode === 'sell' ? '/admin/billing' : `/admin/billing?mode=${mode}`); // Keep mode for non-sell admin
-      } else {
-         setTimeout(() => productNameInputRef.current?.focus(), 0);
+      const basePath = '/admin/billing';
+      if (currentQueryModeInUrl && currentQueryModeInUrl !== 'sell') {
+         router.push(`${basePath}?mode=${currentQueryModeInUrl}`);
+      } else { 
+         router.push(basePath);
       }
-    } else {
+    } else { 
        setTimeout(() => productNameInputRef.current?.focus(), 0);
     }
   };
@@ -447,7 +466,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
     if (newMode !== mode) {
         setMode(newMode);
-        const basePath = storeId ? `/storeportal/${storeId}/billing` : '/admin/billing';
+        const basePath = storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing';
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
         resetFullForm();
     }
@@ -485,9 +504,9 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
   const displayModes = allowedModes || ['sell', 'buy', 'return'];
   const activeModeConfig = {
-    sell: { icon: Send, color: "bg-primary hover:bg-primary/90 text-primary-foreground", label: "Sales" },
-    buy: { icon: ShoppingBag, color: "bg-destructive hover:bg-destructive/90 text-destructive-foreground", label: "Expense" },
-    return: { icon: RotateCcw, color: "bg-amber-400 hover:bg-amber-400/90 text-amber-900 dark:bg-amber-500 dark:hover:bg-amber-500/90 dark:text-amber-950", label: "Return" },
+    sell: { icon: Send, color: "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground", label: "Sales" },
+    buy: { icon: ShoppingBag, color: "data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground", label: "Expense" },
+    return: { icon: RotateCcw, color: "data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950", label: "Return" },
   };
 
   return (
@@ -503,7 +522,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('sell') && (
               <TabsTrigger
                 value="sell"
-                className={cn("flex items-center gap-2", mode === 'sell' ? activeModeConfig.sell.color : "")}
+                className={cn("flex items-center gap-2", activeModeConfig.sell.color)}
               >
                 <activeModeConfig.sell.icon size={18}/>{activeModeConfig.sell.label}
               </TabsTrigger>
@@ -511,7 +530,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('buy') && (
               <TabsTrigger
                 value="buy"
-                className={cn("flex items-center gap-2", mode === 'buy' ? activeModeConfig.buy.color : "")}
+                className={cn("flex items-center gap-2", activeModeConfig.buy.color)}
               >
                 <activeModeConfig.buy.icon size={18}/>{activeModeConfig.buy.label}
               </TabsTrigger>
@@ -519,7 +538,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
             {displayModes.includes('return') && (
               <TabsTrigger
                 value="return"
-                className={cn("flex items-center gap-2", mode === 'return' ? activeModeConfig.return.color : "")}
+                className={cn("flex items-center gap-2", activeModeConfig.return.color)}
               >
                 <activeModeConfig.return.icon size={18}/>{activeModeConfig.return.label}
               </TabsTrigger>
@@ -547,7 +566,25 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
 
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
-          {/* Item Entry Section START */}
+          {isAdminContext && allStores.length > 1 && (
+              <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
+                <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base">
+                    <Building size={18} className="text-muted-foreground"/> Select Store for this Bill
+                </Label>
+                <Select value={selectedStoreIdForAdmin} onValueChange={setSelectedStoreIdForAdmin}>
+                    <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
+                        <SelectValue placeholder="Select a store..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {allStores.map(store => (
+                            <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                 {isAdminContext && allStores.length > 1 && !selectedStoreIdForAdmin && <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>}
+              </div>
+          )}
+
           <div className="space-y-4 pb-4 border-b border-dashed mb-4">
             <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
@@ -709,8 +746,7 @@ export function BillingForm({ billedByStaffId, storeId, allowedModes, initialMod
               </div>
             )}
           </div>
-          {/* Item Entry Section END */}
-
+          
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">

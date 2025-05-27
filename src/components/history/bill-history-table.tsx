@@ -26,11 +26,14 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 
-type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName'>;
+type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus'>;
 type BillFilterType = 'all' | BillMode;
 
+interface BillHistoryTableProps {
+  filterByStoreId?: string;
+}
 
-export function BillHistoryTable() {
+export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const { bills, getProductById, userProfile } = useInventoryStore();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,6 +45,10 @@ export function BillHistoryTable() {
 
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
+
+    if (filterByStoreId) {
+      processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
+    }
 
     if (filterType !== 'all') {
       processBills = processBills.filter(bill => bill.type === filterType);
@@ -56,6 +63,7 @@ export function BillHistoryTable() {
         getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) ||
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
+        (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
         bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.billedByStaffName && bill.billedByStaffName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.storeName && bill.storeName.toLowerCase().includes(lowerSearchTerm))
@@ -82,6 +90,10 @@ export function BillHistoryTable() {
         } else if (typeof valA === 'number' && typeof valB === 'number') {
           comparison = valA - valB;
         }
+        
+        if (valA === undefined || valA === null) comparison = -1;
+        if (valB === undefined || valB === null) comparison = 1;
+
 
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
@@ -90,7 +102,7 @@ export function BillHistoryTable() {
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, filterType]);
+  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId]);
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -114,17 +126,17 @@ export function BillHistoryTable() {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
+        "  body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.4; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { max-width: 750px; margin: auto; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
         "  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 25px; background-color: transparent; border-radius: 0; border-left: 0; border-right: 0; }\n" +
-        "  .header h1 { margin: 0 0 5px 0; font-size: 20pt; font-weight: bold; color: #000; }\n" +
+        "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: bold; color: #000; }\n" +
         "  .header p { margin: 2px 0; font-size: 9pt; color: #444; }\n" +
-        "  h3, h4 { margin-top: 0; margin-bottom: 10px; font-size: 13pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px; color: #111; }\n" +
-        "  h4 { font-size: 11pt; }\n" +
-        "  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }\n" +
-        "  th, td { border: 1px solid #ddd; padding: 8px 10px; text-align: left; vertical-align: top; }\n" +
+        "  h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; color: #111; }\n" +
+        "  h4 { font-size: 10pt; }\n" +
+        "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
+        "  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
         "  th { background-color: #f7f7f7; font-weight: bold; color: #222; }\n" +
         "  .text-right { text-align: right; }\n" +
         "  .font-medium { font-weight: bold; }\n" +
@@ -132,8 +144,11 @@ export function BillHistoryTable() {
         "  .badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.375rem; border: 1px solid transparent; }\n" +
         "  .badge-destructive { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }\n" +
         "  .badge-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }\n" +
+        "  .badge-paid { color: #155724; background-color: #d4edda; border-color: #c3e6cb; } \n" +
+        "  .badge-unpaid { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; } \n" +
         "  .total-row td { font-weight: bold; background-color: #f7f7f7; font-size: 10pt; }\n" +
         "  .items-section .variant-options { font-size: 0.8em; color: #555; margin-left: 10px; margin-top: 3px; display: block; font-style: italic; }\n" +
+        "  .items-section .item-sub-detail { font-size: 0.85em; color: #444; margin-top: 2px; display: block; } \n" +
         "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee; }\n" +
         "  .no-print { display: none !important; } \n" +
         "</style>\n";
@@ -162,21 +177,24 @@ export function BillHistoryTable() {
       printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
       printWindow.document.write(`<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`);
       printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
+      if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy')) {
+         printWindow.document.write(`<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`);
+      }
       printWindow.document.write('</div>');
       printWindow.document.write('</td></tr></table>');
 
       if (billToPrint.billedByStaffName || billToPrint.storeName) {
         printWindow.document.write('<div class="billed-by-section">');
-        printWindow.document.write(`<h4>Transaction Details</h4>`);
-        if (billToPrint.billedByStaffName) printWindow.document.write(`<p><strong>Billed by:</strong> ${billToPrint.billedByStaffName}</p>`);
+        printWindow.document.write(`<h4>Transaction Origin</h4>`);
         if (billToPrint.storeName) printWindow.document.write(`<p><strong>Store:</strong> ${billToPrint.storeName}</p>`);
+        if (billToPrint.billedByStaffName) printWindow.document.write(`<p><strong>Billed by:</strong> ${billToPrint.billedByStaffName}</p>`);
         printWindow.document.write('</div>');
       }
 
       printWindow.document.write('<div class="items-section">');
       printWindow.document.write('<h3>Items</h3>');
       
-      if (billToPrint.type === 'buy') { // Expense Bill Print Items
+      if (billToPrint.type === 'buy') { 
         printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Qty Purchased</th><th>Cost/Unit</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             printWindow.document.write('<tr>');
@@ -187,14 +205,14 @@ export function BillHistoryTable() {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-            printWindow.document.write(`<div class="variant-options" style="margin-left:0; margin-top:2px;">Sell Price set: ₹${item.sellPrice.toFixed(2)}</div>`);
+            printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.costPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
-      } else if (billToPrint.type === 'sell') { // Sales Bill Print Items
+      } else if (billToPrint.type === 'sell') {
         printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             printWindow.document.write('<tr>');
@@ -211,7 +229,7 @@ export function BillHistoryTable() {
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.sellPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
-      } else { // Return Bill Print Items
+      } else { 
         printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Cost/Unit</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             printWindow.document.write('<tr>');
@@ -248,19 +266,19 @@ export function BillHistoryTable() {
 
       printWindow.document.write('<div class="summary-section">');
       printWindow.document.write('<h4>Summary</h4>');
-      printWindow.document.write(`<table style="width: auto; margin-left: auto;">`);
+      printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
-      if (billToPrint.type === 'buy') { // Expense Bill
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Cost (This Bill):</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+      if (billToPrint.type === 'buy') {
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Cost (This Bill):</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
         const profitLossColor = expectedProfitOrLoss >= 0 ? 'green' : 'red';
-        printWindow.document.write(`<tr><td style="text-align:right;">Expected Revenue from these Items:</td><td class="text-right">₹${expectedRevenue.toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor};">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
-      } else if (billToPrint.type === 'sell') { // Sales Bill
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Sales Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-      } else { // Return Bill
-         printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Return Value:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue from these Items:</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
+        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor}; border: none;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
+      } else if (billToPrint.type === 'sell') {
+        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+      } else { 
+         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
       printWindow.document.write('</table>');
       printWindow.document.write('</div>');
@@ -307,7 +325,6 @@ export function BillHistoryTable() {
   const findProductSKU = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
     if (!product) return undefined;
-    // For service items (non-inventory), there's no SKU to find
     if (productId.startsWith('SERVICE_ITEM_')) return undefined;
 
     const targetOptionValues = selectedOptions || {};
@@ -377,25 +394,40 @@ export function BillHistoryTable() {
                         <p className="text-xs text-muted-foreground">Bill Type</p>
                         <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
                     </div>
+                    {selectedBill.paymentStatus && (selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
+                        <div>
+                            <p className="text-xs text-muted-foreground">Payment Status</p>
+                            <Badge 
+                                className={cn(
+                                    "capitalize text-xs", 
+                                    selectedBill.paymentStatus === 'paid' 
+                                    ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                    : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                                )}
+                            >
+                                {selectedBill.paymentStatus}
+                            </Badge>
+                        </div>
+                    )}
                 </div>
               </div>
 
               {(selectedBill.billedByStaffName || selectedBill.storeName) && (
                 <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                  <h4 className="text-md font-semibold text-foreground mb-1">Transaction Details</h4>
+                  <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
+                   {selectedBill.storeName && (
+                    <div>
+                      <p className="text-xs text-muted-foreground">Store</p>
+                      <p className="font-medium text-sm flex items-center gap-1.5">
+                        <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
+                      </p>
+                    </div>
+                  )}
                   {selectedBill.billedByStaffName && (
                     <div>
                       <p className="text-xs text-muted-foreground">Billed by</p>
                       <p className="font-medium text-sm flex items-center gap-1.5">
                         <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
-                      </p>
-                    </div>
-                  )}
-                  {selectedBill.storeName && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Store</p>
-                      <p className="font-medium text-sm flex items-center gap-1.5">
-                        <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
                       </p>
                     </div>
                   )}
@@ -406,7 +438,7 @@ export function BillHistoryTable() {
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
                 <Table className="mt-0">
-                 {selectedBill.type === 'buy' ? ( // Expense Bill Item View
+                 {selectedBill.type === 'buy' ? ( 
                     <>
                       <TableHeader>
                         <TableRow>
@@ -418,6 +450,7 @@ export function BillHistoryTable() {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
+                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -433,9 +466,13 @@ export function BillHistoryTable() {
                                     Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                 </div>
                                 <div className="text-xs text-muted-foreground mt-1">
-                                    Purchased: {item.quantity}
+                                    Purchased (this bill): {item.quantity}
                                 </div>
-                                {/* Removed Current SKU Stock display for simplification based on feedback */}
+                                {currentSKU && getProductById(item.productId)?.trackQuantity && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                        Current total stock for this SKU: {currentSKU.quantityInStock}
+                                    </div>
+                                )}
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
@@ -445,13 +482,12 @@ export function BillHistoryTable() {
                         })}
                       </TableBody>
                     </>
-                  ) : selectedBill.type === 'sell' ? ( // Sales Bill
+                  ) : selectedBill.type === 'sell' ? ( 
                     <>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
-                          {/* Cost/Unit column removed for Sales Bill */}
                           <TableHead className="text-right">Price/Unit</TableHead>
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
@@ -470,7 +506,6 @@ export function BillHistoryTable() {
                               )}
                             </TableCell>
                             <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
-                            {/* Cost/Unit cell removed for Sales Bill */}
                             <TableCell className="text-right py-3 align-top">₹{item.sellPrice.toFixed(2)}</TableCell>
                             <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
                           </TableRow>
@@ -556,13 +591,11 @@ export function BillHistoryTable() {
                             })()}
                         </>
                     ) : selectedBill.type === 'sell' ? ( 
-                        <>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Total Sales Amount:</span>
-                                <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                            </div>
-                        </>
-                    ) : ( // Return Bill
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground">Total Sales Amount:</span>
+                            <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                        </div>
+                    ) : ( 
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Total Return Value:</span>
                             <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
@@ -587,7 +620,7 @@ export function BillHistoryTable() {
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
         <Input
-          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Product, Staff, Store)..."
+          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Payment Status, Product, Staff, Store)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto"
@@ -621,6 +654,9 @@ export function BillHistoryTable() {
               <TableHead className="text-right w-[80px] py-3 px-4">Items</TableHead>
               <TableHead className="text-right cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4" onClick={() => requestSort('totalAmount')} >
                 Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
+               <TableHead className="text-center cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4" onClick={() => requestSort('paymentStatus')}>
+                Payment <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right w-[80px] py-3 px-4">Actions</TableHead>
             </TableRow>
@@ -657,6 +693,22 @@ export function BillHistoryTable() {
                   </TableCell>
                   <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
                   <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-center py-3 px-4 w-[120px]">
+                    {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus ? (
+                      <Badge 
+                        className={cn(
+                            "capitalize text-xs", 
+                            bill.paymentStatus === 'paid' 
+                            ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                            : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                        )}
+                      >
+                        {bill.paymentStatus}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right py-3 px-4 w-[80px]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -680,7 +732,7 @@ export function BillHistoryTable() {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   No bills found.
                 </TableCell>
               </TableRow>
@@ -691,7 +743,5 @@ export function BillHistoryTable() {
     </>
   );
 }
-    
 
     
-

@@ -24,8 +24,8 @@ function BillingContent() {
   }
 
   if (isNewBillAction) {
-    let title = "New Bill";
-    let icon = DollarSign;
+    let title = "New Sales Bill"; 
+    let icon = Send;
 
     if (effectiveModeForTitle === 'buy') {
       title = "New Expense Bill";
@@ -51,9 +51,7 @@ function BillingContent() {
             </Button>
           }
         />
-        {/* Pass modeFromUrl as a key to force remount if mode changes via URL */}
-        {/* Also pass it as initialModeProp for explicit initialization logic within BillingForm */}
-        <BillingForm key={modeFromUrl || 'default_admin_bill_form'} initialModeProp={modeFromUrl} />
+        <BillingForm key={modeFromUrl || 'default_admin_bill_form'} initialModeProp={modeFromUrl} isAdminContext={true}/>
       </>
     );
   }
@@ -86,3 +84,5 @@ export default function AdminBillingPage() {
     </div>
   );
 }
+
+    
