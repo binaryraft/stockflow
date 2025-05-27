@@ -1,5 +1,6 @@
 
 "use client";
+import React from 'react'; // Added React import
 import { PageTitle } from '@/components/common/page-title';
 import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,17 +63,17 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <Button asChild variant="default" className="w-full justify-start">
-              <Link href="/billing?action=new&mode=sell">
+              <Link href="/admin/billing?action=new&mode=sell">
                 <Send className="mr-2 h-4 w-4" /> New Sales Bill
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/billing?action=new&mode=buy">
+              <Link href="/admin/billing?action=new&mode=buy">
                 <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
               </Link>
             </Button>
              <Button asChild variant="outline" className="w-full justify-start">
-              <Link href="/products?action=add"> {/* Assuming products page can handle ?action=add to open dialog */}
+              <Link href="/admin/products?action=add"> {/* Assuming products page can handle ?action=add to open dialog */}
                 <PackageSearch className="mr-2 h-4 w-4" /> Add New Product
               </Link>
             </Button>
@@ -125,10 +126,10 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
-              <Link href="/products">View All Products</Link>
+              <Link href="/admin/products">View All Products</Link>
             </Button>
             <Button asChild variant="link" className="w-full justify-start p-0 h-auto">
-              <Link href="/billing">View Bill History</Link>
+              <Link href="/admin/billing">View Bill History</Link>
             </Button>
           </CardContent>
         </Card>
