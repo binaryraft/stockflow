@@ -243,12 +243,8 @@ export function BillHistoryTable() {
         printWindow.document.write(`<tr><td style="text-align:right;">Expected Revenue from these Items:</td><td class="text-right">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right;">Expected Profit/(Loss):</td><td class="text-right" style="color:${profitLossColor};">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') { // Sales Bill
-        const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
-        const profitColor = profitFromSale >= 0 ? 'green' : 'red';
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Sales Amount:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right;">Cost of Goods Sold:</td><td class="text-right">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor};">₹${profitFromSale.toFixed(2)}</td></tr>`);
+        // COGS and Profit removed for Sales bills as per request
       } else { // Return Bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right;"><strong>Total Return Value:</strong></td><td class="text-right"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
@@ -396,7 +392,7 @@ export function BillHistoryTable() {
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
                 <Table className="mt-0">
-                 {selectedBill.type === 'buy' ? (
+                 {selectedBill.type === 'buy' ? ( // Expense Bill Item View
                     <>
                       <TableHeader>
                         <TableRow>
@@ -407,26 +403,37 @@ export function BillHistoryTable() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {selectedBill.items.map(item => (
-                          <TableRow key={item.id || item.productId}>
-                            <TableCell className="py-3 align-top">
-                              <div>{item.productName}</div>
-                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {Object.entries(item.selectedVariantOptions)
-                                    .map(([key, value]) => `${key}: ${value}`)
-                                    .join('; ')}
+                        {selectedBill.items.map(item => {
+                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
+                            return (
+                            <TableRow key={item.id || item.productId}>
+                                <TableCell className="py-3 align-top">
+                                <div>{item.productName}</div>
+                                {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                    {Object.entries(item.selectedVariantOptions)
+                                        .map(([key, value]) => `${key}: ${value}`)
+                                        .join('; ')}
+                                    </div>
+                                )}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                 </div>
-                              )}
-                              <div className="text-xs text-muted-foreground mt-1">
-                                Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
-                            <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
-                          </TableRow>
-                        ))}
+                                <div className="text-xs text-muted-foreground mt-1">
+                                    Purchased: {item.quantity}
+                                </div>
+                                {currentSKU && 
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                        Current SKU Stock: {currentSKU.quantityInStock}
+                                    </div>
+                                }
+                                </TableCell>
+                                <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
+                                <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
+                                <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
+                            </TableRow>
+                            );
+                        })}
                       </TableBody>
                     </>
                   ) : ( // Sales or Return Bill
@@ -515,24 +522,7 @@ export function BillHistoryTable() {
                                 <span className="text-muted-foreground">Total Sales Amount:</span>
                                 <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
                             </div>
-                            {(() => {
-                                const costOfGoodsSold = selectedBill.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-                                const profitFromSale = selectedBill.totalAmount - costOfGoodsSold;
-                                return (
-                                <>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Cost of Goods Sold:</span>
-                                        <span className="font-semibold">₹{costOfGoodsSold.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Profit from this Sale:</span>
-                                        <span className={cn("font-semibold", profitFromSale >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
-                                            ₹{profitFromSale.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </>
-                                );
-                            })()}
+                            {/* Cost of Goods Sold and Profit removed for Sales bills as per request */}
                         </>
                     ) : ( // Return Bill
                         <div className="flex justify-between">
