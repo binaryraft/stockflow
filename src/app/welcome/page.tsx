@@ -1,22 +1,6 @@
 
-import { LandingHeader } from '@/components/landing/landing-header';
-import { HeroSection } from '@/components/landing/hero-section';
-import { FeaturesSection } from '@/components/landing/features-section';
-import { PricingSectionLanding } from '@/components/landing/pricing-section-landing';
-import { CallToActionSection } from '@/components/landing/call-to-action-section';
-import { LandingFooter } from '@/components/landing/landing-footer';
-
+// This page is effectively replaced by src/app/page.tsx for the landing site.
+// Keeping it to return null to avoid 404s if old links exist or are bookmarked.
 export default function WelcomePage() {
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <LandingHeader />
-      <main className="flex-grow">
-        <HeroSection />
-        <FeaturesSection />
-        <PricingSectionLanding />
-        <CallToActionSection />
-      </main>
-      <LandingFooter />
-    </div>
-  );
+  return null;
 }

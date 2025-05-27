@@ -2,9 +2,10 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
-import { AppShell } from '@/components/layout/app-shell';
+// Removed AppShell import
 import { APP_NAME } from '@/lib/constants';
-import { ThemeProvider } from '@/components/theme-provider'; // Added ThemeProvider
+import { ThemeProvider } from '@/components/theme-provider';
+import { Toaster } from '@/components/ui/toaster'; // Keep Toaster here
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -17,8 +18,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: `${APP_NAME} - Inventory Management`,
-  description: 'Modern inventory management and billing solution.',
+  title: `${APP_NAME} - Inventory Management & Billing`, // Updated title
+  description: 'Modern inventory management and billing solution for businesses of all sizes.', // Updated description
 };
 
 export default function RootLayout({
@@ -35,9 +36,8 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>
-            {children}
-          </AppShell>
+          {children} {/* AppShell is no longer here */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

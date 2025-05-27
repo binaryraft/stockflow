@@ -16,11 +16,9 @@ function BillingContent() {
   const action = searchParams.get('action');
   const modeFromUrl = searchParams.get('mode') as BillMode | null;
 
-  // Determine if we are in a "new bill" action based on URL
-  // 'sell', 'buy', 'return' modes inherently mean a new bill form or that the form should be active.
   const isNewBillAction = action === 'new' || !!modeFromUrl;
 
-  let effectiveModeForTitle: BillMode = 'sell'; // Default for title if no specific mode
+  let effectiveModeForTitle: BillMode = 'sell'; 
   if (modeFromUrl && ['sell', 'buy', 'return'].includes(modeFromUrl)) {
     effectiveModeForTitle = modeFromUrl;
   }
@@ -53,9 +51,9 @@ function BillingContent() {
             </Button>
           }
         />
-        {/* Pass modeFromUrl as a key to force remount and re-initialization of BillingForm if mode changes via URL */}
+        {/* Pass modeFromUrl as a key to force remount if mode changes via URL */}
         {/* Also pass it as initialModeProp for explicit initialization logic within BillingForm */}
-        <BillingForm key={modeFromUrl || 'default_history_view'} initialModeProp={modeFromUrl} />
+        <BillingForm key={modeFromUrl || 'default_admin_bill_form'} initialModeProp={modeFromUrl} />
       </>
     );
   }
@@ -68,7 +66,6 @@ function BillingContent() {
         icon={HistoryIcon}
         actions={
           <Button asChild>
-            {/* Default "Create New Bill" button goes to Sales mode */}
             <Link href="/admin/billing?mode=sell"> 
               <PlusCircle className="mr-2 h-4 w-4" /> Create New Bill
             </Link>
@@ -80,7 +77,7 @@ function BillingContent() {
   );
 }
 
-export default function BillingPage() {
+export default function AdminBillingPage() {
   return (
     <div className="flex flex-col gap-6"> 
       <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Bill Information...</div>}>

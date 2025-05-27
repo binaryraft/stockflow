@@ -102,7 +102,7 @@ export default function DashboardPage() {
         <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5 text-primary" /> {/* Changed icon to Users for recent activity context */}
+              <Users className="h-5 w-5 text-primary" />
               Recent Activity
             </CardTitle>
             <CardDescription>Latest bills processed.</CardDescription>
@@ -162,5 +162,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-
-    

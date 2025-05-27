@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'; // Added LogOut, SettingsIcon, UserIcon
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { Package2 } from 'lucide-react';
@@ -23,15 +23,12 @@ export function HeaderMain() {
   const router = useRouter();
 
   const handleLogout = () => {
-    // Basic logout: clear session storage related to store/employee auth
-    // In a real app, this would involve clearing auth tokens, etc.
     Object.keys(sessionStorage).forEach(key => {
       if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/welcome'); // Redirect to the new landing page
-    // Optionally, show a toast message for logout
+    router.push('/'); // Redirect to the new landing page (root)
   };
 
   return (
@@ -47,7 +44,7 @@ export function HeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0">
               <nav className="grid gap-2 text-lg font-medium p-4">
                 <Link
-                  href="/"
+                  href="/admin" // Points to admin dashboard
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
                   <Package2 className="h-6 w-6 text-primary" />
@@ -56,7 +53,7 @@ export function HeaderMain() {
                 {NAV_LINKS.map(link => (
                     <Link
                         key={link.href}
-                        href={link.href}
+                        href={link.href} // NAV_LINKS hrefs are now prefixed with /admin
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary"
                     >
                         <link.icon className="h-4 w-4" />
@@ -81,13 +78,13 @@ export function HeaderMain() {
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
-              <Link href="/profile">
+              <Link href="/admin/profile"> {/* Prefixed with /admin */}
                 <UserIcon className="mr-2 h-4 w-4" />
                 Profile
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
-              <Link href="/settings">
+              <Link href="/admin/settings"> {/* Prefixed with /admin */}
                 <SettingsIcon className="mr-2 h-4 w-4" />
                 Settings
               </Link>

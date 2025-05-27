@@ -11,7 +11,7 @@ import { Package2, ChevronRight, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import React, { useState, useEffect } from 'react'; // Added React, useState, useEffect
+import React, { useState, useEffect } from 'react';
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -26,6 +26,9 @@ export function SidebarNav() {
     const plan = getActiveSubscriptionPlan();
     setActivePlanId(plan?.id);
   }, [getActiveSubscriptionPlan]);
+
+  // NAV_LINKS now have /admin prefixes
+  // Pathname also includes /admin, so direct comparison works
 
   return (
     <Sidebar className="border-r" collapsible="icon">
@@ -65,14 +68,11 @@ export function SidebarNav() {
         <ScrollArea className="flex-1">
           <SidebarMenu className="p-2 pt-0">
             {NAV_LINKS.map((link) => {
-              // Default to enabled state for server render and initial client render
-              // Actual disabling logic applies after mount
               const defaultIsAdminOnlyPlan = getActiveSubscriptionPlan()?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && !hasMounted;
-
               const isAdminOnlyPlan = hasMounted ? activePlanId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY : defaultIsAdminOnlyPlan;
               
               const isDisabledBySubscription =
-                (link.href === '/admin/stores' || link.href === '/admin/staff') && isAdminOnlyPlan;
+                (link.href === '/admin/stores' || link.href === '/admin/staff' || link.href === '/admin/chat') && isAdminOnlyPlan;
 
               const menuItemContent = (
                 <SidebarMenuButton
@@ -80,11 +80,11 @@ export function SidebarNav() {
                   size="default"
                   isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
                   tooltip={link.label}
-                  aria-disabled={isDisabledBySubscription}
-                  className={cn(isDisabledBySubscription && "opacity-50 cursor-not-allowed")}
+                  aria-disabled={isDisabledBySubscription && hasMounted} 
+                  className={cn(isDisabledBySubscription && hasMounted && "opacity-50 cursor-not-allowed")}
                 >
                   <Link
-                    href={isDisabledBySubscription && hasMounted ? "#" : link.href} // Only change href to # on client after mount
+                    href={isDisabledBySubscription && hasMounted ? "#" : link.href}
                     className={cn("flex items-center gap-3", isDisabledBySubscription && hasMounted && "pointer-events-none")}
                     onClick={(e) => { if (isDisabledBySubscription && hasMounted) e.preventDefault(); }}
                   >

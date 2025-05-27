@@ -1,35 +1,36 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon } from 'lucide-react'; 
+import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare } from 'lucide-react'; // Added MessageSquare
 import type { SubscriptionPlan } from '@/types';
 
 export interface NavLink {
   href: string;
   label: string;
   icon: LucideIcon;
-  disabled?: boolean; // For subscription-based disabling
+  disabled?: boolean;
 }
 
 export const NAV_LINKS: NavLink[] = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/billing', label: 'Billing', icon: DollarSign },
-  { href: '/products', label: 'Products', icon: Package },
-  { href: '/staff', label: 'Staff', icon: Users },
-  { href: '/stores', label: 'Stores', icon: Building },
-  { href: '/profile', label: 'Profile', icon: UserIcon },
-  { href: '/settings', label: 'Settings', icon: SettingsIcon },
+  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/admin/billing', label: 'Billing', icon: DollarSign },
+  { href: '/admin/products', label: 'Products', icon: Package },
+  { href: '/admin/staff', label: 'Staff', icon: Users },
+  { href: '/admin/stores', label: 'Stores', icon: Building },
+  { href: '/admin/chat', label: 'Chat', icon: MessageSquare }, // Added Chat link
+  { href: '/admin/profile', label: 'Profile', icon: UserIcon },
+  { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
 ];
 
 export const APP_NAME = "StockFlow";
 
+// Default Categories and Company Details remain unchanged from previous state
 export const DEFAULT_CATEGORIES: string[] = [
   "Electronics", "Groceries", "Clothing", "Books", "Home Goods", "Toys", "Sports", "Automotive", "Health", "Beauty", "Services", "Other"
 ];
 
-// Company details (will be editable in Profile)
-export const DEFAULT_COMPANY_NAME = "StockFlow Inc.";
-export const COMPANY_ADDRESS = "123 Inventory Lane, Business City, ST 54321";
-export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: contact@stockflow.inc";
+export const DEFAULT_COMPANY_NAME = "StockFlow Solutions"; // Slightly more descriptive
+export const COMPANY_ADDRESS = "123 Commerce Way, Business City, ST 54321";
+export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow.app";
 
 
 // Subscription Plans
@@ -46,8 +47,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     price: 199,
     priceSuffix: '/ month',
     features: ['Admin Access Only', 'Unlimited Products', 'Unlimited Bills', 'Basic Reporting'],
-    maxStores: 0, // Effectively 0, as this plan doesn't include store management
-    maxEmployees: 0, // Effectively 0, as this plan doesn't include staff management
+    maxStores: 0,
+    maxEmployees: 0,
   },
   {
     id: SUBSCRIPTION_PLAN_IDS.MULTI_STORE,
