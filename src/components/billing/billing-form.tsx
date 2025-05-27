@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -184,7 +185,7 @@ export function BillingForm() {
     setCustomerVendorName('');
     setNotes('');
     resetFormFields();
-    router.push('/history'); // Navigate to history after saving
+    router.push('/billing'); // Navigate to history view on the same page
   };
   
   const onNewProductAddedFromDialog = (product: Product) => {
@@ -200,7 +201,7 @@ export function BillingForm() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full">
+    <div className="flex flex-col lg:flex-row gap-6"> {/* Removed h-full, parent flex context manages height */}
       <NewProductDialog
         isOpen={isNewProductDialogOpen}
         onOpenChange={setIsNewProductDialogOpen}
@@ -292,7 +293,8 @@ export function BillingForm() {
       </Card>
 
       {/* Right Panel: Current Bill & Actions */}
-      <Card className="flex-[2] shadow-lg flex flex-col max-h-[calc(100vh-150px)]"> {/* Adjust max-h as needed */}
+      {/* Removed max-h-[calc(100vh-150px)], CardContent is now flex-1 to manage height */}
+      <Card className="flex-[2] shadow-lg flex flex-col"> 
         <CardHeader>
             <div className="flex justify-between items-start">
                 <div>
@@ -308,6 +310,7 @@ export function BillingForm() {
                 </Tabs>
             </div>
         </CardHeader>
+        {/* CardContent uses flex-1 to grow and ScrollArea within it handles overflow */}
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-3">
           <div className="space-y-1">
             <Label htmlFor="customerVendorName">
@@ -323,7 +326,8 @@ export function BillingForm() {
           </div>
           
           {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
-          <ScrollArea className="flex-1 -mx-6 px-6"> {/* Negative margin to extend scroll area to card padding */}
+          {/* ScrollArea is flex-1 to use available space from its parent CardContent */}
+          <ScrollArea className="flex-1 -mx-6 px-6"> 
             {currentBillItems.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
             ) : (
@@ -336,7 +340,6 @@ export function BillingForm() {
                     onQuantityChange={(itemId, newQty) => updateBillItem(itemId, { quantity: newQty })}
                     onPriceChange={mode === 'buy' ? (itemId, newPrice, type) => updateBillItem(itemId, type === 'cost' ? { costPrice: newPrice } : { sellPrice: newPrice }) : undefined}
                     onRemoveItem={removeBillItem}
-                    // Pass refs and enter press for the last item potentially
                   />
                 ))}
               </div>
