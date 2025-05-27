@@ -23,8 +23,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
 
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName'>;
+type BillFilterType = 'all' | 'sell' | 'buy' | 'return';
 
 
 export function BillHistoryTable() {
@@ -34,13 +37,21 @@ export function BillHistoryTable() {
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
+  const [filterType, setFilterType] = useState<BillFilterType>('all');
 
 
   const filteredAndSortedBills = useMemo(() => {
-    let sortableBills = [...bills];
+    let processBills = [...bills];
+
+    // 1. Filter by type
+    if (filterType !== 'all') {
+      processBills = processBills.filter(bill => bill.type === filterType);
+    }
+
+    // 2. Filter by search term
     if (searchTerm) {
       const lowerSearchTerm = searchTerm.toLowerCase();
-      sortableBills = sortableBills.filter(bill =>
+      processBills = processBills.filter(bill =>
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
@@ -51,8 +62,9 @@ export function BillHistoryTable() {
       );
     }
 
+    // 3. Sort
     if (sortConfig !== null) {
-        sortableBills.sort((a, b) => {
+        processBills.sort((a, b) => {
         let valA = a[sortConfig.key];
         let valB = b[sortConfig.key];
 
@@ -75,11 +87,11 @@ export function BillHistoryTable() {
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
-        sortableBills.sort((a,b) => b.timestamp - a.timestamp); // Default sort: newest first
+        processBills.sort((a,b) => b.timestamp - a.timestamp); // Default sort: newest first
     }
 
-    return sortableBills;
-  }, [bills, searchTerm, sortConfig]);
+    return processBills;
+  }, [bills, searchTerm, sortConfig, filterType]);
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -101,7 +113,6 @@ export function BillHistoryTable() {
     if (printWindow) {
       printWindow.document.write('<html><head><title>Print Bill</title>');
       
-      // Refactored style block to use string concatenation
       const styles =
         "<style>\n" +
         "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; }\n" +
@@ -119,8 +130,8 @@ export function BillHistoryTable() {
         "  .font-medium { font-weight: 500; }\n" +
         "  .text-muted-foreground { color: #777; font-size: 0.9em; }\n" +
         "  .badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: 700; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.375rem; }\n" +
-        "  .badge-destructive { color: #fff; background-color: #dc3545; }\n" +
-        "  .badge-success { color: #fff; background-color: #28a745; } /* Kept for explicit print styling if needed */\n" +
+        "  .badge-destructive { color: #fff; background-color: #dc3545; }\n" + // Kept for explicit print styling if needed
+        "  .badge-success { color: #fff; background-color: #28a745; } \n" + // Kept for explicit print styling if needed
         "  .total-row td { font-weight: bold; background-color: #f9f9f9; }\n" +
         "  .items-section .variant-options { font-size: 0.85em; color: #555; margin-left: 10px; }\n" +
         "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #fdfdfd; padding: 10px; border-radius: 4px; }\n" +
@@ -231,6 +242,19 @@ export function BillHistoryTable() {
     return bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
   };
 
+  const getPartyDetailsTitle = (billType?: Bill['type']): string => {
+    if (billType === 'buy') return 'Vendor Details';
+    if (billType === 'sell' || billType === 'return') return 'Customer Details';
+    return 'Party Details';
+  };
+
+  const getPartyNameLabel = (billType?: Bill['type']): string => {
+    if (billType === 'buy') return 'Vendor Name';
+    if (billType === 'sell' || billType === 'return') return 'Customer Name';
+    return 'Name';
+  };
+
+
   return (
     <>
       {selectedBill && (
@@ -261,11 +285,11 @@ export function BillHistoryTable() {
                 {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
                     <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
                     <h4 className="text-md font-semibold text-foreground mb-1">
-                        {selectedBill.type === 'buy' ? 'Vendor Details' : 'Customer Details'}
+                        {getPartyDetailsTitle(selectedBill.type)}
                     </h4>
                     {selectedBill.vendorOrCustomerName && (
                         <div>
-                            <p className="text-xs text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor Name' : 'Customer Name'}</p>
+                            <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
                             <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
                         </div>
                     )}
@@ -381,13 +405,24 @@ export function BillHistoryTable() {
         </Dialog>
       )}
 
-      <div className="mb-4">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
         <Input
           placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Product)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md"
+          className="max-w-md w-full md:w-auto"
         />
+        <Select value={filterType} onValueChange={(value) => setFilterType(value as BillFilterType)}>
+            <SelectTrigger className="w-full md:w-[180px] select-trigger-class">
+                <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Bills</SelectItem>
+                <SelectItem value="sell">Sales Bills</SelectItem>
+                <SelectItem value="buy">Expense Bills</SelectItem>
+                <SelectItem value="return">Return Bills</SelectItem>
+            </SelectContent>
+        </Select>
       </div>
       <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
@@ -473,3 +508,5 @@ export function BillHistoryTable() {
     </>
   );
 }
+
+    
