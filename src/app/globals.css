@@ -30,7 +30,7 @@ body {
     --tertiary: 45 30% 96%; /* Very Light Warm Beige */
     --tertiary-foreground: 45 10% 35%; /* Dark Warm Gray */
 
-    --muted: 240 5% 90%; /* Light Gray for less prominent elements */
+    --muted: 240 5% 92%; /* Slightly lighter Gray for less prominent elements */
     --muted-foreground: 240 5% 45%; /* Muted text color */
 
     --accent: 210 100% 56%; /* Vibrant Blue for highlights, focus rings */
@@ -39,10 +39,10 @@ body {
     --destructive: 0 84.2% 60.2%; /* Standard destructive red */
     --destructive-foreground: 0 0% 98%; /* Light text on destructive */
 
-    --border: 240 5% 85%; /* Softer Light Gray for borders */
+    --border: 240 5% 88%; /* Softer Light Gray for borders */
     --input-background: 0 0% 100%; /* White for input backgrounds */
-    --input-border: 240 5% 80%; /* Slightly darker gray for input borders */
-    --ring: 145 60% 45%; /* Brighter Green for focus rings */
+    --input-border: 240 5% 75%; /* Slightly stronger gray for input borders */
+    --ring: 145 65% 45%; /* Brighter Green for focus rings */
 
     --radius: 0.5rem;
 
@@ -61,17 +61,17 @@ body {
     --sidebar-accent: 240 4.8% 90%;
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 240 5.9% 85%;
-    --sidebar-ring: 145 60% 45%; /* Align sidebar ring with new app ring */
+    --sidebar-ring: 145 65% 45%; /* Align sidebar ring with new app ring */
   }
 
   .dark {
-    --background: 220 15% 12%; /* Very Dark Cool Blue/Gray */
+    --background: 220 15% 10%; /* Slightly darker Very Dark Cool Blue/Gray */
     --foreground: 0 0% 95%; /* Light Gray */
 
-    --card: 220 15% 18%; /* Dark Cool Blue/Gray, slightly lighter */
+    --card: 220 15% 15%; /* Darker Cool Blue/Gray, slightly lighter */
     --card-foreground: 0 0% 95%; 
 
-    --popover: 220 15% 18%;
+    --popover: 220 15% 15%;
     --popover-foreground: 0 0% 95%;
 
     /* Primary is Royal Green (dark mode) */
@@ -83,10 +83,10 @@ body {
     --secondary-foreground: 220 15% 96%; /* Light Bluish White */
 
     /* Tertiary for subtle backgrounds/accents - Dark Warm Gray */
-    --tertiary: 45 8% 22%; /* Dark Warm Gray */
+    --tertiary: 45 8% 18%; /* Darker Warm Gray */
     --tertiary-foreground: 45 15% 75%; /* Light Warm Gray */
 
-    --muted: 240 4% 30%; 
+    --muted: 240 4% 25%; 
     --muted-foreground: 240 4% 65%; 
 
     --accent: 210 100% 66%; /* Brighter Vibrant Blue */
@@ -95,10 +95,10 @@ body {
     --destructive: 0 70% 50%; /* Adjusted dark destructive red */
     --destructive-foreground: 0 0% 98%; 
 
-    --border: 220 10% 35%; /* Dark Cool Gray Border */
+    --border: 220 10% 30%; /* Darker Cool Gray Border */
     --input-background: 220 10% 25%; /* Dark Cool Gray for input backgrounds */
-    --input-border: 220 10% 35%; /* Dark Cool Gray for input borders */
-    --ring: 145 55% 58%; /* Brighter green for focus rings */
+    --input-border: 220 10% 40%; /* Slightly more prominent dark Cool Gray for input borders */
+    --ring: 145 60% 58%; /* Brighter green for focus rings */
     
     /* Sidebar specific colors for dark theme - Keep these consistent, primary aligned */
     --sidebar-background: 240 6% 10%;
@@ -108,7 +108,7 @@ body {
     --sidebar-accent: 240 3.7% 20%; 
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 240 3.7% 20%; 
-    --sidebar-ring: 145 55% 58%; /* Align sidebar ring with new app ring */
+    --sidebar-ring: 145 60% 58%; /* Align sidebar ring with new app ring */
   }
 }
 
@@ -146,3 +146,4 @@ body {
   }
 
 }
+

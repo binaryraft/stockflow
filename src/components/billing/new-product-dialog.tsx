@@ -25,6 +25,7 @@ import type { Product, ProductVariant as ProductVariantType } from '@/types';
 import { CategorySearchInput } from './category-search-input';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 const productOptionSchema = z.object({
   value: z.string().min(1, "Option value cannot be empty"),
@@ -59,7 +60,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   variantIndex,
   removeVariant
 }) => {
-  const { control, register, formState, watch } = useFormContext<NewProductFormData>(); 
+  const { control, register, formState, watch, setFocus } = useFormContext<NewProductFormData>(); 
 
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
@@ -69,7 +70,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   const variantName = watch(`variants.${variantIndex}.name`);
 
   return (
-    <div className="space-y-3 border p-4 rounded-md bg-tertiary">
+    <div className="space-y-3 border border-primary/20 p-4 rounded-md bg-tertiary">
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium">Variant {variantIndex + 1}</Label>
         <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant">
@@ -83,9 +84,12 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
         onKeyDown={(e) => {
           if (e.key === 'Enter') {
             e.preventDefault();
-            const firstOptionInput = document.querySelector(`input[name="variants.${variantIndex}.options.0.value"]`) as HTMLInputElement;
-            if (firstOptionInput) firstOptionInput.focus();
-            else if (optionFields.length === 0) appendOption({ value: '' }); 
+            if (optionFields.length === 0) {
+              appendOption({ value: '' });
+              setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
+            } else {
+              setFocus(`variants.${variantIndex}.options.0.value`);
+            }
           }
         }}
       />
@@ -104,8 +108,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
                   e.preventDefault(); 
                   appendOption({ value: '' });
                   setTimeout(() => {
-                     const nextInput = document.querySelector(`input[name="variants.${variantIndex}.options.${optionFields.length}.value"]`) as HTMLInputElement;
-                     nextInput?.focus();
+                     setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
                   }, 0);
                 }
               }}
@@ -129,8 +132,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
         onClick={() => {
           appendOption({ value: '' });
           setTimeout(() => {
-             const nextInput = document.querySelector(`input[name="variants.${variantIndex}.options.${optionFields.length}.value"]`) as HTMLInputElement;
-             nextInput?.focus();
+            setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
           }, 0);
         }}
       >
@@ -268,7 +270,7 @@ export function NewProductDialog({
       }
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto border-t-4 border-t-primary shadow-lg">
         <DialogHeader>
           <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
           <DialogDescription>

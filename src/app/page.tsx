@@ -14,7 +14,7 @@ export default function DashboardPage() {
       <OverviewStats />
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
+        <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
@@ -41,7 +41,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
+        <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PackageSearch className="h-5 w-5 text-primary" />
@@ -61,7 +61,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
         
-        <Card className="shadow-md hover:shadow-lg transition-shadow">
+        <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />

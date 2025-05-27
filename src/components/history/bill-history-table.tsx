@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'; // Added CardHeader, CardTitle, CardDescription
+import { Card, CardContent } from '@/components/ui/card';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName'>;
 
@@ -104,7 +105,7 @@ export function BillHistoryTable() {
     if (bill.type === 'sell') return <Send className="h-4 w-4 text-primary-foreground" />; 
     if (bill.type === 'return') {
       if (bill.items.some(item => item.isDefective === true)) {
-        return <AlertTriangle className="h-4 w-4 text-amber-900 dark:text-amber-950" />; // Use warning color for defective return icon
+        return <AlertTriangle className="h-4 w-4 text-destructive" />; 
       }
       return <RotateCcw className="h-4 w-4 text-amber-900 dark:text-amber-950" />; 
     }
@@ -141,87 +142,110 @@ export function BillHistoryTable() {
       {selectedBill && (
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
           <DialogContent className="sm:max-w-2xl max-h-[90vh]">
-            <DialogHeader>
-              <DialogTitle>Bill Details (ID: {selectedBill.id})</DialogTitle>
+            <DialogHeader className="border-b pb-4 mb-4">
+              <DialogTitle className="flex items-center gap-2">
+                {getBillTypeIcon(selectedBill)}
+                Bill Details (ID: {selectedBill.id})
+              </DialogTitle>
               <DialogDescription>
                 {getBillTypeName(selectedBill)} Bill dated {format(new Date(selectedBill.date), 'PPpp')}
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[60vh] p-1 -mx-1">
-            <div className="space-y-4 py-4 px-2">
-              <div className="grid grid-cols-2 gap-4 mb-3">
-                {selectedBill.vendorOrCustomerName && (
-                  <div>
-                      <p className="text-sm text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor' : 'Customer'}</p>
-                      <p className="font-medium">{selectedBill.vendorOrCustomerName}</p>
+            <div className="space-y-6 py-2 px-2">
+              
+              {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
+                <div className="p-4 border rounded-md bg-card">
+                  <h4 className="text-sm font-semibold text-primary mb-2">
+                    {selectedBill.type === 'buy' ? 'Vendor Details' : 'Customer Details'}
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    {selectedBill.vendorOrCustomerName && (
+                      <div>
+                          <p className="text-xs text-muted-foreground">{selectedBill.type === 'buy' ? 'Vendor Name' : 'Customer Name'}</p>
+                          <p className="font-medium">{selectedBill.vendorOrCustomerName}</p>
+                      </div>
+                    )}
+                    {selectedBill.customerPhone && (
+                      <div>
+                          <p className="text-xs text-muted-foreground">Phone</p>
+                          <p className="font-medium">{selectedBill.customerPhone}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedBill.customerPhone && (
-                  <div>
-                      <p className="text-sm text-muted-foreground">Phone</p>
-                      <p className="font-medium">{selectedBill.customerPhone}</p>
-                  </div>
-                )}
-              </div>
-              <Separator />
-              <Table className="mt-2">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Product</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Cost/Unit</TableHead>
-                    <TableHead className="text-right">Price/Unit</TableHead>
-                    <TableHead className="text-right">Item Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {selectedBill.items.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>{item.productName}</div>
-                        {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                          <div className="text-xs text-muted-foreground">
-                            {Object.entries(item.selectedVariantOptions)
-                              .map(([key, value]) => `${key}: ${value}`)
-                              .join(', ')}
-                          </div>
-                        )}
-                        {selectedBill.type === 'return' && (
-                          item.isDefective ? (
-                            <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
-                          )
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">₹{item.costPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right">₹{item.sellPrice.toFixed(2)}</TableCell>
-                      <TableCell className="text-right font-medium">₹{(item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              <Separator className="my-3"/>
-              <div className="text-right font-semibold text-lg text-foreground">
-                Total: ₹{selectedBill.totalAmount.toFixed(2)}
-              </div>
-              {selectedBill.type === 'buy' && calculatePotentialSellTotal(selectedBill) !== null && (
-                <div className="text-right text-sm text-muted-foreground mt-1">
-                    Potential Sell Value: ₹{calculatePotentialSellTotal(selectedBill)!.toFixed(2)}
                 </div>
               )}
+              
+              <div>
+                <h4 className="text-sm font-semibold text-primary mb-2 ml-1">Items</h4>
+                <Table className="mt-0 border rounded-md">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Product</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Cost/Unit</TableHead>
+                      <TableHead className="text-right">Price/Unit</TableHead>
+                      <TableHead className="text-right">Item Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {selectedBill.items.map(item => (
+                      <TableRow key={item.id}>
+                        <TableCell>
+                          <div>{item.productName}</div>
+                          {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                            <div className="text-xs text-muted-foreground">
+                              {Object.entries(item.selectedVariantOptions)
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join(', ')}
+                            </div>
+                          )}
+                          {selectedBill.type === 'return' && (
+                            item.isDefective ? (
+                              <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
+                            )
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">₹{item.costPrice.toFixed(2)}</TableCell>
+                        <TableCell className="text-right">₹{item.sellPrice.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-medium">₹{(item.quantity * (selectedBill.type === 'buy' ? item.costPrice : item.sellPrice)).toFixed(2)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+             
               {selectedBill.notes && (
-                <div className="pt-3 mt-2 border-t">
-                    <p className="font-semibold text-sm mb-1 text-foreground">Notes:</p>
-                    <p className="text-sm text-muted-foreground p-3 border rounded-md bg-tertiary whitespace-pre-wrap">
+                <div className="p-4 border rounded-md bg-tertiary">
+                    <h4 className="text-sm font-semibold text-primary mb-1">Notes:</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                         {selectedBill.notes}
                     </p>
                 </div>
               )}
+
+              <div className="p-4 border rounded-md bg-card">
+                <h4 className="text-sm font-semibold text-primary mb-2">Summary</h4>
+                <div className="space-y-1">
+                    <div className="flex justify-between text-lg font-semibold text-foreground">
+                        <span>Total Amount:</span>
+                        <span>₹{selectedBill.totalAmount.toFixed(2)}</span>
+                    </div>
+                    {selectedBill.type === 'buy' && calculatePotentialSellTotal(selectedBill) !== null && (
+                        <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                            <span>Potential Sell Value:</span>
+                            <span>₹{calculatePotentialSellTotal(selectedBill)!.toFixed(2)}</span>
+                        </div>
+                    )}
+                </div>
+              </div>
+
             </div>
             </ScrollArea>
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 border-t mt-4">
               <Button variant="outline" onClick={() => handlePrintBill(selectedBill.id)}>
                 <Printer className="mr-2 h-4 w-4" /> Print
               </Button>
@@ -241,7 +265,7 @@ export function BillHistoryTable() {
           className="max-w-md"
         />
       </div>
-      <Card className="shadow-md">
+      <Card className="shadow-lg border-t-2 border-t-primary">
         <CardContent className="p-0">
           <Table>
             <TableHeader>
@@ -271,7 +295,7 @@ export function BillHistoryTable() {
                     <TableCell className="font-mono text-xs">{bill.id}</TableCell>
                     <TableCell>
                       <Badge 
-                        className={`capitalize flex items-center gap-1 w-fit min-w-[100px] justify-center ${getBillTypeBadgeClassName(bill)}`}
+                        className={cn("capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", getBillTypeBadgeClassName(bill))}
                       >
                         {getBillTypeIcon(bill)}
                         {getBillTypeName(bill)}

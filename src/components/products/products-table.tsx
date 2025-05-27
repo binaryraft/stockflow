@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card'; // Ensure Card and CardContent are imported
+import { Card, CardContent } from '@/components/ui/card'; 
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'lucide-react';
 import Image from 'next/image';
@@ -112,7 +112,7 @@ export function ProductsTable() {
           <PlusCircle className="mr-2 h-4 w-4" /> Add Product
         </Button>
       </div>
-      <Card className="shadow-md">
+      <Card className="shadow-lg border-t-2 border-t-primary">
        <CardContent className="p-0">
         <Table>
           <TableHeader>
@@ -166,7 +166,7 @@ export function ProductsTable() {
                   <TableCell className="text-right">₹{product.costPrice.toFixed(2)}</TableCell>
                   <TableCell className="text-right">₹{product.sellPrice.toFixed(2)}</TableCell>
                   <TableCell>
-                     <Badge variant={product.trackQuantity ? "default" : "outline"}>
+                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={product.trackQuantity ? "bg-primary/80 hover:bg-primary" : ""}>
                         {product.trackQuantity ? 'Yes' : 'No'}
                      </Badge>
                   </TableCell>
