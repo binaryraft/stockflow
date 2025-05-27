@@ -11,7 +11,7 @@ import { LogIn } from 'lucide-react';
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false); // Renamed from isLoading for clarity
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
@@ -32,6 +32,7 @@ export default function AdminLoginPage() {
 
     setIsSubmitting(true);
     localStorage.setItem('isAdminLoggedIn', 'true');
+    // No need for setIsAuthenticated(true) here as AdminLayout will handle it
     router.push('/admin'); 
     // No need to setIsSubmitting(false) here as the page will redirect and unmount.
   };

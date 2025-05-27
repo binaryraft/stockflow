@@ -3,7 +3,6 @@
 
 import { AppShell } from '@/components/layout/app-shell';
 import { useEffect, useState } from 'react';
-import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
@@ -23,17 +22,19 @@ export default function AdminLayout({
   }, []);
 
   useEffect(() => {
-    if (!hasMounted) return; // Only run auth check on client after mount
+    if (!hasMounted) return; 
 
-    setIsLoadingAuth(true); // Indicate start of auth check
+    setIsLoadingAuth(true); 
     const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
     if (adminLoggedIn === 'true') {
       setIsAuthenticated(true);
-      setIsLoadingAuth(false); // Auth check complete, user is authenticated
+      setIsLoadingAuth(false); 
     } else {
       router.replace('/admin/login');
-      // Even if redirecting, set loading to false so UI doesn't hang on "Checking..."
-      setIsLoadingAuth(false); // Auth check complete, user is not authenticated
+      // It's important to set isLoadingAuth to false even when redirecting,
+      // so the "Redirecting to login..." message can appear if needed,
+      // rather than being stuck on "Checking authentication...".
+      setIsLoadingAuth(false); 
     }
   }, [router, hasMounted]);
 

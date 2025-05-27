@@ -25,42 +25,41 @@ export default function StoreLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [hasMounted, setHasMounted] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true); // To manage initial data fetch
+  const [initialLoading, setInitialLoading] = useState(true); 
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
   useEffect(() => {
-    if (hasMounted && storeId) {
-      const store = getStoreById(storeId);
-      if (store) {
-        setStoreName(store.name);
-        // If already authenticated for this store, redirect to billing
-        if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
-          router.replace(`/storeportal/${storeId}/billing`);
-          // No need to setInitialLoading(false) here as it will redirect
-          return;
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Store Not Found",
-          description: "The requested store does not exist.",
-        });
-        router.replace('/storeportal'); 
-        // No need to setInitialLoading(false) here
-        return;
-      }
-      setInitialLoading(false); // Store info loaded, not redirecting yet
-    } else if (hasMounted && !storeId) {
-      // If mounted but no storeId, means URL is wrong or params not ready
+    if (!hasMounted) return;
+
+    if (!storeId) {
       toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
       router.replace('/storeportal');
-      // No need to setInitialLoading(false) here
+      setInitialLoading(false); // Stop loading as we are redirecting
       return;
     }
-    // If !hasMounted, initialLoading remains true implicitly.
+
+    const store = getStoreById(storeId);
+    if (store) {
+      setStoreName(store.name);
+      if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
+        router.replace(`/storeportal/${storeId}/billing`);
+        // No need to setInitialLoading(false) here as it will redirect and unmount
+        return; 
+      }
+    } else {
+      toast({
+        variant: "destructive",
+        title: "Store Not Found",
+        description: "The requested store does not exist.",
+      });
+      router.replace('/storeportal'); 
+      setInitialLoading(false); // Stop loading
+      return;
+    }
+    setInitialLoading(false); // Store info loaded, not redirecting yet
   }, [storeId, getStoreById, router, toast, hasMounted]);
 
 
@@ -88,7 +87,7 @@ export default function StoreLoginPage() {
     }
   };
   
-  if (!hasMounted || initialLoading) { // Show loading if not mounted or still fetching store info
+  if (!hasMounted || initialLoading) { 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Image 
@@ -103,10 +102,6 @@ export default function StoreLoginPage() {
       </div>
     );
   }
-
-  // If here, hasMounted is true and initialLoading is false.
-  // This means either store was found and user is not session-authenticated, or store was not found (and redirect is in progress).
-  // The form should only render if a storeName is set.
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
