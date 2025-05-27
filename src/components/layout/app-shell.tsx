@@ -1,3 +1,4 @@
+
 "use client";
 
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
@@ -15,18 +16,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full flex-col bg-muted/40">
-        <SidebarNav />
-        <div className="flex flex-col sm:gap-4 sm:py-4 md:pl-[var(--sidebar-width-icon)] group-data-[state=expanded]:md:pl-[var(--sidebar-width)] transition-[padding-left] duration-200 ease-linear">
-           {/* The actual sidebar width adjustment is handled by the Sidebar component itself.
-               This pl-[...] is a fallback or for content that might not be inside SidebarInset.
-               For the main content, SidebarInset should handle its own margins based on sidebar state.
-            */}
-          <HeaderMain />
-          <main className="flex-1 p-4 sm:px-6 sm:py-0">
+      <div className="flex min-h-screen w-full bg-muted/40"> {/* Base container */}
+        <SidebarNav /> {/* Renders the 'peer' Sidebar component */}
+        {/* SidebarInset is the main content area that respects the sidebar */}
+        <SidebarInset className="flex flex-col flex-1 overflow-x-hidden bg-background"> {/* flex-1 to take remaining space, overflow-x-hidden for safety. Added bg-background here. */}
+          <HeaderMain /> {/* Sticky header, child of SidebarInset */}
+          {/* This div is the main scrollable content area within SidebarInset */}
+          <div className="flex-1 p-4 sm:px-6 sm:py-0 md:p-6 lg:p-8 overflow-y-auto">
             {children}
-          </main>
-        </div>
+          </div>
+        </SidebarInset>
       </div>
       <Toaster />
     </SidebarProvider>
