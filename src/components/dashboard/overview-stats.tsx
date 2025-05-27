@@ -29,7 +29,7 @@ export function OverviewStats() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(()_ => {
+  useEffect(() => {
     setIsLoading(true);
     const todayStr = format(new Date(), 'yyyy-MM-dd');
 
