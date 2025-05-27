@@ -123,6 +123,7 @@ export function BillingForm() {
                     if (firstVariantRef?.current) {
                         firstVariantRef.current.focus();
                     } else {
+                        // Fallback if ref not immediately available (less ideal, but a failsafe)
                         const firstVariantSelectTriggerEl = document.getElementById(`variant-select-${firstVariant.id}-trigger`);
                         firstVariantSelectTriggerEl?.focus();
                     }
@@ -130,9 +131,10 @@ export function BillingForm() {
             }
         } else { // No variants, product selected
             quantityInputRef.current?.focus();
+            quantityInputRef.current?.select();
         }
     }
-  }, [currentProductForSelection?.id]); // Re-evaluate when currentProductForSelection changes
+  }, [currentProductForSelection?.id, currentProductForSelection?.variants]);
 
 
   useEffect(() => {
@@ -145,9 +147,11 @@ export function BillingForm() {
         const isVariantSelectFocused = currentProductForSelection.variants.some(variant => 
             activeElement?.id === `variant-select-${variant.id}-trigger`
         );
-        // Only focus quantity if it's not already focused and if a variant select wasn't the last focused element
+        
+        // Only focus quantity if it's not already focused and if a variant select wasn't the last focused element that triggered this effect
         if(!isVariantSelectFocused && activeElement?.id !== quantityInputRef.current?.id) {
              quantityInputRef.current?.focus();
+             quantityInputRef.current?.select();
         }
       }
     }
@@ -212,10 +216,14 @@ export function BillingForm() {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1 && !currentProductForSelection) { 
             handleProductSelect(productsFound[0]); 
+            // Focus logic is now handled by useEffect based on currentProductForSelection
        } else if (productsFound.length > 1 && !currentProductForSelection) {
+            // Keep focus on product name to allow user to refine search or pick from dropdown
             productNameInputRef.current?.focus(); 
        } else { 
+            // Case: Product already selected (currentProductForSelection is true) OR no products found
             if (productNotFoundHint === productNameQuery && !currentProductForSelection) { 
+                // Second Enter: Product not found, open dialog
                 setNewProductDialogInitialValues({
                     name: productNameQuery,
                     quantity: mode === 'buy' ? (typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1) : undefined,
@@ -225,30 +233,43 @@ export function BillingForm() {
                 setIsNewProductDialogOpen(true);
                 setProductNotFoundHint(''); 
             } else if (!currentProductForSelection && productNameQuery.trim() !== '') {
+                // First Enter: Product not found, show hint
                 setProductNotFoundHint(productNameQuery); 
             } else if (currentProductForSelection) { 
+                // Product is selected, move to variants or quantity
                 if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
                      quantityInputRef.current?.focus();
+                     quantityInputRef.current?.select();
                 } else {
+                    // Product has variants, try to focus the first unselected variant
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     if(firstUnselectedVariant && variantSelectRefs.current[firstUnselectedVariant.id]?.current){
                         variantSelectRefs.current[firstUnselectedVariant.id].current.focus();
                     } else if (firstUnselectedVariant) {
+                        // Fallback if ref not immediately available
                         const triggerEl = document.getElementById(`variant-select-${firstUnselectedVariant.id}-trigger`);
                         triggerEl?.focus();
-                    } else { // all variants selected or no unselected ref found
+                    } else { // All variants selected or no unselected ref found
                         quantityInputRef.current?.focus();
+                        quantityInputRef.current?.select();
                     }
                 }
             }
        }
     } else if (currentField === 'variantSelect') { // This case will be triggered from onKeyDown of SelectTrigger
         quantityInputRef.current?.focus();
+        quantityInputRef.current?.select();
     } else if (currentField === 'quantity') {
-      if (mode === 'buy') costPriceInputRef.current?.focus();
+      if (mode === 'buy') {
+        costPriceInputRef.current?.focus();
+        costPriceInputRef.current?.select();
+      }
       else handleAddNewItem(); 
     } else if (currentField === 'costPrice') {
-      if (mode === 'buy') sellPriceInputRef.current?.focus();
+      if (mode === 'buy') {
+        sellPriceInputRef.current?.focus();
+        sellPriceInputRef.current?.select();
+      }
     } else if (currentField === 'sellPrice') {
       if (mode === 'buy') handleAddNewItem();
     }
@@ -334,13 +355,13 @@ export function BillingForm() {
             <TabsList className="grid w-full grid-cols-3 gap-1">
                 <TabsTrigger 
                   value="sell" 
-                  className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white dark:data-[state=active]:bg-green-500 dark:data-[state=active]:text-green-950"
+                  className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground dark:data-[state=active]:bg-primary dark:data-[state=active]:text-primary-foreground"
                 >
                   <Send size={18}/>Sales
                 </TabsTrigger>
                 <TabsTrigger 
                   value="buy" 
-                  className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white dark:data-[state=active]:bg-red-500 dark:data-[state=active]:text-red-950"
+                  className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground dark:data-[state=active]:bg-destructive dark:data-[state=active]:text-destructive-foreground"
                 >
                   <ShoppingBag size={18}/>Expense
                 </TabsTrigger>
@@ -376,7 +397,7 @@ export function BillingForm() {
             
             <div className="space-y-4 pb-4 border-b border-dashed mb-4">
               <h3 className="text-lg font-medium text-foreground">Add Item</h3>
-              <div className={cn(`grid ${mode === 'sell' || mode === 'return' ? 'grid-cols-1 md:grid-cols-[2fr_auto_1fr]' : 'grid-cols-1 md:grid-cols-[2fr_auto_1fr_1fr_1fr]'} gap-4 items-end`)}>
+              <div className={cn(`grid ${mode === 'sell' || mode === 'return' ? 'grid-cols-1 md:grid-cols-[2fr_auto_1fr]' : 'grid-cols-1 md:grid-cols-[2fr_auto_1fr_1fr_1fr]'} gap-4 items-baseline`)}>
                   <div className="space-y-1.5 flex-grow">
                     <Label htmlFor="productNameGlobal">Product Name</Label>
                     <div className="flex items-center gap-2">
@@ -399,7 +420,7 @@ export function BillingForm() {
                      {productNotFoundHint && productNameQuery === productNotFoundHint && (
                         <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
                             <Info size={16} className="text-accent" />
-                            Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} className="inline text-green-600 mx-1" /> Enter to add it.
+                            Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} className="inline text-green-600 dark:text-green-500 mx-1" /> Enter to add it.
                         </div>
                     )}
                   </div>
@@ -429,6 +450,7 @@ export function BillingForm() {
                         value={costPrice}
                         onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
+                        onFocus={(e) => e.target.select()}
                         step="0.01" min="0"
                         />
                     </div>
@@ -441,6 +463,7 @@ export function BillingForm() {
                         value={sellPrice}
                         onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
+                        onFocus={(e) => e.target.select()}
                         step="0.01" min="0"
                         />
                     </div>
@@ -471,13 +494,17 @@ export function BillingForm() {
                                 if (e.key === 'Enter') {
                                     e.preventDefault();
                                     if (index === currentProductForSelection!.variants!.length - 1) {
-                                        handleEnterNavigation('variantSelect'); // To focus quantity
+                                        // Last variant selected, move to quantity
+                                        quantityInputRef.current?.focus();
+                                        quantityInputRef.current?.select();
                                     } else {
+                                        // Move to next variant selector
                                         const nextVariantId = currentProductForSelection!.variants![index + 1].id;
                                         const nextVariantRef = variantSelectRefs.current[nextVariantId];
                                         if (nextVariantRef?.current) {
                                           nextVariantRef.current.focus();
                                         } else {
+                                           // Fallback if ref not immediately available
                                            const nextVariantSelectTriggerEl = document.getElementById(`variant-select-${nextVariantId}-trigger`);
                                            nextVariantSelectTriggerEl?.focus();
                                         }
