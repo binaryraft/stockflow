@@ -144,4 +144,3 @@ export function CategorySearchInput({
     </div>
   );
 }
-```
