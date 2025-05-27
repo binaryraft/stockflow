@@ -9,7 +9,10 @@ export default function AdminLoginLayout({
 }) {
   return (
     <div className="flex items-center justify-center min-h-screen bg-muted/40 p-4">
-      {children}
+      {/* You can add a temporary border to see if this layout is rendering */}
+      {/* <div style={{ border: '2px solid blue', width: '100%', height: '100%' }}> */}
+        {children}
+      {/* </div> */}
     </div>
   );
 }
