@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, LogIn } from 'lucide-react';
-import type { Store } from '@/types';
+import type { Store, Staff } from '@/types'; // Added Staff
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { StoreFormDialog } from './store-form-dialog';
 import { useToast } from '@/hooks/use-toast';
@@ -26,15 +26,15 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 type SortableStoreColumns = keyof Pick<Store, 'name' | 'location' | 'email' | 'phone'>;
 
 export function StoresTable() {
-  const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan } = useInventoryStore();
+  const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
   const { toast } = useToast();
-  
+
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableStoreColumns; direction: 'ascending' | 'descending' } | null>(null);
 
-  const staffMembers = getAllStaff(); 
+  const staffMembers = getAllStaff();
   const activePlan = getActiveSubscriptionPlan();
   const userCanAddStore = activePlan ? stores.length < activePlan.maxStores : false;
   const isAdminOnlyPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
@@ -80,8 +80,8 @@ export function StoresTable() {
       toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
       return;
     }
-    setEditingStore(store); 
-    setIsFormDialogOpen(true); 
+    setEditingStore(store);
+    setIsFormDialogOpen(true);
   };
 
   const handleDeleteStore = (storeId: string, storeName: string) => {
@@ -93,26 +93,26 @@ export function StoresTable() {
     toast({ title: "Store Deleted", description: `${storeName} has been removed.` });
   };
 
-  const onFormDialogSubmit = () => { 
+  const onFormDialogSubmit = () => {
     setIsFormDialogOpen(false);
-    setEditingStore(null); 
+    setEditingStore(null);
   };
 
-  const addStoreButtonTooltipContent = isAdminOnlyPlan 
+  const addStoreButtonTooltipContent = isAdminOnlyPlan
     ? "Store management is not available on the Basic Admin plan. Please upgrade."
-    : !userCanAddStore 
-    ? `You have reached the maximum of ${activePlan?.maxStores} stores for your current plan. Please upgrade.` 
+    : !userCanAddStore
+    ? `You have reached the maximum of ${activePlan?.maxStores} stores for your current plan. Please upgrade.`
     : "Add New Store";
 
   return (
     <TooltipProvider>
-      <StoreFormDialog 
-        isOpen={isFormDialogOpen} 
+      <StoreFormDialog
+        isOpen={isFormDialogOpen}
         onOpenChange={(open) => {
-          if (!open) setEditingStore(null); 
+          if (!open) setEditingStore(null);
           setIsFormDialogOpen(open);
         }}
-        editingStore={editingStore} 
+        editingStore={editingStore}
         onFormSubmit={onFormDialogSubmit}
         allStaff={staffMembers}
       />
@@ -125,9 +125,9 @@ export function StoresTable() {
         />
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="inline-block"> 
-              <Button 
-                onClick={() => { 
+            <div className="inline-block">
+              <Button
+                onClick={() => {
                   if (isAdminOnlyPlan) {
                     toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
                     return;
@@ -136,8 +136,8 @@ export function StoresTable() {
                      toast({variant: "destructive", title: "Limit Reached", description: `Cannot add more stores. Max ${activePlan?.maxStores} allowed on current plan.`});
                     return;
                   }
-                  setEditingStore(null); 
-                  setIsFormDialogOpen(true); 
+                  setEditingStore(null);
+                  setIsFormDialogOpen(true);
                 }}
                 disabled={!userCanAddStore || isAdminOnlyPlan}
                 aria-disabled={!userCanAddStore || isAdminOnlyPlan}
@@ -176,16 +176,18 @@ export function StoresTable() {
           </TableHeader>
           <TableBody>
             {filteredAndSortedStores.length > 0 ? (
-              filteredAndSortedStores.map((store) => (
+              filteredAndSortedStores.map((store) => {
+                const allowedStaff = getStaffDetailsByIds(store.allowedStaffIds);
+                return (
                 <TableRow key={store.id}>
                   <TableCell className="font-medium py-3 px-4">{store.name}</TableCell>
                   <TableCell className="py-3 px-4">{store.location}</TableCell>
                   <TableCell className="py-3 px-4">{store.email}</TableCell>
                   <TableCell className="py-3 px-4">{store.phone}</TableCell>
                    <TableCell className="py-3 px-4 text-xs">
-                    {store.allowedStaffIds.length > 0 
-                      ? `${store.allowedStaffIds.length} staff member(s)`
-                      : <span className="text-muted-foreground">All staff with access</span> 
+                    {store.allowedStaffIds.length === 0
+                      ? <span className="text-muted-foreground">All staff with general access</span>
+                      : allowedStaff.map(staff => staff.name).join(', ') || <span className="text-muted-foreground">None explicitly</span>
                     }
                   </TableCell>
                   <TableCell className="py-3 px-4 text-xs capitalize">
@@ -211,8 +213,8 @@ export function StoresTable() {
                         </DropdownMenuItem>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <DropdownMenuItem 
-                                  onSelect={(e) => e.preventDefault()} 
+                                <DropdownMenuItem
+                                  onSelect={(e) => e.preventDefault()}
                                   className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                   disabled={isAdminOnlyPlan}
                                 >
@@ -238,7 +240,7 @@ export function StoresTable() {
                     </DropdownMenu>
                   </TableCell>
                 </TableRow>
-              ))
+              )})
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">

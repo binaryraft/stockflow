@@ -5,14 +5,15 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { BillingForm } from '@/components/billing/billing-form';
-import type { Store, BillMode } from '@/types';
+import type { Store, BillMode, Staff } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShoppingCart, MessageSquare } from 'lucide-react'; 
+import { LogOut, ShoppingCart, MessageSquare, LogIn as LogInIcon } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChatInterface } from '@/components/chat/ChatInterface';
+import { EmployeePasskeyDialog } from '@/components/billing/employee-passkey-dialog'; // For header-initiated login
 
 export default function StoreBillingPage() {
   const router = useRouter();
@@ -20,10 +21,12 @@ export default function StoreBillingPage() {
   const storeId = params.storeId as string;
   const nextSearchParams = useNextSearchParams();
 
-  const { getStoreById } = useInventoryStore(); 
-  
+  const { getStoreById, getStaffById } = useInventoryStore();
+
   const [isStoreAuthenticated, setIsStoreAuthenticated] = useState(false);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
+  const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
+  const [isEmployeeAuthDialogOpen, setIsEmployeeAuthDialogOpen] = useState(false); // For header login
   const [isLoading, setIsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
@@ -32,6 +35,7 @@ export default function StoreBillingPage() {
     setHasMounted(true);
   }, []);
 
+  // Store and initial employee authentication
   useEffect(() => {
     if (!hasMounted || !storeId) {
       setIsLoading(true);
@@ -43,7 +47,7 @@ export default function StoreBillingPage() {
 
     if (!store) {
       setCurrentStore(null);
-      router.replace('/storeportal'); 
+      router.replace('/storeportal');
       setIsLoading(false);
       return;
     }
@@ -52,21 +56,39 @@ export default function StoreBillingPage() {
     const authenticatedStoreSession = sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true';
     if (authenticatedStoreSession) {
       setIsStoreAuthenticated(true);
-    } else { 
+      // Try to load current staff from session for this store
+      const staffSessionData = sessionStorage.getItem(`currentStaff_${storeId}`);
+      if (staffSessionData) {
+        try {
+          const staffInfo = JSON.parse(staffSessionData) as { id: string; name: string };
+          // Validate if this staff is still valid (exists and can access this store)
+          const validatedStaff = getStaffById(staffInfo.id);
+          if (validatedStaff && (validatedStaff.accessibleStoreIds.length === 0 || validatedStaff.accessibleStoreIds.includes(storeId))) {
+            setCurrentStaff(validatedStaff);
+          } else {
+            sessionStorage.removeItem(`currentStaff_${storeId}`); // Clear invalid staff
+          }
+        } catch (error) {
+          console.error("Error parsing staff session data:", error);
+          sessionStorage.removeItem(`currentStaff_${storeId}`);
+        }
+      }
+    } else {
       setIsStoreAuthenticated(false);
       router.replace(`/storeportal/${storeId}/login`);
     }
-    setIsLoading(false); 
-  }, [storeId, router, getStoreById, hasMounted]);
+    setIsLoading(false);
+  }, [storeId, router, getStoreById, hasMounted, getStaffById]);
 
+  // Mode redirection logic
   useEffect(() => {
     if (!hasMounted || isLoading || !isStoreAuthenticated || !currentStore || !storeId) {
-      return; 
+      return;
     }
 
     const currentMode = nextSearchParams.get('mode') as BillMode | null;
     const allowedOps = currentStore.allowedOperations || [];
-    
+
     if (allowedOps.length === 0) {
       console.warn(`Store ${storeId} has no allowed operations. Defaulting to sell for URL.`);
       if (currentMode !== 'sell') {
@@ -75,32 +97,57 @@ export default function StoreBillingPage() {
       return;
     }
 
-    if (!currentMode) { 
+    if (!currentMode) {
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
-    } else if (!allowedOps.includes(currentMode)) { 
+    } else if (!allowedOps.includes(currentMode)) {
       console.warn(`Mode ${currentMode} not allowed for store ${storeId}. Redirecting to ${allowedOps[0]}.`);
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     }
   }, [storeId, isStoreAuthenticated, currentStore, nextSearchParams, router, hasMounted, isLoading]);
 
-
   const handleStoreLogout = () => {
     if (hasMounted && storeId) {
       sessionStorage.removeItem(`authenticatedStore_${storeId}`);
+      sessionStorage.removeItem(`currentStaff_${storeId}`); // Clear current staff on store logout
     }
     setIsStoreAuthenticated(false);
+    setCurrentStaff(null);
     if (storeId) router.push(`/storeportal/${storeId}/login`);
     else router.push('/storeportal');
   };
-  
-  if (!hasMounted || (!storeId && hasMounted)) { 
+
+  const handleEmployeeLoginClick = () => {
+    setIsEmployeeAuthDialogOpen(true);
+  };
+
+  const handleEmployeeAuthenticatedFromDialog = (staff: Staff) => {
+    setCurrentStaff(staff);
+    if (storeId) {
+      sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify({ id: staff.id, name: staff.name }));
+    }
+    setIsEmployeeAuthDialogOpen(false);
+  };
+
+  const handleBillSavedWithEmployee = (staff: Staff) => {
+    // If a bill was saved and an employee was identified transactionally,
+    // update the current operator display
+    if (!currentStaff || currentStaff.id !== staff.id) {
+        setCurrentStaff(staff);
+        if (storeId) {
+            sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify({ id: staff.id, name: staff.name }));
+        }
+    }
+  };
+
+
+  if (!hasMounted || (!storeId && hasMounted)) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image 
-          src="https://placehold.co/64x64.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={48} 
-          height={48} 
+        <Image
+          src="https://placehold.co/64x64.png"
+          alt={`${APP_NAME} Logo`}
+          width={48}
+          height={48}
           className="mb-2 rounded-lg animate-pulse"
           data-ai-hint="logo company"
         />
@@ -108,31 +155,31 @@ export default function StoreBillingPage() {
       </div>
     );
   }
-  
+
   if (isLoading) {
-     return (
+    return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image 
-          src="https://placehold.co/64x64.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={48} 
-          height={48} 
+        <Image
+          src="https://placehold.co/64x64.png"
+          alt={`${APP_NAME} Logo`}
+          width={48}
+          height={48}
           className="mb-2 rounded-lg animate-pulse"
-          data-ai-hint="logo company" 
+          data-ai-hint="logo company"
         />
         <p className="text-lg text-muted-foreground">Loading {currentStore ? currentStore.name : 'Store'} Terminal...</p>
       </div>
     );
   }
 
-  if (!currentStore && !isLoading) { 
-     return (
+  if (!currentStore && !isLoading) {
+    return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image 
-          src="https://placehold.co/64x64.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={48} 
-          height={48} 
+        <Image
+          src="https://placehold.co/64x64.png"
+          alt={`${APP_NAME} Logo`}
+          width={48}
+          height={48}
           className="mb-2 rounded-lg"
           data-ai-hint="logo company"
         />
@@ -141,14 +188,14 @@ export default function StoreBillingPage() {
     );
   }
 
-  if (currentStore && !isStoreAuthenticated && !isLoading) { 
-     return (
+  if (currentStore && !isStoreAuthenticated && !isLoading) {
+    return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image 
-          src="https://placehold.co/64x64.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={48} 
-          height={48} 
+        <Image
+          src="https://placehold.co/64x64.png"
+          alt={`${APP_NAME} Logo`}
+          width={48}
+          height={48}
           className="mb-2 rounded-lg"
           data-ai-hint="logo company"
         />
@@ -156,72 +203,87 @@ export default function StoreBillingPage() {
       </div>
     );
   }
-  
+
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
-  if (!currentStore || !isStoreAuthenticated) {
-    return (
-         <div className="flex min-h-screen flex-col items-center justify-center p-4">
-            <Image 
-                src="https://placehold.co/64x64.png" 
-                alt={`${APP_NAME} Logo`} 
-                width={48} 
-                height={48} 
-                className="mb-2 rounded-lg animate-pulse"
-                data-ai-hint="logo company"
-            />
-            <p className="text-lg text-muted-foreground">Preparing Store Terminal...</p>
-        </div>
-    );
+  if (!currentStore || !isStoreAuthenticated) { // Fallback if other checks didn't catch it
+      return (
+           <div className="flex min-h-screen flex-col items-center justify-center p-4">
+              <Image
+                  src="https://placehold.co/64x64.png"
+                  alt={`${APP_NAME} Logo`}
+                  width={48}
+                  height={48}
+                  className="mb-2 rounded-lg animate-pulse"
+                  data-ai-hint="logo company"
+              />
+              <p className="text-lg text-muted-foreground">Preparing Store Terminal...</p>
+          </div>
+      );
   }
-
 
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
-      <PageTitle 
+      <PageTitle
         title={`${currentStore.name} - Billing Terminal`}
-        icon={ShoppingCart} 
+        icon={ShoppingCart}
         actions={
-            <div className="flex items-center gap-3">
-                <Button variant="outline" size="icon" onClick={() => setIsChatDialogOpen(true)} aria-label="Open Chat">
-                    <MessageSquare className="h-5 w-5" />
-                </Button>
-                <Button variant="destructive" size="sm" onClick={handleStoreLogout}>
-                    <LogOut className="mr-2 h-4 w-4" /> Logout Store
-                </Button>
-            </div>
+          <div className="flex items-center gap-3">
+            {currentStaff && (
+              <span className="text-sm font-medium text-muted-foreground hidden md:inline">
+                Operator: <span className="text-primary">{currentStaff.name}</span>
+              </span>
+            )}
+            <Button variant="outline" size="sm" onClick={handleEmployeeLoginClick}>
+              <LogInIcon className="mr-2 h-4 w-4" /> {currentStaff ? "Switch" : "Login"} Employee
+            </Button>
+            <Button variant="outline" size="icon" onClick={() => setIsChatDialogOpen(true)} aria-label="Open Chat">
+              <MessageSquare className="h-5 w-5" />
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleStoreLogout}>
+              <LogOut className="mr-2 h-4 w-4" /> Logout Store
+            </Button>
+          </div>
         }
       />
-       <Dialog open={isChatDialogOpen} onOpenChange={setIsChatDialogOpen}>
+      <EmployeePasskeyDialog
+        isOpen={isEmployeeAuthDialogOpen}
+        onOpenChange={setIsEmployeeAuthDialogOpen}
+        storeId={currentStore.id}
+        onAuthenticated={handleEmployeeAuthenticatedFromDialog}
+      />
+      <Dialog open={isChatDialogOpen} onOpenChange={setIsChatDialogOpen}>
         <DialogContent className="sm:max-w-lg h-[70vh] p-0 flex flex-col border-t-4 border-t-primary shadow-lg">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Chat with Admin ({currentStore.name})</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0">
-            <ChatInterface storeId={currentStore.id} currentUserId={currentStore.id} currentUserName={currentStore.name} />
+            <ChatInterface storeId={currentStore.id} currentUserId={currentStaff?.id || currentStore.id} currentUserName={currentStaff?.name || currentStore.name} />
           </div>
         </DialogContent>
       </Dialog>
 
       <Suspense fallback={
         <div className="flex-1 flex items-center justify-center">
-            <Image 
-              src="https://placehold.co/64x64.png" 
-              alt={`${APP_NAME} Logo`} 
-              width={48} 
-              height={48} 
-              className="mb-2 rounded-lg animate-pulse"
-              data-ai-hint="logo company"
-            />
-            <p className="text-lg text-muted-foreground">Loading Billing Interface...</p>
+          <Image
+            src="https://placehold.co/64x64.png"
+            alt={`${APP_NAME} Logo`}
+            width={48}
+            height={48}
+            className="mb-2 rounded-lg animate-pulse"
+            data-ai-hint="logo company"
+          />
+          <p className="text-lg text-muted-foreground">Loading Billing Interface...</p>
         </div>
       }>
-        <BillingForm 
-            key={modeFromUrl || currentStore.id} 
-            initialModeProp={modeFromUrl}
-            storeId={currentStore.id}
-            allowedModes={currentStore.allowedOperations}
-            isAdminContext={false}
+        <BillingForm
+          key={modeFromUrl || currentStore.id} // Ensures remount if mode or store changes significantly
+          initialModeProp={modeFromUrl}
+          storeId={currentStore.id}
+          allowedModes={currentStore.allowedOperations}
+          isAdminContext={false}
+          identifiedStaffProp={currentStaff}
+          onEmployeeIdentifiedForBill={handleBillSavedWithEmployee}
         />
       </Suspense>
     </div>
