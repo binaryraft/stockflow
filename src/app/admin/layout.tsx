@@ -23,7 +23,7 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!hasMounted) {
-      return;
+      return; // Wait for client-side mount
     }
 
     setIsLoadingAuth(true); 
@@ -34,13 +34,12 @@ export default function AdminLayout({
       setIsLoadingAuth(false);
     } else {
       setIsAuthenticated(false);
-      // Redirect to landing page for login, not /admin/login
-      router.replace('/'); 
+      router.replace('/'); // Redirect to landing page, which handles login forms
       setIsLoadingAuth(false); 
     }
   }, [router, hasMounted]);
 
-  if (!hasMounted || isLoadingAuth) { 
+  if (!hasMounted) { 
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <Image 
@@ -51,16 +50,30 @@ export default function AdminLayout({
           className="mb-6 rounded-xl shadow-lg animate-pulse"
           data-ai-hint="logo company"
         />
-        <p className="text-lg text-muted-foreground">
-          {!hasMounted ? "Initializing Admin Portal..." : "Checking authentication..."}
-        </p>
+        <p className="text-lg text-muted-foreground">Initializing Admin Portal...</p>
+      </div>
+    );
+  }
+  
+  if (isLoadingAuth) {
+     return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Image 
+          src="https://placehold.co/128x128.png" 
+          alt={`${APP_NAME} Logo`} 
+          width={80} 
+          height={80} 
+          className="mb-6 rounded-xl shadow-lg animate-pulse"
+          data-ai-hint="logo company"
+        />
+        <p className="text-lg text-muted-foreground">Checking authentication...</p>
       </div>
     );
   }
 
   if (!isAuthenticated) {
     // This state should ideally be brief as router.replace('/') would have been called.
-    // Returning null lets the router handle the redirect.
+    // Returning null lets the router handle the redirect without flashing content.
     return null; 
   }
 

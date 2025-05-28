@@ -11,7 +11,7 @@ import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/call-to-action-section';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
-import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded'; // New component
+import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
 
 type UIMode = 'landing' | 'adminLogin' | 'storeSelect';
 

@@ -61,7 +61,7 @@ interface InventoryState {
   deleteStaff: (staffId: string) => void;
   getStaffById: (staffId: string) => Staff | undefined;
   getAllStaff: () => Staff[];
-  getStaffDetailsByIds: (staffIds: string[]) => Staff[]; // New selector
+  getStaffDetailsByIds: (staffIds: string[]) => Staff[];
 
   // Store CRUD
   addStore: (storeData: Omit<Store, 'id' | 'allowedOperations'> & { allowedOperations?: BillMode[] }) => Store | null;
@@ -91,7 +91,7 @@ interface InventoryState {
 }
 
 const getSkuIdentifier = (productName: string, optionValues: Record<string, string>): string => {
-  if (Object.keys(optionValues).length === 0) return productName;
+  if (Object.keys(optionValues).length === 0) return productName; // Default SKU for simple products
   const sortedOptions = Object.entries(optionValues)
     .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
     .map(([, value]) => value)
@@ -158,10 +158,9 @@ export const useInventoryStore = create<InventoryState>()(
             costPrice: productData.costPrice || 0,
             sellPrice: productData.sellPrice || 0,
             quantityInStock: productData.trackQuantity ? (productData.initialStock || 0) : 0,
-            skuIdentifier: productData.name, // Base name as SKU identifier for simple products
+            skuIdentifier: getSkuIdentifier(productData.name, {}),
           });
         }
-        // For variant products, SKUs will be created on first purchase.
 
         const newProduct: Product = {
           id: generateId(),
@@ -173,7 +172,7 @@ export const useInventoryStore = create<InventoryState>()(
           imageUrl: `https://placehold.co/100x100.png?text=${encodeURIComponent(productData.name.substring(0,10))}&font=roboto`,
           description: productData.description,
           variants: productVariants,
-          productSKUs: initialSKUs, // Will be empty for new variant products, populated for simple products
+          productSKUs: initialSKUs,
         };
         set((state) => ({ products: [...state.products, newProduct] }));
         if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
@@ -204,22 +203,19 @@ export const useInventoryStore = create<InventoryState>()(
                 : p.variants;
 
               let updatedProductSKUs = p.productSKUs;
-              // If it's a simple product (no variants defined in update or existing) and default price/stock are being updated
               if ((!updatedVariants || updatedVariants.length === 0) && !productData.productSKUs) {
                 const defaultSku = p.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0) ||
-                                   { id: generateId(), optionValues: {}, skuIdentifier: p.name, costPrice: 0, sellPrice: 0, quantityInStock: 0 };
+                                   { id: generateId(), optionValues: {}, skuIdentifier: getSkuIdentifier(p.name, {}), costPrice: 0, sellPrice: 0, quantityInStock: 0 };
                 updatedProductSKUs = [{
                   ...defaultSku,
                   costPrice: productData.costPrice !== undefined ? productData.costPrice : defaultSku.costPrice,
                   sellPrice: productData.sellPrice !== undefined ? productData.sellPrice : defaultSku.sellPrice,
                   quantityInStock: productData.trackQuantity === false ? 0 : (productData.initialStock !== undefined ? productData.initialStock : defaultSku.quantityInStock),
                 }];
-              } else if (productData.productSKUs) { // If SKUs are explicitly passed for update
+              } else if (productData.productSKUs) {
                  updatedProductSKUs = productData.productSKUs;
               }
-              // Note: For variant products, direct update of individual SKU prices/stock via this general updateProduct is less common.
-              // SKU specific updates happen primarily via `findOrCreateProductSKU` during billing.
-
+              
               return {
                 ...p,
                 ...productData,
@@ -242,49 +238,35 @@ export const useInventoryStore = create<InventoryState>()(
         if (productIndex === -1) return undefined;
 
         const product = products[productIndex];
-        // Normalize optionValues for consistent matching: sort keys then stringify
-        const sortedOptionValues = Object.entries(optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
-        const stringifiedOptionValues = JSON.stringify(Object.fromEntries(sortedOptionValues));
-
-
-        let skuIndex = product.productSKUs.findIndex(sku => {
-             const sortedSkuOptionValues = Object.entries(sku.optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB));
-             return JSON.stringify(Object.fromEntries(sortedSkuOptionValues)) === stringifiedOptionValues;
-        });
-
-
+        const stringifiedOptionValues = JSON.stringify(Object.fromEntries(Object.entries(optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))));
+        let skuIndex = product.productSKUs.findIndex(sku => JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB)))) === stringifiedOptionValues);
         let updatedSku: ProductSKU;
 
-        if (skuIndex !== -1) { // SKU exists
+        if (skuIndex !== -1) {
           updatedSku = { ...product.productSKUs[skuIndex] };
-          if (trackProductQuantity) {
-            if (isPurchase) { // Expense bill
-              updatedSku.costPrice = costPrice; // Update cost price to this purchase's cost
-              updatedSku.sellPrice = sellPrice; // Update sell price to this purchase's sell price
-              updatedSku.quantityInStock += quantityChange;
-            } else { // Sales or Return bill
-              updatedSku.quantityInStock += quantityChange; // Adjust stock for sale/return
-            }
-          } else if (isPurchase) { // Not tracked, but it's a purchase, so update reference prices
-             updatedSku.costPrice = costPrice;
-             updatedSku.sellPrice = sellPrice;
+          if (isPurchase) { // Expense bill
+            updatedSku.costPrice = costPrice;
+            updatedSku.sellPrice = sellPrice; // Update sell price when purchasing
+            if (trackProductQuantity) updatedSku.quantityInStock += quantityChange;
+          } else { // Sales or Return bill
+            if (trackProductQuantity) updatedSku.quantityInStock += quantityChange; // Adjust stock for sale/return
           }
-        } else { // SKU does not exist, create it (typically for a new variant combination during an expense bill)
+        } else {
           if (!isPurchase && trackProductQuantity) {
             console.error("Attempted to sell/return non-existent tracked SKU for variant product:", productId, optionValues);
-            return undefined; // Cannot sell/return an SKU that doesn't exist and wasn't purchased
+            return undefined;
           }
           updatedSku = {
             id: generateId(),
             optionValues,
             costPrice: costPrice,
             sellPrice: sellPrice,
-            quantityInStock: trackProductQuantity ? quantityChange : 0, // Initial stock from this transaction
+            quantityInStock: trackProductQuantity ? quantityChange : 0,
             skuIdentifier: getSkuIdentifier(product.name, optionValues),
           };
         }
 
-        if(trackProductQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock); // Ensure stock doesn't go negative
+        if(trackProductQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock);
 
         const updatedProductSKUs = [...product.productSKUs];
         if (skuIndex !== -1) {
@@ -292,20 +274,13 @@ export const useInventoryStore = create<InventoryState>()(
         } else {
           updatedProductSKUs.push(updatedSku);
         }
-
-        // Update the product in the store with the modified/new SKU list
+        
         get().updateProduct(productId, { productSKUs: updatedProductSKUs, trackQuantity: product.trackQuantity });
         return updatedSku;
       },
 
-      getProductById: (productId) => {
-        return get().products.find((p) => p.id === productId);
-      },
-
-      getProductByName: (name) => {
-        return get().products.find((p) => p.name.toLowerCase() === name.toLowerCase());
-      },
-
+      getProductById: (productId) => get().products.find((p) => p.id === productId),
+      getProductByName: (name) => get().products.find((p) => p.name.toLowerCase() === name.toLowerCase()),
       searchProducts: (searchTerm) => {
         if (!searchTerm) return [];
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -316,7 +291,6 @@ export const useInventoryStore = create<InventoryState>()(
           (p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm)))
         );
       },
-
       getLowStockProductCount: (threshold: number) => {
          return get().products.reduce((count, product) => {
           if (product.trackQuantity) {
@@ -354,8 +328,8 @@ export const useInventoryStore = create<InventoryState>()(
             const targetSKU = get().findOrCreateProductSKU(
               itemData.productId,
               itemData.selectedVariantOptions || {},
-              itemData.costPrice, // Pass the cost from bill form
-              itemData.sellPrice, // Pass the sell price from bill form
+              itemData.costPrice, 
+              itemData.sellPrice, 
               qtyModifier,
               isPurchase,
               product.trackQuantity
@@ -366,13 +340,10 @@ export const useInventoryStore = create<InventoryState>()(
               return;
             }
 
-            // For Sales/Return, the BillItem's prices should reflect the SKU's current prices at the time of sale/return
-            if (!isPurchase) {
+            if (!isPurchase) { // For Sales/Return, BillItem prices reflect the SKU's prices
               itemCostPrice = targetSKU.costPrice;
               itemSellPrice = targetSKU.sellPrice;
             }
-            // For Expense (isPurchase=true), itemCostPrice and itemSellPrice are already set from itemData
-            // and findOrCreateProductSKU has updated the SKU in the store with these.
           }
 
           newBillItems.push({
@@ -386,7 +357,6 @@ export const useInventoryStore = create<InventoryState>()(
             selectedVariantOptions: itemData.selectedVariantOptions,
           });
         });
-
 
         let totalAmount = 0;
         newBillItems.forEach(item => {
@@ -403,7 +373,7 @@ export const useInventoryStore = create<InventoryState>()(
           timestamp: currentDate.getTime(),
           items: newBillItems,
           totalAmount,
-          paymentStatus: billData.paymentStatus || (billData.type === 'return' ? 'paid' : 'paid'), // Default payment status
+          paymentStatus: billData.paymentStatus || (billData.type === 'return' ? 'paid' : 'paid'),
           billedByStaffId: staffMember?.id,
           billedByStaffName: staffMember?.name,
           storeId: storeLocation?.id,
@@ -413,11 +383,7 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({ bills: [newBill, ...state.bills] }));
         return newBill;
       },
-
-      getBillById: (billId) => {
-        return get().bills.find((b) => b.id === billId);
-      },
-
+      getBillById: (billId) => get().bills.find((b) => b.id === billId),
       getRecentBills: (limit: number) => {
         return [...get().bills]
           .sort((a, b) => b.timestamp - a.timestamp)
@@ -427,12 +393,10 @@ export const useInventoryStore = create<InventoryState>()(
       addCategory: (categoryName) => {
         const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
         if (existingCategory) return existingCategory;
-
         const newCategory: Category = { id: generateId(), name: categoryName };
         set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
       },
-
       searchCategories: (searchTerm: string) => {
         if (!searchTerm) return get().categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
         const lowerSearchTerm = searchTerm.toLowerCase();
@@ -541,7 +505,6 @@ export const useInventoryStore = create<InventoryState>()(
         }
         return dailyData;
       },
-
       getTopSellingProductsByRevenue: (limit) => {
         const bills = get().bills;
         const productRevenue: Record<string, { name: string; revenue: number }> = {};
@@ -549,13 +512,10 @@ export const useInventoryStore = create<InventoryState>()(
         bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+              if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const product = get().getProductById(item.productId);
               if (!product) return;
-
-              // For variant products, group revenue by the base product name
               const baseProductName = product.name;
-
               if (!productRevenue[baseProductName]) {
                 productRevenue[baseProductName] = { name: baseProductName, revenue: 0 };
               }
@@ -567,21 +527,16 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, limit);
       },
-
       getRecentExpenseBillsWithPotentialCoverage: (limit: number) => {
         const expenseBills = get().bills.filter(bill => bill.type === 'buy')
           .sort((a, b) => b.timestamp - a.timestamp);
-
         return expenseBills.slice(0, limit).map(bill => {
           const totalCost = bill.totalAmount;
-          const potentialRevenue = bill.items.reduce((acc, item) => {
-            return acc + (item.sellPrice * item.quantity); // Use sellPrice from the BillItem
-          }, 0);
+          const potentialRevenue = bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
           return { ...bill, totalCost, potentialRevenue, coverageStatus };
         });
       },
-
       getExpenseSummaryStats: (): ExpenseSummary => {
         const expenseBills = get().bills.filter(bill => bill.type === 'buy');
         let totalCoveredExpenseValue = 0;
@@ -590,13 +545,9 @@ export const useInventoryStore = create<InventoryState>()(
         let totalOutstandingCostOnUncoveredExpenses = 0;
         let coveredBillCount = 0;
         let uncoveredBillCount = 0;
-
         expenseBills.forEach(bill => {
           const totalCost = bill.totalAmount;
-          const potentialRevenue = bill.items.reduce((acc, item) => {
-            return acc + (item.sellPrice * item.quantity);
-          }, 0);
-
+          const potentialRevenue = bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
           if (potentialRevenue >= totalCost) {
             totalCoveredExpenseValue += totalCost;
             totalPotentialProfitOnCoveredExpenses += (potentialRevenue - totalCost);
@@ -607,7 +558,6 @@ export const useInventoryStore = create<InventoryState>()(
             uncoveredBillCount++;
           }
         });
-
         return {
           totalCoveredExpenseValue,
           totalUncoveredExpenseValue,
@@ -643,113 +593,105 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       _hydrate: () => {
-        console.log("Attempting to hydrate inventory store...");
         try {
           const state = get();
-          let updated = false;
+          let storeUpdated = false;
 
           if (Array.isArray(state.products)) {
             const hydratedProducts = state.products.map(p => {
-              if (!p || typeof p !== 'object' || !p.id || !p.name) {
-                console.warn("Skipping invalid product during hydration:", p);
-                return null;
-              }
-
-              const newP: Partial<Product> & { costPrice?: number, sellPrice?: number, quantityInStock?: number } = { ...p };
-
+              if (!p || typeof p !== 'object' || !p.id || !p.name) return null;
+              const newP: Partial<Product> & { costPrice_old?: number, sellPrice_old?: number, quantityInStock_old?: number } = { ...p };
               newP.variants = Array.isArray(newP.variants) ? newP.variants : [];
               newP.productSKUs = Array.isArray(newP.productSKUs) ? newP.productSKUs : [];
 
-              // Migrate old single price/stock model to default SKU if productSKUs is empty and no variants
               if (newP.productSKUs.length === 0 && (!newP.variants || newP.variants.length === 0)) {
-                if (newP.hasOwnProperty('costPrice') && newP.hasOwnProperty('sellPrice') && newP.hasOwnProperty('quantityInStock')) {
-                  console.log(`Hydrating simple product ${newP.name} to default SKU.`);
+                if (newP.hasOwnProperty('costPrice_old') || newP.hasOwnProperty('sellPrice_old') || newP.hasOwnProperty('quantityInStock_old') ||
+                    newP.hasOwnProperty('costPrice') || newP.hasOwnProperty('sellPrice') || newP.hasOwnProperty('quantityInStock')) {
                   newP.productSKUs.push({
                     id: generateId(),
                     optionValues: {},
-                    costPrice: newP.costPrice ?? 0,
-                    sellPrice: newP.sellPrice ?? 0,
-                    quantityInStock: newP.quantityInStock ?? 0,
-                    skuIdentifier: newP.name
+                    costPrice: (newP as any).costPrice ?? (newP as any).costPrice_old ?? 0,
+                    sellPrice: (newP as any).sellPrice ?? (newP as any).sellPrice_old ?? 0,
+                    quantityInStock: (newP as any).quantityInStock ?? (newP as any).quantityInStock_old ?? 0,
+                    skuIdentifier: getSkuIdentifier(newP.name!, {})
                   });
-                  updated = true;
+                  storeUpdated = true;
                 }
               }
-              // Clean up old top-level fields if they exist
-              if (newP.hasOwnProperty('costPrice')) { delete newP.costPrice; updated = true; }
-              if (newP.hasOwnProperty('sellPrice')) { delete newP.sellPrice; updated = true; }
-              if (newP.hasOwnProperty('quantityInStock')) { delete newP.quantityInStock; updated = true; }
-
+              ['costPrice', 'sellPrice', 'quantityInStock', 'costPrice_old', 'sellPrice_old', 'quantityInStock_old'].forEach(key => {
+                if (newP.hasOwnProperty(key)) delete (newP as any)[key];
+              });
               return newP as Product;
             }).filter(p => p !== null) as Product[];
-
-            if (updated || (state.products.length === 0 && initialProducts.length > 0)) {
-               set({ products: updated ? hydratedProducts : initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})) });
-               updated = true; // Ensure updated is true if we set initial products
+            if (storeUpdated || (state.products.length === 0 && initialProducts.length > 0)) {
+               set({ products: storeUpdated ? hydratedProducts : initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})) });
             }
           } else {
-            console.log("Products array not found, setting initial products.");
             set({ products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})) });
-            updated = true;
+            storeUpdated = true;
           }
 
           if (Array.isArray(state.categories)) {
             if (state.categories.length === 0 && initialCategories.length > 0) {
               set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
-              updated = true;
-            } else {
-              const sortedCategories = [...state.categories].sort((a,b) => a.name.localeCompare(b.name));
-              if (JSON.stringify(sortedCategories) !== JSON.stringify(state.categories)) {
-                set({ categories: sortedCategories });
-                updated = true;
-              }
+              storeUpdated = true;
             }
           } else {
             set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
-            updated = true;
+            storeUpdated = true;
           }
-
           DEFAULT_CATEGORIES.forEach(catName => {
             if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
-              get().addCategory(catName);
-              updated = true;
+              get().addCategory(catName); storeUpdated = true;
             }
           });
 
           if (!state.userProfile || typeof state.userProfile !== 'object') {
             set({ userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY }});
-            console.log("UserProfile hydrated with default values because it was missing or invalid.");
-            updated = true;
+            storeUpdated = true;
           } else {
             let profileChanged = false;
             const currentSubId = state.userProfile.activeSubscriptionId;
             const isValidSubId = SUBSCRIPTION_PLANS.some(p => p.id === currentSubId);
-
             if (!currentSubId || !isValidSubId) {
               state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
-              console.log(`UserProfile activeSubscriptionId was invalid ('${currentSubId}'), defaulted to ${SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY}.`);
               profileChanged = true;
             }
-            if (!state.userProfile.companyName) {
+            if (!state.userProfile.companyName || state.userProfile.companyName.trim() === '') {
               state.userProfile.companyName = DEFAULT_COMPANY_NAME;
               profileChanged = true;
             }
             if (profileChanged) {
               set({ userProfile: { ...state.userProfile } });
-              updated = true;
+              storeUpdated = true;
             }
           }
 
-          if (!Array.isArray(state.staffs)) { set({ staffs: [] }); updated = true; }
-          if (!Array.isArray(state.stores)) { set({ stores: [] }); updated = true; }
+          if (!Array.isArray(state.staffs)) { set({ staffs: [] }); storeUpdated = true; }
+          if (!Array.isArray(state.stores)) { set({ stores: [] }); storeUpdated = true; }
           if (typeof state.messagesByStore !== 'object' || state.messagesByStore === null) {
-            set({ messagesByStore: {} });
-            updated = true;
+            set({ messagesByStore: {} }); storeUpdated = true;
           }
 
+          // Ensure existing bills have staff/store names if IDs are present
+          if (Array.isArray(state.bills)) {
+            const updatedBills = state.bills.map(bill => {
+              let billChanged = false;
+              if (bill.billedByStaffId && !bill.billedByStaffName) {
+                const staff = get().getStaffById(bill.billedByStaffId);
+                if (staff) { bill.billedByStaffName = staff.name; billChanged = true;}
+              }
+              if (bill.storeId && !bill.storeName) {
+                const store = get().getStoreById(bill.storeId);
+                if (store) { bill.storeName = store.name; billChanged = true; }
+              }
+              return billChanged ? { ...bill } : bill;
+            });
+            if (storeUpdated || updatedBills.some((b, i) => b !== state.bills[i])) {
+               set({ bills: updatedBills });
+            }
+          }
 
-          if (updated) console.log("Inventory store hydrated/updated with new structure and defaults.");
-          else console.log("Inventory store hydration complete, no structural changes needed from localStorage data.");
 
         } catch (error) {
           console.error("Critical error during inventory store hydration:", error);
@@ -774,9 +716,3 @@ export const useInventoryStore = create<InventoryState>()(
     }
   )
 );
-
-if (typeof window !== 'undefined') {
-  // This ensures _hydrate is called if onRehydrateStorage hasn't fired yet (e.g., for initial load)
-  // or if persist middleware has rehydrated but _hydrate needs to run its logic
-  // useInventoryStore.getState()._hydrate();
-}

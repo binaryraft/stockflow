@@ -48,8 +48,7 @@ interface BillingFormProps {
   allowedModes?: BillMode[];
   initialModeProp?: BillMode | null;
   isAdminContext?: boolean;
-  identifiedStaffProp?: Staff | null; // New prop for proactively identified staff
-  onEmployeeIdentifiedForBill?: (staff: Staff) => void; // Callback when employee identified for bill
+  onEmployeeIdentifiedForBill?: (staff: Staff) => void; 
 }
 
 export function BillingForm({
@@ -57,7 +56,6 @@ export function BillingForm({
   allowedModes,
   initialModeProp,
   isAdminContext = false,
-  identifiedStaffProp,
   onEmployeeIdentifiedForBill,
 }: BillingFormProps) {
   const router = useRouter();
@@ -67,28 +65,59 @@ export function BillingForm({
   const allStores = getAllStores();
 
   const determineMode = useCallback((): BillMode => {
-    const urlMode = searchParams.get('mode') as BillMode | null;
+    const urlMode = initialModeProp || searchParams.get('mode') as BillMode | null;
 
     if (urlMode && ['sell', 'buy', 'return'].includes(urlMode)) {
         if (!allowedModes || (allowedModes && allowedModes.includes(urlMode))) {
             return urlMode;
         }
     }
-    if (initialModeProp && ['sell', 'buy', 'return'].includes(initialModeProp)) {
-      if (!allowedModes || (allowedModes && allowedModes.includes(initialModeProp))) {
-        return initialModeProp;
-      }
-    }
     if (allowedModes && allowedModes.length > 0) {
       return allowedModes[0];
     }
     return 'sell';
   }, [initialModeProp, allowedModes, searchParams]);
-
+  
   const [mode, setMode] = useState<BillMode>(determineMode());
   const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(
     isAdminContext && allStores.length === 1 ? allStores[0].id : undefined
   );
+
+  const resetFormFields = useCallback((focusProductName = true) => {
+    setProductNameQuery('');
+    setQuantity(1);
+    setCostPrice('');
+    setSellPrice('');
+    setCurrentSkuStock(null);
+    setReturnItemIsDefective(false);
+    setCurrentProductForSelection(null);
+    setSelectedVariantOptions({});
+    setVariantDropdownOpenState({});
+    setProductNotFoundHint('');
+    if (focusProductName) {
+      setTimeout(() => productNameInputRef.current?.focus(), 0);
+    }
+  }, []);
+
+  const resetFullForm = useCallback(() => {
+    setCurrentBillItems([]);
+    setCustomerVendorName('');
+    setCustomerPhone('');
+    setNotes('');
+    setIsPaid(true);
+    setServiceDescription('');
+    setServiceAmount('');
+    resetFormFields(true);
+  }, [resetFormFields]);
+
+
+  useEffect(() => {
+    const newDeterminedMode = determineMode();
+    if (newDeterminedMode !== mode) {
+      setMode(newDeterminedMode);
+      resetFullForm();
+    }
+  }, [determineMode, mode, resetFullForm]);
 
 
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
@@ -129,49 +158,12 @@ export function BillingForm({
   const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
   const serviceAmountInputRef = useRef<HTMLInputElement>(null);
 
-  const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false); // For bill-save verification
+  const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false); 
   const [pendingBillPayload, setPendingBillPayload] = useState<PendingBillPayload | null>(null);
-
-
-  const resetFormFields = useCallback((focusProductName = true) => {
-    setProductNameQuery('');
-    setQuantity(1);
-    setCostPrice('');
-    setSellPrice('');
-    setCurrentSkuStock(null);
-    setReturnItemIsDefective(false);
-    setCurrentProductForSelection(null);
-    setSelectedVariantOptions({});
-    setVariantDropdownOpenState({});
-    setProductNotFoundHint('');
-    if (focusProductName) {
-      setTimeout(() => productNameInputRef.current?.focus(), 0);
-    }
-  }, []);
-
-  const resetFullForm = useCallback(() => {
-    setCurrentBillItems([]);
-    setCustomerVendorName('');
-    setCustomerPhone('');
-    setNotes('');
-    setIsPaid(true);
-    setServiceDescription('');
-    setServiceAmount('');
-    resetFormFields(true);
-  }, [resetFormFields]);
-
-  useEffect(() => {
-    const newDeterminedMode = determineMode();
-    if (newDeterminedMode !== mode) {
-      setMode(newDeterminedMode);
-      resetFullForm();
-    }
-  }, [determineMode, mode, resetFullForm]);
-
 
   useEffect(() => {
     setTimeout(() => productNameInputRef.current?.focus(), 0);
-  }, []);
+  }, [mode]); // Focus on mode change
 
   const handleProductSelect = (product: Product) => {
     setProductNameQuery(product.name);
@@ -185,14 +177,12 @@ export function BillingForm({
         if (defaultSku) {
             setCostPrice(mode === 'buy' ? (defaultSku.costPrice || '') : defaultSku.costPrice);
             setSellPrice(mode === 'buy' ? (defaultSku.sellPrice || '') : defaultSku.sellPrice);
-            if(product.trackQuantity || !product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock); // Also show stock for non-tracked if needed
+            if(product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock);
         } else { setCostPrice(''); setSellPrice(''); }
-
         setTimeout(() => {
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
         }, 50);
-
     } else {
         setCostPrice('');
         setSellPrice('');
@@ -237,13 +227,12 @@ export function BillingForm({
           setSellPrice('');
           setCurrentSkuStock(0);
         }
-
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
         if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
              setTimeout(() => {
                 quantityInputRef.current?.focus();
                 quantityInputRef.current?.select();
-            }, 100); // Increased timeout slightly for stability
+            }, 100); 
         }
       }
     }
@@ -291,7 +280,7 @@ export function BillingForm({
     );
 
     if (mode === 'sell' && product.trackQuantity) {
-      const stockToCheck = targetSku ? targetSku.quantityInStock : 0;
+      const stockToCheck = targetSku ? targetSku.quantityInStock : (product.productSKUs[0]?.quantityInStock ?? 0);
       if (stockToCheck < (typeof quantity === 'string' ? parseInt(quantity) : quantity)) {
         toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck} of ${product.name} (selected variant) available.` });
         return;
@@ -304,15 +293,10 @@ export function BillingForm({
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
       itemSellPrice = parseFloat(sellPrice.toString()) || 0;
-    } else { // Sell or Return mode
-      itemCostPrice = targetSku?.costPrice ?? (product.productSKUs[0]?.costPrice ?? 0); // Fallback to first SKU if target not found
+    } else { 
+      itemCostPrice = targetSku?.costPrice ?? (product.productSKUs[0]?.costPrice ?? 0); 
       itemSellPrice = targetSku?.sellPrice ?? (product.productSKUs[0]?.sellPrice ?? 0);
-      if (product.trackQuantity === false) { // For non-tracked items, sell price is what's set on the main default SKU
-         const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
-         itemSellPrice = defaultSku?.sellPrice ?? 0;
-      }
     }
-
 
     const newItem: BillItem = {
       id: uuidv4(),
@@ -481,11 +465,7 @@ export function BillingForm({
     setPendingBillPayload(currentBillPayload);
 
     if (!isAdminContext && storeIdFromProp) {
-        if (identifiedStaffProp?.id) { // If an employee is already identified via header
-            proceedWithSave(identifiedStaffProp.id);
-        } else { // Otherwise, prompt for employee passkey for this transaction
-            setIsVerifyEmployeeDialogOpen(true);
-        }
+        setIsVerifyEmployeeDialogOpen(true); // Always prompt for employee in store portal
     } else {
       proceedWithSave('admin_self_billed'); // Placeholder for admin
     }
@@ -493,9 +473,9 @@ export function BillingForm({
 
   const handleEmployeeVerifiedForBill = (staff: Staff) => {
     setIsVerifyEmployeeDialogOpen(false);
-    if (pendingBillPayload && storeIdFromProp) {
+    if (pendingBillPayload && (storeIdFromProp || isAdminContext)) { // Ensure payload exists
       proceedWithSave(staff.id);
-      onEmployeeIdentifiedForBill?.(staff); // Notify parent page if an employee was identified
+      onEmployeeIdentifiedForBill?.(staff); 
     } else {
         toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
     }
@@ -511,8 +491,13 @@ export function BillingForm({
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParams.get('mode');
       const basePath = '/admin/billing';
-       router.push(basePath);
+       if (currentQueryModeInUrl) {
+         router.push(`${basePath}?mode=${currentQueryModeInUrl}`); // Maintain current mode after save for admin
+       } else {
+         router.push(basePath); // Default to history view
+       }
     }
+    // For store portal, no automatic navigation away from billing form after save.
   };
 
   const onNewProductAddedFromDialog = (product: Product) => {
@@ -572,12 +557,7 @@ export function BillingForm({
     return: { icon: RotateCcw, color: "data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950", label: "Return" },
   };
 
-  useEffect(() => {
-    setTimeout(() => {
-      productNameInputRef.current?.focus();
-    }, 0);
-  }, [mode]);
-
+  
   return (
     <div className="flex flex-col gap-6">
       <BillSaveAnimation
@@ -602,12 +582,12 @@ export function BillingForm({
         initialSellPriceForDialog={newProductDialogInitialValues.sellPrice}
         onProductAdd={onNewProductAddedFromDialog}
       />
-      {storeIdFromProp && (
+      {(storeIdFromProp && !isAdminContext) && (
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
               if(!open && isVerifyEmployeeDialogOpen) {
-                  setPendingBillPayload(null);
+                  setPendingBillPayload(null); // Clear pending data if dialog closed without auth
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -701,11 +681,11 @@ export function BillingForm({
                     </Tooltip>
                   )}
                 </div>
-                {currentProductForSelection && <span className="text-xs text-muted-foreground ml-1">Selected: {currentProductForSelection.name} {currentSkuStock !== null ? `(Stock: ${currentSkuStock})` : ''}</span>}
+                {currentProductForSelection && <span className="text-xs text-muted-foreground ml-1">Selected: {currentProductForSelection.name} {currentProductForSelection.trackQuantity && currentSkuStock !== null ? `(Stock: ${currentSkuStock})` : ''}</span>}
                 {productNotFoundHint && productNameQuery === productNotFoundHint && (
                     <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
                         <Info size={16} className="text-accent shrink-0" />
-                        Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter to add it.
+                        Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter to add it.
                     </div>
                 )}
               </div>
@@ -723,7 +703,7 @@ export function BillingForm({
                   min="1"
                 />
               </div>
-              {mode === 'buy' && (
+              {mode === 'buy' ? (
                 <>
                   <div className="space-y-1.5 w-full md:w-32">
                     <Label htmlFor="costPrice">Cost Price/Unit</Label>
@@ -751,11 +731,15 @@ export function BillingForm({
                       step="0.01" min="0"
                     />
                   </div>
+                  <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                     <PlusCircle className="mr-2 h-4 w-4" /> Add
+                  </Button>
                 </>
+              ) : ( // Sell or Return mode
+                 <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                 </Button>
               )}
-              <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Item
-              </Button>
             </div>
 
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
@@ -782,8 +766,7 @@ export function BillingForm({
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
                                 setTimeout(() => {
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                  variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                }, 50);
+                                }, 50); // No direct focus here, useEffect will handle it based on open state
                             } else {
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
@@ -801,7 +784,7 @@ export function BillingForm({
                                 e.preventDefault();
                                 setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
                             } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
-                                // If dropdown is open, let Radix handle selection
+                                // Let Radix handle selection
                             }
                           }}
                         >
