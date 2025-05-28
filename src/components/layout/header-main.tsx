@@ -3,7 +3,7 @@
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon, Wifi, WifiOff, Database } from 'lucide-react';
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'; // Removed Wifi, WifiOff, Database
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { Package2 } from 'lucide-react';
@@ -18,21 +18,18 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { useToast } from '@/hooks/use-toast';
-import { Switch } from '@/components/ui/switch'; // For the toggle
-import { Label } from '@/components/ui/label';   // For the label
-import { cn } from '@/lib/utils';
+// Removed: import { useInventoryStore } from '@/hooks/use-inventory-store';
+// Removed: import { useToast } from '@/hooks/use-toast';
+// Removed: import { Switch } from '@/components/ui/switch';
+// Removed: import { Label } from '@/components/ui/label';
+// Removed: import { cn } from '@/lib/utils';
 
 export function HeaderMain() {
   const router = useRouter();
-  const { toast } = useToast();
+  // const { toast } = useToast(); // Removed toast as data mode toggle is removed
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
-  const { userProfile, setDataMode } = useInventoryStore((state) => ({
-    userProfile: state.userProfile,
-    setDataMode: state.setDataMode,
-  }));
+  // Removed userProfile and setDataMode from useInventoryStore as data mode toggle is removed
 
   useEffect(() => {
     setHasMounted(true);
@@ -48,17 +45,10 @@ export function HeaderMain() {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/');
+    router.push('/'); // Redirect to main landing page
   };
 
-  const handleDataModeToggle = (isGlobal: boolean) => {
-    const newMode = isGlobal ? 'global' : 'local';
-    setDataMode(newMode);
-    toast({
-      title: `Switched to ${newMode === 'global' ? 'Global' : 'Local'} Mode`,
-      description: newMode === 'global' ? "Data sync is simulated." : "Using local browser storage.",
-    });
-  };
+  // Removed handleDataModeToggle function
 
   if (!hasMounted) {
     return (
@@ -72,7 +62,7 @@ export function HeaderMain() {
     );
   }
 
-  const currentDataMode = userProfile?.dataMode || 'local';
+  // Removed currentDataMode variable
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -109,20 +99,7 @@ export function HeaderMain() {
         </div>
 
       <div className="flex w-full items-center justify-end gap-3 md:ml-auto">
-        <div className="flex items-center space-x-2">
-          <Switch
-            id="data-mode-toggle"
-            checked={currentDataMode === 'global'}
-            onCheckedChange={handleDataModeToggle}
-            aria-label={`Switch to ${currentDataMode === 'local' ? 'Global' : 'Local'} Mode`}
-          />
-          <Label htmlFor="data-mode-toggle" className="text-xs flex items-center gap-1.5 cursor-pointer">
-            {currentDataMode === 'global' ? <Wifi size={14} className="text-primary" /> : <Database size={14} className="text-secondary"/>}
-            <span className={cn(currentDataMode === 'global' ? "text-primary" : "text-secondary")}>
-              {currentDataMode === 'global' ? 'Global' : 'Local'}
-            </span>
-          </Label>
-        </div>
+        {/* Data Mode Toggle UI Removed */}
         <ThemeToggle />
         {isAdminLoggedIn ? (
           <DropdownMenu>
@@ -156,7 +133,7 @@ export function HeaderMain() {
           </DropdownMenu>
         ) : (
           <Button asChild variant="outline" size="sm">
-            <Link href="/">Admin Login</Link>
+            <Link href="/">Admin Login (from Landing)</Link> {/* This button might be less relevant if AdminLayout handles redirect */}
           </Button>
         )}
       </div>

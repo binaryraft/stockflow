@@ -101,14 +101,14 @@ export interface SubscriptionPlan {
 export interface UserProfile {
   companyName: string;
   activeSubscriptionId: string;
-  dataMode: 'local' | 'global'; // Added dataMode
+  // dataMode: 'local' | 'global'; // Removed dataMode
 }
 
 export interface ChatMessage {
   id: string;
   storeId: string;
-  senderId: 'admin' | string; // 'admin' or staffId/storeId
-  senderName: string; // "Admin" or staff's/store's name
+  senderId: 'admin' | string; // 'admin' or staffId
+  senderName: string; // "Admin" or staff's name
   text: string;
   timestamp: number;
 }

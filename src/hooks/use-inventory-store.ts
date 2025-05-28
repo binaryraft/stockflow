@@ -72,7 +72,7 @@ interface InventoryState {
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
-  setDataMode: (mode: 'local' | 'global') => void; // New action
+  // setDataMode: (mode: 'local' | 'global') => void; // Removed setDataMode
 
   getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
@@ -121,10 +121,9 @@ const initialProducts: Product[] = [
 
 const initialCategories: Category[] = DEFAULT_CATEGORIES.map(name => ({ id: generateId(), name }));
 
-const defaultUserProfile: UserProfile = {
+const defaultUserProfile: Omit<UserProfile, 'dataMode'> = { // dataMode removed
   companyName: DEFAULT_COMPANY_NAME,
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN,
-  dataMode: 'local', // Default data mode
 };
 
 
@@ -136,7 +135,7 @@ export const useInventoryStore = create<InventoryState>()(
       categories: initialCategories,
       staffs: [],
       stores: [],
-      userProfile: defaultUserProfile,
+      userProfile: defaultUserProfile as UserProfile, // Cast as UserProfile
       messagesByStore: {},
 
       addProduct: (productData) => {
@@ -240,13 +239,15 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       deleteProduct: (productId: string) => {
-        set((state) => ({
-          products: state.products.filter((p) => p.id !== productId),
-          bills: state.bills.map(bill => ({
+        set((state) => {
+          const updatedProducts = state.products.filter((p) => p.id !== productId);
+          const updatedBills = state.bills.map(bill => ({
             ...bill,
             items: bill.items.filter(item => item.productId !== productId)
-          })).filter(bill => bill.items.length > 0)
-        }));
+          })).filter(bill => bill.items.length > 0); // Remove bills if they become empty
+
+          return { products: updatedProducts, bills: updatedBills };
+        });
       },
 
       findOrCreateProductSKU: (productId, optionValues, costPrice, sellPrice, quantityChange, isPurchase) => {
@@ -360,8 +361,8 @@ export const useInventoryStore = create<InventoryState>()(
               itemSellPrice = targetSKU.sellPrice;
             }
           } else if (itemData.productId.startsWith('SERVICE_ITEM_')) {
-            itemCostPrice = itemData.costPrice; // For services, use cost from billData
-            itemSellPrice = itemData.sellPrice; // For services, use sell price from billData
+            itemCostPrice = itemData.costPrice;
+            itemSellPrice = itemData.sellPrice;
           }
 
           newBillItems.push({
@@ -385,7 +386,7 @@ export const useInventoryStore = create<InventoryState>()(
         const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
 
         const newBill: Bill = {
-          id: format(currentDate, 'ddMMyyHHmmss'),
+          id: format(currentDate, 'ddMMyyHHmmssSSS'), // Added SSS for milliseconds to ensure uniqueness
           type: billData.type,
           date: currentDate.toISOString(),
           timestamp: currentDate.getTime(),
@@ -508,11 +509,6 @@ export const useInventoryStore = create<InventoryState>()(
         if (!plan) return false;
         return get().staffs.length < plan.maxEmployees;
       },
-      setDataMode: (mode: 'local' | 'global') => { // New action to set dataMode
-        set((state) => ({
-          userProfile: { ...state.userProfile, dataMode: mode }
-        }));
-      },
 
       getDailySalesAndExpenses: (days) => {
         const bills = get().bills;
@@ -634,31 +630,27 @@ export const useInventoryStore = create<InventoryState>()(
           const state = get();
           let storeUpdated = false;
 
-          const initialSafeState: Partial<InventoryState> = {
+          const defaultStateSnapshot = {
             products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
             bills: [],
             categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
             staffs: [],
             stores: [],
-            userProfile: {...defaultUserProfile},
+            userProfile: {...defaultUserProfile } as UserProfile,
             messagesByStore: {}
           };
 
           // Ensure top-level properties exist and are of the correct type
-          (Object.keys(initialSafeState) as Array<keyof InventoryState>).forEach(key => {
-            if (typeof state[key] === 'undefined' || state[key] === null || typeof state[key] !== typeof initialSafeState[key]) {
-              (state as any)[key] = initialSafeState[key];
+          (Object.keys(defaultStateSnapshot) as Array<keyof InventoryState>).forEach(key => {
+            if (typeof state[key] === 'undefined' || state[key] === null || (Array.isArray(defaultStateSnapshot[key]) && !Array.isArray(state[key]))) {
+              (state as any)[key] = (defaultStateSnapshot as any)[key];
               storeUpdated = true;
             }
-            if (Array.isArray(initialSafeState[key]) && !Array.isArray(state[key])) {
-               (state as any)[key] = initialSafeState[key];
-               storeUpdated = true;
-            }
           });
-
+          
           // Hydrate userProfile carefully
           if (!state.userProfile || typeof state.userProfile !== 'object') {
-            state.userProfile = {...defaultUserProfile};
+            state.userProfile = {...defaultUserProfile} as UserProfile;
             storeUpdated = true;
           } else {
             if (!state.userProfile.companyName || typeof state.userProfile.companyName !== 'string' || state.userProfile.companyName.trim() === '') {
@@ -671,37 +663,42 @@ export const useInventoryStore = create<InventoryState>()(
               state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
               storeUpdated = true;
             }
-            if (!state.userProfile.dataMode || !['local', 'global'].includes(state.userProfile.dataMode)) {
-              state.userProfile.dataMode = 'local';
+             // Remove dataMode if it exists from older versions
+            if ((state.userProfile as any).dataMode) {
+              delete (state.userProfile as any).dataMode;
               storeUpdated = true;
             }
           }
 
-          // Products migration/validation
           if (Array.isArray(state.products)) {
-            state.products = state.products.map(p => {
-              if (!p || typeof p !== 'object' || !p.id || !p.name) return null;
-              const migratedProduct: Partial<Product> & { costPrice?: number; sellPrice?: number; quantityInStock?: number } = { ...p };
-              migratedProduct.variants = Array.isArray(migratedProduct.variants) ? migratedProduct.variants : [];
-              migratedProduct.productSKUs = Array.isArray(migratedProduct.productSKUs) ? migratedProduct.productSKUs : [];
+            state.products = state.products.map(p_any => {
+              if (!p_any || typeof p_any !== 'object' || !p_any.id || !p_any.name) {
+                storeUpdated = true;
+                return null;
+              }
+              const p = p_any as Product & {costPrice?: number, sellPrice?: number, quantityInStock?:number}; // Cast for old fields
 
-              if (migratedProduct.productSKUs.length === 0 && (!migratedProduct.variants || migratedProduct.variants.length === 0)) {
-                if (migratedProduct.hasOwnProperty('costPrice') || migratedProduct.hasOwnProperty('sellPrice') || migratedProduct.hasOwnProperty('quantityInStock')) {
-                  migratedProduct.productSKUs.push({
+              p.variants = Array.isArray(p.variants) ? p.variants : [];
+              p.productSKUs = Array.isArray(p.productSKUs) ? p.productSKUs : [];
+
+              if (p.productSKUs.length === 0 && (!p.variants || p.variants.length === 0)) {
+                if (p.hasOwnProperty('costPrice') || p.hasOwnProperty('sellPrice') || p.hasOwnProperty('quantityInStock')) {
+                  p.productSKUs.push({
                       id: generateId(),
                       optionValues: {},
-                      costPrice: migratedProduct.costPrice ?? 0,
-                      sellPrice: migratedProduct.sellPrice ?? 0,
-                      quantityInStock: migratedProduct.quantityInStock ?? 0,
-                      skuIdentifier: getSkuIdentifier(migratedProduct.name, {})
+                      costPrice: p.costPrice ?? 0,
+                      sellPrice: p.sellPrice ?? 0,
+                      quantityInStock: p.quantityInStock ?? 0,
+                      skuIdentifier: getSkuIdentifier(p.name, {})
                   });
                   storeUpdated = true;
                 }
               }
-              delete migratedProduct.costPrice;
-              delete migratedProduct.sellPrice;
-              delete migratedProduct.quantityInStock;
-              return migratedProduct as Product;
+              // Clean up old top-level fields
+              if (p.hasOwnProperty('costPrice')) { delete p.costPrice; storeUpdated = true; }
+              if (p.hasOwnProperty('sellPrice')) { delete p.sellPrice; storeUpdated = true; }
+              if (p.hasOwnProperty('quantityInStock')) { delete p.quantityInStock; storeUpdated = true; }
+              return p as Product;
             }).filter(p => p !== null) as Product[];
           } else {
             state.products = initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []}));
@@ -725,7 +722,7 @@ export const useInventoryStore = create<InventoryState>()(
             categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
             staffs: [],
             stores: [],
-            userProfile: {...defaultUserProfile},
+            userProfile: {...defaultUserProfile} as UserProfile,
             messagesByStore: {}
           });
         }

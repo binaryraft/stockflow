@@ -11,9 +11,8 @@ interface BillItemRowProps {
   item: BillItem;
   mode: BillMode;
   onQuantityChange: (itemId: string, newQuantity: number) => void;
-  onPriceChange?: (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => void; // For buy mode
+  onPriceChange?: (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => void;
   onRemoveItem: (itemId: string) => void;
-  isFirstItem?: boolean; // To manage focus for first item on new add
   inputRefs?: {
     quantity: React.RefObject<HTMLInputElement>;
     costPrice?: React.RefObject<HTMLInputElement>;
@@ -22,11 +21,11 @@ interface BillItemRowProps {
   onEnterPress?: (field: 'quantity' | 'costPrice' | 'sellPrice' | 'nextItem') => void;
 }
 
-export function BillItemRow({ 
-  item, 
-  mode, 
-  onQuantityChange, 
-  onPriceChange, 
+export function BillItemRow({
+  item,
+  mode,
+  onQuantityChange,
+  onPriceChange,
   onRemoveItem,
   inputRefs,
   onEnterPress
@@ -38,9 +37,14 @@ export function BillItemRow({
       onEnterPress?.(field);
     }
   };
-  
+
+  const subtotal = mode === 'buy' ? item.quantity * item.costPrice : item.quantity * item.sellPrice;
+
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2 py-2 border-b border-dashed"> 
+    <div className={cn(
+      "grid items-center gap-2 py-2 border-b border-dashed",
+      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]"
+    )}>
       <div>
         <span className="truncate text-sm font-medium">{item.productName}</span>
         {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
@@ -51,7 +55,7 @@ export function BillItemRow({
           </div>
         )}
       </div>
-      
+
       <Input
         ref={inputRefs?.quantity}
         type="number"
@@ -74,6 +78,9 @@ export function BillItemRow({
             step="0.01"
             min="0"
           />
+          <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">
+            ₹{subtotal.toFixed(2)}
+          </span>
           <Input
             ref={inputRefs?.sellPrice}
             type="number"
@@ -87,11 +94,15 @@ export function BillItemRow({
         </>
       ) : ( // Sell or Return mode
         <>
-          <span className="text-sm text-muted-foreground text-right flex items-center justify-end h-8 pr-2">₹{item.costPrice.toFixed(2)}</span>
-          <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">₹{item.sellPrice.toFixed(2)}</span>
+          <span className="text-sm text-muted-foreground text-right flex items-center justify-end h-8 pr-2">
+            ₹{item.sellPrice.toFixed(2)}
+          </span>
+          <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">
+            ₹{subtotal.toFixed(2)}
+          </span>
         </>
       )}
-      
+
       <Button variant="ghost" size="icon" onClick={() => onRemoveItem(item.id)} className="h-8 w-8">
         <Trash2 className="h-4 w-4 text-destructive" />
       </Button>
@@ -101,18 +112,25 @@ export function BillItemRow({
 
 export function BillItemHeader({ mode }: { mode: BillMode }) {
   return (
-    <div className="grid grid-cols-[1fr_80px_100px_100px_40px] items-center gap-2 pb-2 border-b">
+    <div className={cn(
+      "grid items-center gap-2 pb-2 border-b",
+      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]"
+    )}>
       <span className="text-xs font-semibold text-muted-foreground">Product</span>
       <span className="text-xs font-semibold text-muted-foreground text-right">Qty</span>
-      <span className={cn("text-xs font-semibold text-muted-foreground text-right", mode !== 'buy' && "pr-2")}>
-        {mode === 'buy' ? 'Cost/Unit' : 'Cost/Unit'}
-      </span>
-      <span className="text-xs font-semibold text-muted-foreground text-right pr-2">
-        {mode === 'buy' ? 'Sell/Unit' : 'Price/Unit'}
-      </span>
+      {mode === 'buy' ? (
+        <>
+          <span className="text-xs font-semibold text-muted-foreground text-right">Cost/Unit</span>
+          <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Subtotal</span>
+          <span className="text-xs font-semibold text-muted-foreground text-right">Sell Price/Unit</span>
+        </>
+      ) : (
+        <>
+          <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Price/Unit</span>
+          <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Subtotal</span>
+        </>
+      )}
       <span className="text-xs font-semibold text-muted-foreground"></span> {/* For remove button */}
     </div>
   );
 }
-
-    
