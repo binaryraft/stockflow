@@ -76,7 +76,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       e.preventDefault();
       appendOption({ value: '' });
       setTimeout(() => {
-        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`); // Focus newly added field
+        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`); 
       }, 0);
     }
   };
@@ -209,7 +209,6 @@ export function NewProductDialog({
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
-        // For editing, productSKUs provide the source of truth for non-variant products
         const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0) 
                             ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) 
                             : null;
@@ -218,7 +217,6 @@ export function NewProductDialog({
           description: editingProduct.description || '',
           category: editingProduct.category || '',
           trackQuantity: editingProduct.trackQuantity,
-          // initialStock, costPrice, sellPrice are for the default SKU if no variants
           initialStock: defaultSku ? defaultSku.quantityInStock : 0, 
           costPrice: defaultSku ? defaultSku.costPrice : 0,
           sellPrice: defaultSku ? defaultSku.sellPrice : 0,
@@ -229,7 +227,7 @@ export function NewProductDialog({
             options: v.options.map(o => ({ value: o.value }))
           })) || [],
         });
-      } else { // Adding new product
+      } else { 
         const shouldTrack = initialQuantityForDialog !== undefined; 
         formReset({
           name: initialProductName || '',
@@ -267,15 +265,12 @@ export function NewProductDialog({
         trackQuantity: data.trackQuantity,
         sku: data.sku,
         expiryDate: data.expiryDate,
-        variants: data.variants, // This is ProductVariantFormSchema[]
+        variants: data.variants, 
     };
     
     let finalPayload: any;
 
     if (editingProduct) {
-      // When editing, we pass the base data and variants.
-      // The store's updateProduct logic will handle SKUs based on these variants.
-      // If it's a non-variant product, we also pass the updated price/stock for its default SKU.
       const defaultSkuUpdates = (!data.variants || data.variants.length === 0) 
         ? { initialStock: data.initialStock, costPrice: data.costPrice, sellPrice: data.sellPrice } 
         : {};
@@ -283,14 +278,14 @@ export function NewProductDialog({
       finalPayload = { ...productPayloadBase, ...defaultSkuUpdates };
       updateProduct(editingProduct.id, finalPayload as Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      const updatedProduct = { ...editingProduct, ...finalPayload } as Product; // This is a simplified representation for callback
+      const updatedProduct = { ...editingProduct, ...finalPayload } as Product; 
       onProductAdd?.(updatedProduct);
-    } else { // Adding new product
+    } else { 
         finalPayload = {
           ...productPayloadBase,
-          initialStock: (!data.variants || data.variants.length === 0) ? data.initialStock : undefined, // only for non-variant
-          costPrice: (!data.variants || data.variants.length === 0) ? data.costPrice : undefined,       // only for non-variant
-          sellPrice: (!data.variants || data.variants.length === 0) ? data.sellPrice : undefined,       // only for non-variant
+          initialStock: (!data.variants || data.variants.length === 0) ? data.initialStock : undefined,
+          costPrice: (!data.variants || data.variants.length === 0) ? data.costPrice : undefined,
+          sellPrice: (!data.variants || data.variants.length === 0) ? data.sellPrice : undefined,
         };
       const addedProduct = addProduct(finalPayload as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
       toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
@@ -357,47 +352,46 @@ export function NewProductDialog({
               <Label htmlFor="trackQuantity" className="font-normal">Track Quantity</Label>
             </div>
 
-            {trackQuantityValue && (
+            {/* Fields for non-variant products or default values */}
+            {!hasVariants && (
               <>
-                {!hasVariants && ( // Only show these if NOT a variant product
-                  <>
+                {trackQuantityValue && (
                   <div>
                     <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
                     <Input id="initialStock" type="number" {...register("initialStock")} />
                     {formState.errors.initialStock && <p className="text-sm text-destructive mt-1">{formState.errors.initialStock.message}</p>}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="costPrice">Cost Price*</Label>
-                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
-                      {formState.errors.costPrice && <p className="text-sm text-destructive mt-1">{formState.errors.costPrice.message}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="sellPrice">Sell Price*</Label>
-                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
-                      {formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{formState.errors.sellPrice.message}</p>}
-                    </div>
-                  </div>
-                  </>
                 )}
-                <div>
-                  <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional, for base product)</span></Label>
-                  <Input id="sku" {...register("sku")} />
-                </div>
-                <div>
-                  <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                  <Input id="expiryDate" type="date" {...register("expiryDate")} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="costPrice">Cost Price*</Label>
+                    <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
+                    {formState.errors.costPrice && <p className="text-sm text-destructive mt-1">{formState.errors.costPrice.message}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="sellPrice">Sell Price*</Label>
+                    <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
+                    {formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{formState.errors.sellPrice.message}</p>}
+                  </div>
                 </div>
               </>
             )}
+
+            {/* SKU and Expiry Date - Always visible */}
+            <div>
+              <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+              <Input id="sku" {...register("sku")} />
+            </div>
+            <div>
+              <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+              <Input id="expiryDate" type="date" {...register("expiryDate")} />
+            </div>
             
-            {/* Hide top-level price/stock if variants exist, as these are SKU specific */}
-            {hasVariants && trackQuantityValue && (
+            {hasVariants && (
                 <p className="text-xs text-muted-foreground italic">
                     For products with variants, stock and pricing are managed per specific combination (SKU) and typically set during purchase/expense bills.
                 </p>
             )}
-
 
             <Separator/>
             <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
@@ -427,7 +421,6 @@ export function NewProductDialog({
             )}
             {formState.errors.variants && typeof formState.errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{formState.errors.variants.message}</p>}
 
-
             <DialogFooter className="pt-4">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
@@ -440,3 +433,5 @@ export function NewProductDialog({
     </Dialog>
   );
 }
+
+    
