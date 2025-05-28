@@ -10,12 +10,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput } from './product-search-input';
-// import { NewProductDialog } from './new-product-dialog'; // Removed
 import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -49,6 +48,8 @@ interface BillingFormProps {
   allowedModes?: BillMode[];
   initialModeProp?: BillMode | null;
   isAdminContext?: boolean;
+  // identifiedStaffProp?: Staff | null; // Removed as per new flow
+  // onEmployeeIdentifiedForBill?: (staff: Staff) => void; // Removed as per new flow
 }
 
 export function BillingForm({
@@ -106,7 +107,7 @@ export function BillingForm({
     setIsPaid(true);
     setServiceDescription('');
     setServiceAmount('');
-    resetFormFields(true); // This now includes resetting productNotFoundHint
+    resetFormFields(true); 
   }, [resetFormFields]);
 
 
@@ -159,45 +160,46 @@ export function BillingForm({
 
   useEffect(() => {
     setTimeout(() => productNameInputRef.current?.focus(), 0);
-  }, [mode]); // Focus product name on mode change
+  }, [mode]); 
 
   const handleProductSelect = (product: Product) => {
     setProductNameQuery(product.name);
     setCurrentProductForSelection(product);
-    setSelectedVariantOptions({}); // Reset variant selections
+    setSelectedVariantOptions({});
     setProductNotFoundHint('');
-    setCurrentSkuStock(null); // Reset SKU stock display
+    setCurrentSkuStock(null); 
 
-    if (!product.variants || product.variants.length === 0) { // Product without variants
+    if (!product.variants || product.variants.length === 0) { 
         const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
         if (defaultSku) {
             setCostPrice(mode === 'buy' ? (defaultSku.costPrice ?? '') : defaultSku.costPrice);
             setSellPrice(mode === 'buy' ? (defaultSku.sellPrice ?? '') : defaultSku.sellPrice);
             if(product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock);
         } else { 
-            // Should not happen if product structure is correct (non-variant products always have a default SKU)
             setCostPrice(mode === 'buy' ? '' : 0);
             setSellPrice(mode === 'buy' ? '' : 0);
             if(product.trackQuantity) setCurrentSkuStock(0);
         }
-        // Focus quantity input for non-variant products
+        
         setTimeout(() => {
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
         }, 50);
-    } else { // Product with variants
-        setCostPrice(''); // Prices will be determined by selected SKU
+
+    } else { 
+        setCostPrice(''); 
         setSellPrice('');
-        // Attempt to open the first variant dropdown
         const firstVariantId = product.variants[0].id;
         if (firstVariantId) {
             setVariantDropdownOpenState({ [firstVariantId]: true });
-            // Focus will be handled by useEffect watching variantDropdownOpenState
+             setTimeout(() => {
+                const elToFocus = variantSelectRefs.current[firstVariantId]?.current || document.getElementById(`variant-select-${firstVariantId}-trigger`);
+                (elToFocus as HTMLElement)?.focus();
+            }, 100);
         }
     }
   };
 
-  // Effect to focus the first variant dropdown when it's set to open
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
@@ -206,12 +208,11 @@ export function BillingForm({
             setTimeout(() => {
                 const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (elToFocus as HTMLElement)?.focus();
-            }, 100); // Increased timeout slightly
+            }, 100); 
         }
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
 
-  // Effect to update prices and focus quantity input after all variants are selected
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
       const allVariantsSelected = currentProductForSelection.variants.every(
@@ -229,13 +230,11 @@ export function BillingForm({
           setSellPrice(mode === 'buy' ? (targetSku.sellPrice ?? '') : targetSku.sellPrice);
           if(currentProductForSelection.trackQuantity) setCurrentSkuStock(targetSku.quantityInStock);
         } else {
-          // This case might occur if a variant combination doesn't have a corresponding SKU yet (e.g. new combo in buy mode)
           setCostPrice(mode === 'buy' ? '' : 0);
           setSellPrice(mode === 'buy' ? '' : 0);
           setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
         }
         
-        // Only focus quantity input if the last variant dropdown is not currently open and quantity input isn't already focused.
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
         if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
              setTimeout(() => {
@@ -259,12 +258,11 @@ export function BillingForm({
     let product = currentProductForSelection || getProductByName(productNameQuery);
 
     if (!product) {
-      // Navigate to add product page with pre-filled data
       const params: NewProductPrefillParams = { name: productNameQuery };
       if (mode === 'buy') {
         params.quantity = currentQuantity.toString();
-        params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
-        params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+        params.costPrice = (typeof costPrice === 'string' ? parseFloat(costPrice) : costPrice || 0).toString();
+        params.sellPrice = (typeof sellPrice === 'string' ? parseFloat(sellPrice) : sellPrice || 0).toString();
       }
       const query = new URLSearchParams(params as Record<string, string>).toString();
       router.push(`/admin/products/add?${query}`);
@@ -293,7 +291,7 @@ export function BillingForm({
     );
 
     if ((mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) && product.trackQuantity) {
-      const stockToCheck = targetSku ? targetSku.quantityInStock : 0; // If no specific SKU, assume 0 for safety
+      const stockToCheck = targetSku ? targetSku.quantityInStock : 0; 
       if (stockToCheck < currentQuantity) {
         toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck} of ${product.name} (selected variant) available.` });
         return;
@@ -311,12 +309,10 @@ export function BillingForm({
         costPriceInputRef.current?.focus();
         return;
       }
-    } else { // Sell or Return mode
-      // If targetSku doesn't exist (e.g., product structure issue or newly defined variant without SKU from purchase yet)
-      // we should ideally prevent selling/returning. For now, default to 0 or product's base if any.
+    } else { 
       itemCostPrice = targetSku?.costPrice ?? 0; 
       itemSellPrice = targetSku?.sellPrice ?? 0;
-      if (itemSellPrice <= 0 && mode === 'sell' && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) { // Use product.id for service check
+      if (itemSellPrice <= 0 && mode === 'sell' && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) { 
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
         return;
       }
@@ -334,44 +330,46 @@ export function BillingForm({
     };
 
     setCurrentBillItems(prevItems => [...prevItems, newItem]);
-    resetFormFields(true); // Focus product name after adding
+    resetFormFields(true); 
   };
 
   const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
     if (currentField === 'productName') {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1 && !currentProductForSelection && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
-            handleProductSelect(productsFound[0]); // This will handle focusing next field
+            handleProductSelect(productsFound[0]); 
        } else {
-            if (currentProductForSelection) { // Product is selected
+            if (currentProductForSelection) { 
                 if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
                      quantityInputRef.current?.focus();
                      quantityInputRef.current?.select();
-                } else { // Product has variants
+                } else { 
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     const firstVariantId = currentProductForSelection.variants[0]?.id;
                     if(firstUnselectedVariant && firstVariantId){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstVariantId]: true }));
-                        // Focus will be handled by useEffect watching variantDropdownOpenState
-                    } else { // All variants somehow already selected or no variants focus quantity
+                        setTimeout(() => {
+                           const elToFocus = variantSelectRefs.current[firstVariantId]?.current || document.getElementById(`variant-select-${firstVariantId}-trigger`);
+                           (elToFocus as HTMLElement)?.focus();
+                        }, 100);
+                    } else { 
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
                     }
                 }
             } else if (productNotFoundHint === productNameQuery && productNameQuery.trim() !== '') {
-                // Second enter press when product not found - navigate to add product page
                 const params: NewProductPrefillParams = { name: productNameQuery };
                 if (mode === 'buy') {
                   const currentQty = typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1;
                   params.quantity = currentQty.toString();
-                  params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
-                  params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+                  params.costPrice = (typeof costPrice === 'string' ? parseFloat(costPrice) : costPrice || 0).toString();
+                  params.sellPrice = (typeof sellPrice === 'string' ? parseFloat(sellPrice) : sellPrice || 0).toString();
                 }
                 const query = new URLSearchParams(params as Record<string, string>).toString();
                 router.push(`/admin/products/add?${query}`);
                 setProductNotFoundHint('');
             } else if (productNameQuery.trim() !== '') {
-                setProductNotFoundHint(productNameQuery); // Set hint on first enter if no exact match
+                setProductNotFoundHint(productNameQuery); 
             }
        }
     } else if (currentField === 'quantity') {
@@ -452,7 +450,7 @@ export function BillingForm({
 
     setLastSavedBillMode(billType);
     setIsSavingAnimationVisible(true);
-    setPendingBillPayload(null); // Clear pending payload after proceeding
+    setPendingBillPayload(null); 
   };
 
 
@@ -475,7 +473,7 @@ export function BillingForm({
 
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      productName: item.productName, // Pass productName for service items
+      productName: item.productName, 
       quantity: item.quantity,
       costPrice: item.costPrice,
       sellPrice: item.sellPrice,
@@ -495,12 +493,12 @@ export function BillingForm({
       storeIdForBill: finalStoreId,
     };
     
-    if (!isAdminContext && storeIdFromProp) { // Store portal context
+    if (!isAdminContext && storeIdFromProp) { 
         setPendingBillPayload(currentBillPayload);
         setIsVerifyEmployeeDialogOpen(true); 
-    } else { // Admin context
+    } else { 
       setPendingBillPayload(currentBillPayload); 
-      proceedWithSave('admin_self_billed'); // Admin bills are self-billed for now
+      proceedWithSave('admin_self_billed'); 
     }
   };
 
@@ -511,14 +509,13 @@ export function BillingForm({
     } else {
         toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
     }
-    // PendingBillPayload is cleared inside proceedWithSave or animation close
   };
 
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
-    resetFullForm(); // This also resets product input fields
+    resetFullForm(); 
 
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParams.get('mode');
@@ -526,10 +523,9 @@ export function BillingForm({
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
          router.push(`${basePath}?mode=${currentQueryModeInUrl}`); 
        } else {
-         router.push(basePath); // Default to history view
+         router.push(basePath); 
        }
     }
-    // For store portal, no explicit navigation needed here, stays on billing form with current mode.
   };
 
   const handleModeChange = (newModeString: string) => {
@@ -541,9 +537,9 @@ export function BillingForm({
 
     if (newMode !== mode) {
         setMode(newMode);
-        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); // Fallback for safety
+        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); 
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
-        resetFullForm(); // Ensure form is reset when mode changes via tabs
+        resetFullForm(); 
     }
   };
 
@@ -563,11 +559,11 @@ export function BillingForm({
     const amount = parseFloat(serviceAmount.toString());
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, // Unique ID for service item
+      productId: `SERVICE_ITEM_${uuidv4()}`, 
       productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0, // Cost is amount if buying, 0 if selling
-      sellPrice: amount, // Sell price is always the amount
+      costPrice: mode === 'buy' ? amount : 0, 
+      sellPrice: amount, 
       isDefective: undefined,
       selectedVariantOptions: undefined,
     };
@@ -591,13 +587,12 @@ export function BillingForm({
         billMode={lastSavedBillMode}
         onClose={handleAnimationClose}
       />
-      {/* EmployeePasskeyDialog is specific to store portal usage */}
       {(!isAdminContext && storeIdFromProp) && (
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
-              if(!open && isVerifyEmployeeDialogOpen) { // If dialog is cancelled
-                  setPendingBillPayload(null); // Clear pending data
+              if(!open && isVerifyEmployeeDialogOpen) { 
+                  setPendingBillPayload(null); 
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -663,7 +658,7 @@ export function BillingForm({
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
             </h3>
             <div className={cn(
-              "grid gap-4 items-baseline", // Use items-baseline for better input alignment
+              "grid gap-4 items-baseline", 
               "grid-cols-1",
               mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]"
             )}>
@@ -680,7 +675,7 @@ export function BillingForm({
                     id="productNameGlobal"
                     className="flex-grow"
                   />
-                  {currentProductForSelection && isAdminContext && ( // Only show edit for admin for now
+                  {currentProductForSelection && isAdminContext && ( 
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
@@ -770,16 +765,17 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current dropdown
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { // Use timeout to ensure state updates propagate
+                                setTimeout(() => { 
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                  // Focus handled by useEffect watching variantDropdownOpenState
+                                   const elToFocus = variantSelectRefs.current[nextVariantId]?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
+                                   (elToFocus as HTMLElement)?.focus();
                                 }, 50); 
-                            } else { // Last variant selected
+                            } else { 
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -796,8 +792,32 @@ export function BillingForm({
                                 e.preventDefault();
                                 setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
                             } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
-                                // If dropdown is open and Enter is pressed, Radix Select handles selection.
-                                // The onValueChange will then trigger focus to next element.
+                               // Radix will handle selection
+                            } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+                                if(!variantDropdownOpenState[variant.id]) { // only navigate if dropdown is closed
+                                    e.preventDefault();
+                                    const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
+                                    if (currentIndex < currentProductForSelection!.variants!.length - 1) {
+                                        const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
+                                        const elToFocus = variantSelectRefs.current[nextVariantId]?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
+                                        (elToFocus as HTMLElement)?.focus();
+                                    } else {
+                                        quantityInputRef.current?.focus();
+                                        quantityInputRef.current?.select();
+                                    }
+                                }
+                            } else if (e.key === 'ArrowLeft') {
+                                if(!variantDropdownOpenState[variant.id]) {
+                                    e.preventDefault();
+                                    const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
+                                    if (currentIndex > 0) {
+                                        const prevVariantId = currentProductForSelection!.variants![currentIndex - 1].id;
+                                        const elToFocus = variantSelectRefs.current[prevVariantId]?.current || document.getElementById(`variant-select-${prevVariantId}-trigger`);
+                                        (elToFocus as HTMLElement)?.focus();
+                                    } else {
+                                        productNameInputRef.current?.focus();
+                                    }
+                                }
                             }
                           }}
                         >
@@ -831,7 +851,7 @@ export function BillingForm({
           {/* Bill Items List */}
           <div className="flex-grow overflow-hidden">
             {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
-            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> {/* Constrained height for scroll */}
+            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> 
               {currentBillItems.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
               ) : (
@@ -853,7 +873,7 @@ export function BillingForm({
 
           {/* Ad-hoc Service/Charge Section */}
           {(mode === 'sell' || mode === 'buy') && (
-            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> {/* Ensure it's pushed down */}
+            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> 
               <h3 className="text-md font-medium text-foreground flex items-center gap-2">
                 <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
               </h3>
@@ -877,7 +897,7 @@ export function BillingForm({
                     type="number"
                     value={serviceAmount}
                     onChange={(e) => setServiceAmount(parseFloat(e.target.value) || '')}
-                    placeholder="Amount"
+                    placeholder="0.00"
                     step="0.01"
                     min="0"
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
