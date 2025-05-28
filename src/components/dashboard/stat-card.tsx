@@ -17,7 +17,7 @@ export function StatCard({ title, value, icon: Icon, description, isLoading = fa
   return (
     <Card className="shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-sm font-medium text-secondary"> {/* Changed to text-secondary */}
           {title}
         </CardTitle>
         <Icon className="h-5 w-5 text-muted-foreground" />

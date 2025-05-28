@@ -23,7 +23,7 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!hasMounted) {
-      return; // Wait for client-side mount
+      return; 
     }
 
     setIsLoadingAuth(true); 
@@ -33,8 +33,8 @@ export default function AdminLayout({
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
     } else {
-      setIsAuthenticated(false);
-      router.replace('/'); // Redirect to landing page, which handles login forms
+      setIsAuthenticated(false); // Ensure this is set before redirect
+      router.replace('/'); 
       setIsLoadingAuth(false); 
     }
   }, [router, hasMounted]);
