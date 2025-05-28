@@ -32,9 +32,8 @@ interface InventoryState {
   staffs: Staff[];
   stores: Store[];
   userProfile: UserProfile;
-  messagesByStore: Record<string, ChatMessage[]>; // storeId -> messages array
+  messagesByStore: Record<string, ChatMessage[]>;
 
-  // Product Methods
   addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> }) => Product;
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }>, productSKUs?: ProductSKU[], initialStock?: number, costPrice?: number, sellPrice?: number }) => void;
   getProductById: (productId: string) => Product | undefined;
@@ -43,7 +42,6 @@ interface InventoryState {
   getLowStockProductCount: (threshold: number) => number;
   findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>, costPrice: number, sellPrice: number, quantityChange: number, isPurchase: boolean, trackProductQuantity: boolean) => ProductSKU | undefined;
 
-  // Bill Methods
   addBill: (
     billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName'>,
     items: Omit<BillItem, 'id'|'productName'>[]
@@ -51,11 +49,9 @@ interface InventoryState {
   getBillById: (billId: string) => Bill | undefined;
   getRecentBills: (limit: number) => Bill[];
 
-  // Category Methods
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
 
-  // Staff CRUD
   addStaff: (staffData: Omit<Staff, 'id'>) => Staff | null;
   updateStaff: (staffId: string, staffData: Partial<Omit<Staff, 'id'>>) => void;
   deleteStaff: (staffId: string) => void;
@@ -63,27 +59,23 @@ interface InventoryState {
   getAllStaff: () => Staff[];
   getStaffDetailsByIds: (staffIds: string[]) => Staff[];
 
-  // Store CRUD
   addStore: (storeData: Omit<Store, 'id'>) => Store | null;
   updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id'>>) => void;
   deleteStore: (storeId: string) => void;
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
 
-  // User Profile & Subscription
   updateCompanyName: (name: string) => void;
   updateSubscription: (planId: string) => void;
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
 
-  // Dashboard Selectors
   getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
   getRecentExpenseBillsWithPotentialCoverage: (limit: number) => ExpenseBillWithCoverage[];
   getExpenseSummaryStats: () => ExpenseSummary;
 
-  // Chat Methods
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string) => void;
   getMessagesForStore: (storeId: string) => ChatMessage[];
 
@@ -91,7 +83,7 @@ interface InventoryState {
 }
 
 const getSkuIdentifier = (productName: string, optionValues: Record<string, string>): string => {
-  if (Object.keys(optionValues).length === 0) return productName; 
+  if (Object.keys(optionValues).length === 0) return productName;
   const sortedOptions = Object.entries(optionValues)
     .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
     .map(([, value]) => value)
@@ -125,6 +117,11 @@ const initialProducts: Product[] = [
 
 const initialCategories: Category[] = DEFAULT_CATEGORIES.map(name => ({ id: generateId(), name }));
 
+const defaultUserProfile: UserProfile = {
+  companyName: DEFAULT_COMPANY_NAME,
+  activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN,
+};
+
 
 export const useInventoryStore = create<InventoryState>()(
   persist(
@@ -134,10 +131,7 @@ export const useInventoryStore = create<InventoryState>()(
       categories: initialCategories,
       staffs: [],
       stores: [],
-      userProfile: {
-        companyName: DEFAULT_COMPANY_NAME,
-        activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN, // Default to Basic Admin
-      },
+      userProfile: defaultUserProfile,
       messagesByStore: {},
 
       addProduct: (productData) => {
@@ -151,7 +145,7 @@ export const useInventoryStore = create<InventoryState>()(
         }));
 
         let initialSKUs: ProductSKU[] = [];
-        if (!productData.variants || productData.variants.length === 0) { // Simple product, no variants
+        if (!productData.variants || productData.variants.length === 0) {
           initialSKUs.push({
             id: generateId(),
             optionValues: {},
@@ -238,40 +232,33 @@ export const useInventoryStore = create<InventoryState>()(
         if (productIndex === -1) return undefined;
 
         const product = products[productIndex];
+        const actualTrackQuantity = product.trackQuantity; // Use the product's trackQuantity setting
+
         const stringifiedOptionValues = JSON.stringify(Object.fromEntries(Object.entries(optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))));
         let skuIndex = product.productSKUs.findIndex(sku => JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB)))) === stringifiedOptionValues);
         let updatedSku: ProductSKU;
 
         if (skuIndex !== -1) {
           updatedSku = { ...product.productSKUs[skuIndex] };
-          if (isPurchase) { // Expense bill
+          if (isPurchase) {
             updatedSku.costPrice = costPrice;
             updatedSku.sellPrice = sellPrice; 
-            if (trackProductQuantity) updatedSku.quantityInStock += quantityChange;
-          } else { // Sales or Return bill
-            if (trackProductQuantity) updatedSku.quantityInStock += quantityChange; 
+            if (actualTrackQuantity) updatedSku.quantityInStock += quantityChange;
+          } else { 
+            if (actualTrackQuantity) updatedSku.quantityInStock += quantityChange; 
           }
         } else {
-          // if (!isPurchase && trackProductQuantity) {
-          //   console.error("Attempted to sell/return non-existent tracked SKU for variant product:", productId, optionValues);
-          //   return undefined;
-          // }
-          // For purchases (isPurchase === true), or for non-tracked items, a new SKU is always created if not found.
-          // For sales/returns of tracked items, this path implies an error or a newly defined variant combination *not yet purchased*.
-          // The current logic allows creating an SKU even on sale if one isn't found, using provided prices.
-          // This might be okay for services, but for tracked goods, this means selling something with 0 stock.
-          // A stricter check might be: if (!isPurchase && trackProductQuantity && skuIndex === -1) return undefined;
           updatedSku = {
             id: generateId(),
             optionValues,
             costPrice: costPrice,
             sellPrice: sellPrice,
-            quantityInStock: trackProductQuantity ? quantityChange : 0,
+            quantityInStock: actualTrackQuantity ? quantityChange : 0,
             skuIdentifier: getSkuIdentifier(product.name, optionValues),
           };
         }
 
-        if(trackProductQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock);
+        if(actualTrackQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock);
 
         const updatedProductSKUs = [...product.productSKUs];
         if (skuIndex !== -1) {
@@ -280,7 +267,7 @@ export const useInventoryStore = create<InventoryState>()(
           updatedProductSKUs.push(updatedSku);
         }
         
-        get().updateProduct(productId, { productSKUs: updatedProductSKUs, trackQuantity: product.trackQuantity });
+        get().updateProduct(productId, { productSKUs: updatedProductSKUs });
         return updatedSku;
       },
 
@@ -372,7 +359,7 @@ export const useInventoryStore = create<InventoryState>()(
         const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
 
         const newBill: Bill = {
-          id: format(currentDate, 'ddMMyyHHmmssSSS'), // Added SSS for milliseconds to ensure more uniqueness
+          id: format(currentDate, 'ddMMyyHHmmss'),
           type: billData.type,
           date: currentDate.toISOString(),
           timestamp: currentDate.getTime(),
@@ -482,12 +469,12 @@ export const useInventoryStore = create<InventoryState>()(
       },
       canAddStore: () => {
         const plan = get().getActiveSubscriptionPlan();
-        if (!plan) return false; // Should not happen with the fallback in getActiveSubscriptionPlan
+        if (!plan) return false;
         return get().stores.length < plan.maxStores;
       },
       canAddStaff: () => {
         const plan = get().getActiveSubscriptionPlan();
-        if (!plan) return false; // Should not happen
+        if (!plan) return false;
         return get().staffs.length < plan.maxEmployees;
       },
 
@@ -520,10 +507,10 @@ export const useInventoryStore = create<InventoryState>()(
         bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Exclude service items
+              if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const product = get().getProductById(item.productId);
               if (!product) return;
-              const baseProductName = product.name; // Group by base product name, not SKU specific name
+              const baseProductName = product.name;
               if (!productRevenue[baseProductName]) {
                 productRevenue[baseProductName] = { name: baseProductName, revenue: 0 };
               }
@@ -604,114 +591,92 @@ export const useInventoryStore = create<InventoryState>()(
         try {
           const state = get();
           let storeUpdated = false;
+          
+          const initialSafeState = {
+            products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
+            bills: [],
+            categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
+            staffs: [],
+            stores: [],
+            userProfile: {...defaultUserProfile},
+            messagesByStore: {}
+          };
 
-          if (Array.isArray(state.products)) {
-            const hydratedProducts = state.products.map(p => {
+          if (!state.products || !Array.isArray(state.products)) {
+            state.products = initialSafeState.products;
+            storeUpdated = true;
+          } else {
+            state.products = state.products.map(p => {
               if (!p || typeof p !== 'object' || !p.id || !p.name) return null;
-              const newP: Partial<Product> & { costPrice_old?: number, sellPrice_old?: number, quantityInStock_old?: number } = { ...p };
+              const newP: Partial<Product> = { ...p };
               newP.variants = Array.isArray(newP.variants) ? newP.variants : [];
               newP.productSKUs = Array.isArray(newP.productSKUs) ? newP.productSKUs : [];
 
-              if ((newP.productSKUs.length === 0 && (!newP.variants || newP.variants.length === 0)) || newP.productSKUs.some(sku => !sku.id)) {
-                if (newP.hasOwnProperty('costPrice_old') || newP.hasOwnProperty('sellPrice_old') || newP.hasOwnProperty('quantityInStock_old') ||
-                    newP.hasOwnProperty('costPrice') || newP.hasOwnProperty('sellPrice') || newP.hasOwnProperty('quantityInStock')) {
-                  newP.productSKUs = [{ // Overwrite or create default SKU
-                    id: newP.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0)?.id || generateId(),
-                    optionValues: {},
-                    costPrice: (newP as any).costPrice ?? (newP as any).costPrice_old ?? 0,
-                    sellPrice: (newP as any).sellPrice ?? (newP as any).sellPrice_old ?? 0,
-                    quantityInStock: (newP as any).quantityInStock ?? (newP as any).quantityInStock_old ?? 0,
-                    skuIdentifier: getSkuIdentifier(newP.name!, {})
-                  }];
-                  storeUpdated = true;
-                }
+              if (newP.productSKUs.length === 0 && (!newP.variants || newP.variants.length === 0)) {
+                 if (p.hasOwnProperty('costPrice') || p.hasOwnProperty('sellPrice') || p.hasOwnProperty('quantityInStock')) {
+                    newP.productSKUs = [{
+                        id: generateId(),
+                        optionValues: {},
+                        costPrice: (p as any).costPrice ?? 0,
+                        sellPrice: (p as any).sellPrice ?? 0,
+                        quantityInStock: (p as any).quantityInStock ?? 0,
+                        skuIdentifier: getSkuIdentifier(p.name, {})
+                    }];
+                    storeUpdated = true;
+                 }
               }
-              ['costPrice', 'sellPrice', 'quantityInStock', 'costPrice_old', 'sellPrice_old', 'quantityInStock_old'].forEach(key => {
-                if (newP.hasOwnProperty(key)) delete (newP as any)[key];
+              ['costPrice', 'sellPrice', 'quantityInStock'].forEach(key => {
+                  if (newP.hasOwnProperty(key)) delete (newP as any)[key];
               });
               return newP as Product;
             }).filter(p => p !== null) as Product[];
-            
-            if (storeUpdated || (state.products.length === 0 && initialProducts.length > 0)) {
-               set({ products: storeUpdated ? hydratedProducts : initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})) });
-            }
-          } else {
-            set({ products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})) });
-            storeUpdated = true;
           }
 
-          if (Array.isArray(state.categories)) {
-            if (state.categories.length === 0 && initialCategories.length > 0) {
-              set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
+          if (!state.bills || !Array.isArray(state.bills)) { state.bills = initialSafeState.bills; storeUpdated = true; }
+          if (!state.categories || !Array.isArray(state.categories)) { state.categories = initialSafeState.categories; storeUpdated = true; }
+          if (!state.staffs || !Array.isArray(state.staffs)) { state.staffs = initialSafeState.staffs; storeUpdated = true; }
+          if (!state.stores || !Array.isArray(state.stores)) { state.stores = initialSafeState.stores; storeUpdated = true; }
+          
+          if (!state.userProfile || typeof state.userProfile !== 'object') {
+            state.userProfile = {...defaultUserProfile};
+            storeUpdated = true;
+          } else {
+            if (!state.userProfile.companyName || typeof state.userProfile.companyName !== 'string' || state.userProfile.companyName.trim() === '') {
+              state.userProfile.companyName = DEFAULT_COMPANY_NAME;
               storeUpdated = true;
             }
-          } else {
-            set({ categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)) });
-            storeUpdated = true;
+            const currentSubId = state.userProfile.activeSubscriptionId;
+            const isValidSubId = SUBSCRIPTION_PLANS.some(plan => plan.id === currentSubId);
+            if (!currentSubId || !isValidSubId) {
+              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
+              storeUpdated = true;
+            }
           }
+          
+          if (!state.messagesByStore || typeof state.messagesByStore !== 'object' || Array.isArray(state.messagesByStore)) {
+             state.messagesByStore = initialSafeState.messagesByStore;
+             storeUpdated = true;
+          }
+          
           DEFAULT_CATEGORIES.forEach(catName => {
             if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
               get().addCategory(catName); storeUpdated = true;
             }
           });
 
-          if (!state.userProfile || typeof state.userProfile !== 'object') {
-            set({ userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN }});
-            storeUpdated = true;
-          } else {
-            let profileChanged = false;
-            const currentSubId = state.userProfile.activeSubscriptionId;
-            const isValidSubId = SUBSCRIPTION_PLANS.some(p => p.id === currentSubId);
-            if (!currentSubId || !isValidSubId) {
-              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
-              profileChanged = true;
-            }
-            if (!state.userProfile.companyName || state.userProfile.companyName.trim() === '') {
-              state.userProfile.companyName = DEFAULT_COMPANY_NAME;
-              profileChanged = true;
-            }
-            if (profileChanged) {
-              set({ userProfile: { ...state.userProfile } });
-              storeUpdated = true;
-            }
-          }
-
-          if (!Array.isArray(state.staffs)) { set({ staffs: [] }); storeUpdated = true; }
-          if (!Array.isArray(state.stores)) { set({ stores: [] }); storeUpdated = true; }
-          if (typeof state.messagesByStore !== 'object' || state.messagesByStore === null) {
-            set({ messagesByStore: {} }); storeUpdated = true;
-          }
-
-          if (Array.isArray(state.bills)) {
-            let billsUpdated = false;
-            const updatedBills = state.bills.map(bill => {
-              let billChanged = false;
-              if (bill.billedByStaffId && !bill.billedByStaffName) {
-                const staff = get().getStaffById(bill.billedByStaffId);
-                if (staff) { bill.billedByStaffName = staff.name; billChanged = true;}
-              }
-              if (bill.storeId && !bill.storeName) {
-                const store = get().getStoreById(bill.storeId);
-                if (store) { bill.storeName = store.name; billChanged = true; }
-              }
-              return billChanged ? { ...bill } : bill;
-            });
-            if (storeUpdated || billsUpdated || updatedBills.some((b, i) => b !== state.bills[i])) {
-               set({ bills: updatedBills });
-            }
+          if (storeUpdated) {
+            set({ ...state });
           }
 
         } catch (error) {
-          console.error("Error during inventory store hydration:", error);
-          // Optionally, clear localStorage if hydration fails badly
-          // localStorage.removeItem('stockflow-inventory-storage');
+          console.error("Error during inventory store hydration, resetting to defaults:", error);
           set({
             products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
             bills: [],
             categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
             staffs: [],
             stores: [],
-            userProfile: { companyName: DEFAULT_COMPANY_NAME, activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN },
+            userProfile: {...defaultUserProfile},
             messagesByStore: {}
           });
         }
@@ -727,3 +692,4 @@ export const useInventoryStore = create<InventoryState>()(
   )
 );
 
+    

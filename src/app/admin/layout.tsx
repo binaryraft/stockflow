@@ -34,14 +34,14 @@ export default function AdminLayout({
       setIsLoadingAuth(false);
     } else {
       setIsAuthenticated(false); // Ensure this is set before redirect
-      router.replace('/'); 
+      router.replace('/'); // Redirect to main landing page for embedded login
       setIsLoadingAuth(false); 
     }
   }, [router, hasMounted]);
 
   if (!hasMounted) { 
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image 
           src="https://placehold.co/128x128.png" 
           alt={`${APP_NAME} Logo`} 
@@ -57,7 +57,7 @@ export default function AdminLayout({
   
   if (isLoadingAuth) {
      return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image 
           src="https://placehold.co/128x128.png" 
           alt={`${APP_NAME} Logo`} 
@@ -77,6 +77,7 @@ export default function AdminLayout({
     return null; 
   }
 
-  // If authenticated and loading is complete:
   return <AppShell>{children}</AppShell>;
 }
+
+    

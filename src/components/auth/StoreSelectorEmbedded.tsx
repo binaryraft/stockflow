@@ -45,7 +45,7 @@ export function StoreSelectorEmbedded({ onCancel }: StoreSelectorEmbeddedProps) 
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/90 backdrop-blur-sm">
       <div className="absolute top-4 right-4">
         <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Close store selector">
           <XCircle className="h-6 w-6 text-muted-foreground hover:text-foreground" />
@@ -101,3 +101,5 @@ export function StoreSelectorEmbedded({ onCancel }: StoreSelectorEmbeddedProps) 
     </div>
   );
 }
+
+    

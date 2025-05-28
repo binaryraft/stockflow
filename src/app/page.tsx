@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
@@ -17,12 +17,26 @@ type UIMode = 'landing' | 'adminLogin' | 'storeSelect';
 
 export default function HomePage() {
   const [uiMode, setUiMode] = useState<UIMode>('landing');
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   const showAdminLogin = () => setUiMode('adminLogin');
   const hideAdminLogin = () => setUiMode('landing');
 
   const showStoreSelect = () => setUiMode('storeSelect');
   const hideStoreSelect = () => setUiMode('landing');
+
+  if (!hasMounted) {
+    // Render nothing or a minimal loader to prevent hydration mismatch with uiMode
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <p className="text-lg text-muted-foreground">Loading Application...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -51,3 +65,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

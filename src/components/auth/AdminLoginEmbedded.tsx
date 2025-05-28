@@ -23,11 +23,10 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     setHasMounted(true);
   }, []);
 
-  // Check if already logged in (though AdminLayout should handle primary redirect)
   useEffect(() => {
     if (hasMounted && localStorage.getItem('isAdminLoggedIn') === 'true') {
       router.replace('/admin');
-      onLoginSuccess(); // Notify parent to hide this form
+      onLoginSuccess(); 
     }
   }, [router, hasMounted, onLoginSuccess]);
 
@@ -35,11 +34,10 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     if (!hasMounted) return;
 
     setIsSubmitting(true);
-    // Simulate API call
     setTimeout(() => {
       localStorage.setItem('isAdminLoggedIn', 'true');
       router.replace('/admin');
-      onLoginSuccess(); // Notify parent
+      onLoginSuccess(); 
       setIsSubmitting(false);
     }, 500);
   };
@@ -61,7 +59,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/90 backdrop-blur-sm">
       <div className="absolute top-4 right-4">
         <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Close login">
           <XCircle className="h-6 w-6 text-muted-foreground hover:text-foreground" />
@@ -99,3 +97,5 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     </div>
   );
 }
+
+    
