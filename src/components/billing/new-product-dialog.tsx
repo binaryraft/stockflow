@@ -27,6 +27,7 @@ import { PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 
 const productOptionSchema = z.object({
@@ -45,10 +46,10 @@ const newProductSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  initialStock: z.coerce.number().min(0).optional().default(0), 
-  costPrice: z.coerce.number().min(0).optional().default(0),    
-  sellPrice: z.coerce.number().min(0).optional().default(0),    
-  sku: z.string().optional(), 
+  initialStock: z.coerce.number().min(0).optional().default(0),
+  costPrice: z.coerce.number().min(0).optional().default(0),
+  sellPrice: z.coerce.number().min(0).optional().default(0),
+  sku: z.string().optional(),
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -64,7 +65,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   variantIndex,
   removeVariant
 }) => {
-  const { control, register, formState: { errors }, watch, setFocus } = useFormContext<NewProductFormData>(); 
+  const { control, register, formState: { errors }, watch, setFocus } = useFormContext<NewProductFormData>();
 
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
@@ -78,21 +79,19 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       e.preventDefault();
       appendOption({ value: '' });
       setTimeout(() => {
-        // Focus the newly added input. The name will be variants.${variantIndex}.options.${optionFields.length}.value
-        // because optionFields.length would have been the index before append.
-        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`); 
-      }, 0);
+        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
+      }, 50); // Added a slight delay for DOM update
     }
   };
-  
+
   const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
      if (e.key === 'Enter') {
         e.preventDefault();
         if (optionFields.length === 0) {
           appendOption({ value: '' });
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
+          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
         } else {
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 0);
+          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
         }
       }
   }
@@ -110,14 +109,14 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
             <TooltipContent><p>Remove this variant type</p></TooltipContent>
         </Tooltip>
       </div>
-      <Input 
-        {...register(`variants.${variantIndex}.name`)} 
+      <Input
+        {...register(`variants.${variantIndex}.name`)}
         placeholder="e.g. Color, Size"
         aria-label={`Variant ${variantIndex + 1} Name`}
         onKeyDown={handleVariantNameEnter}
       />
       {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
-      
+
       <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant ${variantIndex+1}`}</Label>
       <div className="space-y-2">
         {optionFields.map((optionValueField, optionIndex) => (
@@ -144,16 +143,16 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
          {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
 
       </div>
-      <Button 
-        type="button" 
-        variant="outline" 
-        size="sm" 
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
         className="text-xs"
         onClick={() => {
           appendOption({ value: '' });
           setTimeout(() => {
             setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
-          }, 0);
+          }, 50);
         }}
       >
         <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Option
@@ -166,7 +165,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 interface NewProductDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onProductAdd?: (product: Product) => void; // Product might not always be returned if just adding and ID is store-generated
+  onProductAdd?: (product: Product) => void;
   editingProduct?: Product | null;
   initialProductName?: string;
   initialQuantityForDialog?: number;
@@ -174,19 +173,19 @@ interface NewProductDialogProps {
   initialSellPriceForDialog?: number;
 }
 
-export function NewProductDialog({ 
-  isOpen, 
-  onOpenChange, 
-  onProductAdd, 
+export function NewProductDialog({
+  isOpen,
+  onOpenChange,
+  onProductAdd,
   editingProduct,
   initialProductName,
   initialQuantityForDialog,
   initialCostPriceForDialog,
-  initialSellPriceForDialog 
+  initialSellPriceForDialog
 }: NewProductDialogProps) {
   const { addProduct, updateProduct } = useInventoryStore();
   const { toast } = useToast();
-  
+
   const form = useForm<NewProductFormData>({
     resolver: zodResolver(newProductSchema),
     defaultValues: {
@@ -203,7 +202,7 @@ export function NewProductDialog({
     },
   });
 
-  const { control, register, handleSubmit, formState: { errors }, watch, reset: formReset, setValue } = form;
+  const { control, register, handleSubmit, formState: { errors }, watch, reset: formReset, setValue, setFocus } = form;
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
     control: control,
@@ -213,31 +212,29 @@ export function NewProductDialog({
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
-        // Find the default SKU if it's a non-variant product or one whose variants were removed
-        const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0) 
-                            ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) 
+        const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0)
+                            ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0)
                             : null;
         formReset({
           name: editingProduct.name,
           description: editingProduct.description || '',
           category: editingProduct.category || '',
           trackQuantity: editingProduct.trackQuantity,
-          // For editing, initialStock, costPrice, sellPrice should come from the default SKU if it exists
-          initialStock: defaultSku ? defaultSku.quantityInStock : 0, 
+          initialStock: defaultSku ? defaultSku.quantityInStock : 0,
           costPrice: defaultSku ? defaultSku.costPrice : 0,
           sellPrice: defaultSku ? defaultSku.sellPrice : 0,
-          sku: editingProduct.sku || '', // Main product SKU/code
+          sku: editingProduct.sku || '',
           expiryDate: editingProduct.expiryDate || '',
           variants: editingProduct.variants?.map(v => ({
             name: v.name,
-            options: v.options.map(o => ({ value: o.value })) // Only value is needed for the form
+            options: v.options.map(o => ({ value: o.value }))
           })) || [],
         });
-      } else { 
-        const shouldTrack = initialQuantityForDialog !== undefined; 
+      } else {
+        const shouldTrack = initialQuantityForDialog !== undefined;
         formReset({
           name: initialProductName || '',
-          description: '', 
+          description: '',
           category: '',
           trackQuantity: shouldTrack,
           initialStock: initialQuantityForDialog || 0,
@@ -248,15 +245,17 @@ export function NewProductDialog({
           variants: [],
         });
       }
+      setTimeout(() => setFocus('name'), 50); // Auto-focus name field on open
     }
   }, [
-    isOpen, 
+    isOpen,
     editingProduct,
-    initialProductName, 
-    initialQuantityForDialog, 
-    initialCostPriceForDialog, 
-    initialSellPriceForDialog, 
-    formReset
+    initialProductName,
+    initialQuantityForDialog,
+    initialCostPriceForDialog,
+    initialSellPriceForDialog,
+    formReset,
+    setFocus
   ]);
 
   const trackQuantityValue = watch('trackQuantity');
@@ -265,10 +264,9 @@ export function NewProductDialog({
 
 
   const onSubmit = (data: NewProductFormData) => {
-    // Prepare payload for variants
     const productVariantsPayload = data.variants?.map(v => ({
         name: v.name,
-        options: v.options.map(opt => ({ value: opt.value })) // Store only value, ID generated by store
+        options: v.options.map(opt => ({ value: opt.value }))
     }));
 
     if (editingProduct) {
@@ -281,7 +279,6 @@ export function NewProductDialog({
         expiryDate: data.expiryDate,
         variants: productVariantsPayload,
       };
-      // If it's NOT a variant product, include the cost/sell/stock for its default SKU
       if (!hasVariants) {
         payloadForUpdate.costPrice = data.costPrice;
         payloadForUpdate.sellPrice = data.sellPrice;
@@ -290,10 +287,9 @@ export function NewProductDialog({
 
       updateProduct(editingProduct.id, payloadForUpdate);
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      // Fetch the updated product to pass to onProductAdd if needed, or pass the payload
-      const updatedProductData = { ...editingProduct, ...payloadForUpdate } as Product; 
+      const updatedProductData = useInventoryStore.getState().getProductById(editingProduct.id) || { ...editingProduct, ...payloadForUpdate } as Product;
       onProductAdd?.(updatedProductData);
-    } else { 
+    } else {
       const payloadForAdd: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: any[] } = {
         name: data.name,
         description: data.description,
@@ -318,7 +314,7 @@ export function NewProductDialog({
   return (
     <Dialog open={isOpen} onOpenChange={(open) => {
       if (!open) {
-        formReset(); 
+        formReset();
       }
       onOpenChange(open);
     }}>
@@ -329,8 +325,8 @@ export function NewProductDialog({
             Fill in the details for the product. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1 my-1 -mx-6 px-6"> 
-          <FormProvider {...form}> 
+        <ScrollArea className="flex-1 my-1 -mx-6 px-6">
+          <FormProvider {...form}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
               <div>
                 <Label htmlFor="name">Product Name*</Label>
@@ -342,7 +338,7 @@ export function NewProductDialog({
                 <Label htmlFor="description">Description</Label>
                 <Textarea id="description" {...register("description")} placeholder="Enter product description..."/>
               </div>
-              
+
               <div className="flex items-end gap-2">
                 <div className="flex-grow">
                   <Label htmlFor="category">Category</Label>
@@ -379,19 +375,19 @@ export function NewProductDialog({
                   {trackQuantityValue && (
                     <div>
                       <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
-                      <Input id="initialStock" type="number" {...register("initialStock")} />
+                      <Input id="initialStock" type="number" {...register("initialStock")} placeholder="0" />
                       {errors.initialStock && <p className="text-sm text-destructive mt-1">{errors.initialStock.message}</p>}
                     </div>
                   )}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="costPrice">Cost Price*</Label>
-                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
+                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
                       {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
                     </div>
                     <div>
                       <Label htmlFor="sellPrice">Sell Price*</Label>
-                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
+                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
                       {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
                     </div>
                   </div>
@@ -406,7 +402,7 @@ export function NewProductDialog({
                 <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                 <Input id="expiryDate" type="date" {...register("expiryDate")} />
               </div>
-              
+
               {hasVariants && (
                   <p className="text-xs text-muted-foreground italic">
                       For products with variants, stock and pricing are managed per specific combination (SKU) and primarily set/updated via Expense Bills.
@@ -427,11 +423,11 @@ export function NewProductDialog({
                   removeVariant={removeVariant}
                 />
               ))}
-              
+
               {variantFields.length < 2 && (
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
                   className="w-full"
                 >
@@ -453,4 +449,3 @@ export function NewProductDialog({
     </Dialog>
   );
 }
-    
