@@ -8,12 +8,11 @@ import { BillingForm } from '@/components/billing/billing-form';
 import type { Store, BillMode, Staff } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShoppingCart, MessageSquare, LogIn as LogInIcon } from 'lucide-react';
+import { LogOut, ShoppingCart, MessageSquare } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ChatInterface } from '@/components/chat/ChatInterface';
-import { EmployeePasskeyDialog } from '@/components/billing/employee-passkey-dialog'; // For header-initiated login
 
 export default function StoreBillingPage() {
   const router = useRouter();
@@ -21,12 +20,10 @@ export default function StoreBillingPage() {
   const storeId = params.storeId as string;
   const nextSearchParams = useNextSearchParams();
 
-  const { getStoreById, getStaffById } = useInventoryStore();
+  const { getStoreById } = useInventoryStore();
 
   const [isStoreAuthenticated, setIsStoreAuthenticated] = useState(false);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
-  const [currentStaff, setCurrentStaff] = useState<Staff | null>(null);
-  const [isEmployeeAuthDialogOpen, setIsEmployeeAuthDialogOpen] = useState(false); // For header login
   const [isLoading, setIsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
@@ -35,7 +32,7 @@ export default function StoreBillingPage() {
     setHasMounted(true);
   }, []);
 
-  // Store and initial employee authentication
+  // Store authentication
   useEffect(() => {
     if (!hasMounted || !storeId) {
       setIsLoading(true);
@@ -47,7 +44,7 @@ export default function StoreBillingPage() {
 
     if (!store) {
       setCurrentStore(null);
-      router.replace('/storeportal');
+      router.replace('/storeportal'); // Redirect if store not found
       setIsLoading(false);
       return;
     }
@@ -56,29 +53,12 @@ export default function StoreBillingPage() {
     const authenticatedStoreSession = sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true';
     if (authenticatedStoreSession) {
       setIsStoreAuthenticated(true);
-      // Try to load current staff from session for this store
-      const staffSessionData = sessionStorage.getItem(`currentStaff_${storeId}`);
-      if (staffSessionData) {
-        try {
-          const staffInfo = JSON.parse(staffSessionData) as { id: string; name: string };
-          // Validate if this staff is still valid (exists and can access this store)
-          const validatedStaff = getStaffById(staffInfo.id);
-          if (validatedStaff && (validatedStaff.accessibleStoreIds.length === 0 || validatedStaff.accessibleStoreIds.includes(storeId))) {
-            setCurrentStaff(validatedStaff);
-          } else {
-            sessionStorage.removeItem(`currentStaff_${storeId}`); // Clear invalid staff
-          }
-        } catch (error) {
-          console.error("Error parsing staff session data:", error);
-          sessionStorage.removeItem(`currentStaff_${storeId}`);
-        }
-      }
     } else {
       setIsStoreAuthenticated(false);
       router.replace(`/storeportal/${storeId}/login`);
     }
     setIsLoading(false);
-  }, [storeId, router, getStoreById, hasMounted, getStaffById]);
+  }, [storeId, router, getStoreById, hasMounted]);
 
   // Mode redirection logic
   useEffect(() => {
@@ -108,37 +88,11 @@ export default function StoreBillingPage() {
   const handleStoreLogout = () => {
     if (hasMounted && storeId) {
       sessionStorage.removeItem(`authenticatedStore_${storeId}`);
-      sessionStorage.removeItem(`currentStaff_${storeId}`); // Clear current staff on store logout
     }
     setIsStoreAuthenticated(false);
-    setCurrentStaff(null);
     if (storeId) router.push(`/storeportal/${storeId}/login`);
     else router.push('/storeportal');
   };
-
-  const handleEmployeeLoginClick = () => {
-    setIsEmployeeAuthDialogOpen(true);
-  };
-
-  const handleEmployeeAuthenticatedFromDialog = (staff: Staff) => {
-    setCurrentStaff(staff);
-    if (storeId) {
-      sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify({ id: staff.id, name: staff.name }));
-    }
-    setIsEmployeeAuthDialogOpen(false);
-  };
-
-  const handleBillSavedWithEmployee = (staff: Staff) => {
-    // If a bill was saved and an employee was identified transactionally,
-    // update the current operator display
-    if (!currentStaff || currentStaff.id !== staff.id) {
-        setCurrentStaff(staff);
-        if (storeId) {
-            sessionStorage.setItem(`currentStaff_${storeId}`, JSON.stringify({ id: staff.id, name: staff.name }));
-        }
-    }
-  };
-
 
   if (!hasMounted || (!storeId && hasMounted)) {
     return (
@@ -172,7 +126,7 @@ export default function StoreBillingPage() {
     );
   }
 
-  if (!currentStore && !isLoading) {
+  if (!currentStore && !isLoading) { // Should be caught by redirect, but safety net
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Image
@@ -188,7 +142,7 @@ export default function StoreBillingPage() {
     );
   }
 
-  if (currentStore && !isStoreAuthenticated && !isLoading) {
+  if (currentStore && !isStoreAuthenticated && !isLoading) { // Should be caught by redirect
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
         <Image
@@ -203,10 +157,11 @@ export default function StoreBillingPage() {
       </div>
     );
   }
-
+  
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
-  if (!currentStore || !isStoreAuthenticated) { // Fallback if other checks didn't catch it
+  // Fallback if other checks didn't catch it or in transition states
+  if (!currentStore || !isStoreAuthenticated) {
       return (
            <div className="flex min-h-screen flex-col items-center justify-center p-4">
               <Image
@@ -229,14 +184,6 @@ export default function StoreBillingPage() {
         icon={ShoppingCart}
         actions={
           <div className="flex items-center gap-3">
-            {currentStaff && (
-              <span className="text-sm font-medium text-muted-foreground hidden md:inline">
-                Operator: <span className="text-primary">{currentStaff.name}</span>
-              </span>
-            )}
-            <Button variant="outline" size="sm" onClick={handleEmployeeLoginClick}>
-              <LogInIcon className="mr-2 h-4 w-4" /> {currentStaff ? "Switch" : "Login"} Employee
-            </Button>
             <Button variant="outline" size="icon" onClick={() => setIsChatDialogOpen(true)} aria-label="Open Chat">
               <MessageSquare className="h-5 w-5" />
             </Button>
@@ -246,19 +193,20 @@ export default function StoreBillingPage() {
           </div>
         }
       />
-      <EmployeePasskeyDialog
-        isOpen={isEmployeeAuthDialogOpen}
-        onOpenChange={setIsEmployeeAuthDialogOpen}
-        storeId={currentStore.id}
-        onAuthenticated={handleEmployeeAuthenticatedFromDialog}
-      />
+      
       <Dialog open={isChatDialogOpen} onOpenChange={setIsChatDialogOpen}>
         <DialogContent className="sm:max-w-lg h-[70vh] p-0 flex flex-col border-t-4 border-t-primary shadow-lg">
           <DialogHeader className="p-4 border-b">
             <DialogTitle>Chat with Admin ({currentStore.name})</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0">
-            <ChatInterface storeId={currentStore.id} currentUserId={currentStaff?.id || currentStore.id} currentUserName={currentStaff?.name || currentStore.name} />
+             {/* ChatInterface needs currentUserId and currentUserName. 
+                 Since we don't have a persistent employee login on this page anymore,
+                 we can use store ID/Name as a placeholder for now.
+                 Alternatively, ChatInterface could be more flexible.
+                 For now, using storeId and storeName.
+             */}
+            <ChatInterface storeId={currentStore.id} currentUserId={currentStore.id} currentUserName={currentStore.name} />
           </div>
         </DialogContent>
       </Dialog>
@@ -277,13 +225,11 @@ export default function StoreBillingPage() {
         </div>
       }>
         <BillingForm
-          key={modeFromUrl || currentStore.id} // Ensures remount if mode or store changes significantly
+          key={modeFromUrl || currentStore.id}
           initialModeProp={modeFromUrl}
           storeId={currentStore.id}
           allowedModes={currentStore.allowedOperations}
           isAdminContext={false}
-          identifiedStaffProp={currentStaff}
-          onEmployeeIdentifiedForBill={handleBillSavedWithEmployee}
         />
       </Suspense>
     </div>
