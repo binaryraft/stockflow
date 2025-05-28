@@ -6,8 +6,8 @@ export interface ProductOption {
 
 export interface ProductVariant {
   id: string;
-  name: string; 
-  options: ProductOption[]; 
+  name: string;
+  options: ProductOption[];
 }
 
 export interface ProductSKU {
@@ -25,35 +25,35 @@ export interface Product {
   category?: string;
   trackQuantity: boolean;
   sku?: string; // Base SKU for non-variant products, or general product code
-  expiryDate?: string; 
-  imageUrl?: string; 
-  description?: string; 
-  variants?: ProductVariant[]; 
+  expiryDate?: string;
+  imageUrl?: string;
+  description?: string;
+  variants?: ProductVariant[];
   productSKUs: ProductSKU[]; // Holds all stock keeping units for this product
 }
 
 export type BillMode = 'buy' | 'sell' | 'return';
 
 export interface BillItem {
-  id: string; 
+  id: string;
   productId: string; // Refers to the main Product ID
   productName: string; // Denormalized for easy display
   quantity: number;
   costPrice: number; // Price at the time of this transaction
   sellPrice: number; // Price at the time of this transaction
-  isDefective?: boolean; 
-  selectedVariantOptions?: Record<string, string>; 
+  isDefective?: boolean;
+  selectedVariantOptions?: Record<string, string>;
 }
 
 export interface Bill {
   id:string;
-  type: BillMode; 
-  date: string; 
-  timestamp: number; 
+  type: BillMode;
+  date: string;
+  timestamp: number;
   vendorOrCustomerName?: string;
   customerPhone?: string;
   items: BillItem[];
-  totalAmount: number; 
+  totalAmount: number;
   notes?: string;
   paymentStatus?: 'paid' | 'unpaid';
   billedByStaffId?: string;
@@ -72,7 +72,7 @@ export interface Staff {
   name: string;
   email: string;
   phone: string;
-  passkey: string; 
+  passkey: string;
   accessibleStoreIds: string[];
 }
 
@@ -82,7 +82,7 @@ export interface Store {
   location: string;
   phone: string;
   email: string;
-  passkey: string; 
+  passkey: string;
   allowedStaffIds: string[];
   allowedOperations: BillMode[]; // e.g., ['sell', 'return']
 }
@@ -90,24 +90,25 @@ export interface Store {
 export interface SubscriptionPlan {
   id: string;
   name: string;
-  price: number; 
-  priceSuffix: string; 
+  price: number;
+  priceSuffix: string;
   features: string[];
-  maxStores: number; 
-  maxEmployees: number; 
+  maxStores: number;
+  maxEmployees: number;
   isPopular?: boolean;
 }
 
 export interface UserProfile {
   companyName: string;
   activeSubscriptionId: string;
+  dataMode: 'local' | 'global'; // Added dataMode
 }
 
 export interface ChatMessage {
   id: string;
   storeId: string;
-  senderId: 'admin' | string; // 'admin' or staffId
-  senderName: string; // "Admin" or staff's name
+  senderId: 'admin' | string; // 'admin' or staffId/storeId
+  senderName: string; // "Admin" or staff's/store's name
   text: string;
   timestamp: number;
 }

@@ -72,6 +72,7 @@ interface InventoryState {
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
+  setDataMode: (mode: 'local' | 'global') => void; // New action
 
   getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
@@ -123,6 +124,7 @@ const initialCategories: Category[] = DEFAULT_CATEGORIES.map(name => ({ id: gene
 const defaultUserProfile: UserProfile = {
   companyName: DEFAULT_COMPANY_NAME,
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN,
+  dataMode: 'local', // Default data mode
 };
 
 
@@ -158,14 +160,13 @@ export const useInventoryStore = create<InventoryState>()(
             skuIdentifier: getSkuIdentifier(productData.name, {}),
           });
         }
-        // If variants ARE defined, productSKUs will be empty initially. They get created upon first purchase.
 
         const newProduct: Product = {
           id: generateId(),
           name: productData.name,
           category: productData.category,
           trackQuantity: productData.trackQuantity,
-          sku: productData.sku, // Base SKU if provided
+          sku: productData.sku,
           expiryDate: productData.expiryDate,
           imageUrl: `https://placehold.co/100x100.png?text=${encodeURIComponent(productData.name.substring(0,10))}&font=roboto`,
           description: productData.description,
@@ -185,10 +186,9 @@ export const useInventoryStore = create<InventoryState>()(
             if (p.id === productId) {
               const updatedProduct: Product = { ...p, ...productData };
 
-              // Update variants if provided
               if (productData.variants) {
                 updatedProduct.variants = productData.variants.map((variantData, variantIdx) => {
-                  const existingVariant = p.variants?.find(v => v.name === variantData.name || v.id === (variantData as any).id); // Check by name or existing ID
+                  const existingVariant = p.variants?.find(v => v.name === variantData.name || v.id === (variantData as any).id);
                   return {
                     id: existingVariant?.id || `variant-${generateId()}-${variantIdx}`,
                     name: variantData.name,
@@ -203,10 +203,8 @@ export const useInventoryStore = create<InventoryState>()(
                 });
               }
 
-              // If it's a non-variant product and price/stock is updated
-              if ((!updatedProduct.variants || updatedProduct.variants.length === 0) && 
+              if ((!updatedProduct.variants || updatedProduct.variants.length === 0) &&
                   (productData.costPrice !== undefined || productData.sellPrice !== undefined || productData.initialStock !== undefined)) {
-                
                 let defaultSku = updatedProduct.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
                 if (defaultSku) {
                   defaultSku.costPrice = productData.costPrice !== undefined ? productData.costPrice : defaultSku.costPrice;
@@ -216,7 +214,7 @@ export const useInventoryStore = create<InventoryState>()(
                   } else {
                     defaultSku.quantityInStock = 0;
                   }
-                } else { // Create default SKU if it doesn't exist (e.g., product was variant, now isn't)
+                } else {
                   const newDefaultSku: ProductSKU = {
                     id: generateId(),
                     optionValues: {},
@@ -228,18 +226,9 @@ export const useInventoryStore = create<InventoryState>()(
                   updatedProduct.productSKUs = [newDefaultSku];
                 }
               }
-              // If the product becomes a variant product (variants added, but was non-variant)
-              // and had a default SKU, we might want to remove that default SKU
-              // or convert it if its optionValues become relevant. For now, we'll keep it simple:
-              // if variants are added, the old default SKU remains unless explicitly managed or deleted.
-              // A more robust system might clear productSKUs if variants structure changes significantly.
-              
-              // If productSKUs are directly provided (e.g., advanced edit), use them
               if (productData.productSKUs) {
                 updatedProduct.productSKUs = productData.productSKUs;
               }
-
-
               return updatedProduct;
             }
             return p;
@@ -253,11 +242,10 @@ export const useInventoryStore = create<InventoryState>()(
       deleteProduct: (productId: string) => {
         set((state) => ({
           products: state.products.filter((p) => p.id !== productId),
-          // Optional: Also remove bill items associated with this product
           bills: state.bills.map(bill => ({
             ...bill,
             items: bill.items.filter(item => item.productId !== productId)
-          })).filter(bill => bill.items.length > 0) // Remove bills if they become empty
+          })).filter(bill => bill.items.length > 0)
         }));
       },
 
@@ -267,41 +255,31 @@ export const useInventoryStore = create<InventoryState>()(
         if (productIndex === -1) return undefined;
 
         const product = products[productIndex];
-        const actualTrackQuantity = product.trackQuantity;
 
         const stringifiedOptionValues = JSON.stringify(Object.fromEntries(Object.entries(optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))));
         let skuIndex = product.productSKUs.findIndex(sku => JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB)))) === stringifiedOptionValues);
-        
+
         let updatedSku: ProductSKU;
 
         if (skuIndex !== -1) { // SKU Exists
           updatedSku = { ...product.productSKUs[skuIndex] };
           if (isPurchase) {
-            updatedSku.costPrice = costPrice; // Update cost price on purchase
-            updatedSku.sellPrice = sellPrice; // Update sell price on purchase
-            if (actualTrackQuantity) updatedSku.quantityInStock += quantityChange;
-          } else { // Sell or Return
-            if (actualTrackQuantity) updatedSku.quantityInStock += quantityChange;
+            updatedSku.costPrice = costPrice;
+            updatedSku.sellPrice = sellPrice;
           }
-        } else { // SKU does not exist, create it (should primarily happen during purchase)
-          if (!isPurchase && (!product.variants || product.variants.length > 0)) { 
-            // This case should ideally not happen for sales/returns if SKUs are created on purchase.
-            // If it does, it implies a data inconsistency or selling a variant that was never purchased.
-            // For robustness, we might log an error or create it with fetched default prices if available.
-            // For now, we'll allow creation but it might use the passed cost/sell which could be 0 if not from form.
-          }
+          if (product.trackQuantity) updatedSku.quantityInStock += quantityChange;
+
+        } else { // SKU does not exist, create it
           updatedSku = {
             id: generateId(),
             optionValues,
-            costPrice: costPrice, 
-            sellPrice: sellPrice, 
-            quantityInStock: actualTrackQuantity ? quantityChange : 0,
+            costPrice: costPrice,
+            sellPrice: sellPrice,
+            quantityInStock: product.trackQuantity ? quantityChange : 0,
             skuIdentifier: getSkuIdentifier(product.name, optionValues),
           };
         }
-
-        if (actualTrackQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock);
-
+        if (product.trackQuantity) updatedSku.quantityInStock = Math.max(0, updatedSku.quantityInStock);
 
         const updatedProductSKUs = [...product.productSKUs];
         if (skuIndex !== -1) {
@@ -309,8 +287,7 @@ export const useInventoryStore = create<InventoryState>()(
         } else {
           updatedProductSKUs.push(updatedSku);
         }
-        
-        // Update the product in the store
+
         const updatedProducts = [...products];
         updatedProducts[productIndex] = { ...product, productSKUs: updatedProductSKUs };
         set({ products: updatedProducts });
@@ -326,14 +303,13 @@ export const useInventoryStore = create<InventoryState>()(
         return get().products.filter((p) =>
           p.name.toLowerCase().includes(lowerSearchTerm) ||
           (p.category && p.category.toLowerCase().includes(lowerSearchTerm)) ||
-          (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm)) || // Base SKU
+          (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm)) ||
           (p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm)))
         );
       },
       getLowStockProductCount: (threshold: number) => {
          return get().products.reduce((count, product) => {
           if (product.trackQuantity) {
-            // Check if any SKU of this product is below threshold
             if (product.productSKUs.some(sku => sku.quantityInStock < threshold)) {
                 return count + 1;
             }
@@ -348,18 +324,17 @@ export const useInventoryStore = create<InventoryState>()(
 
         billItemsData.forEach(itemData => {
           const product = get().getProductById(itemData.productId);
-          
+
           if (!product && !itemData.productId.startsWith('SERVICE_ITEM_')) {
-            // This should ideally not happen if products are selected/created correctly
             console.error(`Product not found for itemData.productId: ${itemData.productId} during bill creation.`);
-            return; // Skip this item
+            return;
           }
 
           let itemCostPrice = itemData.costPrice;
           let itemSellPrice = itemData.sellPrice;
           let quantityModifier = 0;
 
-          if (product) { // Handle actual products
+          if (product) {
             if (product.trackQuantity) {
                 if (billData.type === 'sell') quantityModifier = -itemData.quantity;
                 else if (billData.type === 'buy') quantityModifier = itemData.quantity;
@@ -368,35 +343,30 @@ export const useInventoryStore = create<InventoryState>()(
 
             const targetSKU = get().findOrCreateProductSKU(
               itemData.productId,
-              itemData.selectedVariantOptions || {}, // Pass selected options
-              itemData.costPrice, // Cost price from form (relevant for 'buy')
-              itemData.sellPrice, // Sell price from form (relevant for 'buy')
-              quantityModifier,   // Quantity change for stock
-              billData.type === 'buy' // isPurchase flag
+              itemData.selectedVariantOptions || {},
+              itemData.costPrice,
+              itemData.sellPrice,
+              quantityModifier,
+              billData.type === 'buy'
             );
 
             if (!targetSKU) {
               console.error("Could not find or create SKU for bill item:", itemData.productId, itemData.selectedVariantOptions);
-              return; // Skip this item if SKU cannot be resolved
+              return;
             }
 
-            // For sell/return, the item's price is taken from the SKU
             if (billData.type === 'sell' || billData.type === 'return') {
               itemCostPrice = targetSKU.costPrice;
               itemSellPrice = targetSKU.sellPrice;
             }
-            // For 'buy', itemCostPrice and itemSellPrice from itemData (form input) are used,
-            // and findOrCreateProductSKU would have updated the SKU's prices.
           } else if (itemData.productId.startsWith('SERVICE_ITEM_')) {
-            // Service items don't affect inventory, prices are directly from itemData
-            itemCostPrice = itemData.costPrice;
-            itemSellPrice = itemData.sellPrice;
+            itemCostPrice = itemData.costPrice; // For services, use cost from billData
+            itemSellPrice = itemData.sellPrice; // For services, use sell price from billData
           }
-
 
           newBillItems.push({
             id: generateId(),
-            productName: product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? itemData.productName : 'Unknown Product'), // Use explicit productName for service
+            productName: product?.name || itemData.productName || 'Unknown Product',
             productId: itemData.productId,
             quantity: itemData.quantity,
             costPrice: itemCostPrice,
@@ -406,13 +376,6 @@ export const useInventoryStore = create<InventoryState>()(
           });
         });
 
-        if (newBillItems.length === 0 && billItemsData.length > 0) {
-          // This implies all items failed to process, which is an issue.
-          console.error("No items were successfully added to the bill.");
-          // Depending on desired behavior, you might throw an error or return null.
-          // For now, let's proceed but the bill will be empty, which is not ideal.
-        }
-        
         let totalAmount = 0;
         newBillItems.forEach(item => {
           totalAmount += item.quantity * (billData.type === 'buy' ? item.costPrice : item.sellPrice);
@@ -442,7 +405,6 @@ export const useInventoryStore = create<InventoryState>()(
         return newBill;
       },
       deleteBill: (billId: string) => {
-        // Note: This does not revert stock changes. A full "undo" is complex.
         set((state) => ({
           bills: state.bills.filter((b) => b.id !== billId),
         }));
@@ -546,6 +508,11 @@ export const useInventoryStore = create<InventoryState>()(
         if (!plan) return false;
         return get().staffs.length < plan.maxEmployees;
       },
+      setDataMode: (mode: 'local' | 'global') => { // New action to set dataMode
+        set((state) => ({
+          userProfile: { ...state.userProfile, dataMode: mode }
+        }));
+      },
 
       getDailySalesAndExpenses: (days) => {
         const bills = get().bills;
@@ -576,11 +543,8 @@ export const useInventoryStore = create<InventoryState>()(
         bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Exclude service items
-              
-              // Product name for aggregation, handle potential undefined product if data is inconsistent
+              if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const productNameForItem = item.productName || get().getProductById(item.productId)?.name || 'Unknown Product';
-
               if (!productRevenue[productNameForItem]) {
                 productRevenue[productNameForItem] = { name: productNameForItem, revenue: 0 };
               }
@@ -594,7 +558,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getRecentExpenseBillsWithPotentialCoverage: (limit: number) => {
         const expenseBills = get().bills.filter(bill => bill.type === 'buy')
-          .sort((a, b) => b.timestamp - a.timestamp); // Sort by timestamp for most recent
+          .sort((a, b) => b.timestamp - a.timestamp);
         return expenseBills.slice(0, limit).map(bill => {
           const totalCost = bill.totalAmount;
           const potentialRevenue = bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
@@ -610,7 +574,7 @@ export const useInventoryStore = create<InventoryState>()(
         let totalOutstandingCostOnUncoveredExpenses = 0;
         let coveredBillCount = 0;
         let uncoveredBillCount = 0;
-        
+
         expenseBills.forEach(bill => {
           const totalCost = bill.totalAmount;
           const potentialRevenue = bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
@@ -620,7 +584,7 @@ export const useInventoryStore = create<InventoryState>()(
             coveredBillCount++;
           } else {
             totalUncoveredExpenseValue += totalCost;
-            totalOutstandingCostOnUncoveredExpenses += (totalCost - potentialRevenue); // This is the amount 'short'
+            totalOutstandingCostOnUncoveredExpenses += (totalCost - potentialRevenue);
             uncoveredBillCount++;
           }
         });
@@ -660,7 +624,7 @@ export const useInventoryStore = create<InventoryState>()(
       clearChatForStore: (storeId: string) => {
         set((state) => {
           const newMessagesByStore = { ...state.messagesByStore };
-          delete newMessagesByStore[storeId]; // Or set to [] if preferred
+          delete newMessagesByStore[storeId];
           return { messagesByStore: newMessagesByStore };
         });
       },
@@ -669,8 +633,8 @@ export const useInventoryStore = create<InventoryState>()(
         try {
           const state = get();
           let storeUpdated = false;
-          
-          const initialSafeState = {
+
+          const initialSafeState: Partial<InventoryState> = {
             products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
             bills: [],
             categories: initialCategories.sort((a, b) => a.name.localeCompare(b.name)),
@@ -681,43 +645,16 @@ export const useInventoryStore = create<InventoryState>()(
           };
 
           // Ensure top-level properties exist and are of the correct type
-          if (!state.products || !Array.isArray(state.products)) { state.products = initialSafeState.products; storeUpdated = true; }
-          if (!state.bills || !Array.isArray(state.bills)) { state.bills = initialSafeState.bills; storeUpdated = true; }
-          if (!state.categories || !Array.isArray(state.categories)) { state.categories = initialSafeState.categories; storeUpdated = true; }
-          if (!state.staffs || !Array.isArray(state.staffs)) { state.staffs = initialSafeState.staffs; storeUpdated = true; }
-          if (!state.stores || !Array.isArray(state.stores)) { state.stores = initialSafeState.stores; storeUpdated = true; }
-          if (!state.messagesByStore || typeof state.messagesByStore !== 'object' || Array.isArray(state.messagesByStore)) { state.messagesByStore = initialSafeState.messagesByStore; storeUpdated = true; }
-
-
-          // Hydrate products carefully
-          state.products = state.products.map(p => {
-            if (!p || typeof p !== 'object' || !p.id || !p.name) return null; // Skip invalid product objects
-
-            const migratedProduct: Partial<Product> = { ...p };
-            migratedProduct.variants = Array.isArray(migratedProduct.variants) ? migratedProduct.variants : [];
-            migratedProduct.productSKUs = Array.isArray(migratedProduct.productSKUs) ? migratedProduct.productSKUs : [];
-
-            // Migrate old structure (top-level price/stock) to default SKU if productSKUs is empty AND it's not a variant product
-            if (migratedProduct.productSKUs.length === 0 && (!migratedProduct.variants || migratedProduct.variants.length === 0)) {
-              if (p.hasOwnProperty('costPrice') || p.hasOwnProperty('sellPrice') || p.hasOwnProperty('quantityInStock')) {
-                migratedProduct.productSKUs = [{
-                    id: generateId(),
-                    optionValues: {},
-                    costPrice: (p as any).costPrice ?? 0,
-                    sellPrice: (p as any).sellPrice ?? 0,
-                    quantityInStock: (p as any).quantityInStock ?? 0,
-                    skuIdentifier: getSkuIdentifier(p.name, {})
-                }];
-                storeUpdated = true;
-              }
+          (Object.keys(initialSafeState) as Array<keyof InventoryState>).forEach(key => {
+            if (typeof state[key] === 'undefined' || state[key] === null || typeof state[key] !== typeof initialSafeState[key]) {
+              (state as any)[key] = initialSafeState[key];
+              storeUpdated = true;
             }
-            // Clean up old top-level fields if they exist
-            ['costPrice', 'sellPrice', 'quantityInStock'].forEach(key => {
-                if (migratedProduct.hasOwnProperty(key)) delete (migratedProduct as any)[key];
-            });
-            return migratedProduct as Product;
-          }).filter(p => p !== null) as Product[];
-
+            if (Array.isArray(initialSafeState[key]) && !Array.isArray(state[key])) {
+               (state as any)[key] = initialSafeState[key];
+               storeUpdated = true;
+            }
+          });
 
           // Hydrate userProfile carefully
           if (!state.userProfile || typeof state.userProfile !== 'object') {
@@ -731,12 +668,46 @@ export const useInventoryStore = create<InventoryState>()(
             const currentSubId = state.userProfile.activeSubscriptionId;
             const isValidSubId = SUBSCRIPTION_PLANS.some(plan => plan.id === currentSubId);
             if (!currentSubId || !isValidSubId) {
-              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN; // Default to a valid plan
+              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
+              storeUpdated = true;
+            }
+            if (!state.userProfile.dataMode || !['local', 'global'].includes(state.userProfile.dataMode)) {
+              state.userProfile.dataMode = 'local';
               storeUpdated = true;
             }
           }
-          
-          // Ensure default categories exist
+
+          // Products migration/validation
+          if (Array.isArray(state.products)) {
+            state.products = state.products.map(p => {
+              if (!p || typeof p !== 'object' || !p.id || !p.name) return null;
+              const migratedProduct: Partial<Product> & { costPrice?: number; sellPrice?: number; quantityInStock?: number } = { ...p };
+              migratedProduct.variants = Array.isArray(migratedProduct.variants) ? migratedProduct.variants : [];
+              migratedProduct.productSKUs = Array.isArray(migratedProduct.productSKUs) ? migratedProduct.productSKUs : [];
+
+              if (migratedProduct.productSKUs.length === 0 && (!migratedProduct.variants || migratedProduct.variants.length === 0)) {
+                if (migratedProduct.hasOwnProperty('costPrice') || migratedProduct.hasOwnProperty('sellPrice') || migratedProduct.hasOwnProperty('quantityInStock')) {
+                  migratedProduct.productSKUs.push({
+                      id: generateId(),
+                      optionValues: {},
+                      costPrice: migratedProduct.costPrice ?? 0,
+                      sellPrice: migratedProduct.sellPrice ?? 0,
+                      quantityInStock: migratedProduct.quantityInStock ?? 0,
+                      skuIdentifier: getSkuIdentifier(migratedProduct.name, {})
+                  });
+                  storeUpdated = true;
+                }
+              }
+              delete migratedProduct.costPrice;
+              delete migratedProduct.sellPrice;
+              delete migratedProduct.quantityInStock;
+              return migratedProduct as Product;
+            }).filter(p => p !== null) as Product[];
+          } else {
+            state.products = initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []}));
+            storeUpdated = true;
+          }
+
           DEFAULT_CATEGORIES.forEach(catName => {
             if(!get().categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
               get().addCategory(catName); storeUpdated = true;
@@ -746,10 +717,8 @@ export const useInventoryStore = create<InventoryState>()(
           if (storeUpdated) {
             set({ ...state });
           }
-
         } catch (error) {
           console.error("Critical error during inventory store hydration, resetting to defaults:", error);
-          // Reset to a known good state if hydration fails spectacularly
           set({
             products: initialProducts.map(p => ({...p, variants: p.variants || [], productSKUs: p.productSKUs || []})),
             bills: [],
@@ -771,5 +740,3 @@ export const useInventoryStore = create<InventoryState>()(
     }
   )
 );
-
-    
