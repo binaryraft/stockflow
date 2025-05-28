@@ -1,451 +1,939 @@
-
 "use client";
 
-import React, { useEffect } from 'react';
-import { useForm, Controller, useFieldArray, FormProvider, useFormContext } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ProductSearchInput } from './product-search-input';
+// import { NewProductDialog } from './new-product-dialog'; // Removed
+import { BillItemRow, BillItemHeader } from './bill-item-row';
+import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, ProductSKU } from '@/types';
-import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
+import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { BillSaveAnimation } from './bill-save-animation';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { EmployeePasskeyDialog } from './employee-passkey-dialog';
 
-
-const productOptionSchema = z.object({
-  value: z.string().min(1, "Option value cannot be empty"),
-  // id: z.string().optional(), // Keep track of existing option IDs for edits
-});
-
-const productVariantFormSchema = z.object({
-  name: z.string().min(1, "Variant name cannot be empty"),
-  options: z.array(productOptionSchema).min(1, "At least one option is required for a variant."),
-  // id: z.string().optional(), // Keep track of existing variant IDs for edits
-});
-
-const newProductSchema = z.object({
-  name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
-  description: z.string().optional(),
-  category: z.string().optional().default(''),
-  trackQuantity: z.boolean().default(false),
-  initialStock: z.coerce.number().min(0).optional().default(0),
-  costPrice: z.coerce.number().min(0).optional().default(0),
-  sellPrice: z.coerce.number().min(0).optional().default(0),
-  sku: z.string().optional(),
-  expiryDate: z.string().optional(),
-  variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
-});
-
-type NewProductFormData = z.infer<typeof newProductSchema>;
-
-interface VariantFormSectionProps {
-  variantIndex: number;
-  removeVariant: (index: number) => void;
+// Interface for values pre-filled from billing flow to new product page
+interface NewProductPrefillParams {
+  name?: string;
+  quantity?: string;
+  costPrice?: string;
+  sellPrice?: string;
 }
 
-const VariantFormSection: React.FC<VariantFormSectionProps> = ({
-  variantIndex,
-  removeVariant
-}) => {
-  const { control, register, formState: { errors }, watch, setFocus } = useFormContext<NewProductFormData>();
-
-  const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
-    control,
-    name: `variants.${variantIndex}.options` as const,
-  });
-
-  const variantName = watch(`variants.${variantIndex}.name`);
-
-  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, optionIndex: number) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      appendOption({ value: '' });
-      setTimeout(() => {
-        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
-      }, 50); // Added a slight delay for DOM update
-    }
-  };
-
-  const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
-     if (e.key === 'Enter') {
-        e.preventDefault();
-        if (optionFields.length === 0) {
-          appendOption({ value: '' });
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-        } else {
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-        }
-      }
-  }
-
-  return (
-    <div className="space-y-3 border border-primary/20 p-4 rounded-md bg-tertiary">
-      <div className="flex justify-between items-center">
-        <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium">Variant {variantIndex + 1}</Label>
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant">
-                    <Trash2 className="h-4 w-4 text-destructive"/>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Remove this variant type</p></TooltipContent>
-        </Tooltip>
-      </div>
-      <Input
-        {...register(`variants.${variantIndex}.name`)}
-        placeholder="e.g. Color, Size"
-        aria-label={`Variant ${variantIndex + 1} Name`}
-        onKeyDown={handleVariantNameEnter}
-      />
-      {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
-
-      <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant ${variantIndex+1}`}</Label>
-      <div className="space-y-2">
-        {optionFields.map((optionValueField, optionIndex) => (
-          <div key={optionValueField.id} className="flex items-center gap-2">
-            <Input
-              {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
-              placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
-              aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
-            />
-            {optionFields.length > 1 && (
-               <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option">
-                        <Trash2 className="h-3 w-3 text-destructive"/>
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Remove this option</p></TooltipContent>
-              </Tooltip>
-            )}
-          </div>
-        ))}
-        {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants?.[variantIndex]?.options?.root?.message}</p>}
-         {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
-
-      </div>
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="text-xs"
-        onClick={() => {
-          appendOption({ value: '' });
-          setTimeout(() => {
-            setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
-          }, 50);
-        }}
-      >
-        <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Option
-      </Button>
-    </div>
-  );
+type PendingBillPayload = {
+  billType: BillMode;
+  vendorOrCustomerName?: string;
+  customerPhone?: string;
+  notes?: string;
+  paymentStatus?: 'paid' | 'unpaid';
+  items: Omit<BillItem, 'id'|'productName'>[];
+  storeIdForBill?: string;
 };
 
 
-interface NewProductDialogProps {
-  isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
-  onProductAdd?: (product: Product) => void;
-  editingProduct?: Product | null;
-  initialProductName?: string;
-  initialQuantityForDialog?: number;
-  initialCostPriceForDialog?: number;
-  initialSellPriceForDialog?: number;
+interface BillingFormProps {
+  storeId?: string; // storeIdFromProp
+  allowedModes?: BillMode[];
+  initialModeProp?: BillMode | null;
+  isAdminContext?: boolean;
 }
 
-export function NewProductDialog({
-  isOpen,
-  onOpenChange,
-  onProductAdd,
-  editingProduct,
-  initialProductName,
-  initialQuantityForDialog,
-  initialCostPriceForDialog,
-  initialSellPriceForDialog
-}: NewProductDialogProps) {
-  const { addProduct, updateProduct } = useInventoryStore();
+export function BillingForm({
+  storeId: storeIdFromProp,
+  allowedModes,
+  initialModeProp,
+  isAdminContext = false,
+}: BillingFormProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { toast } = useToast();
+  const { getProductByName, addBill, searchProducts, getProductById, getAllStores } = useInventoryStore();
+  const allStores = getAllStores();
 
-  const form = useForm<NewProductFormData>({
-    resolver: zodResolver(newProductSchema),
-    defaultValues: {
-      name: '',
-      description: '',
-      category: '',
-      trackQuantity: false,
-      initialStock: 0,
-      costPrice: 0,
-      sellPrice: 0,
-      sku: '',
-      expiryDate: '',
-      variants: [],
-    },
-  });
+  const determineMode = useCallback((): BillMode => {
+    const urlMode = initialModeProp || searchParams.get('mode') as BillMode | null;
 
-  const { control, register, handleSubmit, formState: { errors }, watch, reset: formReset, setValue, setFocus } = form;
+    if (urlMode && ['sell', 'buy', 'return'].includes(urlMode)) {
+        if (!allowedModes || (allowedModes && allowedModes.includes(urlMode))) {
+            return urlMode;
+        }
+    }
+    if (allowedModes && allowedModes.length > 0) {
+      return allowedModes[0];
+    }
+    return 'sell'; 
+  }, [initialModeProp, allowedModes, searchParams]);
+  
+  const [mode, setMode] = useState<BillMode>(determineMode());
+  const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(
+    isAdminContext && allStores.length === 1 ? allStores[0].id : undefined
+  );
 
-  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-    control: control,
-    name: "variants",
-  });
+  const resetFormFields = useCallback((focusProductName = true) => {
+    setProductNameQuery('');
+    setQuantity(1);
+    setCostPrice('');
+    setSellPrice('');
+    setCurrentSkuStock(null);
+    setReturnItemIsDefective(false);
+    setCurrentProductForSelection(null);
+    setSelectedVariantOptions({});
+    setVariantDropdownOpenState({});
+    setProductNotFoundHint('');
+    if (focusProductName) {
+      setTimeout(() => productNameInputRef.current?.focus(), 0);
+    }
+  }, []);
+
+  const resetFullForm = useCallback(() => {
+    setCurrentBillItems([]);
+    setCustomerVendorName('');
+    setCustomerPhone('');
+    setNotes('');
+    setIsPaid(true);
+    setServiceDescription('');
+    setServiceAmount('');
+    resetFormFields(true); // This now includes resetting productNotFoundHint
+  }, [resetFormFields]);
+
 
   useEffect(() => {
-    if (isOpen) {
-      if (editingProduct) {
-        const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0)
-                            ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0)
-                            : null;
-        formReset({
-          name: editingProduct.name,
-          description: editingProduct.description || '',
-          category: editingProduct.category || '',
-          trackQuantity: editingProduct.trackQuantity,
-          initialStock: defaultSku ? defaultSku.quantityInStock : 0,
-          costPrice: defaultSku ? defaultSku.costPrice : 0,
-          sellPrice: defaultSku ? defaultSku.sellPrice : 0,
-          sku: editingProduct.sku || '',
-          expiryDate: editingProduct.expiryDate || '',
-          variants: editingProduct.variants?.map(v => ({
-            name: v.name,
-            options: v.options.map(o => ({ value: o.value }))
-          })) || [],
-        });
-      } else {
-        const shouldTrack = initialQuantityForDialog !== undefined;
-        formReset({
-          name: initialProductName || '',
-          description: '',
-          category: '',
-          trackQuantity: shouldTrack,
-          initialStock: initialQuantityForDialog || 0,
-          costPrice: initialCostPriceForDialog || 0,
-          sellPrice: initialSellPriceForDialog || 0,
-          sku: '',
-          expiryDate: '',
-          variants: [],
-        });
-      }
-      setTimeout(() => setFocus('name'), 50); // Auto-focus name field on open
+    const newDeterminedMode = determineMode();
+    if (newDeterminedMode !== mode) {
+      setMode(newDeterminedMode);
+      resetFullForm();
     }
-  }, [
-    isOpen,
-    editingProduct,
-    initialProductName,
-    initialQuantityForDialog,
-    initialCostPriceForDialog,
-    initialSellPriceForDialog,
-    formReset,
-    setFocus
-  ]);
-
-  const trackQuantityValue = watch('trackQuantity');
-  const currentVariants = watch('variants');
-  const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
+  }, [determineMode, mode, resetFullForm]);
 
 
-  const onSubmit = (data: NewProductFormData) => {
-    const productVariantsPayload = data.variants?.map(v => ({
-        name: v.name,
-        options: v.options.map(opt => ({ value: opt.value }))
-    }));
+  const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
+  const [customerVendorName, setCustomerVendorName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [notes, setNotes] = useState('');
+  const [isPaid, setIsPaid] = useState(true);
 
-    if (editingProduct) {
-      const payloadForUpdate: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: any[], initialStock?: number, costPrice?: number, sellPrice?: number } = {
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        trackQuantity: data.trackQuantity,
-        sku: data.sku,
-        expiryDate: data.expiryDate,
-        variants: productVariantsPayload,
-      };
-      if (!hasVariants) {
-        payloadForUpdate.costPrice = data.costPrice;
-        payloadForUpdate.sellPrice = data.sellPrice;
-        payloadForUpdate.initialStock = data.trackQuantity ? data.initialStock : 0;
-      }
+  const [productNameQuery, setProductNameQuery] = useState('');
+  const [quantity, setQuantity] = useState<number | string>(1);
+  const [costPrice, setCostPrice] = useState<number | string>('');
+  const [sellPrice, setSellPrice] = useState<number | string>('');
+  const [currentSkuStock, setCurrentSkuStock] = useState<number | null>(null);
 
-      updateProduct(editingProduct.id, payloadForUpdate);
-      toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      const updatedProductData = useInventoryStore.getState().getProductById(editingProduct.id) || { ...editingProduct, ...payloadForUpdate } as Product;
-      onProductAdd?.(updatedProductData);
-    } else {
-      const payloadForAdd: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: any[] } = {
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        trackQuantity: data.trackQuantity,
-        sku: data.sku,
-        expiryDate: data.expiryDate,
-        variants: productVariantsPayload,
-      };
-       if (!hasVariants) {
-        payloadForAdd.costPrice = data.costPrice;
-        payloadForAdd.sellPrice = data.sellPrice;
-        payloadForAdd.initialStock = data.trackQuantity ? data.initialStock : 0;
-      }
-      const addedProduct = addProduct(payloadForAdd);
-      toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
-      onProductAdd?.(addedProduct);
+  const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
+  const [productNotFoundHint, setProductNotFoundHint] = useState('');
+
+  const [currentProductForSelection, setCurrentProductForSelection] = useState<Product | null>(null);
+  const [selectedVariantOptions, setSelectedVariantOptions] = useState<Record<string, string>>({});
+  const variantSelectRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
+  const [variantDropdownOpenState, setVariantDropdownOpenState] = useState<Record<string, boolean>>({});
+
+  const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
+  const [lastSavedBillMode, setLastSavedBillMode] = useState<BillMode | null>(null);
+
+  const productNameInputRef = useRef<HTMLInputElement>(null);
+  const quantityInputRef = useRef<HTMLInputElement>(null);
+  const costPriceInputRef = useRef<HTMLInputElement>(null);
+  const sellPriceInputRef = useRef<HTMLInputElement>(null);
+  const customerVendorNameInputRef = useRef<HTMLInputElement>(null);
+  const customerPhoneInputRef = useRef<HTMLInputElement>(null);
+
+  const [serviceDescription, setServiceDescription] = useState('');
+  const [serviceAmount, setServiceAmount] = useState<number | string>('');
+  const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
+  const serviceAmountInputRef = useRef<HTMLInputElement>(null);
+
+  const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false); 
+  const [pendingBillPayload, setPendingBillPayload] = useState<PendingBillPayload | null>(null);
+
+  useEffect(() => {
+    setTimeout(() => productNameInputRef.current?.focus(), 0);
+  }, [mode]); // Focus product name on mode change
+
+  const handleProductSelect = (product: Product) => {
+    setProductNameQuery(product.name);
+    setCurrentProductForSelection(product);
+    setSelectedVariantOptions({}); // Reset variant selections
+    setProductNotFoundHint('');
+    setCurrentSkuStock(null); // Reset SKU stock display
+
+    if (!product.variants || product.variants.length === 0) { // Product without variants
+        const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
+        if (defaultSku) {
+            setCostPrice(mode === 'buy' ? (defaultSku.costPrice ?? '') : defaultSku.costPrice);
+            setSellPrice(mode === 'buy' ? (defaultSku.sellPrice ?? '') : defaultSku.sellPrice);
+            if(product.trackQuantity) setCurrentSkuStock(defaultSku.quantityInStock);
+        } else { 
+            // Should not happen if product structure is correct (non-variant products always have a default SKU)
+            setCostPrice(mode === 'buy' ? '' : 0);
+            setSellPrice(mode === 'buy' ? '' : 0);
+            if(product.trackQuantity) setCurrentSkuStock(0);
+        }
+        // Focus quantity input for non-variant products
+        setTimeout(() => {
+            quantityInputRef.current?.focus();
+            quantityInputRef.current?.select();
+        }, 50);
+    } else { // Product with variants
+        setCostPrice(''); // Prices will be determined by selected SKU
+        setSellPrice('');
+        // Attempt to open the first variant dropdown
+        const firstVariantId = product.variants[0].id;
+        if (firstVariantId) {
+            setVariantDropdownOpenState({ [firstVariantId]: true });
+            // Focus will be handled by useEffect watching variantDropdownOpenState
+        }
     }
-    onOpenChange(false);
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) {
-        formReset();
+  // Effect to focus the first variant dropdown when it's set to open
+  useEffect(() => {
+    if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
+        const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
+        if (firstOpenVariantId) {
+            const firstVariantRef = variantSelectRefs.current[firstOpenVariantId];
+            setTimeout(() => {
+                const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
+                (elToFocus as HTMLElement)?.focus();
+            }, 100); // Increased timeout slightly
+        }
+    }
+  }, [currentProductForSelection, variantDropdownOpenState]);
+
+  // Effect to update prices and focus quantity input after all variants are selected
+  useEffect(() => {
+    if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
+      const allVariantsSelected = currentProductForSelection.variants.every(
+        (v) => selectedVariantOptions[v.name]
+      );
+
+      if (allVariantsSelected) {
+        const targetSku = currentProductForSelection.productSKUs.find(
+          sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) ===
+                 JSON.stringify(Object.entries(selectedVariantOptions).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
+        );
+
+        if (targetSku) {
+          setCostPrice(mode === 'buy' ? (targetSku.costPrice ?? '') : targetSku.costPrice);
+          setSellPrice(mode === 'buy' ? (targetSku.sellPrice ?? '') : targetSku.sellPrice);
+          if(currentProductForSelection.trackQuantity) setCurrentSkuStock(targetSku.quantityInStock);
+        } else {
+          // This case might occur if a variant combination doesn't have a corresponding SKU yet (e.g. new combo in buy mode)
+          setCostPrice(mode === 'buy' ? '' : 0);
+          setSellPrice(mode === 'buy' ? '' : 0);
+          setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
+        }
+        
+        // Only focus quantity input if the last variant dropdown is not currently open and quantity input isn't already focused.
+        const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
+        if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
+             setTimeout(() => {
+                quantityInputRef.current?.focus();
+                quantityInputRef.current?.select();
+            }, 100); 
+        }
       }
-      onOpenChange(open);
-    }}>
-      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg">
-        <DialogHeader>
-          <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
-          <DialogDescription>
-            Fill in the details for the product. Fields marked with * are required.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="flex-1 my-1 -mx-6 px-6">
-          <FormProvider {...form}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-              <div>
-                <Label htmlFor="name">Product Name*</Label>
-                <Input id="name" {...register("name")} />
-                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-              </div>
+    }
+  }, [selectedVariantOptions, currentProductForSelection, mode, variantDropdownOpenState]);
 
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea id="description" {...register("description")} placeholder="Enter product description..."/>
-              </div>
 
-              <div className="flex items-end gap-2">
-                <div className="flex-grow">
-                  <Label htmlFor="category">Category</Label>
-                  <Controller
-                    name="category"
-                    control={control}
-                    render={({ field }) => (
-                      <CategorySearchInput
-                        id="category"
-                        value={field.value || ''}
-                        onValueChange={(value) => field.onChange(value)}
-                        onCategorySelect={(categoryName) => field.onChange(categoryName)}
-                        placeholder="Type or select category"
-                      />
-                    )}
+  const handleAddNewItem = () => {
+    const currentQuantity = typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1;
+    if (!productNameQuery || currentQuantity <= 0) {
+      toast({ variant: "destructive", title: "Missing Information", description: "Please enter product name and valid quantity." });
+      productNameInputRef.current?.focus();
+      return;
+    }
+
+    let product = currentProductForSelection || getProductByName(productNameQuery);
+
+    if (!product) {
+      // Navigate to add product page with pre-filled data
+      const params: NewProductPrefillParams = { name: productNameQuery };
+      if (mode === 'buy') {
+        params.quantity = currentQuantity.toString();
+        params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
+        params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+      }
+      const query = new URLSearchParams(params as Record<string, string>).toString();
+      router.push(`/admin/products/add?${query}`);
+      setProductNotFoundHint(''); 
+      return;
+    }
+
+    if (product.variants && product.variants.length > 0) {
+      const allVariantsSelected = product.variants.every(
+        (v) => selectedVariantOptions[v.name]
+      );
+      if (!allVariantsSelected) {
+        toast({ variant: "destructive", title: "Variant Selection Required", description: "Please select options for all product variants." });
+        const firstUnselectedVariant = product.variants.find(v => !selectedVariantOptions[v.name]);
+        if (firstUnselectedVariant) {
+            setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
+        }
+        return;
+      }
+    }
+
+    const targetOptionValues = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
+    let targetSku = product.productSKUs.find(
+      sku => JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) ===
+             JSON.stringify(Object.entries(targetOptionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
+    );
+
+    if ((mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) && product.trackQuantity) {
+      const stockToCheck = targetSku ? targetSku.quantityInStock : 0; // If no specific SKU, assume 0 for safety
+      if (stockToCheck < currentQuantity) {
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck} of ${product.name} (selected variant) available.` });
+        return;
+      }
+    }
+
+    let itemCostPrice: number;
+    let itemSellPrice: number;
+
+    if (mode === 'buy') {
+      itemCostPrice = parseFloat(costPrice.toString()) || 0;
+      itemSellPrice = parseFloat(sellPrice.toString()) || 0;
+       if (itemCostPrice <= 0 && itemSellPrice <= 0 && currentQuantity > 0) {
+        toast({ variant: "destructive", title: "Invalid Prices", description: "Cost and/or Sell Price must be greater than 0 for purchases."});
+        costPriceInputRef.current?.focus();
+        return;
+      }
+    } else { // Sell or Return mode
+      // If targetSku doesn't exist (e.g., product structure issue or newly defined variant without SKU from purchase yet)
+      // we should ideally prevent selling/returning. For now, default to 0 or product's base if any.
+      itemCostPrice = targetSku?.costPrice ?? 0; 
+      itemSellPrice = targetSku?.sellPrice ?? 0;
+      if (itemSellPrice <= 0 && mode === 'sell' && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) { // Use product.id for service check
+        toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
+        return;
+      }
+    }
+
+    const newItem: BillItem = {
+      id: uuidv4(),
+      productId: product.id,
+      productName: product.name,
+      quantity: currentQuantity,
+      costPrice: itemCostPrice,
+      sellPrice: itemSellPrice,
+      isDefective: mode === 'return' ? returnItemIsDefective : undefined,
+      selectedVariantOptions: (product.variants && product.variants.length > 0) ? { ...selectedVariantOptions } : undefined,
+    };
+
+    setCurrentBillItems(prevItems => [...prevItems, newItem]);
+    resetFormFields(true); // Focus product name after adding
+  };
+
+  const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
+    if (currentField === 'productName') {
+       const productsFound = searchProducts(productNameQuery);
+       if (productsFound.length === 1 && !currentProductForSelection && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
+            handleProductSelect(productsFound[0]); // This will handle focusing next field
+       } else {
+            if (currentProductForSelection) { // Product is selected
+                if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
+                     quantityInputRef.current?.focus();
+                     quantityInputRef.current?.select();
+                } else { // Product has variants
+                    const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
+                    const firstVariantId = currentProductForSelection.variants[0]?.id;
+                    if(firstUnselectedVariant && firstVariantId){
+                        setVariantDropdownOpenState(prev => ({ ...prev, [firstVariantId]: true }));
+                        // Focus will be handled by useEffect watching variantDropdownOpenState
+                    } else { // All variants somehow already selected or no variants focus quantity
+                        quantityInputRef.current?.focus();
+                        quantityInputRef.current?.select();
+                    }
+                }
+            } else if (productNotFoundHint === productNameQuery && productNameQuery.trim() !== '') {
+                // Second enter press when product not found - navigate to add product page
+                const params: NewProductPrefillParams = { name: productNameQuery };
+                if (mode === 'buy') {
+                  const currentQty = typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1;
+                  params.quantity = currentQty.toString();
+                  params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
+                  params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+                }
+                const query = new URLSearchParams(params as Record<string, string>).toString();
+                router.push(`/admin/products/add?${query}`);
+                setProductNotFoundHint('');
+            } else if (productNameQuery.trim() !== '') {
+                setProductNotFoundHint(productNameQuery); // Set hint on first enter if no exact match
+            }
+       }
+    } else if (currentField === 'quantity') {
+      if (mode === 'buy') {
+        costPriceInputRef.current?.focus();
+        costPriceInputRef.current?.select();
+      } else if (mode === 'sell' || mode === 'return') {
+        handleAddNewItem();
+      }
+    } else if (currentField === 'costPrice') {
+      if (mode === 'buy') {
+        sellPriceInputRef.current?.focus();
+        sellPriceInputRef.current?.select();
+      }
+    } else if (currentField === 'sellPrice') {
+      if (mode === 'buy') handleAddNewItem();
+    } else if (currentField === 'serviceDescription') {
+      serviceAmountInputRef.current?.focus();
+      serviceAmountInputRef.current?.select();
+    } else if (currentField === 'serviceAmount') {
+      handleAddServiceItem();
+    }
+  };
+
+  const updateBillItemQuantity = (itemId: string, newQuantity: number) => {
+    setCurrentBillItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          return { ...item, quantity: Math.max(0, newQuantity) };
+        }
+        return item;
+      })
+    );
+  };
+
+  const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
+    if (mode !== 'buy') return;
+    setCurrentBillItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
+      )
+    );
+  };
+
+  const removeBillItem = (itemId: string) => {
+    setCurrentBillItems(prevItems => prevItems.filter(item => item.id !== itemId));
+  };
+
+  const calculateTotal = () => {
+    return currentBillItems.reduce((acc, item) => {
+      const price = mode === 'buy' ? item.costPrice : item.sellPrice;
+      return acc + (price * item.quantity);
+    }, 0);
+  };
+
+  const calculatePotentialSellTotalForBuy = () => {
+    if (mode !== 'buy') return 0;
+    return currentBillItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
+  };
+
+  const proceedWithSave = (staffId: string) => {
+    if (!pendingBillPayload) {
+      toast({ variant: "destructive", title: "Error", description: "No bill data to save." });
+      return;
+    }
+
+    const { billType, vendorOrCustomerName, customerPhone, notes, paymentStatus, items, storeIdForBill } = pendingBillPayload;
+
+    addBill({
+      type: billType,
+      vendorOrCustomerName: vendorOrCustomerName,
+      customerPhone: customerPhone,
+      notes: notes,
+      paymentStatus: paymentStatus,
+      billedByStaffId: staffId,
+      storeId: storeIdForBill,
+    }, items);
+
+    setLastSavedBillMode(billType);
+    setIsSavingAnimationVisible(true);
+    setPendingBillPayload(null); // Clear pending payload after proceeding
+  };
+
+
+  const handleSaveBill = () => {
+    if (currentBillItems.length === 0) {
+      toast({ variant: "destructive", title: "Empty Bill", description: "Please add items to the bill." });
+      return;
+    }
+
+    const finalStoreId = isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
+
+    if (isAdminContext && allStores.length > 1 && !finalStoreId) {
+      toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
+      return;
+    }
+     if (isAdminContext && allStores.length === 0 && !finalStoreId && !storeIdFromProp) {
+        toast({ variant: "destructive", title: "No Stores Configured", description: "Please add stores in Store Management before creating bills." });
+        return;
+    }
+
+    const billItemsForStore = currentBillItems.map(item => ({
+      productId: item.productId,
+      productName: item.productName, // Pass productName for service items
+      quantity: item.quantity,
+      costPrice: item.costPrice,
+      sellPrice: item.sellPrice,
+      isDefective: item.isDefective,
+      selectedVariantOptions: item.selectedVariantOptions,
+    }));
+
+    const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
+
+    const currentBillPayload: PendingBillPayload = {
+      billType: mode,
+      vendorOrCustomerName: customerVendorName,
+      customerPhone: customerPhone,
+      notes: notes,
+      paymentStatus: billPaymentStatus,
+      items: billItemsForStore,
+      storeIdForBill: finalStoreId,
+    };
+    
+    if (!isAdminContext && storeIdFromProp) { // Store portal context
+        setPendingBillPayload(currentBillPayload);
+        setIsVerifyEmployeeDialogOpen(true); 
+    } else { // Admin context
+      setPendingBillPayload(currentBillPayload); 
+      proceedWithSave('admin_self_billed'); // Admin bills are self-billed for now
+    }
+  };
+
+  const handleEmployeeVerifiedForBill = (staff: Staff) => {
+    setIsVerifyEmployeeDialogOpen(false);
+    if (pendingBillPayload) { 
+      proceedWithSave(staff.id);
+    } else {
+        toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
+    }
+    // PendingBillPayload is cleared inside proceedWithSave or animation close
+  };
+
+
+  const handleAnimationClose = () => {
+    setIsSavingAnimationVisible(false);
+    setLastSavedBillMode(null);
+    resetFullForm(); // This also resets product input fields
+
+    if (isAdminContext) {
+      const currentQueryModeInUrl = searchParams.get('mode');
+      const basePath = '/admin/billing';
+       if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
+         router.push(`${basePath}?mode=${currentQueryModeInUrl}`); 
+       } else {
+         router.push(basePath); // Default to history view
+       }
+    }
+    // For store portal, no explicit navigation needed here, stays on billing form with current mode.
+  };
+
+  const handleModeChange = (newModeString: string) => {
+    const newMode = newModeString as BillMode;
+    if (allowedModes && allowedModes.length > 0 && !allowedModes.includes(newMode)) {
+        toast({variant: "destructive", title: "Mode Not Allowed", description: `This terminal is not configured for ${newMode} operations.`});
+        return;
+    }
+
+    if (newMode !== mode) {
+        setMode(newMode);
+        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); // Fallback for safety
+        router.push(`${basePath}?mode=${newMode}`, { scroll: false });
+        resetFullForm(); // Ensure form is reset when mode changes via tabs
+    }
+  };
+
+
+  const handleEditProductClick = () => {
+    if (currentProductForSelection) {
+      router.push(`/admin/products/${currentProductForSelection.id}`);
+    }
+  };
+
+  const handleAddServiceItem = () => {
+    if (!serviceDescription || !serviceAmount || parseFloat(serviceAmount.toString()) <= 0) {
+      toast({ variant: "destructive", title: "Missing Service Info", description: "Please enter service description and a valid amount." });
+      serviceDescriptionInputRef.current?.focus();
+      return;
+    }
+    const amount = parseFloat(serviceAmount.toString());
+    const serviceItem: BillItem = {
+      id: uuidv4(),
+      productId: `SERVICE_ITEM_${uuidv4()}`, // Unique ID for service item
+      productName: serviceDescription,
+      quantity: 1,
+      costPrice: mode === 'buy' ? amount : 0, // Cost is amount if buying, 0 if selling
+      sellPrice: amount, // Sell price is always the amount
+      isDefective: undefined,
+      selectedVariantOptions: undefined,
+    };
+    setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
+    setServiceDescription('');
+    setServiceAmount('');
+    setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0);
+  };
+
+  const displayModes = allowedModes || ['sell', 'buy', 'return'];
+  const activeModeConfig = {
+    sell: { icon: Send, color: "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground", label: "Sales" },
+    buy: { icon: ShoppingBag, color: "data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground", label: "Expense" },
+    return: { icon: RotateCcw, color: "data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950", label: "Return" },
+  };
+  
+  return (
+    <div className="flex flex-col gap-6">
+      <BillSaveAnimation
+        show={isSavingAnimationVisible}
+        billMode={lastSavedBillMode}
+        onClose={handleAnimationClose}
+      />
+      {/* EmployeePasskeyDialog is specific to store portal usage */}
+      {(!isAdminContext && storeIdFromProp) && (
+        <EmployeePasskeyDialog
+          isOpen={isVerifyEmployeeDialogOpen}
+          onOpenChange={(open) => {
+              if(!open && isVerifyEmployeeDialogOpen) { // If dialog is cancelled
+                  setPendingBillPayload(null); // Clear pending data
+              }
+              setIsVerifyEmployeeDialogOpen(open);
+          }}
+          storeId={storeIdFromProp}
+          onAuthenticated={handleEmployeeVerifiedForBill}
+        />
+      )}
+
+      <div className="flex justify-center">
+        <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
+          <TabsList className="grid w-full grid-cols-3 gap-1">
+            {displayModes.includes('sell') && (
+              <TabsTrigger
+                value="sell"
+                className={cn("flex items-center gap-2 text-sm px-4 py-2", activeModeConfig.sell.color)}
+              >
+                <activeModeConfig.sell.icon size={18}/>{activeModeConfig.sell.label}
+              </TabsTrigger>
+            )}
+            {displayModes.includes('buy') && (
+              <TabsTrigger
+                value="buy"
+                className={cn("flex items-center gap-2 text-sm px-4 py-2", activeModeConfig.buy.color)}
+              >
+                <activeModeConfig.buy.icon size={18}/>{activeModeConfig.buy.label}
+              </TabsTrigger>
+            )}
+            {displayModes.includes('return') && (
+              <TabsTrigger
+                value="return"
+                className={cn("flex items-center gap-2 text-sm px-4 py-2", activeModeConfig.return.color)}
+              >
+                <activeModeConfig.return.icon size={18}/>{activeModeConfig.return.label}
+              </TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
+      </div>
+
+      <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
+        <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
+          {isAdminContext && allStores.length > 1 && (
+              <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
+                <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium">
+                    <Building size={18} className="text-muted-foreground"/> Select Store for this Bill
+                </Label>
+                <Select value={selectedStoreIdForAdmin} onValueChange={setSelectedStoreIdForAdmin}>
+                    <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
+                        <SelectValue placeholder="Select a store..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {allStores.map(store => (
+                            <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                 {isAdminContext && allStores.length > 1 && !selectedStoreIdForAdmin && <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>}
+              </div>
+          )}
+
+          <div className="space-y-4 pb-4 border-b border-dashed">
+            <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
+            </h3>
+            <div className={cn(
+              "grid gap-4 items-baseline", // Use items-baseline for better input alignment
+              "grid-cols-1",
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]"
+            )}>
+              <div className="space-y-1.5 flex-grow">
+                <Label htmlFor="productNameGlobal">Product Name</Label>
+                <div className="flex items-center gap-2">
+                  <ProductSearchInput
+                    inputRef={productNameInputRef}
+                    value={productNameQuery}
+                    onValueChange={(v) => { setProductNameQuery(v); if (!v) {setCurrentProductForSelection(null); setProductNotFoundHint(''); setCurrentSkuStock(null);}}}
+                    onProductSelect={handleProductSelect}
+                    onEnterWithoutSelection={() => handleEnterNavigation('productName')}
+                    placeholder={mode === 'return' ? 'Search product to return' : 'Scan or type product name'}
+                    id="productNameGlobal"
+                    className="flex-grow"
                   />
-                  {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
+                  {currentProductForSelection && isAdminContext && ( // Only show edit for admin for now
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
+                          <Edit3 className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Edit {currentProductForSelection.name}</p></TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
+                {currentProductForSelection && <span className="text-xs text-muted-foreground ml-1">Selected: {currentProductForSelection.name} {currentProductForSelection.trackQuantity && currentSkuStock !== null ? `(Stock: ${currentSkuStock})` : ''}</span>}
+                {productNotFoundHint && productNameQuery === productNotFoundHint && (
+                    <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
+                        <Info size={16} className="text-accent shrink-0" />
+                        Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter to add it.
+                    </div>
+                )}
               </div>
 
-              <div className="flex items-center space-x-2">
-                <Controller
-                  name="trackQuantity"
-                  control={control}
-                  render={({ field }) => (
-                    <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                  )}
+              <div className="space-y-1.5 w-full md:w-24">
+                <Label htmlFor="quantityGlobal">Quantity</Label>
+                <Input
+                  id="quantityGlobal"
+                  ref={quantityInputRef}
+                  type="number"
+                  value={quantity}
+                  onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
+                  onFocus={(e) => e.target.select()}
+                  min="1"
+                  placeholder="1"
                 />
-                <Label htmlFor="trackQuantity" className="font-normal">Track Quantity</Label>
               </div>
-
-              {!hasVariants && (
+              {mode === 'buy' ? (
                 <>
-                  {trackQuantityValue && (
-                    <div>
-                      <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
-                      <Input id="initialStock" type="number" {...register("initialStock")} placeholder="0" />
-                      {errors.initialStock && <p className="text-sm text-destructive mt-1">{errors.initialStock.message}</p>}
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="costPrice">Cost Price*</Label>
-                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
-                      {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
-                    </div>
-                    <div>
-                      <Label htmlFor="sellPrice">Sell Price*</Label>
-                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
-                      {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
-                    </div>
+                  <div className="space-y-1.5 w-full md:w-32">
+                    <Label htmlFor="costPrice">Cost Price/Unit</Label>
+                    <Input
+                      id="costPrice"
+                      ref={costPriceInputRef}
+                      type="number"
+                      value={costPrice}
+                      onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
+                      onFocus={(e) => e.target.select()}
+                      step="0.01" min="0" placeholder="0.00"
+                    />
                   </div>
+                  <div className="space-y-1.5 w-full md:w-32">
+                    <Label htmlFor="sellPrice">Sell Price/Unit</Label>
+                    <Input
+                      id="sellPrice"
+                      ref={sellPriceInputRef}
+                      type="number"
+                      value={sellPrice}
+                      onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
+                      onFocus={(e) => e.target.select()}
+                      step="0.01" min="0" placeholder="0.00"
+                    />
+                  </div>
+                  <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                     <PlusCircle className="mr-2 h-4 w-4" /> Add
+                  </Button>
                 </>
+              ) : ( 
+                 <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                 </Button>
               )}
+            </div>
 
-              <div>
-                <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional - for base product)</span></Label>
-                <Input id="sku" {...register("sku")} />
+            {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
+              <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
+                {currentProductForSelection.variants.map((variant, index) => {
+                   if (!variantSelectRefs.current[variant.id]) {
+                      variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
+                    }
+                  return (
+                    <div key={variant.id} className="space-y-1.5">
+                      <Label htmlFor={`variant-select-${variant.id}-trigger`}>{variant.name}</Label>
+                      <Select
+                        open={variantDropdownOpenState[variant.id] || false}
+                        onOpenChange={(isOpen) => {
+                          setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
+                        }}
+                        value={selectedVariantOptions[variant.name] || ""}
+                        onValueChange={(value) => {
+                            setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current dropdown
+
+                            const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
+                            if (currentIndex < currentProductForSelection!.variants!.length - 1) {
+                                const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
+                                setTimeout(() => { // Use timeout to ensure state updates propagate
+                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
+                                  // Focus handled by useEffect watching variantDropdownOpenState
+                                }, 50); 
+                            } else { // Last variant selected
+                                setTimeout(() => {
+                                   quantityInputRef.current?.focus();
+                                   quantityInputRef.current?.select();
+                                }, 50);
+                            }
+                        }}
+                      >
+                        <SelectTrigger
+                          id={`variant-select-${variant.id}-trigger`}
+                          ref={variantSelectRefs.current[variant.id]}
+                          className="w-full select-trigger-class"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) {
+                                e.preventDefault();
+                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
+                            } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
+                                // If dropdown is open and Enter is pressed, Radix Select handles selection.
+                                // The onValueChange will then trigger focus to next element.
+                            }
+                          }}
+                        >
+                          <SelectValue placeholder={`Select ${variant.name}`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {variant.options.map((option) => (
+                            <SelectItem key={option.id} value={option.value}>
+                              {option.value}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )})}
               </div>
-              <div>
-                <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                <Input id="expiryDate" type="date" {...register("expiryDate")} />
-              </div>
+            )}
 
-              {hasVariants && (
-                  <p className="text-xs text-muted-foreground italic">
-                      For products with variants, stock and pricing are managed per specific combination (SKU) and primarily set/updated via Expense Bills.
-                  </p>
-              )}
-
-              <Separator/>
-              <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
-              <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                  Define variant types like 'Color' or 'Size'. Options for each variant (e.g., Red, Blue; Small, Medium) are added below.
-              </p>
-              {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
-
-              {variantFields.map((variantField, variantIndex) => (
-                <VariantFormSection
-                  key={variantField.id}
-                  variantIndex={variantIndex}
-                  removeVariant={removeVariant}
+            {mode === 'return' && (
+              <div className="flex items-center space-x-2 pt-2">
+                <Switch
+                  id="isDefective"
+                  checked={returnItemIsDefective}
+                  onCheckedChange={setReturnItemIsDefective}
                 />
-              ))}
+                <Label htmlFor="isDefective">Item is defective</Label>
+              </div>
+            )}
+          </div>
 
-              {variantFields.length < 2 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
-                  className="w-full"
-                >
-                  <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
-                </Button>
+          {/* Bill Items List */}
+          <div className="flex-grow overflow-hidden">
+            {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
+            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> {/* Constrained height for scroll */}
+              {currentBillItems.length === 0 ? (
+                <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
+              ) : (
+                <div className="space-y-0">
+                  {currentBillItems.map((item) => (
+                    <BillItemRow
+                      key={item.id}
+                      item={item}
+                      mode={mode}
+                      onQuantityChange={updateBillItemQuantity}
+                      onPriceChange={updateBillItemPrice}
+                      onRemoveItem={removeBillItem}
+                    />
+                  ))}
+                </div>
               )}
-              {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
+            </ScrollArea>
+          </div>
 
-            </form>
-          </FormProvider>
-        </ScrollArea>
-        <DialogFooter className="border-t pt-4">
-            <DialogClose asChild>
-            <Button type="button" variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button type="button" onClick={handleSubmit(onSubmit)} variant="default">{editingProduct ? 'Save Changes' : 'Add Product'}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          {/* Ad-hoc Service/Charge Section */}
+          {(mode === 'sell' || mode === 'buy') && (
+            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> {/* Ensure it's pushed down */}
+              <h3 className="text-md font-medium text-foreground flex items-center gap-2">
+                <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+                <div className="space-y-1.5">
+                  <Label htmlFor="serviceDescription">Description</Label>
+                  <Input
+                    id="serviceDescription"
+                    ref={serviceDescriptionInputRef}
+                    value={serviceDescription}
+                    onChange={(e) => setServiceDescription(e.target.value)}
+                    placeholder="e.g., Delivery Fee, Repair Service"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceDescription'))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="serviceAmount">Amount</Label>
+                  <Input
+                    id="serviceAmount"
+                    ref={serviceAmountInputRef}
+                    type="number"
+                    value={serviceAmount}
+                    onChange={(e) => setServiceAmount(parseFloat(e.target.value) || '')}
+                    placeholder="Amount"
+                    step="0.01"
+                    min="0"
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
+                    onFocus={(e) => e.target.select()}
+                  />
+                </div>
+                <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
+                  <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+        <Separator className="my-0"/>
+        <CardFooter className="flex-col items-stretch gap-4 pt-6">
+          <div className="flex justify-between text-lg font-semibold text-foreground">
+            <span>Total:</span>
+            <span>₹{calculateTotal().toFixed(2)}</span>
+          </div>
+          {mode === 'buy' && currentBillItems.length > 0 && (
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>Potential Sell Value:</span>
+              <span>₹{calculatePotentialSellTotalForBuy().toFixed(2)}</span>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label htmlFor="notes">Notes</Label>
+            <Input
+              id="notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Add any notes for this bill (optional)"
+            />
+          </div>
+           {(mode === 'sell' || mode === 'buy') && (
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch
+                id="paymentStatus"
+                checked={isPaid}
+                onCheckedChange={setIsPaid}
+                className={cn(isPaid ? "data-[state=checked]:bg-green-500" : "data-[state=unchecked]:bg-destructive")}
+              />
+              <Label htmlFor="paymentStatus" className={cn("font-medium", isPaid ? "text-green-600 dark:text-green-500" : "text-destructive")}>
+                {isPaid ? 'Paid' : 'Unpaid'}
+              </Label>
+            </div>
+          )}
+          <div className="flex gap-3 mt-2">
+            <Button variant="outline" onClick={resetFullForm} className="flex-1">
+              <Eraser className="mr-2 h-4 w-4" /> Clear Bill
+            </Button>
+            <Button onClick={handleSaveBill} className="flex-1" disabled={currentBillItems.length === 0}>
+              <Save className="mr-2 h-4 w-4" /> Save Bill
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
