@@ -18,7 +18,8 @@ import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw
 import { format } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,19 @@ interface BillHistoryTableProps {
   filterByStoreId?: string;
 }
 
+
+const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
+  const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
+  if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
+  if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
+  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
+  return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
+};
+
+const getBillTypeName = (bill: Bill): string => {
+  return getBillTypeIconAndColor(bill).name;
+};
+
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const { bills, getProductById, userProfile, deleteBill } = useInventoryStore();
   const { toast } = useToast();
@@ -43,18 +57,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   const [filterType, setFilterType] = useState<BillFilterType>('all');
-
-  const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
-    const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
-    if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
-    if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
-    if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
-    return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
-  };
-
-  const getBillTypeName = (bill: Bill): string => {
-    return getBillTypeIconAndColor(bill).name;
-  };
 
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
@@ -284,14 +286,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write('<h4>Summary</h4>');
       printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
-      if (billToPrint.type === 'buy') {
+      if (billToPrint.type === 'buy') { // Expense Bill
         const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
         const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // green or red
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
-      } else if (billToPrint.type === 'sell') {
+      } else if (billToPrint.type === 'sell') { // Sales Bill
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       } else { // Return bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
@@ -328,7 +330,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const findProductSKU = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
     if (!product) return undefined;
-    if (productId.startsWith('SERVICE_ITEM_')) return undefined; // Service items don't have SKUs in the same way
+    if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
 
     const targetOptionValues = selectedOptions || {};
     return product.productSKUs.find(sku => 
@@ -453,6 +455,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
+                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -609,25 +612,25 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
+                  <AlertDialogHead>
+                    <AlertDialogTit>Are you sure?</AlertDialogTit>
+                    <AlertDialogDesc>
                       This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
                       Stock levels will NOT be automatically readjusted.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
+                    </AlertDialogDesc>
+                  </AlertDialogHead>
+                  <AlertDialogFoot>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
                       onClick={() => {
                         handleDeleteBillClick(selectedBill.id, selectedBill.id);
-                        setIsViewDialogOpen(false); // Close the details dialog after deletion
+                        setIsViewDialogOpen(false); 
                       }}
                       className="bg-destructive hover:bg-destructive/90"
                     >
                       Delete Bill
                     </AlertDialogAction>
-                  </AlertDialogFooter>
+                  </AlertDialogFoot>
                 </AlertDialogContent>
               </AlertDialog>
               <DialogClose asChild>
@@ -665,7 +668,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 Date / Time
               </TableHead>
               <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[160px] py-3 px-4"> {/* Increased width for new content */}
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[160px] py-3 px-4"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
@@ -776,18 +779,18 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 </DropdownMenuItem>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
+                                <AlertDialogHead>
+                                <AlertDialogTit>Are you sure?</AlertDialogTit>
+                                <AlertDialogDesc>
                                     This action cannot be undone. This will permanently delete bill ID: {bill.id}. Stock levels will NOT be automatically readjusted.
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
+                                </AlertDialogDesc>
+                                </AlertDialogHead>
+                                <AlertDialogFoot>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleDeleteBillClick(bill.id, bill.id)} className="bg-destructive hover:bg-destructive/90">
                                     Delete Bill
                                 </AlertDialogAction>
-                                </AlertDialogFooter>
+                                </AlertDialogFoot>
                             </AlertDialogContent>
                         </AlertDialog>
                       </DropdownMenuContent>
@@ -808,6 +811,3 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
-
-
-    
