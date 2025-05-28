@@ -63,6 +63,7 @@ export function OverviewStats() {
     });
     
     const totalTrackedProducts = products.filter(p => p.trackQuantity).length;
+    // Correctly use getLowStockProductCount from the store instance
     const lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
 
     setStats({
