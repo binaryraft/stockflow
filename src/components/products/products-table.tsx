@@ -17,7 +17,6 @@ import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown } from 'luc
 import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-// Removed: import { NewProductDialog } from '../billing/new-product-dialog'; 
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -27,11 +26,11 @@ import Link from 'next/link';
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
 
 export function ProductsTable() {
-  const { products, deleteProduct } = useInventoryStore();
+  const { products, deleteProduct, getSkuDetails } = useInventoryStore();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: SortableColumns; direction: 'ascending' | 'descending' } | null>(null);
+  const [sortConfig, setSortConfig] = useState<{ key: SortableColumns; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
 
   const filteredAndSortedProducts = useMemo(() => {
     let sortableProducts = [...products];
@@ -48,13 +47,18 @@ export function ProductsTable() {
       sortableProducts.sort((a, b) => {
         let valA, valB;
         if (sortConfig.key === 'stock') {
-            valA = a.trackQuantity ? a.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0) : -1; // Non-tracked as lowest
-            valB = b.trackQuantity ? b.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0) : -1;
-        } else if (sortConfig.key === 'costPrice' || sortConfig.key === 'sellPrice') {
-            const pricesA = a.productSKUs.map(sku => sku[sortConfig.key as 'costPrice' | 'sellPrice']);
-            const pricesB = b.productSKUs.map(sku => sku[sortConfig.key as 'costPrice' | 'sellPrice']);
-            valA = pricesA.length > 0 ? Math.min(...pricesA.filter(p => typeof p === 'number')) : Infinity; // Unpriced at the end for min sort
-            valB = pricesB.length > 0 ? Math.min(...pricesB.filter(p => typeof p === 'number')) : Infinity;
+            valA = a.trackQuantity ? a.productSKUs.reduce((sum, sku) => sum + getSkuDetails(sku).totalStock, 0) : -1;
+            valB = b.trackQuantity ? b.productSKUs.reduce((sum, sku) => sum + getSkuDetails(sku).totalStock, 0) : -1;
+        } else if (sortConfig.key === 'costPrice') {
+            const costsA = a.productSKUs.map(sku => getSkuDetails(sku).averageCostPrice).filter(p => p !== null) as number[];
+            const costsB = b.productSKUs.map(sku => getSkuDetails(sku).averageCostPrice).filter(p => p !== null) as number[];
+            valA = costsA.length > 0 ? Math.min(...costsA) : Infinity;
+            valB = costsB.length > 0 ? Math.min(...costsB) : Infinity;
+        } else if (sortConfig.key === 'sellPrice') {
+            const pricesA = a.productSKUs.map(sku => getSkuDetails(sku).currentSellPrice).filter(p => p !== null) as number[];
+            const pricesB = b.productSKUs.map(sku => getSkuDetails(sku).currentSellPrice).filter(p => p !== null) as number[];
+            valA = pricesA.length > 0 ? Math.min(...pricesA) : Infinity;
+            valB = pricesB.length > 0 ? Math.min(...pricesB) : Infinity;
         } else if (sortConfig.key === 'sku') {
             valA = a.sku || '';
             valB = b.sku || '';
@@ -77,12 +81,9 @@ export function ProductsTable() {
         
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
-    } else {
-      // Default sort by name
-      sortableProducts.sort((a,b) => a.name.localeCompare(b.name));
     }
     return sortableProducts;
-  }, [products, searchTerm, sortConfig]);
+  }, [products, searchTerm, sortConfig, getSkuDetails]);
 
   const requestSort = (key: SortableColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -99,18 +100,19 @@ export function ProductsTable() {
 
   const getProductStockDisplay = (product: Product): string | number => {
     if (!product.trackQuantity) return <span className="text-xs text-muted-foreground">N/A</span>;
-    if (product.productSKUs.length === 0 && product.variants && product.variants.length > 0) return 0; 
-    return product.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
+    const totalStock = product.productSKUs.reduce((sum, sku) => sum + getSkuDetails(sku).totalStock, 0);
+    return totalStock;
   };
 
-  const getProductPriceDisplay = (product: Product, field: 'costPrice' | 'sellPrice'): string => {
+  const getProductPriceDisplay = (product: Product, field: 'averageCostPrice' | 'currentSellPrice'): string => {
     if (product.productSKUs.length === 0) return "N/A";
     
-    const prices = product.productSKUs.map(sku => sku[field]).filter(price => typeof price === 'number');
+    const prices = product.productSKUs.map(sku => getSkuDetails(sku)[field]).filter(price => price !== null) as number[];
+    
     if (prices.length === 0) return "N/A"; 
     
     const allPricesAreZero = prices.every(price => price === 0);
-    if (allPricesAreZero && prices.length > 0) return `₹0.00`;
+    if (allPricesAreZero) return `₹0.00`;
 
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
@@ -153,7 +155,7 @@ export function ProductsTable() {
                 Stock <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('costPrice')}>
-                Cost <ArrowUpDown className="ml-1 h-3 w-3 inline" />
+                Avg. Cost <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
               <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('sellPrice')}>
                 Sell Price <ArrowUpDown className="ml-1 h-3 w-3 inline" />
@@ -185,7 +187,7 @@ export function ProductsTable() {
                     <div>{product.name}</div>
                     {isVariantProduct && (
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {product.variants?.map(v => `${v.name} (${v.options.length})`).join(' / ')} ({product.productSKUs.length} SKU(s))
+                        {product.variants?.map(v => `${v.name} (${v.options.length})`).join(' / ')} ({product.productSKUs.length} Defined SKU(s))
                       </div>
                     )}
                   </TableCell>
@@ -199,10 +201,10 @@ export function ProductsTable() {
                     {getProductStockDisplay(product)}
                   </TableCell>
                   <TableCell className="text-right py-3 px-4 align-top">
-                    {getProductPriceDisplay(product, 'costPrice')}
+                    {getProductPriceDisplay(product, 'averageCostPrice')}
                   </TableCell>
                   <TableCell className="text-right py-3 px-4 align-top">
-                     {getProductPriceDisplay(product, 'sellPrice')}
+                     {getProductPriceDisplay(product, 'currentSellPrice')}
                   </TableCell>
                   <TableCell className="py-3 px-4 align-top text-xs hidden lg:table-cell">
                     {product.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : <span className="text-muted-foreground">-</span>}
@@ -238,7 +240,7 @@ export function ProductsTable() {
                                 <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the product "{product.name}" and all associated data.
+                                    This action cannot be undone. This will permanently delete the product "{product.name}" and all associated data (including stock layers and SKU definitions). Bill history will retain references to this product name.
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -267,5 +269,3 @@ export function ProductsTable() {
     </>
   );
 }
-
-    

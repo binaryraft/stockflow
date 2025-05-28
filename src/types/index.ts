@@ -10,13 +10,20 @@ export interface ProductVariant {
   options: ProductOption[];
 }
 
+export interface StockLayer {
+  id: string; // Unique ID for this layer/batch
+  purchaseBillId: string; // ID of the expense bill this layer came from
+  purchaseDate: string; // ISO date string
+  quantity: number; // Quantity remaining in this layer
+  costPrice: number; // Cost price for items in this layer
+  sellPrice: number; // Sell price set for items from this layer (at time of purchase)
+}
+
 export interface ProductSKU {
   id: string;
   optionValues: Record<string, string>; // e.g., {"Color": "Red", "Size": "M"}
-  costPrice: number;
-  sellPrice: number;
-  quantityInStock: number;
   skuIdentifier?: string; // e.g., PNAME-RED-M
+  stockLayers: StockLayer[];
 }
 
 export interface Product {
@@ -39,7 +46,7 @@ export interface BillItem {
   productId: string; // Refers to the main Product ID
   productName: string; // Denormalized for easy display
   quantity: number;
-  costPrice: number; // Price at the time of this transaction
+  costPrice: number; // For sales/returns, this is COGS from FIFO. For purchases, it's the purchase cost.
   sellPrice: number; // Price at the time of this transaction
   isDefective?: boolean;
   selectedVariantOptions?: Record<string, string>;
@@ -101,7 +108,6 @@ export interface SubscriptionPlan {
 export interface UserProfile {
   companyName: string;
   activeSubscriptionId: string;
-  // dataMode: 'local' | 'global'; // Removed dataMode
 }
 
 export interface ChatMessage {

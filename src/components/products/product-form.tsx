@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU } from '@/types';
-import { CategorySearchInput } from '@/components/billing/category-search-input'; // Re-use from billing
+import { CategorySearchInput } from '@/components/billing/category-search-input';
 import { PlusCircle, Trash2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -23,26 +23,24 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 
 const productOptionSchema = z.object({
-  id: z.string().optional(), // Keep ID for existing options during edits
+  id: z.string().optional(),
   value: z.string().min(1, "Option value cannot be empty"),
 });
 
 const productVariantFormSchema = z.object({
-  id: z.string().optional(), // Keep ID for existing variants during edits
+  id: z.string().optional(),
   name: z.string().min(1, "Variant name cannot be empty"),
   options: z.array(productOptionSchema).min(1, "At least one option is required for a variant."),
 });
 
+// Removed initialStock, costPrice, sellPrice from top-level for non-variant products.
+// These are now managed via stockLayers in ProductSKU, typically initiated by an Expense Bill.
 const productFormSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  // Fields for non-variant product's default SKU
-  initialStock: z.coerce.number().min(0).optional().default(0),
-  costPrice: z.coerce.number().min(0).optional().default(0),
-  sellPrice: z.coerce.number().min(0).optional().default(0),
-  sku: z.string().optional(), // Base SKU
+  sku: z.string().optional(), // Base SKU for the product itself
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -52,7 +50,7 @@ type ProductFormData = z.infer<typeof productFormSchema>;
 interface VariantFormSectionProps {
   variantIndex: number;
   removeVariant: (index: number) => void;
-  control: any; // Control from useForm
+  control: any;
   register: any;
   formState: any;
   watch: any;
@@ -163,7 +161,6 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 interface ProductFormProps {
   initialData?: Product | null;
-  // searchParams used for pre-filling when adding new product from billing
   searchParams?: { [key: string]: string | string[] | undefined }; 
 }
 
@@ -180,9 +177,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       description: '',
       category: '',
       trackQuantity: false,
-      initialStock: 0,
-      costPrice: 0,
-      sellPrice: 0,
       sku: '',
       expiryDate: '',
       variants: [],
@@ -198,37 +192,29 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
 
   useEffect(() => {
     if (isEditing && initialData) {
-      const defaultSku = (!initialData.variants || initialData.variants.length === 0)
-                          ? initialData.productSKUs.find(s => Object.keys(s.optionValues).length === 0)
-                          : null;
       formReset({
         name: initialData.name,
         description: initialData.description || '',
         category: initialData.category || '',
         trackQuantity: initialData.trackQuantity,
-        initialStock: defaultSku ? defaultSku.quantityInStock : 0,
-        costPrice: defaultSku ? defaultSku.costPrice : 0,
-        sellPrice: defaultSku ? defaultSku.sellPrice : 0,
         sku: initialData.sku || '',
-        expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '', // Format for date input
+        expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         variants: initialData.variants?.map(v => ({
-          id: v.id, // Preserve existing variant IDs
+          id: v.id,
           name: v.name,
-          options: v.options.map(o => ({ id: o.id, value: o.value })) // Preserve existing option IDs
+          options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
       });
-    } else if (!isEditing && searchParams) { // Pre-fill for new product from billing
+    } else if (!isEditing && searchParams) {
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
         trackQuantity: searchParams.quantity !== undefined, // Track if quantity was passed
-        initialStock: typeof searchParams.quantity === 'string' ? parseInt(searchParams.quantity) : 0,
-        costPrice: typeof searchParams.costPrice === 'string' ? parseFloat(searchParams.costPrice) : 0,
-        sellPrice: typeof searchParams.sellPrice === 'string' ? parseFloat(searchParams.sellPrice) : 0,
         sku: '',
         expiryDate: '',
         variants: [],
+        // Initial stock & prices for non-variant products are no longer set here; they are set via Expense Bills.
       });
     }
     setTimeout(() => setFocus('name'), 50);
@@ -240,10 +226,10 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
 
   const onSubmit = (data: ProductFormData) => {
     const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
-        id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // Ensure ID exists
+        id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
         options: v_form.options.map(opt_form => ({ 
-          id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`, // Ensure ID exists
+          id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
           value: opt_form.value 
         }))
     }));
@@ -253,10 +239,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     }
     
     if (isEditing && initialData) {
-      // For updates, productSKUs are managed via Expense Bills or potentially a future dedicated SKU management UI.
-      // This form primarily updates the base product info and variant structure.
-      // If it's a non-variant product, we update its single default SKU.
-      const updatedProductData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: ProductVariantType[], initialStock?: number, costPrice?: number, sellPrice?: number } = {
+      const updatedProductData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: ProductVariantType[] } = {
         name: data.name,
         description: data.description,
         category: data.category,
@@ -265,15 +248,10 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         expiryDate: data.expiryDate,
         variants: productVariantsPayload,
       };
-      if (!hasVariants) { // Non-variant product: update its default SKU
-        updatedProductData.costPrice = data.costPrice;
-        updatedProductData.sellPrice = data.sellPrice;
-        updatedProductData.initialStock = data.trackQuantity ? data.initialStock : 0;
-      }
       updateProduct(initialData.id, updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      const newProductData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: ProductVariantType[] } = {
+      const newProductData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
         name: data.name,
         description: data.description,
         category: data.category,
@@ -282,11 +260,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         expiryDate: data.expiryDate,
         variants: productVariantsPayload,
       };
-      if (!hasVariants) { // Non-variant product: set details for its default SKU
-        newProductData.costPrice = data.costPrice;
-        newProductData.sellPrice = data.sellPrice;
-        newProductData.initialStock = data.trackQuantity ? data.initialStock : 0;
-      }
       addProduct(newProductData);
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
@@ -349,34 +322,10 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
 
-            {!hasVariants && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 border rounded-md bg-tertiary/50 shadow-sm">
-                {trackQuantityValue && (
-                  <div className="space-y-1.5">
-                    <Label htmlFor="initialStock">{isEditing ? 'Current Stock*' : 'Initial Stock*'}</Label>
-                    <Input id="initialStock" type="number" {...register("initialStock")} placeholder="0" />
-                    {errors.initialStock && <p className="text-sm text-destructive mt-1">{errors.initialStock.message}</p>}
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <Label htmlFor="costPrice">Cost Price* (Default)</Label>
-                  <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
-                  {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="sellPrice">Sell Price* (Default)</Label>
-                  <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
-                  {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
-                </div>
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30">
+                Pricing and initial stock for products (and their specific variants/SKUs) are primarily set and updated via Expense Bills. This form defines the product structure.
+            </p>
             
-            {hasVariants && (
-                <p className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30">
-                    For products with variants, stock and pricing are managed per specific combination (SKU) and are primarily set/updated via Expense Bills. The default prices above will not apply if variants are defined.
-                </p>
-            )}
-
             <Separator className="my-6"/>
             
             <div className="space-y-4">
@@ -427,5 +376,3 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     </Card>
   );
 }
-
-    

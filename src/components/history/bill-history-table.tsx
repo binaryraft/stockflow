@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
+import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -35,12 +35,11 @@ interface BillHistoryTableProps {
   filterByStoreId?: string;
 }
 
-
 const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
   const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
   if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
   if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
-  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
+  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-red-500 dark:text-red-400" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
 };
 
@@ -49,7 +48,7 @@ const getBillTypeName = (bill: Bill): string => {
 };
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
-  const { bills, getProductById, userProfile, deleteBill } = useInventoryStore();
+  const { bills, getProductById, userProfile, deleteBill, getSkuDetails } = useInventoryStore();
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -116,7 +115,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId, getBillTypeName]); 
+  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId]); 
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -145,7 +144,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
+        "  body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { max-width: 750px; margin: auto; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
@@ -287,7 +286,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
       if (billToPrint.type === 'buy') { // Expense Bill
-        const expectedRevenue = calculatePotentialRevenue(billToPrint);
+        const expectedRevenue = billToPrint.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
         const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // green or red
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
@@ -310,11 +309,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
   };
 
-  const calculatePotentialRevenue = (bill: Bill): number => {
-    if (!bill || !bill.items) return 0;
-    return bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
-  };
-
   const getPartyDetailsTitle = (billType?: BillMode): string => {
     if (billType === 'buy') return 'Vendor Details';
     if (billType === 'sell' || billType === 'return') return 'Customer Details';
@@ -327,15 +321,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     return 'Name';
   };
 
-  const findProductSKU = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
+  const findProductSKUfromStore = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
     if (!product) return undefined;
     if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
 
     const targetOptionValues = selectedOptions || {};
     return product.productSKUs.find(sku => 
-      JSON.stringify(Object.entries(sku.optionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>)) === 
-      JSON.stringify(Object.entries(targetOptionValues).sort().reduce((r, [k, v]) => (r[k] = v, r), {} as Record<string,string>))
+      JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort())) === 
+      JSON.stringify(Object.fromEntries(Object.entries(targetOptionValues).sort()))
     );
   };
 
@@ -439,7 +433,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 </div>
               )}
 
-
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-3">Items</h4>
                 <Table className="mt-0">
@@ -455,7 +448,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
+                            const currentSKU = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+                            const skuDetails = getSkuDetails(currentSKU);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -567,7 +561,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                             </div>
                             {(() => {
-                                const expectedRevenue = calculatePotentialRevenue(selectedBill);
+                                const expectedRevenue = selectedBill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
                                 const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
                                 return (
                                 <>
@@ -616,7 +610,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     <AlertDialogTit>Are you sure?</AlertDialogTit>
                     <AlertDialogDesc>
                       This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
-                      Stock levels will NOT be automatically readjusted.
+                      Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
                     </AlertDialogDesc>
                   </AlertDialogHead>
                   <AlertDialogFoot>
@@ -750,7 +744,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                             : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
                         )}
                       >
-                        {bill.paymentStatus}
+                        {selectedBill?.paymentStatus}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">-</span>
@@ -782,12 +776,12 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <AlertDialogHead>
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
-                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}. Stock levels will NOT be automatically readjusted.
+                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}. Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
                                 </AlertDialogDesc>
                                 </AlertDialogHead>
                                 <AlertDialogFoot>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteBillClick(bill.id, bill.id)} className="bg-destructive hover:bg-destructive/90">
+                                <AlertDialogAction onClick={() => { handleDeleteBillClick(bill.id, bill.id); setIsViewDialogOpen(false); }} className="bg-destructive hover:bg-destructive/90">
                                     Delete Bill
                                 </AlertDialogAction>
                                 </AlertDialogFoot>
