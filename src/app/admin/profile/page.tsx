@@ -9,9 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { SUBSCRIPTION_PLANS } from '@/lib/constants';
+import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import type { SubscriptionPlan } from '@/types';
-import { CheckCircle, Edit3, Save, User, BadgeCheck } from 'lucide-react';
+import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export default function ProfilePage() {
@@ -30,7 +30,8 @@ export default function ProfilePage() {
   useEffect(() => {
     if (hasMounted) {
       setCompanyNameInput(userProfile.companyName);
-      setActivePlan(getActiveSubscriptionPlan());
+      const currentPlan = getActiveSubscriptionPlan();
+      setActivePlan(currentPlan);
     }
   }, [hasMounted, userProfile, getActiveSubscriptionPlan]);
 
@@ -45,9 +46,15 @@ export default function ProfilePage() {
   };
 
   const handleSubscriptionSelect = (planId: string) => {
+    if (planId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) {
+      // In a real app, this would open a contact form or redirect
+      toast({ title: 'Enterprise Plan', description: 'Please contact sales for Enterprise pricing and setup.' });
+      return;
+    }
     updateSubscription(planId);
-    // The useEffect above will update activePlan, triggering a re-render
-    toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${SUBSCRIPTION_PLANS.find(p => p.id === planId)?.name}.` });
+    // activePlan will be updated by the useEffect watching getActiveSubscriptionPlan
+    const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+    toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
   };
   
   if (!hasMounted || !activePlan) {
@@ -107,7 +114,7 @@ export default function ProfilePage() {
           <CardTitle>Subscription Plan</CardTitle>
           <CardDescription>Choose the plan that best fits your business needs. Your current plan is highlighted.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"> {/* Adjusted grid for 4 plans */}
           {SUBSCRIPTION_PLANS.map((plan) => (
             <Card 
               key={plan.id} 
@@ -128,10 +135,14 @@ export default function ProfilePage() {
               )}
               <CardHeader className="pb-4">
                 <CardTitle className={cn("text-xl mb-1", activePlan.id === plan.id && "text-primary")}>{plan.name}</CardTitle>
-                <div className="flex items-baseline">
-                  <span className="text-3xl font-bold">₹{plan.price}</span>
-                  <span className="text-sm text-muted-foreground ml-1">{plan.priceSuffix}</span>
-                </div>
+                {plan.price === -1 ? (
+                    <span className="text-3xl font-bold">Contact Us</span>
+                ) : (
+                    <div className="flex items-baseline">
+                        <span className="text-3xl font-bold text-foreground">₹{plan.price}</span>
+                        <span className="text-sm text-muted-foreground ml-1">{plan.priceSuffix}</span>
+                    </div>
+                )}
               </CardHeader>
               <CardContent className="flex-grow space-y-3 pt-0">
                 <ul className="space-y-1.5 text-sm text-muted-foreground">
@@ -144,13 +155,21 @@ export default function ProfilePage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button
-                  className={cn("w-full", activePlan.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
-                  onClick={() => handleSubscriptionSelect(plan.id)}
-                  disabled={activePlan.id === plan.id}
-                >
-                  {activePlan.id === plan.id ? 'Current Plan' : 'Choose Plan'}
-                </Button>
+                {plan.price === -1 ? (
+                    <Button asChild className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground">
+                        <a href="mailto:sales@stockflow.app"> {/* Example mailto link */}
+                            <Mail className="mr-2 h-4 w-4" /> Contact Sales
+                        </a>
+                    </Button>
+                ) : (
+                    <Button
+                    className={cn("w-full", activePlan.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
+                    onClick={() => handleSubscriptionSelect(plan.id)}
+                    disabled={activePlan.id === plan.id}
+                    >
+                    {activePlan.id === plan.id ? 'Current Plan' : 'Choose Plan'}
+                    </Button>
+                )}
               </CardFooter>
             </Card>
           ))}
@@ -159,5 +178,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    

@@ -33,38 +33,72 @@ export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow
 
 
 export const SUBSCRIPTION_PLAN_IDS = {
-  ADMIN_ONLY: 'plan_admin_only',
-  MULTI_STORE: 'plan_multi_store',
-  UNLIMITED: 'plan_unlimited',
+  BASIC_ADMIN: 'plan_basic_admin',
+  GROWTH_BUSINESS: 'plan_growth_business',
+  SCALE_PRO: 'plan_scale_pro',
+  ENTERPRISE: 'plan_enterprise_contact',
 };
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY,
+    id: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN,
     name: 'Basic Admin',
     price: 199,
     priceSuffix: '/ month',
-    features: ['Admin Access Only', 'Unlimited Products', 'Unlimited Bills', 'Basic Reporting'],
+    features: [
+        'Admin Access Only', 
+        'Unlimited Products', 
+        'Unlimited Bills', 
+        'Basic Reporting'
+    ],
     maxStores: 0,
     maxEmployees: 0,
   },
   {
-    id: SUBSCRIPTION_PLAN_IDS.MULTI_STORE,
+    id: SUBSCRIPTION_PLAN_IDS.GROWTH_BUSINESS,
     name: 'Growth Business',
-    price: 399,
+    price: 499,
     priceSuffix: '/ month',
-    features: ['Up to 2 Stores', 'Up to 20 Employees', 'Advanced Reporting', 'Priority Support'],
+    features: [
+        'Up to 2 Stores', 
+        'Up to 10 Employees', 
+        'Full Admin Features',
+        'Advanced Reporting', 
+        'Priority Support'
+    ],
     maxStores: 2,
-    maxEmployees: 20,
+    maxEmployees: 10,
     isPopular: true,
   },
   {
-    id: SUBSCRIPTION_PLAN_IDS.UNLIMITED,
-    name: 'Enterprise Unlimited',
-    price: 4999,
+    id: SUBSCRIPTION_PLAN_IDS.SCALE_PRO,
+    name: 'Scale Pro',
+    price: 999,
     priceSuffix: '/ month',
-    features: ['Unlimited Stores', 'Unlimited Employees', 'Dedicated Account Manager', 'Custom Integrations'],
+    features: [
+        'Up to 10 Stores', 
+        'Up to 50 Employees',
+        'All Growth Features',
+        'Premium Support',
+        'API Access (soon)'
+    ],
+    maxStores: 10,
+    maxEmployees: 50,
+  },
+  {
+    id: SUBSCRIPTION_PLAN_IDS.ENTERPRISE,
+    name: 'Enterprise',
+    price: -1, // Indicates "Contact Us"
+    priceSuffix: 'Custom Pricing',
+    features: [
+        'Unlimited Stores', 
+        'Unlimited Employees', 
+        'All Scale Pro Features',
+        'Dedicated Account Manager', 
+        'Custom Integrations & Features'
+    ],
     maxStores: Infinity,
     maxEmployees: Infinity,
   },
 ];
+
