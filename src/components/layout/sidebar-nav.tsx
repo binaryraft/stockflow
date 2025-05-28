@@ -23,9 +23,14 @@ export function SidebarNav() {
 
   useEffect(() => {
     setHasMounted(true);
-    const plan = getActiveSubscriptionPlan();
-    setActivePlanId(plan?.id);
-  }, [getActiveSubscriptionPlan]);
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted) {
+      const plan = getActiveSubscriptionPlan();
+      setActivePlanId(plan?.id);
+    }
+  }, [hasMounted, getActiveSubscriptionPlan]);
 
   return (
     <Sidebar className="border-r" collapsible="icon">
@@ -37,15 +42,20 @@ export function SidebarNav() {
               <span className="truncate">{APP_NAME}</span>
             </Link>
           ) : (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-10 text-primary hover:text-primary/80"
-              onClick={toggleSidebar}
-              aria-label="Expand sidebar"
-            >
-              <ChevronRight className="h-6 w-6" />
-            </Button>
+             <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-10 w-10 text-primary hover:text-primary/80"
+                  onClick={toggleSidebar}
+                  aria-label="Expand sidebar"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center"><p>Expand Sidebar</p></TooltipContent>
+            </Tooltip>
           )}
 
           {sidebarState === 'expanded' && (
@@ -65,11 +75,12 @@ export function SidebarNav() {
         <ScrollArea className="flex-1">
           <SidebarMenu className="p-2 pt-0">
             {NAV_LINKS.map((link) => {
-              const defaultIsAdminOnlyPlan = getActiveSubscriptionPlan()?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && !hasMounted;
-              const isAdminOnlyPlan = hasMounted ? activePlanId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY : defaultIsAdminOnlyPlan;
-              
+              // For SSR and initial client render (before hasMounted or activePlanId is set),
+              // assume features are enabled to avoid href="#" mismatches.
+              // Actual disabling logic runs client-side.
+              const isAdminOnlyPlanOnClient = hasMounted && activePlanId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
               const isDisabledBySubscription =
-                (link.href === '/admin/stores' || link.href === '/admin/staff' || link.href === '/admin/chat') && isAdminOnlyPlan;
+                (link.href === '/admin/stores' || link.href === '/admin/staff' || link.href === '/admin/chat') && isAdminOnlyPlanOnClient;
 
               const menuItemContent = (
                 <SidebarMenuButton
@@ -77,13 +88,13 @@ export function SidebarNav() {
                   size="default"
                   isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
                   tooltip={link.label}
-                  aria-disabled={hasMounted ? isDisabledBySubscription : false}
-                  className={cn(hasMounted && isDisabledBySubscription && "opacity-50 cursor-not-allowed")}
+                  aria-disabled={isDisabledBySubscription} // Use aria-disabled for <a> tag accessibility
+                  className={cn(isDisabledBySubscription && "opacity-50 cursor-not-allowed")}
                 >
                   <Link
-                    href={(hasMounted && isDisabledBySubscription) ? "#" : link.href}
-                    className={cn("flex items-center gap-3", (hasMounted && isDisabledBySubscription) && "pointer-events-none")}
-                    onClick={(e) => { if (hasMounted && isDisabledBySubscription) e.preventDefault(); }}
+                    href={link.href} // Always use the actual href
+                    className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")} // pointer-events-none for visual click disabling
+                    onClick={(e) => { if (isDisabledBySubscription) e.preventDefault(); }}
                   >
                     <link.icon className={cn("h-5 w-5 shrink-0")} />
                     {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
@@ -93,7 +104,7 @@ export function SidebarNav() {
 
               return (
                 <SidebarMenuItem key={link.href}>
-                  {(hasMounted && isDisabledBySubscription && sidebarState === 'expanded') ? (
+                  {(isDisabledBySubscription && sidebarState === 'expanded') ? (
                     <Tooltip>
                       <TooltipTrigger asChild>{menuItemContent}</TooltipTrigger>
                       <TooltipContent side="right" align="start">
@@ -112,3 +123,4 @@ export function SidebarNav() {
     </Sidebar>
   );
 }
+    

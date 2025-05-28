@@ -27,7 +27,7 @@ type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice'
 type EditablePriceField = 'costPrice' | 'sellPrice';
 
 export function ProductsTable() {
-  const { products, updateProduct } = useInventoryStore();
+  const { products, updateProduct, deleteProduct } = useInventoryStore(); // Added deleteProduct
   const { toast } = useToast();
   
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
@@ -47,8 +47,9 @@ export function ProductsTable() {
   }, [editingCell]);
 
   const handlePriceEdit = (product: Product, sku: ProductSKU, field: EditablePriceField) => {
+    // Disable inline editing if product has variants, as price/stock is per SKU and complex
     if (product.variants && product.variants.length > 0) { 
-        toast({ title: "Info", description: "Edit variant prices via the main 'Edit' product dialog." });
+        toast({ title: "Info", description: "Edit variant product details, including SKU prices if needed, via the main 'Edit Product' dialog." });
         return;
     }
     setEditingCell({ productId: product.id, skuId: sku.id, field });
@@ -69,12 +70,13 @@ export function ProductsTable() {
       return;
     }
 
-    const product = products.find(p => p.id === editingCell.productId);
-    if (product) {
-        const updatedSKUs = product.productSKUs.map(sku => 
+    const productToUpdate = products.find(p => p.id === editingCell.productId);
+    if (productToUpdate) {
+        const updatedSKUs = productToUpdate.productSKUs.map(sku => 
             sku.id === editingCell.skuId ? { ...sku, [editingCell.field]: numericValue } : sku
         );
-        updateProduct(editingCell.productId, { productSKUs: updatedSKUs });
+        // Pass only the changed productSKUs array to updateProduct
+        updateProduct(editingCell.productId, { productSKUs: updatedSKUs }); 
         toast({
         title: "Price Updated",
         description: `Product ${editingCell.field === 'costPrice' ? 'cost' : 'sell'} price updated.`,
@@ -97,7 +99,7 @@ export function ProductsTable() {
       sortableProducts = sortableProducts.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.category?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) ||
         product.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -109,8 +111,11 @@ export function ProductsTable() {
             valA = a.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
             valB = b.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
         } else if (sortConfig.key === 'costPrice' || sortConfig.key === 'sellPrice') {
-            valA = a.productSKUs[0]?.[sortConfig.key] ?? 0;
-            valB = b.productSKUs[0]?.[sortConfig.key] ?? 0;
+            // For variant products, take min price, for non-variant, take the direct SKU price
+            const pricesA = a.productSKUs.map(sku => sku[sortConfig.key as 'costPrice' | 'sellPrice']);
+            const pricesB = b.productSKUs.map(sku => sku[sortConfig.key as 'costPrice' | 'sellPrice']);
+            valA = pricesA.length > 0 ? Math.min(...pricesA) : 0;
+            valB = pricesB.length > 0 ? Math.min(...pricesB) : 0;
         } else {
             valA = a[sortConfig.key as keyof Product];
             valB = b[sortConfig.key as keyof Product];
@@ -144,18 +149,19 @@ export function ProductsTable() {
     setIsNewProductDialogOpen(true); 
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    toast({ title: "Delete Product Action", description: `Product with ID ${productId} would be deleted. (Functionality not fully implemented in demo)` });
+  const handleDeleteProductClick = (productId: string, productName: string) => {
+    deleteProduct(productId);
+    toast({ title: "Product Deleted", description: `${productName} has been removed from inventory.` });
   };
 
-  const onProductDialogSubmit = (product: Product) => { 
+  const onProductDialogSubmit = (product?: Product) => { // Product might not be returned if just adding
     setIsNewProductDialogOpen(false);
     setEditingProduct(null); 
   };
 
   const getProductStockDisplay = (product: Product): string | number => {
     if (!product.trackQuantity) return <span className="text-muted-foreground">N/A</span>;
-    if (product.productSKUs.length === 0 && product.variants && product.variants.length > 0) return 0; // Variant product, no SKUs yet
+    if (product.productSKUs.length === 0 && product.variants && product.variants.length > 0) return 0; 
     return product.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0);
   };
 
@@ -163,12 +169,17 @@ export function ProductsTable() {
     if (product.productSKUs.length === 0) return "N/A";
     
     const prices = product.productSKUs.map(sku => sku[field]);
-    if (prices.length === 0) return "N/A"; // Should not happen if productSKUs is not empty, but a safeguard
+    if (prices.length === 0) return "N/A"; 
     
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
+    const allPricesAreZero = prices.every(price => price === 0);
+    if (allPricesAreZero) return `₹0.00`;
 
-    if (minPrice === 0 && maxPrice === 0 && prices.length > 0) return `₹0.00`; // All SKUs are priced at 0
+    const validPrices = prices.filter(price => typeof price === 'number');
+    if (validPrices.length === 0) return "N/A"; // If no valid numeric prices
+
+    const minPrice = Math.min(...validPrices);
+    const maxPrice = Math.max(...validPrices);
+
     if (minPrice === maxPrice) return `₹${minPrice.toFixed(2)}`;
     
     return `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
@@ -202,32 +213,32 @@ export function ProductsTable() {
           <TableHeader>
             <TableRow>
               <TableHead className="w-[80px]">Image</TableHead>
-              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50">
+              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Category <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('stock')}>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('stock')}>
                 Stock <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('costPrice')}>Cost <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50" onClick={() => requestSort('sellPrice')}>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('costPrice')}>Cost <ArrowUpDown className="ml-2 h-3 w-3 inline" /></TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('sellPrice')}>
                 Sell Price <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead>Tracked</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="py-3 px-4">Tracked</TableHead>
+              <TableHead className="text-right py-3 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredAndSortedProducts.length > 0 ? (
               filteredAndSortedProducts.map((product) => {
                 const isVariantProduct = product.variants && product.variants.length > 0;
-                const singleSku = (!isVariantProduct && product.productSKUs.length > 0) ? product.productSKUs[0] : null;
+                const singleDefaultSku = (!isVariantProduct && product.productSKUs.length > 0) ? product.productSKUs[0] : null;
 
                 return (
                 <TableRow key={product.id}>
-                  <TableCell>
+                  <TableCell className="py-3 px-4">
                     <Image
                       src={product.imageUrl || `https://placehold.co/64x64.png`}
                       alt={product.name}
@@ -237,25 +248,29 @@ export function ProductsTable() {
                       data-ai-hint="product item generic"
                     />
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium py-3 px-4">
                     <div>{product.name}</div>
                     {isVariantProduct && (
                       <div className="text-xs text-muted-foreground mt-0.5">
-                        {product.variants?.map(v => `${v.name} (${v.options.length})`).join(', ')} ({product.productSKUs.length} SKUs)
+                        {product.variants?.map(v => `${v.name} (${v.options.length})`).join(', ')} ({product.productSKUs.length} SKU(s))
                       </div>
                     )}
+                     {!isVariantProduct && product.sku && <div className="text-xs text-muted-foreground mt-0.5 font-mono">SKU: {product.sku}</div>}
+                     {isVariantProduct && product.productSKUs.length > 0 && product.productSKUs[0].skuIdentifier && (
+                       <div className="text-xs text-muted-foreground mt-0.5 font-mono">e.g. SKU: {product.productSKUs[0].skuIdentifier}</div>
+                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-3 px-4">
                     {product.category ? <Badge variant="outline" className="bg-tertiary text-tertiary-foreground border-tertiary-foreground/30">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right py-3 px-4">
                     {getProductStockDisplay(product)}
                   </TableCell>
                   <TableCell 
-                    className={cn("text-right group relative", singleSku && "cursor-pointer")}
-                    onClick={() => singleSku && editingCell?.skuId !== singleSku.id && handlePriceEdit(product, singleSku, 'costPrice')}
+                    className={cn("text-right group relative py-3 px-4", singleDefaultSku && "cursor-pointer")}
+                    onClick={() => singleDefaultSku && !isVariantProduct && editingCell?.skuId !== singleDefaultSku.id && handlePriceEdit(product, singleDefaultSku, 'costPrice')}
                   >
-                    {singleSku && editingCell?.skuId === singleSku.id && editingCell?.field === 'costPrice' ? (
+                    {singleDefaultSku && editingCell?.skuId === singleDefaultSku.id && editingCell?.field === 'costPrice' ? (
                       <Input
                         ref={editInputRef}
                         type="number"
@@ -269,15 +284,15 @@ export function ProductsTable() {
                     ) : (
                       <>
                         <span>{getProductPriceDisplay(product, 'costPrice')}</span>
-                        {singleSku && <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
+                        {singleDefaultSku && !isVariantProduct && <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
                       </>
                     )}
                   </TableCell>
                   <TableCell 
-                    className={cn("text-right group relative", singleSku && "cursor-pointer")}
-                    onClick={() => singleSku && editingCell?.skuId !== singleSku.id && handlePriceEdit(product, singleSku, 'sellPrice')}
+                    className={cn("text-right group relative py-3 px-4", singleDefaultSku && "cursor-pointer")}
+                    onClick={() => singleDefaultSku && !isVariantProduct && editingCell?.skuId !== singleDefaultSku.id && handlePriceEdit(product, singleDefaultSku, 'sellPrice')}
                   >
-                     {singleSku && editingCell?.skuId === singleSku.id && editingCell?.field === 'sellPrice' ? (
+                     {singleDefaultSku && editingCell?.skuId === singleDefaultSku.id && editingCell?.field === 'sellPrice' ? (
                       <Input
                         ref={editInputRef}
                         type="number"
@@ -291,16 +306,16 @@ export function ProductsTable() {
                     ) : (
                       <>
                         <span>{getProductPriceDisplay(product, 'sellPrice')}</span>
-                        {singleSku && <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
+                        {singleDefaultSku && !isVariantProduct && <Pencil className="h-3 w-3 absolute right-1 top-1/2 -translate-y-1/2 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />}
                       </>
                     )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="py-3 px-4">
                      <Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/80 hover:bg-primary" : "", "cursor-default")}>
                         {product.trackQuantity ? 'Yes' : 'No'}
                      </Badge>
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right py-3 px-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -326,14 +341,13 @@ export function ProductsTable() {
                                 <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the product "{product.name}" and all its SKUs.
-                                    (Note: Actual delete functionality is not fully implemented in this demo.)
+                                    This action cannot be undone. This will permanently delete the product "{product.name}" and all associated data.
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteProduct(product.id)} className="bg-destructive hover:bg-destructive/90">
-                                    Delete
+                                <AlertDialogAction onClick={() => handleDeleteProductClick(product.id, product.name)} className="bg-destructive hover:bg-destructive/90">
+                                    Delete Product
                                 </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
@@ -345,7 +359,7 @@ export function ProductsTable() {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center py-3 px-4">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -356,3 +370,4 @@ export function ProductsTable() {
     </>
   );
 }
+    

@@ -14,16 +14,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill, ProductSKU, BillMode } from '@/types';
+import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose, AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useToast } from '@/hooks/use-toast';
 
 
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
@@ -34,7 +35,8 @@ interface BillHistoryTableProps {
 }
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
-  const { bills, getProductById, userProfile } = useInventoryStore();
+  const { bills, getProductById, userProfile, deleteBill } = useInventoryStore();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
@@ -42,7 +44,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   const [filterType, setFilterType] = useState<BillFilterType>('all');
 
-  // Define helper functions before they are used in useMemo
   const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
     const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
     if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
@@ -95,7 +96,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             valB = getBillTypeName(b);
         }
 
-
         let comparison = 0;
         if (typeof valA === 'string' && typeof valB === 'string') {
           comparison = valA.localeCompare(valB);
@@ -114,7 +114,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId, getBillTypeName]); // Added getBillTypeName to dependencies
+  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId, getBillTypeName]); 
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -127,6 +127,11 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const handleViewBill = (bill: Bill) => {
     setSelectedBill(bill);
     setIsViewDialogOpen(true);
+  };
+
+  const handleDeleteBillClick = (billId: string, billDisplayId: string) => {
+    deleteBill(billId);
+    toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
   };
 
   const handlePrintBill = (billToPrint: Bill | null) => {
@@ -217,7 +222,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-             printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
+            printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
@@ -282,13 +287,13 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       if (billToPrint.type === 'buy') {
         const expectedRevenue = calculatePotentialRevenue(billToPrint);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c';
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // green or red
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') {
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-      } else { 
+      } else { // Return bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
       printWindow.document.write('</table>');
@@ -323,7 +328,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const findProductSKU = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
     if (!product) return undefined;
-    if (productId.startsWith('SERVICE_ITEM_')) return undefined;
+    if (productId.startsWith('SERVICE_ITEM_')) return undefined; // Service items don't have SKUs in the same way
 
     const targetOptionValues = selectedOptions || {};
     return product.productSKUs.find(sku => 
@@ -448,7 +453,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const currentSKU = findProductSKU(item.productId, item.selectedVariantOptions);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -458,14 +462,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                       {Object.entries(item.selectedVariantOptions)
                                           .map(([key, value]) => `${key}: ${value}`)
                                           .join('; ')}
-                                      </div>
-                                  )}
-                                   <div className="text-xs text-muted-foreground mt-1">
-                                      Purchased: {item.quantity}
-                                  </div>
-                                  {currentSKU && (
-                                      <div className="text-xs text-muted-foreground">
-                                      Current SKU Stock: {currentSKU.quantityInStock}
                                       </div>
                                   )}
                                   <div className="text-xs text-muted-foreground mt-1">
@@ -591,7 +587,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                             <span className="text-muted-foreground">Total Sales Amount:</span>
                             <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
                         </div>
-                    ) : ( 
+                    ) : ( // Return Bill
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Total Return Value:</span>
                             <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
@@ -606,6 +602,34 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               <Button variant="outline" onClick={() => handlePrintBill(selectedBill)}>
                 <Printer className="mr-2 h-4 w-4" /> Print
               </Button>
+               <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive" className="ml-auto">
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
+                      Stock levels will NOT be automatically readjusted.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => {
+                        handleDeleteBillClick(selectedBill.id, selectedBill.id);
+                        setIsViewDialogOpen(false); // Close the details dialog after deletion
+                      }}
+                      className="bg-destructive hover:bg-destructive/90"
+                    >
+                      Delete Bill
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
               <DialogClose asChild>
                 <Button type="button">Close</Button>
               </DialogClose>
@@ -641,10 +665,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 Date / Time
               </TableHead>
               <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[140px] py-3 px-4">
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[160px] py-3 px-4"> {/* Increased width for new content */}
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-               <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
@@ -678,16 +702,18 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4 w-[140px]">
-                    <Badge
-                      className={cn(
-                        "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", 
-                        billDisplayInfo.className
-                      )}
-                    >
-                      {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1 h-4 w-4")})}
-                      {billDisplayInfo.name}
-                    </Badge>
+                  <TableCell className="py-3 px-4 w-[160px]">
+                    <div className="flex flex-col items-start gap-0.5">
+                        <Badge
+                        className={cn(
+                            "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs", 
+                            billDisplayInfo.className
+                        )}
+                        >
+                        {React.cloneElement(billDisplayInfo.icon, {className: cn(billDisplayInfo.icon.props.className, "mr-1 h-4 w-4")})}
+                        {billDisplayInfo.name}
+                        </Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="py-3 px-4">
                     {bill.billedByStaffName ? (
@@ -743,6 +769,27 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <DropdownMenuItem onClick={() => handlePrintBill(bill)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Bill
                         </DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}. Stock levels will NOT be automatically readjusted.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteBillClick(bill.id, bill.id)} className="bg-destructive hover:bg-destructive/90">
+                                    Delete Bill
+                                </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -750,7 +797,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center">
+                <TableCell colSpan={10} className="h-24 text-center py-3 px-4">
                   No bills found.
                 </TableCell>
               </TableRow>
@@ -762,3 +809,5 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   );
 }
 
+
+    

@@ -31,11 +31,13 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
 
 const productOptionSchema = z.object({
   value: z.string().min(1, "Option value cannot be empty"),
+  // id: z.string().optional(), // Keep track of existing option IDs for edits
 });
 
 const productVariantFormSchema = z.object({
   name: z.string().min(1, "Variant name cannot be empty"),
   options: z.array(productOptionSchema).min(1, "At least one option is required for a variant."),
+  // id: z.string().optional(), // Keep track of existing variant IDs for edits
 });
 
 const newProductSchema = z.object({
@@ -43,10 +45,10 @@ const newProductSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  initialStock: z.coerce.number().min(0).optional().default(0), // For default SKU if no variants
-  costPrice: z.coerce.number().min(0).optional().default(0),    // For default SKU if no variants
-  sellPrice: z.coerce.number().min(0).optional().default(0),    // For default SKU if no variants
-  sku: z.string().optional(), // Base SKU, individual SKUs generated
+  initialStock: z.coerce.number().min(0).optional().default(0), 
+  costPrice: z.coerce.number().min(0).optional().default(0),    
+  sellPrice: z.coerce.number().min(0).optional().default(0),    
+  sku: z.string().optional(), 
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -62,7 +64,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   variantIndex,
   removeVariant
 }) => {
-  const { control, register, formState, watch, setFocus } = useFormContext<NewProductFormData>(); 
+  const { control, register, formState: { errors }, watch, setFocus } = useFormContext<NewProductFormData>(); 
 
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
@@ -76,6 +78,8 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       e.preventDefault();
       appendOption({ value: '' });
       setTimeout(() => {
+        // Focus the newly added input. The name will be variants.${variantIndex}.options.${optionFields.length}.value
+        // because optionFields.length would have been the index before append.
         setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`); 
       }, 0);
     }
@@ -112,7 +116,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
         aria-label={`Variant ${variantIndex + 1} Name`}
         onKeyDown={handleVariantNameEnter}
       />
-      {formState.errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{formState.errors.variants[variantIndex]?.name?.message}</p>}
+      {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
       
       <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant ${variantIndex+1}`}</Label>
       <div className="space-y-2">
@@ -136,8 +140,8 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
             )}
           </div>
         ))}
-        {formState.errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{formState.errors.variants?.[variantIndex]?.options?.root?.message}</p>}
-         {Array.isArray(formState.errors.variants?.[variantIndex]?.options) && (formState.errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
+        {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants?.[variantIndex]?.options?.root?.message}</p>}
+         {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
 
       </div>
       <Button 
@@ -162,7 +166,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 interface NewProductDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onProductAdd?: (product: Product) => void;
+  onProductAdd?: (product: Product) => void; // Product might not always be returned if just adding and ID is store-generated
   editingProduct?: Product | null;
   initialProductName?: string;
   initialQuantityForDialog?: number;
@@ -199,7 +203,7 @@ export function NewProductDialog({
     },
   });
 
-  const { control, register, handleSubmit, formState, watch, reset: formReset, setValue } = form;
+  const { control, register, handleSubmit, formState: { errors }, watch, reset: formReset, setValue } = form;
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
     control: control,
@@ -209,6 +213,7 @@ export function NewProductDialog({
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
+        // Find the default SKU if it's a non-variant product or one whose variants were removed
         const defaultSku = (!editingProduct.variants || editingProduct.variants.length === 0) 
                             ? editingProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) 
                             : null;
@@ -217,14 +222,15 @@ export function NewProductDialog({
           description: editingProduct.description || '',
           category: editingProduct.category || '',
           trackQuantity: editingProduct.trackQuantity,
+          // For editing, initialStock, costPrice, sellPrice should come from the default SKU if it exists
           initialStock: defaultSku ? defaultSku.quantityInStock : 0, 
           costPrice: defaultSku ? defaultSku.costPrice : 0,
           sellPrice: defaultSku ? defaultSku.sellPrice : 0,
-          sku: editingProduct.sku || '',
+          sku: editingProduct.sku || '', // Main product SKU/code
           expiryDate: editingProduct.expiryDate || '',
           variants: editingProduct.variants?.map(v => ({
             name: v.name,
-            options: v.options.map(o => ({ value: o.value }))
+            options: v.options.map(o => ({ value: o.value })) // Only value is needed for the form
           })) || [],
         });
       } else { 
@@ -254,40 +260,55 @@ export function NewProductDialog({
   ]);
 
   const trackQuantityValue = watch('trackQuantity');
-  const hasVariants = watch('variants', []).length > 0;
+  const currentVariants = watch('variants');
+  const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
 
 
   const onSubmit = (data: NewProductFormData) => {
-    const productPayloadBase = {
+    // Prepare payload for variants
+    const productVariantsPayload = data.variants?.map(v => ({
+        name: v.name,
+        options: v.options.map(opt => ({ value: opt.value })) // Store only value, ID generated by store
+    }));
+
+    if (editingProduct) {
+      const payloadForUpdate: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: any[], initialStock?: number, costPrice?: number, sellPrice?: number } = {
         name: data.name,
         description: data.description,
         category: data.category,
         trackQuantity: data.trackQuantity,
         sku: data.sku,
         expiryDate: data.expiryDate,
-        variants: data.variants, 
-    };
-    
-    let finalPayload: any;
+        variants: productVariantsPayload,
+      };
+      // If it's NOT a variant product, include the cost/sell/stock for its default SKU
+      if (!hasVariants) {
+        payloadForUpdate.costPrice = data.costPrice;
+        payloadForUpdate.sellPrice = data.sellPrice;
+        payloadForUpdate.initialStock = data.trackQuantity ? data.initialStock : 0;
+      }
 
-    if (editingProduct) {
-      const defaultSkuUpdates = (!data.variants || data.variants.length === 0) 
-        ? { initialStock: data.initialStock, costPrice: data.costPrice, sellPrice: data.sellPrice } 
-        : {};
-
-      finalPayload = { ...productPayloadBase, ...defaultSkuUpdates };
-      updateProduct(editingProduct.id, finalPayload as Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      updateProduct(editingProduct.id, payloadForUpdate);
       toast({ title: "Product Updated", description: `${data.name} has been updated.` });
-      const updatedProduct = { ...editingProduct, ...finalPayload } as Product; 
-      onProductAdd?.(updatedProduct);
+      // Fetch the updated product to pass to onProductAdd if needed, or pass the payload
+      const updatedProductData = { ...editingProduct, ...payloadForUpdate } as Product; 
+      onProductAdd?.(updatedProductData);
     } else { 
-        finalPayload = {
-          ...productPayloadBase,
-          initialStock: (!data.variants || data.variants.length === 0) ? data.initialStock : undefined,
-          costPrice: (!data.variants || data.variants.length === 0) ? data.costPrice : undefined,
-          sellPrice: (!data.variants || data.variants.length === 0) ? data.sellPrice : undefined,
-        };
-      const addedProduct = addProduct(finalPayload as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: Array<{ name: string, options: Array<{ value: string}> }> });
+      const payloadForAdd: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { initialStock?: number; costPrice?: number; sellPrice?: number; variants?: any[] } = {
+        name: data.name,
+        description: data.description,
+        category: data.category,
+        trackQuantity: data.trackQuantity,
+        sku: data.sku,
+        expiryDate: data.expiryDate,
+        variants: productVariantsPayload,
+      };
+       if (!hasVariants) {
+        payloadForAdd.costPrice = data.costPrice;
+        payloadForAdd.sellPrice = data.sellPrice;
+        payloadForAdd.initialStock = data.trackQuantity ? data.initialStock : 0;
+      }
+      const addedProduct = addProduct(payloadForAdd);
       toast({ title: "Product Added", description: `${addedProduct.name} has been added to your inventory.` });
       onProductAdd?.(addedProduct);
     }
@@ -301,137 +322,135 @@ export function NewProductDialog({
       }
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto border-t-4 border-t-primary shadow-lg">
+      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg">
         <DialogHeader>
           <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product'}</DialogTitle>
           <DialogDescription>
             Fill in the details for the product. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <FormProvider {...form}> 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <Label htmlFor="name">Product Name*</Label>
-              <Input id="name" {...register("name")} />
-              {formState.errors.name && <p className="text-sm text-destructive mt-1">{formState.errors.name.message}</p>}
-            </div>
+        <ScrollArea className="flex-1 my-1 -mx-6 px-6"> 
+          <FormProvider {...form}> 
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
+              <div>
+                <Label htmlFor="name">Product Name*</Label>
+                <Input id="name" {...register("name")} />
+                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+              </div>
 
-            <div>
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...register("description")} placeholder="Enter product description..."/>
-            </div>
-            
-            <div className="flex items-end gap-2">
-              <div className="flex-grow">
-                <Label htmlFor="category">Category</Label>
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea id="description" {...register("description")} placeholder="Enter product description..."/>
+              </div>
+              
+              <div className="flex items-end gap-2">
+                <div className="flex-grow">
+                  <Label htmlFor="category">Category</Label>
+                  <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                      <CategorySearchInput
+                        id="category"
+                        value={field.value || ''}
+                        onValueChange={(value) => field.onChange(value)}
+                        onCategorySelect={(categoryName) => field.onChange(categoryName)}
+                        placeholder="Type or select category"
+                      />
+                    )}
+                  />
+                  {errors.category && <p className="text-sm text-destructive mt-1">{errors.category.message}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
                 <Controller
-                  name="category"
+                  name="trackQuantity"
                   control={control}
                   render={({ field }) => (
-                    <CategorySearchInput
-                      id="category"
-                      value={field.value || ''}
-                      onValueChange={(value) => field.onChange(value)}
-                      onCategorySelect={(categoryName) => field.onChange(categoryName)}
-                      placeholder="Type or select category"
-                    />
+                    <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
                   )}
                 />
-                {formState.errors.category && <p className="text-sm text-destructive mt-1">{formState.errors.category.message}</p>}
+                <Label htmlFor="trackQuantity" className="font-normal">Track Quantity</Label>
               </div>
-            </div>
 
-            <div className="flex items-center space-x-2">
-              <Controller
-                name="trackQuantity"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                )}
-              />
-              <Label htmlFor="trackQuantity" className="font-normal">Track Quantity</Label>
-            </div>
-
-            {/* Fields for non-variant products or default values */}
-            {!hasVariants && (
-              <>
-                {trackQuantityValue && (
-                  <div>
-                    <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
-                    <Input id="initialStock" type="number" {...register("initialStock")} />
-                    {formState.errors.initialStock && <p className="text-sm text-destructive mt-1">{formState.errors.initialStock.message}</p>}
+              {!hasVariants && (
+                <>
+                  {trackQuantityValue && (
+                    <div>
+                      <Label htmlFor="initialStock">{editingProduct ? 'Current Stock*' : 'Initial Stock*'}</Label>
+                      <Input id="initialStock" type="number" {...register("initialStock")} />
+                      {errors.initialStock && <p className="text-sm text-destructive mt-1">{errors.initialStock.message}</p>}
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="costPrice">Cost Price*</Label>
+                      <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
+                      {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
+                    </div>
+                    <div>
+                      <Label htmlFor="sellPrice">Sell Price*</Label>
+                      <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
+                      {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
+                    </div>
                   </div>
-                )}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="costPrice">Cost Price*</Label>
-                    <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} />
-                    {formState.errors.costPrice && <p className="text-sm text-destructive mt-1">{formState.errors.costPrice.message}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="sellPrice">Sell Price*</Label>
-                    <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} />
-                    {formState.errors.sellPrice && <p className="text-sm text-destructive mt-1">{formState.errors.sellPrice.message}</p>}
-                  </div>
-                </div>
-              </>
-            )}
+                </>
+              )}
 
-            {/* SKU and Expiry Date - Always visible */}
-            <div>
-              <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-              <Input id="sku" {...register("sku")} />
-            </div>
-            <div>
-              <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-              <Input id="expiryDate" type="date" {...register("expiryDate")} />
-            </div>
-            
-            {hasVariants && (
-                <p className="text-xs text-muted-foreground italic">
-                    For products with variants, stock and pricing are managed per specific combination (SKU) and typically set during purchase/expense bills.
-                </p>
-            )}
+              <div>
+                <Label htmlFor="sku">SKU (Stock Keeping Unit) <span className="text-xs text-muted-foreground">(Optional - for base product)</span></Label>
+                <Input id="sku" {...register("sku")} />
+              </div>
+              <div>
+                <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                <Input id="expiryDate" type="date" {...register("expiryDate")} />
+              </div>
+              
+              {hasVariants && (
+                  <p className="text-xs text-muted-foreground italic">
+                      For products with variants, stock and pricing are managed per specific combination (SKU) and primarily set/updated via Expense Bills.
+                  </p>
+              )}
 
-            <Separator/>
-            <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
-            <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                Define variant types like 'Color' or 'Size'. Options for each variant (e.g., Red, Blue; Small, Medium) are added below.
-                Pricing and stock for each specific combination will be set via Expense Bills.
-            </p>
-            {formState.errors.variants?.root && <p className="text-sm text-destructive mt-1">{formState.errors.variants.root.message}</p>}
+              <Separator/>
+              <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
+              <p className="text-xs text-muted-foreground -mt-2 mb-2">
+                  Define variant types like 'Color' or 'Size'. Options for each variant (e.g., Red, Blue; Small, Medium) are added below.
+              </p>
+              {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
 
-            {variantFields.map((variantField, variantIndex) => (
-              <VariantFormSection
-                key={variantField.id}
-                variantIndex={variantIndex}
-                removeVariant={removeVariant}
-              />
-            ))}
-            
-            {variantFields.length < 2 && (
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
-                className="w-full"
-              >
-                <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
-              </Button>
-            )}
-            {formState.errors.variants && typeof formState.errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{formState.errors.variants.message}</p>}
+              {variantFields.map((variantField, variantIndex) => (
+                <VariantFormSection
+                  key={variantField.id}
+                  variantIndex={variantIndex}
+                  removeVariant={removeVariant}
+                />
+              ))}
+              
+              {variantFields.length < 2 && (
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                  className="w-full"
+                >
+                  <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
+                </Button>
+              )}
+              {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
 
-            <DialogFooter className="pt-4">
-              <DialogClose asChild>
-                <Button type="button" variant="outline">Cancel</Button>
-              </DialogClose>
-              <Button type="submit" variant="default">{editingProduct ? 'Save Changes' : 'Add Product'}</Button>
-            </DialogFooter>
-          </form>
-        </FormProvider>
+            </form>
+          </FormProvider>
+        </ScrollArea>
+        <DialogFooter className="border-t pt-4">
+            <DialogClose asChild>
+            <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button type="button" onClick={handleSubmit(onSubmit)} variant="default">{editingProduct ? 'Save Changes' : 'Add Product'}</Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
     

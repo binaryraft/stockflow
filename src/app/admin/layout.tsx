@@ -33,7 +33,7 @@ export default function AdminLayout({
       setIsAuthenticated(true);
       setIsLoadingAuth(false);
     } else {
-      setIsAuthenticated(false); // Ensure this is set before redirect
+      setIsAuthenticated(false); // Set auth state first
       router.replace('/'); // Redirect to main landing page for embedded login
       setIsLoadingAuth(false); 
     }
@@ -79,5 +79,4 @@ export default function AdminLayout({
 
   return <AppShell>{children}</AppShell>;
 }
-
     
