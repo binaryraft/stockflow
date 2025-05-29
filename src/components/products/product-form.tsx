@@ -12,14 +12,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer, BillMode } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, Package, Edit2, DollarSign, CalendarDays, Info, ListCollapse, PackageSearch } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation'; // Changed to useNextSearchParams
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { format } from 'date-fns';
 import {
@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import Link from 'next/link';
+import { Badge } from '@/components/ui/badge';
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -48,7 +48,7 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  sku: z.string().optional(), // Base SKU for the product itself
+  sku: z.string().optional(),
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -58,22 +58,14 @@ type ProductFormData = z.infer<typeof productFormSchema>;
 interface VariantFormSectionProps {
   variantIndex: number;
   removeVariant: (index: number) => void;
-  control: any;
-  register: any;
-  formState: any;
-  watch: any;
-  setFocus: any;
 }
 
 const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   variantIndex,
   removeVariant,
-  control,
-  register,
-  formState: { errors },
-  watch,
-  setFocus
 }) => {
+  const { control, register, formState: { errors }, watch, setFocus } = useFormContext<ProductFormData>();
+
   const { fields: optionFields, append: appendOption, remove: removeOption } = useFieldArray({
     control,
     name: `variants.${variantIndex}.options` as const,
@@ -81,7 +73,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
   const variantName = watch(`variants.${variantIndex}.name`);
 
-  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, optionIndex: number) => {
+  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       appendOption({ value: '' });
@@ -134,7 +126,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
               placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
               aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
+              onKeyDown={handleOptionEnter}
             />
             {optionFields.length > 1 && (
               <TooltipProvider>
@@ -150,7 +142,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
             )}
           </div>
         ))}
-        {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants?.[variantIndex]?.options?.root?.message}</p>}
+        {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.options?.root?.message}</p>}
          {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
       </div>
       <Button
@@ -177,7 +169,7 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ initialData, searchParams }: ProductFormProps) {
-  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct } = useInventoryStore();
+  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore();
   const { toast } = useToast();
   const router = useRouter();
   const isEditing = !!initialData;
@@ -221,12 +213,13 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && searchParams) {
       const initialQuantity = searchParams.quantity ? parseInt(searchParams.quantity as string) : undefined;
-      const trackQty = initialQuantity !== undefined && initialQuantity > 0;
+      // For new products, stock and pricing are set via Expense Bills.
+      // Pre-filling these here would be misleading as they aren't directly saved with the product definition.
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: trackQty,
+        trackQuantity: !!initialQuantity && initialQuantity > 0, // Track if initial quantity suggested
         sku: '',
         expiryDate: '',
         variants: [],
@@ -253,7 +246,9 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       addCategoryToStore(data.category);
     }
     
-    const productToSave: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { productSKUs?: ProductSKU[] } = {
+    // For saving, productSKUs is managed by the store, not directly set here.
+    // This form defines the product structure.
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -264,19 +259,31 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     };
 
     if (isEditing && initialData) {
-      updateProduct(initialData.id, productToSave);
+      updateProduct(initialData.id, productToSaveBase);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      addProduct(productToSave as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>);
+      addProduct(productToSaveBase); // addProduct in store will initialize empty productSKUs
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
     router.push('/admin/products');
   };
 
-  const getQuantityInBill = (bill: Bill, productId: string): number => {
+  const getQuantityAndContextualInfoInBill = (bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } => {
     const item = bill.items.find(i => i.productId === productId);
-    return item ? item.quantity : 0;
+    const quantity = item ? item.quantity : 0;
+
+    switch (bill.type) {
+      case 'sell':
+        return { quantity, label: 'Sold', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600' };
+      case 'buy':
+        return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
+      case 'return':
+        return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
+      default:
+        return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
+    }
   };
+
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -314,8 +321,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="space-y-1.5">
-                <Label htmlFor="sku">Product SKU / Code <span className="text-xs text-muted-foreground">(Optional - for base product)</span></Label>
-                <Input id="sku" {...register("sku")} placeholder="e.g., PRD-001" />
+                <Label htmlFor="sku">Product SKU / Code <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
@@ -334,23 +341,12 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
             
-            {!hasVariants && (
-                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For non-variant products, initial stock and pricing are established via the first <strong>Expense Bill</strong> that includes this product.
-                    </span>
-                </div>
-            )}
-
-            {hasVariants && (
-                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For products with variants, stock and pricing are managed per specific variant combination (SKU), also established via <strong>Expense Bills</strong>.
-                    </span>
-                </div>
-            )}
+            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                <span>
+                    Initial stock quantities and pricing (cost & sell price) for any product or its variants are established via the first <strong>Expense Bill</strong> that includes this product/variant.
+                </span>
+            </div>
             
             <Separator className="my-6"/>
             
@@ -378,11 +374,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                   key={variantField.id}
                   variantIndex={variantIndex}
                   removeVariant={removeVariant}
-                  control={control}
-                  register={register}
-                  formState={form.formState}
-                  watch={watch}
-                  setFocus={setFocus}
                 />
               ))}
               {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
@@ -400,52 +391,56 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                   ) : (
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
-                        {initialData.productSKUs.map(sku => (
-                          <Card key={sku.id} className="bg-card shadow-sm">
-                            <CardHeader className="pb-2 pt-3 px-4">
-                              <CardTitle className="text-md text-primary">
-                                SKU: {sku.skuIdentifier || "Default SKU"}
-                                {Object.keys(sku.optionValues).length > 0 && (
-                                  <span className="text-xs font-normal text-muted-foreground ml-2">
-                                    ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
-                                  </span>
-                                )}
-                              </CardTitle>
-                            </CardHeader>
-                            <CardContent className="px-4 pb-3">
-                              {sku.stockLayers.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">No stock layers for this SKU. (This SKU was likely defined but not yet purchased).</p>
-                              ) : (
-                                <Table className="text-xs">
-                                  <TableHeader>
-                                    <TableRow>
-                                      <TableHead>Purchased</TableHead>
-                                      <TableHead>From Bill</TableHead>
-                                      <TableHead className="text-right">Initial Qty</TableHead>
-                                      <TableHead className="text-right">Sold Qty</TableHead>
-                                      <TableHead className="text-right">Remaining Qty</TableHead>
-                                      <TableHead className="text-right">Cost/Unit</TableHead>
-                                      <TableHead className="text-right">Sell Price (Set)</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {sku.stockLayers.map(layer => (
-                                      <TableRow key={layer.id}>
-                                        <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
-                                        <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
-                                        <TableCell className="text-right">{layer.initialQuantity}</TableCell>
-                                        <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
-                                        <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
-                                        <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
-                                        <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
+                        {initialData.productSKUs.map(sku => {
+                          const skuDetails = getSkuDetails(sku); // Get current stock for display if needed
+                          return (
+                            <Card key={sku.id} className="bg-card shadow-sm">
+                              <CardHeader className="pb-2 pt-3 px-4">
+                                <CardTitle className="text-md text-primary">
+                                  SKU: {sku.skuIdentifier || "Default SKU"}
+                                  {Object.keys(sku.optionValues).length > 0 && (
+                                    <span className="text-xs font-normal text-muted-foreground ml-2">
+                                      ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
+                                    </span>
+                                  )}
+                                </CardTitle>
+                                <CardDescription>Current Total Stock for this SKU: {skuDetails.totalStock}</CardDescription>
+                              </CardHeader>
+                              <CardContent className="px-4 pb-3">
+                                {sku.stockLayers.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No active stock layers for this SKU (might be fully depleted or defined but not yet purchased).</p>
+                                ) : (
+                                  <Table className="text-xs">
+                                    <TableHeader>
+                                      <TableRow>
+                                        <TableHead>Purchased</TableHead>
+                                        <TableHead>From Bill</TableHead>
+                                        <TableHead className="text-right">Initial Qty</TableHead>
+                                        <TableHead className="text-right">Sold Qty</TableHead>
+                                        <TableHead className="text-right">Remaining Qty</TableHead>
+                                        <TableHead className="text-right">Cost/Unit</TableHead>
+                                        <TableHead className="text-right">Sell Price (Set)</TableHead>
                                       </TableRow>
-                                    ))}
-                                  </TableBody>
-                                </Table>
-                              )}
-                            </CardContent>
-                          </Card>
-                        ))}
+                                    </TableHeader>
+                                    <TableBody>
+                                      {sku.stockLayers.map(layer => (
+                                        <TableRow key={layer.id}>
+                                          <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
+                                          <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
+                                          <TableCell className="text-right">{layer.initialQuantity}</TableCell>
+                                          <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
+                                          <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
+                                          <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
+                                        </TableRow>
+                                      ))}
+                                    </TableBody>
+                                  </Table>
+                                )}
+                              </CardContent>
+                            </Card>
+                          );
+                        })}
                       </div>
                     </ScrollArea>
                   )}
@@ -466,18 +461,23 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                         <TableHead>Bill ID</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Qty of Product</TableHead>
+                                        <TableHead className="text-right">Transaction Details</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {productBills.map(bill => (
+                                    {productBills.map(bill => {
+                                      const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
+                                      return (
                                         <TableRow key={bill.id}>
                                             <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
                                             <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
                                             <TableCell className="capitalize">{bill.type}</TableCell>
-                                            <TableCell className="text-right font-semibold">{getQuantityInBill(bill, initialData.id)}</TableCell>
+                                            <TableCell className="text-right font-semibold">
+                                              {transactionInfo.quantity} <Badge variant="outline" className={cn("ml-1 text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
+                                            </TableCell>
                                         </TableRow>
-                                    ))}
+                                      );
+                                    })}
                                 </TableBody>
                             </Table>
                         </ScrollArea>

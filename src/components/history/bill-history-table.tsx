@@ -59,9 +59,9 @@ interface BillHistoryTableProps {
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const {
     bills,
-    getProductById,
     userProfile,
     deleteBill,
+    getProductById,
     getSkuDetails,
   } = useInventoryStore(
     (state) => ({
@@ -85,7 +85,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     if (!getProductById) { 
-        console.error("getProductById function is not available in findProductSKUfromStore");
+        console.error("getProductById function is not available in findProductSKUfromStore in BillHistoryTable");
         return undefined;
     }
     const product = getProductById(productId);
@@ -260,12 +260,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write('<h3>Items</h3>');
       
       if (billToPrint.type === 'buy') { 
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Purchased Qty</th><th>Sold Qty</th><th>Cost/Unit</th><th>Sell Price (Set)</th><th>Item Total</th></tr></thead><tbody>');
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Purchased Qty</th><th>Sold Qty</th><th>Remaining Qty</th><th>Cost/Unit</th><th>Sell Price (Set)</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
             const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
+            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001 ); // Match layer more precisely
+            
             const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
             const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
+            const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
             
             printWindow.document.write('<tr>');
             printWindow.document.write(`<td>${index + 1}</td>`);
@@ -278,6 +280,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${purchasedQty}</td>`);
             printWindow.document.write(`<td class="text-right" style="color: green;">${soldQty}</td>`);
+            printWindow.document.write(`<td class="text-right font-medium">${remainingQty}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
             printWindow.document.write(`<td class="text-right">₹${layerForThisBillItem ? layerForThisBillItem.sellPrice.toFixed(2) : item.sellPrice.toFixed(2)}</td>`);
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * item.costPrice).toFixed(2)}</td>`);
@@ -341,7 +344,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       if (billToPrint.type === 'buy') {
         const expectedRevenue = billToPrint.items.reduce((acc, item) => {
             const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
+            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
             const sellPriceForCalc = layerForThisBillItem ? layerForThisBillItem.sellPrice : item.sellPrice;
             return acc + (sellPriceForCalc * item.quantity);
         }, 0);
@@ -352,10 +355,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') {
          const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-         const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
-         const profitColor = profitFromSale >= 0 ? '#166534' : '#b91c1c';
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
          if(costOfGoodsSold > 0) { 
+            const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
+            const profitColor = profitFromSale >= 0 ? '#166534' : '#b91c1c';
             printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
             printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profitFromSale.toFixed(2)}</td></tr>`);
          }
@@ -480,9 +483,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     <>
                       <TableHeader>
                         <TableRow>
-                          <TableHead className="align-top w-[40%]">Product</TableHead>
+                          <TableHead className="align-top w-[35%]">Product Details</TableHead>
                           <TableHead className="text-right align-top">Purchased Qty</TableHead>
                           <TableHead className="text-right align-top">Sold Qty</TableHead>
+                          <TableHead className="text-right align-top">Remaining Qty</TableHead>
                           <TableHead className="text-right align-top hidden sm:table-cell">Cost/Unit</TableHead>
                           <TableHead className="text-right align-top hidden sm:table-cell">Sell Price (Set)</TableHead>
                           <TableHead className="text-right align-top">Item Total</TableHead>
@@ -491,15 +495,16 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <TableBody>
                         {selectedBill.items.map(item => {
                             const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                            const skuDetails = getSkuDetails(sku);
-                            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
+                            const skuDetails = getSkuDetails(sku); // Get current stock for display
+                            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001 ); // More precise layer matching
+                            
                             const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
                             const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
                             const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
 
                             return (
                             <TableRow key={item.id || item.productId}>
-                                <TableCell className="py-2 align-top w-[40%]">
+                                <TableCell className="py-2 align-top w-[35%]">
                                   <div>{item.productName}</div>
                                   {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
                                       <div className="text-xs text-muted-foreground mt-0.5">
@@ -516,6 +521,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 </TableCell>
                                 <TableCell className="text-right py-2 align-top">{purchasedQty}</TableCell>
                                 <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty}</TableCell>
+                                <TableCell className="text-right py-2 align-top font-semibold">{remainingQty}</TableCell>
                                 <TableCell className="text-right py-2 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right py-2 align-top hidden sm:table-cell">₹{layerForThisBillItem ? layerForThisBillItem.sellPrice.toFixed(2) : item.sellPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
@@ -613,9 +619,11 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                             </div>
                             {(() => {
                                 const expectedRevenue = selectedBill.items.reduce((acc, item) => {
+                                    // Use the sellPrice recorded with the item during THIS expense bill
+                                    // which is stored on the stockLayer created by this bill.
                                     const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                                    const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
-                                    const sellPriceForCalc = layerForThisBillItem ? layerForThisBillItem.sellPrice : item.sellPrice;
+                                    const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
+                                    const sellPriceForCalc = layerForThisBillItem ? layerForThisBillItem.sellPrice : item.sellPrice; // Fallback to item.sellPrice if layer not perfectly matched
                                     return acc + (sellPriceForCalc * item.quantity);
                                 }, 0);
                                 const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
@@ -641,27 +649,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <span className="text-muted-foreground">Total Sales Amount:</span>
                                 <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
                             </div>
-                            {(() => {
-                                const costOfGoodsSold = selectedBill.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-                                if (costOfGoodsSold > 0) { 
-                                    const profitFromSale = selectedBill.totalAmount - costOfGoodsSold;
-                                    return (
-                                        <>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Cost of Goods Sold:</span>
-                                                <span className="font-semibold">₹{costOfGoodsSold.toFixed(2)}</span>
-                                            </div>
-                                            <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Profit from this Sale:</span>
-                                                <span className={cn("font-semibold", profitFromSale >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
-                                                    ₹{profitFromSale.toFixed(2)}
-                                                </span>
-                                            </div>
-                                        </>
-                                    );
-                                }
-                                return null;
-                            })()}
                         </>
                     ) : ( // Return Bill
                         <div className="flex justify-between">
