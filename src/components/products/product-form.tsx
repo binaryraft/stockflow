@@ -1,8 +1,8 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import { useForm, Controller, useFieldArray, FormProvider } from 'react-hook-form';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useForm, Controller, useFieldArray, FormProvider, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/button';
@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation'; // Changed to useNextSearchParams
+import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { format } from 'date-fns';
 import {
@@ -48,7 +48,7 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(false),
-  sku: z.string().optional(),
+  sku: z.string().optional(), // Base Product SKU/Code for non-variant or overall product
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -165,11 +165,20 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 interface ProductFormProps {
   initialData?: Product | null;
-  searchParams?: { [key: string]: string | string[] | undefined }; 
+  searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 export function ProductForm({ initialData, searchParams }: ProductFormProps) {
-  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore();
+  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore(
+    (state) => ({
+      addProduct: state.addProduct,
+      updateProduct: state.updateProduct,
+      categories: state.categories,
+      addCategory: state.addCategory,
+      getBillsForProduct: state.getBillsForProduct,
+      getSkuDetails: state.getSkuDetails,
+    })
+  );
   const { toast } = useToast();
   const router = useRouter();
   const isEditing = !!initialData;
@@ -212,9 +221,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       });
       setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && searchParams) {
+      // Pre-filling from billing form if adding a new product
       const initialQuantity = searchParams.quantity ? parseInt(searchParams.quantity as string) : undefined;
-      // For new products, stock and pricing are set via Expense Bills.
-      // Pre-filling these here would be misleading as they aren't directly saved with the product definition.
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
@@ -236,18 +244,16 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
         id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
-        options: v_form.options.map(opt_form => ({ 
+        options: v_form.options.map(opt_form => ({
           id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          value: opt_form.value 
+          value: opt_form.value
         }))
     }));
 
     if (data.category && !categories.some(c => c.name.toLowerCase() === data.category!.toLowerCase())) {
-      addCategoryToStore(data.category);
+      addCategoryToStore(data.category!);
     }
     
-    // For saving, productSKUs is managed by the store, not directly set here.
-    // This form defines the product structure.
     const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
       name: data.name,
       description: data.description,
@@ -262,7 +268,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       updateProduct(initialData.id, productToSaveBase);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      addProduct(productToSaveBase); // addProduct in store will initialize empty productSKUs
+      addProduct(productToSaveBase);
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
     router.push('/admin/products');
@@ -279,11 +285,10 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
       case 'return':
         return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
-      default:
+      default: // Should not happen
         return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
     }
   };
-
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -321,7 +326,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
               <div className="space-y-1.5">
-                <Label htmlFor="sku">Product SKU / Code <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                <Label htmlFor="sku">Product SKU / Code <span className="text-xs text-muted-foreground">(Optional, for overall product)</span></Label>
                 <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
               </div>
               <div className="space-y-1.5">
@@ -341,12 +346,22 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
             
-            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                <span>
-                    Initial stock quantities and pricing (cost & sell price) for any product or its variants are established via the first <strong>Expense Bill</strong> that includes this product/variant.
-                </span>
-            </div>
+            {!hasVariants && trackQuantityValue && (
+                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        Initial stock quantities and pricing (cost & sell price) for this product will be established via the first <strong>Expense Bill</strong> that includes it.
+                    </span>
+                </div>
+            )}
+            {hasVariants && (
+                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For products with variants, stock and pricing for each specific combination (SKU) are established and managed via <strong>Expense Bills</strong>.
+                    </span>
+                </div>
+            )}
             
             <Separator className="my-6"/>
             
@@ -392,7 +407,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
                         {initialData.productSKUs.map(sku => {
-                          const skuDetails = getSkuDetails(sku); // Get current stock for display if needed
+                          const skuDetails = getSkuDetails(sku);
                           return (
                             <Card key={sku.id} className="bg-card shadow-sm">
                               <CardHeader className="pb-2 pt-3 px-4">
@@ -466,6 +481,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {productBills.map(bill => {
+                                      if (!initialData) return null; // Should not happen if productBills is populated
                                       const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
                                       return (
                                         <TableRow key={bill.id}>
