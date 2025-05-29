@@ -145,7 +145,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
+        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { max-width: 750px; margin: auto; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
@@ -295,13 +295,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') { // Sales Bill
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        // Cost of Goods Sold and Profit for sales bill (removed as per user request in previous iteration)
-        // const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        // const profit = billToPrint.totalAmount - costOfGoodsSold;
-        // const profitColor = profit >= 0 ? '#166534' : '#b91c1c';
-        // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
-        // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profit.toFixed(2)}</td></tr>`);
-
       } else { // Return bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
@@ -471,9 +464,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                   <div className="text-xs text-muted-foreground mt-1">
                                       Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                   </div>
-                                  {/* Removed 'Current SKU Stock' and 'Purchased:' as it made it too complex.
-                                      The core info for an expense item is what was bought at what cost.
-                                  */}
+                                   <div className="text-xs text-muted-foreground mt-0.5">
+                                    Purchased: {item.quantity}
+                                  </div>
+                                  {skuDetails && item.productId && !item.productId.startsWith('SERVICE_ITEM_') && (
+                                    <div className="text-xs text-muted-foreground mt-0.5">
+                                      Current SKU Stock: {skuDetails.totalStock}
+                                    </div>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
