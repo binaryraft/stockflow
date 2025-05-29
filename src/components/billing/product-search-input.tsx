@@ -64,24 +64,36 @@ export function ProductSearchInput({
             const skuDetails = getSkuDetails(sku);
             const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
 
-            if (currentMode === 'sell' && product.trackQuantity && sku.stockLayers && sku.stockLayers.length > 0) {
-              // For 'sell' mode and tracked items, create suggestions for each stock layer
-              sku.stockLayers.forEach(layer => {
-                const outOfStockLabel = layer.quantity === 0 ? " (Out of Stock)" : "";
+            if (currentMode === 'sell' && product.trackQuantity) {
+              const availableLayers = sku.stockLayers.filter(layer => layer.quantity > 0);
+              if (availableLayers.length > 0) {
+                availableLayers.forEach(layer => {
+                  detailedSuggestions.push({
+                    product,
+                    sku,
+                    layer,
+                    displayInfo: {
+                      name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
+                      stock: layer.quantity,
+                      price: `₹${layer.sellPrice.toFixed(2)}`,
+                      category: product.category,
+                    },
+                  });
+                });
+              } else { // SKU is tracked but has no available stock layers
                 detailedSuggestions.push({
                   product,
                   sku,
-                  layer,
                   displayInfo: {
-                    name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}${outOfStockLabel}`,
-                    stock: layer.quantity,
-                    price: `₹${layer.sellPrice.toFixed(2)}`,
+                    name: `${baseSkuIdentifier} (Out of Stock)`,
+                    stock: 0,
+                    price: 'N/A',
                     category: product.category,
                   },
                 });
-              });
+              }
             } else {
-              // For other modes, non-tracked, or if no specific layers, show general SKU info
+              // For other modes, non-tracked, or if no specific layers to detail
               const isOutOfStock = product.trackQuantity && (skuDetails.totalStock === null || skuDetails.totalStock === 0);
               const outOfStockLabel = isOutOfStock ? " (Out of Stock)" : "";
               detailedSuggestions.push({
@@ -100,10 +112,11 @@ export function ProductSearchInput({
           // Product with no defined SKUs (e.g., new or non-tracked with no prices set yet)
           detailedSuggestions.push({
             product,
-            sku: { id: product.id + '_defaultSKU', optionValues: {}, stockLayers: [], skuIdentifier: product.name }, // Dummy SKU
+            // Create a conceptual default SKU for products without any actual ProductSKU entries
+            sku: { id: product.id + '_defaultSKU', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
             displayInfo: {
               name: product.name,
-              stock: product.trackQuantity ? '0 (No Stock Info)' : 'N/A',
+              stock: product.trackQuantity ? '0 (No Purchases Yet)' : 'N/A',
               price: 'N/A',
               category: product.category,
             },
@@ -113,7 +126,7 @@ export function ProductSearchInput({
 
       setSuggestions(detailedSuggestions);
       setShowSuggestions(detailedSuggestions.length > 0);
-      setActiveIndex(-1);
+      setActiveIndex(-1); // Reset active index when suggestions change
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
@@ -122,7 +135,7 @@ export function ProductSearchInput({
 
   const handleSelectSuggestion = useCallback((suggestion: ProductSearchSuggestion) => {
     onProductSelect(suggestion);
-    onValueChange(suggestion.displayInfo.name); // Keep input updated with selection
+    onValueChange(suggestion.displayInfo.name);
     setShowSuggestions(false);
     setSuggestions([]);
     inputRef?.current?.blur();
@@ -139,11 +152,12 @@ export function ProductSearchInput({
   }, []);
 
   const handleInputBlur = (event: React.FocusEvent<HTMLInputElement>) => {
+    // Delay hiding suggestions to allow click on suggestion item to register
     setTimeout(() => {
       if (containerRef.current && !containerRef.current.contains(document.activeElement as Node)) {
         setShowSuggestions(false);
       }
-    }, 150);
+    }, 150); 
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -158,7 +172,7 @@ export function ProductSearchInput({
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < suggestions.length) {
           handleSelectSuggestion(suggestions[activeIndex]);
-        } else if (suggestions.length > 0) { // Auto-select first suggestion on Enter if none highlighted
+        } else if (suggestions.length > 0) { // Auto-select first if no active index
           handleSelectSuggestion(suggestions[0]);
         }
       } else if (e.key === 'Escape') {
@@ -171,7 +185,8 @@ export function ProductSearchInput({
       }
     }
   };
-
+  
+  // Scroll active item into view
   useEffect(() => {
     const activeItem = document.getElementById(`suggestion-${activeIndex}`);
     if (activeItem) {
@@ -188,55 +203,62 @@ export function ProductSearchInput({
         value={value}
         onChange={(e) => {
             onValueChange(e.target.value);
-            if(e.target.value === "") {
+            if(e.target.value === "") { // If input is cleared, also clear suggestions
                  setSuggestions([]);
                  setShowSuggestions(false);
             }
         }}
-        onFocus={() => {
+        onFocus={() => { // Show suggestions on focus if value is not empty
             if (value && value.length > 0) {
                  // Re-evaluate suggestions on focus if there's already text
                  const foundProducts = searchProducts(value);
                  const detailedSuggestions: ProductSearchSuggestion[] = [];
-                 // (Duplicate of suggestion generation logic from useEffect for brevity in example - ideally centralize this)
+                 // (Duplicated logic for brevity - ideally centralize or call effect's generator)
                 foundProducts.forEach(product => {
-                    if (product.productSKUs && product.productSKUs.length > 0) {
-                        product.productSKUs.forEach(sku => {
-                        const skuDetails = getSkuDetails(sku);
-                        const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
-
-                        if (currentMode === 'sell' && product.trackQuantity && sku.stockLayers && sku.stockLayers.length > 0) {
-                            sku.stockLayers.forEach(layer => {
-                                const outOfStockLabel = layer.quantity === 0 ? " (Out of Stock)" : "";
-                                detailedSuggestions.push({
-                                product, sku, layer,
-                                displayInfo: { name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}${outOfStockLabel}`, stock: layer.quantity, price: `₹${layer.sellPrice.toFixed(2)}`, category: product.category },
-                                });
-                            });
-                        } else {
-                            const isOutOfStock = product.trackQuantity && (skuDetails.totalStock === null || skuDetails.totalStock === 0);
-                            const outOfStockLabel = isOutOfStock ? " (Out of Stock)" : "";
+                  if (product.productSKUs && product.productSKUs.length > 0) {
+                    product.productSKUs.forEach(sku => {
+                      const skuDetails = getSkuDetails(sku);
+                      const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
+          
+                      if (currentMode === 'sell' && product.trackQuantity) {
+                        const availableLayers = sku.stockLayers.filter(layer => layer.quantity > 0);
+                        if (availableLayers.length > 0) {
+                          availableLayers.forEach(layer => {
                             detailedSuggestions.push({
-                            product, sku,
-                            displayInfo: { name: `${baseSkuIdentifier}${outOfStockLabel}`, stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A', price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A', category: product.category },
+                              product, sku, layer,
+                              displayInfo: { name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`, stock: layer.quantity, price: `₹${layer.sellPrice.toFixed(2)}`, category: product.category },
                             });
+                          });
+                        } else {
+                          detailedSuggestions.push({
+                            product, sku,
+                            displayInfo: { name: `${baseSkuIdentifier} (Out of Stock)`, stock: 0, price: 'N/A', category: product.category },
+                          });
                         }
-                        });
-                    } else {
+                      } else {
+                        const isOutOfStock = product.trackQuantity && (skuDetails.totalStock === null || skuDetails.totalStock === 0);
+                        const outOfStockLabel = isOutOfStock ? " (Out of Stock)" : "";
                         detailedSuggestions.push({
-                        product, sku: { id: product.id + '_defaultSKU', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
-                        displayInfo: { name: product.name, stock: product.trackQuantity ? '0 (No Stock Info)' : 'N/A', price: 'N/A', category: product.category },
+                          product, sku,
+                          displayInfo: { name: `${baseSkuIdentifier}${outOfStockLabel}`, stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A', price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A', category: product.category },
                         });
-                    }
+                      }
+                    });
+                  } else {
+                    detailedSuggestions.push({
+                      product, sku: { id: product.id + '_defaultSKU', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
+                      displayInfo: { name: product.name, stock: product.trackQuantity ? '0 (No Purchases Yet)' : 'N/A', price: 'N/A', category: product.category },
+                    });
+                  }
                 });
-                setSuggestions(detailedSuggestions);
-                setShowSuggestions(detailedSuggestions.length > 0);
+                 setSuggestions(detailedSuggestions);
+                 setShowSuggestions(detailedSuggestions.length > 0);
             } else {
-                setShowSuggestions(false);
+                 setShowSuggestions(false); // No value, no suggestions
             }
         }}
         onKeyDown={handleKeyDown}
-        onBlur={handleInputBlur}
+        onBlur={handleInputBlur} // Added onBlur handler
         placeholder={placeholder}
         autoComplete="off"
         className="w-full"
@@ -252,10 +274,10 @@ export function ProductSearchInput({
                   className={cn(
                     "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
                     index === activeIndex && "bg-accent text-accent-foreground",
-                    suggestion.displayInfo.stock === 0 && "text-muted-foreground opacity-75"
+                    suggestion.displayInfo.stock === 0 && suggestion.product.trackQuantity && "text-muted-foreground opacity-75" // Style for out of stock tracked items
                   )}
-                  onMouseDown={(e) => {
-                     e.preventDefault();
+                  onMouseDown={(e) => { // Use onMouseDown to ensure it fires before onBlur
+                     e.preventDefault(); // Prevent input from losing focus immediately
                      handleSelectSuggestion(suggestion);
                   }}
                 >
@@ -263,10 +285,11 @@ export function ProductSearchInput({
                     <span className="truncate mr-2">{suggestion.displayInfo.name}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
                       {suggestion.displayInfo.stock !== 'N/A' 
-                        ? `Qty: ${suggestion.displayInfo.stock}${suggestion.displayInfo.stock === 0 ? " (Out of Stock)" : ""}` 
+                        ? `Qty: ${suggestion.displayInfo.stock}${suggestion.displayInfo.stock === 0 && suggestion.product.trackQuantity ? "" : ""}` // Out of stock already in name
                         : ""}
-                      {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null) && suggestion.displayInfo.price !== 'N/A' ? " " : ""}
-                       {suggestion.displayInfo.price !== 'N/A' && currentMode === 'buy' ? `(Cost: ${suggestion.displayInfo.price})` : suggestion.displayInfo.price}
+                      {/* Separator only if both stock and price are shown */}
+                      {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null && suggestion.displayInfo.price !== 'N/A') ? " " : ""}
+                       {suggestion.displayInfo.price}
                     </span>
                   </div>
                   {suggestion.displayInfo.category && <div className="text-xs text-muted-foreground">{suggestion.displayInfo.category}</div>}
