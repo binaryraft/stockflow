@@ -47,8 +47,8 @@ const productFormSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
   category: z.string().optional().default(''),
-  trackQuantity: z.boolean().default(true), // Default to true
-  sku: z.string().optional(), 
+  trackQuantity: z.boolean().default(true),
+  sku: z.string().optional(), // Base SKU for the product
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -77,7 +77,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
-      if (currentOptionValue.trim() !== '') { // Only append if current option has some value
+      if (currentOptionValue.trim() !== '') {
         appendOption({ value: '' });
         setTimeout(() => {
           setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
@@ -171,6 +171,22 @@ interface ProductFormProps {
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
+function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
+    const item = bill.items.find(i => i.productId === productId);
+    const quantity = item ? item.quantity : 0;
+
+    switch (bill.type) {
+      case 'sell':
+        return { quantity, label: 'Sold', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600' };
+      case 'buy':
+        return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
+      case 'return':
+        return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
+      default: 
+        return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
+    }
+}
+
 export function ProductForm({ initialData, searchParams }: ProductFormProps) {
   const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore(
     (state) => ({
@@ -193,8 +209,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       name: '',
       description: '',
       category: '',
-      trackQuantity: true, // Default to true
-      sku: '',
+      trackQuantity: true,
+      sku: '', 
       expiryDate: '',
       variants: [],
     },
@@ -214,7 +230,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         description: initialData.description || '',
         category: initialData.category || '',
         trackQuantity: initialData.trackQuantity,
-        sku: initialData.sku || '',
+        sku: initialData.sku || '', // Product-level SKU
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         variants: initialData.variants?.map(v => ({
           id: v.id,
@@ -228,7 +244,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: true, // If coming from billing, assume tracking is intended
+        trackQuantity: true, 
         sku: '',
         expiryDate: '',
         variants: [],
@@ -260,7 +276,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       description: data.description,
       category: data.category,
       trackQuantity: data.trackQuantity,
-      sku: data.sku,
+      sku: data.sku, 
       expiryDate: data.expiryDate,
       variants: productVariantsPayload,
     };
@@ -274,23 +290,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     }
     router.push('/admin/products');
   };
-
-  const getQuantityAndContextualInfoInBill = (bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } => {
-    const item = bill.items.find(i => i.productId === productId);
-    const quantity = item ? item.quantity : 0;
-
-    switch (bill.type) {
-      case 'sell':
-        return { quantity, label: 'Sold', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600' };
-      case 'buy':
-        return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
-      case 'return':
-        return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
-      default:
-        return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
-    }
-  };
-
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -326,15 +325,15 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-              <div className="space-y-1.5">
-                <Label htmlFor="sku">Product SKU / Code <span className="text-xs text-muted-foreground">(Optional, for overall product)</span></Label>
-                <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                <Input id="expiryDate" type="date" {...register("expiryDate")} />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div className="space-y-1.5">
+                    <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                    <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
+                </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                    <Input id="expiryDate" type="date" {...register("expiryDate")} />
+                </div>
             </div>
 
             <div className="flex items-center space-x-3 pt-2 pb-2">
@@ -351,7 +350,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
             <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                 <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                 <span>
-                    Initial stock quantities, cost prices, and sell prices (for each specific SKU/variant or the base product) are established via the first <strong>Expense Bill</strong> that includes it.
+                    Pricing and initial stock for this product (or its specific variants/SKUs) are established via the first <strong>Expense Bill</strong> that includes it.
                 </span>
             </div>
             
@@ -372,7 +371,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type.
+                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type. Specific stock and pricing for each variant combination (SKU) are set via Expense Bills.
               </p>
               {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
 
@@ -391,10 +390,10 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                 <Separator className="my-6"/>
                 <div className="space-y-4">
                   <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-                    <ListCollapse size={20} /> SKU Stock Layers
+                    <ListCollapse size={20} /> Purchase Batches & Stock Details
                   </Label>
                   {initialData.productSKUs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No stock layers found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
+                    <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
                   ) : (
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
@@ -404,18 +403,18 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                             <Card key={sku.id} className="bg-card shadow-sm">
                               <CardHeader className="pb-2 pt-3 px-4">
                                 <CardTitle className="text-md text-primary">
-                                  SKU: {sku.skuIdentifier || "Default SKU"}
+                                  Specific Variant (SKU): {sku.skuIdentifier || "Default"}
                                   {Object.keys(sku.optionValues).length > 0 && (
                                     <span className="text-xs font-normal text-muted-foreground ml-2">
                                       ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
                                     </span>
                                   )}
                                 </CardTitle>
-                                <CardDescription>Current Total Stock for this SKU: {skuDetails.totalStock}</CardDescription>
+                                <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock}</CardDescription>
                               </CardHeader>
                               <CardContent className="px-4 pb-3">
                                 {sku.stockLayers.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No active stock layers for this SKU.</p>
+                                  <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill.</p>
                                 ) : (
                                   <Table className="text-xs">
                                     <TableHeader>
@@ -425,8 +424,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                         <TableHead className="text-right">Initial Qty</TableHead>
                                         <TableHead className="text-right">Sold Qty</TableHead>
                                         <TableHead className="text-right">Remaining Qty</TableHead>
-                                        <TableHead className="text-right">Cost/Unit</TableHead>
-                                        <TableHead className="text-right">Sell Price (Set)</TableHead>
+                                        <TableHead className="text-right">Cost/Unit (at purchase)</TableHead>
+                                        <TableHead className="text-right">Sell Price (set at purchase)</TableHead>
                                       </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -477,7 +476,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {productBills.map(bill => {
-                                      if (!initialData) return null;
+                                      if (!initialData) return null; 
                                       const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
                                       return (
                                         <TableRow key={bill.id}>
