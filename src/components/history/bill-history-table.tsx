@@ -18,8 +18,8 @@ import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw
 import { format } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'; // Keep existing Dialog imports
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog'; // Keep existing AlertDialog imports
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -27,15 +27,15 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
 type BillFilterType = 'all' | BillMode;
 
+// Helper functions moved to the top
 const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
   const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
   if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
   if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
-  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-red-500 dark:text-red-400" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
+  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
 };
 
@@ -49,7 +49,7 @@ interface BillHistoryTableProps {
 }
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
-  const { bills, getProductById, userProfile, deleteBill, getSkuDetails } = useInventoryStore();
+  const { bills, getProductById, userProfile, deleteBill, getSkuDetails } = useInventoryStore(); // Ensure getProductById is destructured
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,7 +75,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) ||
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Uses the helper defined above
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
@@ -96,7 +96,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         } else if (sortConfig.key === 'type') {
             valA = getBillTypeName(a);
             valB = getBillTypeName(b);
+        } else if (sortConfig.key === 'billedByStaffName') {
+            valA = a.billedByStaffName || '';
+            valB = b.billedByStaffName || '';
+        } else if (sortConfig.key === 'storeName') {
+            valA = a.storeName || '';
+            valB = b.storeName || '';
         }
+
 
         let comparison = 0;
         if (typeof valA === 'string' && typeof valB === 'string') {
@@ -323,7 +330,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   };
 
   const findProductSKUfromStore = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
-    const product = getProductById(productId);
+    const product = getProductById(productId); // This is where the error occurs
     if (!product) return undefined;
     if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
 
@@ -339,7 +346,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     <>
       {selectedBill && (
         <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-          <DialogContent className="sm:max-w-3xl max-h-[90vh]"> 
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg"> 
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
                 {React.cloneElement(getBillTypeIconAndColor(selectedBill).icon, { className: cn(getBillTypeIconAndColor(selectedBill).icon.props.className, "h-6 w-6")})}
@@ -442,14 +449,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product Details</TableHead>
-                          <TableHead className="text-right">Qty Purchased</TableHead>
                           <TableHead className="text-right hidden sm:table-cell">Cost/Unit</TableHead>
+                          <TableHead className="text-right">Qty Purchased</TableHead>
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const skuDetails = getSkuDetails(findProductSKUfromStore(item.productId, item.selectedVariantOptions));
+                            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+                            const skuDetails = getSkuDetails(sku);
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -467,14 +475,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                    <div className="text-xs text-muted-foreground mt-0.5">
                                     Purchased: {item.quantity}
                                   </div>
-                                  {skuDetails && item.productId && !item.productId.startsWith('SERVICE_ITEM_') && (
+                                  {sku && (
                                     <div className="text-xs text-muted-foreground mt-0.5">
                                       Current SKU Stock: {skuDetails.totalStock}
                                     </div>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
+                                <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
                             </TableRow>
                             );
@@ -666,30 +674,30 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="py-2 px-3 w-[150px]">
+              <TableHead className="py-2 px-3 w-[100px] md:w-[150px]">
                 Date / Time
               </TableHead>
-              <TableHead className="py-3 px-4 hidden md:table-cell">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4"> 
+              <TableHead className="py-3 px-4 hidden md:table-cell w-[180px]">ID</TableHead>
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 w-[150px]"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
+              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[180px]">
                 Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
+              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[180px]">
                 Store <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right py-3 px-4">Items</TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('totalAmount')} >
+              <TableHead className="text-right py-3 px-4 w-[80px]">Items</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 w-[120px]" onClick={() => requestSort('totalAmount')} >
                 Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-               <TableHead className="text-center cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('paymentStatus')}>
+               <TableHead className="text-center cursor-pointer hover:bg-muted/50 py-3 px-4 w-[100px]" onClick={() => requestSort('paymentStatus')}>
                 Payment <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right py-3 px-4">Actions</TableHead>
+              <TableHead className="text-right py-3 px-4 w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -699,15 +707,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
-                  <TableCell className="py-2 px-3 w-[150px]">
+                  <TableCell className="py-2 px-3 w-[100px] md:w-[150px]">
                     <div className="flex flex-col items-start leading-tight">
                       <span className="text-lg font-bold text-primary">{format(billDate, 'EEE').toUpperCase()}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'MMM dd, yyyy')}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4">
+                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell w-[180px]">{bill.id}</TableCell>
+                  <TableCell className="py-3 px-4 w-[150px]">
                     <div className="flex flex-col items-start gap-0.5">
                         <Badge
                         className={cn(
@@ -720,7 +728,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="py-3 px-4 hidden lg:table-cell">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[180px]">
                     {bill.billedByStaffName ? (
                         <div className="text-sm flex items-center gap-1">
                             <Users size={14} className="text-muted-foreground shrink-0" />
@@ -728,7 +736,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         </div>
                     ) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="py-3 px-4 hidden lg:table-cell">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[180px]">
                      {bill.storeName ? (
                         <div className="text-sm flex items-center gap-1">
                             <BuildingIcon size={14} className="text-muted-foreground shrink-0" />
@@ -740,9 +748,9 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
                       {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4">{bill.items.length}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary py-3 px-4">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-center py-3 px-4">
+                  <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
+                  <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-center py-3 px-4 w-[100px]">
                     {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus ? (
                       <Badge 
                         className={cn(
@@ -758,7 +766,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4">
+                  <TableCell className="text-right py-3 px-4 w-[80px]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
