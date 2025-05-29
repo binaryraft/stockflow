@@ -6,7 +6,7 @@ import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, PackageSearch, DollarSign, ShoppingBag, Send, RotateCcw, Users, Building, BarChart3, TrendingUp } from 'lucide-react';
+import { PlusCircle, PackageSearch, DollarSign, ShoppingBag, Send, RotateCcw, Users, Building, BarChart3, TrendingUp, TrendingDown } from 'lucide-react';
 import { SalesExpensesOverviewChart } from '@/components/dashboard/sales-expenses-overview-chart';
 import { TopProductsChart } from '@/components/dashboard/top-products-chart';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -15,8 +15,8 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ExpenseTrackerCard } from '@/components/dashboard/expense-tracker-card';
 import { ExpenseSummaryStats } from '@/components/dashboard/expense-summary-stats';
-import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFinancialSummaryStats'; // New Import
-import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart'; // New Import
+import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFinancialSummaryStats'; 
+import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart'; 
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
@@ -38,7 +38,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (hasMounted) {
-      setRecentBills(getRecentBillsFromStore(5)); // Get last 5 bills
+      setRecentBills(getRecentBillsFromStore(5)); 
     }
   }, [hasMounted, getRecentBillsFromStore]);
 
@@ -48,7 +48,7 @@ export default function DashboardPage() {
       
       <OverviewStats />
 
-      <OverallFinancialSummaryStats /> {/* New Financial Summary Card */}
+      <OverallFinancialSummaryStats /> 
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
@@ -67,9 +67,9 @@ export default function DashboardPage() {
           <CardHeader>
              <CardTitle className="flex items-center gap-2">
                 <TrendingUp className="h-5 w-5 text-primary" />
-                Top 5 Selling Products (by Revenue)
+                Top 5 Selling Products/SKUs (by Revenue)
             </CardTitle>
-            <CardDescription>Products generating the most revenue.</CardDescription>
+            <CardDescription>Products/SKUs generating the most revenue.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] pt-4">
             <TopProductsChart />
@@ -77,14 +77,13 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* New Top Profitable Products Chart */}
       <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-primary" /> {/* Or another suitable icon */}
-              Top 5 Profitable Products/SKUs
+              <TrendingDown className="h-5 w-5 text-primary" /> 
+              Top Products: Revenue vs. Cost
           </CardTitle>
-          <CardDescription>Products/SKUs generating the most profit (Sales - COGS).</CardDescription>
+          <CardDescription>Comparison of total revenue and total cost for top profitable products/SKUs.</CardDescription>
         </CardHeader>
         <CardContent className="h-[300px] pt-4">
           <TopProfitableProductsChart />
