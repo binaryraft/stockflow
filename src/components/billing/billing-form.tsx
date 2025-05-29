@@ -41,7 +41,6 @@ type PendingBillPayload = {
   paymentStatus?: 'paid' | 'unpaid';
   items: Omit<BillItem, 'id'|'productName'>[];
   storeIdForBill?: string;
-  billedByStaffId?: string;
 };
 
 
@@ -168,6 +167,7 @@ export function BillingForm({
     setServiceDescription('');
     setServiceAmount('');
     resetFormFields(true);
+    setPendingBillPayload(null); // Ensure pending payload is also cleared
   }, [resetFormFields]);
 
   const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU) => {
@@ -195,36 +195,35 @@ export function BillingForm({
       setSellPrice('');
       if (mode === 'buy') setCostPrice('');
     }
-  }, [getSkuDetails, mode, currentProductForSelection]); // currentProductForSelection is a dependency
+  }, [getSkuDetails, mode, currentProductForSelection]);
 
   const handleProductSelectFromSearch = useCallback((product: Product, selectedSku?: ProductSKU) => {
     setCurrentProductForSelection(product);
     setProductNotFoundHint('');
 
-    if (selectedSku) { // A specific SKU was selected from the search suggestions
-      const skuDisplayName = selectedSku.skuIdentifier || getSkuIdentifier(product.name, selectedSku.optionValues);
-      setProductNameQuery(skuDisplayName); // Set input to the specific SKU name
+    if (selectedSku) {
+      const skuDetails = getSkuDetails(selectedSku);
+      const skuDisplayName = skuDetails?.skuIdentifier || getSkuIdentifier(product.name, selectedSku.optionValues);
+      setProductNameQuery(skuDisplayName);
       setSelectedVariantOptions(selectedSku.optionValues || {});
       updateSkuDisplayInfo(selectedSku);
       setTimeout(() => {
           quantityInputRef.current?.focus();
           quantityInputRef.current?.select();
       }, 50);
-    } else if (product.variants && product.variants.length > 0) { // Base product selected, has variants, need to pick options
-      setProductNameQuery(product.name);
-      setSelectedVariantOptions({}); // Clear any previous options
-      updateSkuDisplayInfo(undefined); // Clear previous SKU info
-      const firstVariantId = product.variants[0].id;
-      if (firstVariantId) {
-        setTimeout(() => { // Defer to allow UI to update
-            setVariantDropdownOpenState({ [firstVariantId]: true });
-            // Focus on the trigger will be handled by another useEffect watching variantDropdownOpenState
-        }, 50);
-      }
-    } else { // Product selected, no variants (or no SKUs for a variant product yet)
+    } else if (product.variants && product.variants.length > 0) {
       setProductNameQuery(product.name);
       setSelectedVariantOptions({});
-      // Attempt to use the first (default) SKU if it exists (e.g., for non-variant products or variant products with a default state)
+      updateSkuDisplayInfo(undefined);
+      const firstVariantId = product.variants[0].id;
+      if (firstVariantId) {
+        setTimeout(() => {
+            setVariantDropdownOpenState({ [firstVariantId]: true });
+        }, 50);
+      }
+    } else {
+      setProductNameQuery(product.name);
+      setSelectedVariantOptions({});
       const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
       updateSkuDisplayInfo(defaultSku);
       setTimeout(() => {
@@ -232,7 +231,7 @@ export function BillingForm({
           quantityInputRef.current?.select();
       }, 50);
     }
-  }, [updateSkuDisplayInfo, getSkuIdentifier, setProductNameQuery, setSelectedVariantOptions, setProductNotFoundHint, setCurrentProductForSelection]);
+  }, [updateSkuDisplayInfo, getSkuIdentifier, getSkuDetails, setProductNameQuery, setSelectedVariantOptions, setProductNotFoundHint, setCurrentProductForSelection]);
 
   // useEffect Hooks
   useEffect(() => {
@@ -249,21 +248,17 @@ export function BillingForm({
     if (newlyAddedProductId) {
       const product = getProductById(newlyAddedProductId);
       if (product) {
-        // For newly added products, select the first SKU if it exists (e.g., default SKU for non-variant)
-        // Or, if it's a variant product, handleProductSelectFromSearch will manage opening variant selectors.
         const firstSku = product.productSKUs && product.productSKUs.length > 0 ? product.productSKUs[0] : undefined;
         handleProductSelectFromSearch(product, firstSku);
       }
-      // Clean up URL params
       const newParams = new URLSearchParams(searchParamsHook.toString());
       newParams.delete('newlyAddedProductId');
-      newParams.delete('name'); // Also remove other potential prefill params
+      newParams.delete('name'); 
       newParams.delete('quantity');
       newParams.delete('costPrice');
       newParams.delete('sellPrice');
       newParams.delete('returnTo');
       router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-      // Focus handled by handleProductSelectFromSearch
     }
   }, [searchParamsHook, getProductById, router, pathname, handleProductSelectFromSearch]);
 
@@ -272,7 +267,6 @@ export function BillingForm({
     setTimeout(() => productNameInputRef.current?.focus(), 0);
   }, [mode]);
 
-  // Effect to focus the first variant dropdown when it's set to open
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
@@ -286,8 +280,6 @@ export function BillingForm({
     }
   }, [currentProductForSelection, variantDropdownOpenState]);
 
-
-  // Effect to update prices and focus quantity input after all variants are selected
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const allVariantsSelected = currentProductForSelection.variants.every(
@@ -296,18 +288,16 @@ export function BillingForm({
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
 
         if (allVariantsSelected) {
-          // Find the SKU matching the selected options
           const currentSku = currentProductForSelection.productSKUs.find(sku =>
             JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
           );
-          updateSkuDisplayInfo(currentSku); // Update display based on the specific SKU
+          updateSkuDisplayInfo(currentSku);
 
-          // Only focus quantity input if the last variant dropdown is not currently open and quantity input isn't already focused.
           if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
               setTimeout(() => {
                   quantityInputRef.current?.focus();
                   quantityInputRef.current?.select();
-              }, 100); // Small delay to ensure select state has updated
+              }, 100); 
           }
         }
     }
@@ -330,38 +320,32 @@ export function BillingForm({
     }
     const product = currentProductForSelection;
 
-
-    // Ensure all variants are selected if the product has variants
     if (product.variants && product.variants.length > 0) {
       const allVariantsSelected = product.variants.every(
         (v) => selectedVariantOptions[v.name]
       );
       if (!allVariantsSelected) {
         toast({ variant: "destructive", title: "Variant Selection Required", description: "Please select options for all product variants." });
-        // Attempt to open the first unselected variant's dropdown
         const firstUnselectedVariant = product.variants.find(v => !selectedVariantOptions[v.name]);
         if (firstUnselectedVariant) {
             setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-            // Focus will be handled by useEffect watching variantDropdownOpenState
         }
         return;
       }
     }
 
-    // Find or create the target SKU based on selected options
     const selectedOpts = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
-    const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts); // This should just ensure SKU exists.
+    const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts);
     if (!targetSkuFromStore) {
         toast({ variant: "destructive", title: "SKU Error", description: "Could not identify or create the product variant. Please re-select." });
         return;
     }
-    const skuDetails = getSkuDetails(targetSkuFromStore); // Get details of the specific SKU
-    const itemProductNameForBill = targetSkuFromStore.skuIdentifier || getSkuIdentifier(product.name, selectedOpts) || product.name;
+    const skuDetails = getSkuDetails(targetSkuFromStore);
+    const itemProductNameForBill = skuDetails?.skuIdentifier || getSkuIdentifier(product.name, selectedOpts) || product.name;
 
 
-    // Stock and pricing logic based on bill mode
     if (mode === 'buy') {
-        if(product.trackQuantity === false) { // Prevent adding non-tracked items to expense bills
+        if(product.trackQuantity === false) {
              toast({ variant: "destructive", title: "Invalid Action", description: "Non-tracked items/services cannot be added to Expense bills."});
              return;
         }
@@ -379,24 +363,22 @@ export function BillingForm({
 
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
-      itemSellPrice = parseFloat(sellPrice.toString()) || 0; // This is the sell price for this specific batch being purchased
-       if (itemCostPrice <= 0 && currentQuantity > 0) { // Sell price can be 0 for buy mode if not set yet
+      itemSellPrice = parseFloat(sellPrice.toString()) || 0;
+       if (itemCostPrice <= 0 && currentQuantity > 0) {
         toast({ variant: "destructive", title: "Invalid Cost Price", description: "Cost Price must be greater than 0 for purchases."});
         costPriceInputRef.current?.focus();
         return;
       }
     } else if (mode === 'sell') {
-      // For sales, costPrice is COGS (determined later by addBill's FIFO). Sell price is the transaction price.
-      itemCostPrice = product.trackQuantity ? 0 : (skuDetails.averageCostPrice ?? 0); // Placeholder if tracked, actual if not
-      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0; // Prioritize form's sellPrice state, fallback to SKU's
+      itemCostPrice = product.trackQuantity ? 0 : (skuDetails.averageCostPrice ?? 0);
+      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
       if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0. Check inventory pricing."});
         return;
       }
     } else { // Return mode
-      // For returns, sellPrice is the price at which it's being returned. CostPrice is its original COGS.
       itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
-      itemCostPrice = skuDetails.averageCostPrice ?? 0; // Use average cost of the SKU for valuation
+      itemCostPrice = skuDetails.averageCostPrice ?? 0;
       if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0. Check inventory pricing."});
         return;
@@ -406,7 +388,7 @@ export function BillingForm({
     const newItem: BillItem = {
       id: uuidv4(),
       productId: product.id,
-      productName: itemProductNameForBill, // Use the specific SKU identifier
+      productName: itemProductNameForBill,
       quantity: currentQuantity,
       costPrice: itemCostPrice,
       sellPrice: itemSellPrice,
@@ -415,26 +397,20 @@ export function BillingForm({
     };
 
     setCurrentBillItems(prevItems => [...prevItems, newItem]);
-    resetFormFields(true); // Focus product name after adding
+    resetFormFields(true);
   };
 
   const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
     if (currentField === 'productName') {
-       if (productNameQuery.trim() !== '' && !currentProductForSelection) { // If text exists but no product object is selected yet
-           // Attempt to auto-select if ProductSearchInput didn't already
+       if (productNameQuery.trim() !== '' && !currentProductForSelection) { 
            const productsFound = searchProducts(productNameQuery);
            if (productsFound.length === 1 && productsFound[0].productSKUs.length <= 1 && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
-                // If one exact match for a simple product, select it
                 const productToSelect = productsFound[0];
-                // If it's a simple product, its first (and only) SKU is the one to consider.
-                // If it's a variant product with only one SKU defined so far, that might also be auto-selectable.
                 const skuToSelect = productToSelect.productSKUs[0]; 
                 handleProductSelectFromSearch(productToSelect, skuToSelect);
-           } else if (productNotFoundHint === productNameQuery) { // Second enter press when hint is active
-                // Navigate to add product page
+           } else if (productNotFoundHint === productNameQuery) { 
                 const params: NewProductPrefillParams = {
                   name: productNameQuery,
-                  // Encode the current billing URL (including mode) to return to
                   returnTo: encodeURIComponent(pathname + searchParamsHook.toString())
                 };
                 if (mode === 'buy') {
@@ -445,25 +421,22 @@ export function BillingForm({
                 }
                 const query = new URLSearchParams(params as Record<string, string>).toString();
                 router.push(`/admin/products/add?${query}`);
-                resetFormFields(false); // Don't focus product name if navigating away
+                resetFormFields(false); 
             } else if (productsFound.length > 0) { 
-                // This case is handled by ProductSearchInput's internal Enter handling (selects first suggestion)
-                // We wait for ProductSearchInput's onProductSelect to be called.
-            } else { // No products found, and no hint active yet
-                setProductNotFoundHint(productNameQuery); // Activate hint
+                // ProductSearchInput handles Enter by selecting first suggestion
+            } else { 
+                setProductNotFoundHint(productNameQuery); 
             }
-       } else if (currentProductForSelection) { // Product object is selected
+       } else if (currentProductForSelection) { 
             if (currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
-                // If product has variants, try to focus the first unselected variant dropdown
                 const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                 if(firstUnselectedVariant) {
                     setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-                    // Focus will be handled by useEffect watching variantDropdownOpenState
-                } else { // All variants already selected, move to quantity
+                } else { 
                     quantityInputRef.current?.focus();
                     quantityInputRef.current?.select();
                 }
-            } else { // No variants, move to quantity
+            } else { 
                 quantityInputRef.current?.focus();
                 quantityInputRef.current?.select();
             }
@@ -473,7 +446,7 @@ export function BillingForm({
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       } else if (mode === 'sell' || mode === 'return') {
-        handleAddNewItem(); // Attempt to add item directly
+        handleAddNewItem(); 
       }
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') {
@@ -494,16 +467,14 @@ export function BillingForm({
     setCurrentBillItems(prevItems =>
       prevItems.map(item => {
         if (item.id === itemId) {
-          // Ensure quantity doesn't go below 0, or 1 if preferred
           return { ...item, quantity: Math.max(0, newQuantity) };
         }
         return item;
-      }).filter(item => item.quantity > 0) // Optionally remove item if quantity becomes 0
+      }).filter(item => item.quantity > 0)
     );
   };
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    // This function is relevant only for 'buy' mode to adjust cost/sell price of items already in the list
     if (mode !== 'buy') return;
     setCurrentBillItems(prevItems =>
       prevItems.map(item =>
@@ -525,41 +496,30 @@ export function BillingForm({
 
   const calculatePotentialSellTotalForBuy = () => {
     if (mode !== 'buy') return 0;
-    // Sum of (item.sellPrice * item.quantity) for all items in the current bill
     return currentBillItems.reduce((acc, item) => acc + ((parseFloat(item.sellPrice.toString()) || 0) * item.quantity), 0);
   };
 
-
-  const proceedWithSave = (staffId: string) => {
-    if (!pendingBillPayload) {
-      toast({ variant: "destructive", title: "Error", description: "No bill data to save." });
+  const proceedWithSave = (staffId: string, billPayloadToSave: PendingBillPayload) => {
+    if (!billPayloadToSave) {
+      toast({ variant: "destructive", title: "Internal Error", description: "Bill payload missing for save." });
+      setIsSavingAnimationVisible(false);
       return;
     }
-    const { billType, vendorOrCustomerName, customerPhone, notes, paymentStatus, items, storeIdForBill } = pendingBillPayload;
+    const { billType, items, storeIdForBill, ...otherBillData } = billPayloadToSave;
 
-    const billResult = addBill({
-      type: billType,
-      vendorOrCustomerName: vendorOrCustomerName,
-      customerPhone: customerPhone,
-      notes: notes,
-      paymentStatus: paymentStatus,
-      billedByStaffId: staffId, // Use the verified staffId
-      storeId: storeIdForBill,
-    }, items);
+    const billResult = addBill(
+      { type: billType, billedByStaffId: staffId, storeId: storeIdForBill, ...otherBillData },
+      items
+    );
 
     if (billResult === null) {
-      // addBill returns null if there was an issue (e.g., insufficient stock for a tracked item or adding non-tracked to expense)
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not save bill. This might be due to insufficient stock for a tracked item or an invalid operation (e.g., adding a non-tracked service to an expense bill)." });
-      // Do not reset pendingBillPayload here, user might want to correct and retry
-      setIsSavingAnimationVisible(false); // Hide animation if it was shown
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save bill. This might be due to insufficient stock or an invalid operation (e.g., adding a non-tracked service to an expense bill)." });
+      setIsSavingAnimationVisible(false);
       return;
     }
 
-    // Bill saved successfully
     setLastSavedBillMode(billType);
     setIsSavingAnimationVisible(true);
-    setPendingBillPayload(null); // Clear pending payload after successful save
-    // Form reset and navigation is now handled by handleAnimationClose
   };
 
 
@@ -569,32 +529,27 @@ export function BillingForm({
       return;
     }
 
-    // Determine storeId for the bill
     const finalStoreId = isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
     if (isAdminContext && allStores.length > 1 && !finalStoreId) {
       toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
       return;
     }
-     if (isAdminContext && allStores.length === 0 && !finalStoreId && !storeIdFromProp) { // Admin has no stores configured
+     if (isAdminContext && allStores.length === 0 && !finalStoreId && !storeIdFromProp) {
         toast({ variant: "destructive", title: "No Stores Configured", description: "Please add stores in Store Management before creating bills." });
         return;
     }
 
-    // Prepare items for saving
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      // productName: item.productName, // productName is now derived in addBill from SKU
       quantity: item.quantity,
-      costPrice: parseFloat(item.costPrice.toString()) || 0, // Ensure numeric
-      sellPrice: parseFloat(item.sellPrice.toString()) || 0, // Ensure numeric
+      costPrice: parseFloat(item.costPrice.toString()) || 0,
+      sellPrice: parseFloat(item.sellPrice.toString()) || 0,
       isDefective: item.isDefective,
       selectedVariantOptions: item.selectedVariantOptions,
     }));
 
-    // Determine payment status
     const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
 
-    // Construct the bill payload to be potentially held if employee verification is needed
     const currentBillPayload: PendingBillPayload = {
       billType: mode,
       vendorOrCustomerName: customerVendorName,
@@ -603,73 +558,59 @@ export function BillingForm({
       paymentStatus: billPaymentStatus,
       items: billItemsForStore,
       storeIdForBill: finalStoreId,
-      billedByStaffId: undefined, // This will be filled by verification or admin context
     };
 
-    if (!isAdminContext && storeIdFromProp) { // Store portal context - always requires employee verification
+    if (!isAdminContext && storeIdFromProp) {
         setPendingBillPayload(currentBillPayload);
         setIsVerifyEmployeeDialogOpen(true);
-    } else { // Admin context - admin bills are self-billed for now
-      // In a real scenario, admin might also select a staff or be a specific staff user
-      proceedWithSave('admin_self_billed'); 
+    } else {
+      proceedWithSave('admin_self_billed', currentBillPayload); 
     }
   };
 
   const handleEmployeeVerifiedForBill = (staff: Staff) => {
-    setIsVerifyEmployeeDialogOpen(false); // Close the dialog
+    setIsVerifyEmployeeDialogOpen(false); 
     if (pendingBillPayload) {
-      // Now we have the staff, proceed to save with this staff's ID
-      proceedWithSave(staff.id);
+      proceedWithSave(staff.id, pendingBillPayload);
+      // No need to clear pendingBillPayload here, proceedWithSave's success path (via animation close) will lead to resetFullForm
     } else {
-        // This case should ideally not happen if dialog was opened correctly
-        toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
+        toast({ variant: "destructive", title: "Error", description: "Billing data was unexpectedly cleared. Please try saving again." });
     }
-    // pendingBillPayload is cleared inside proceedWithSave or handleAnimationClose
   };
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
-    resetFullForm(); // This also resets product input fields
+    resetFullForm(); 
 
-    // Navigate after save, only for admin context
     if (isAdminContext) {
-      // If the current URL already has a mode (meaning admin navigated to /admin/billing?mode=X), stay on that mode.
-      // Otherwise, go to the default bill history view.
       const currentQueryModeInUrl = searchParamsHook.get('mode');
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
-         // No navigation, stay on form for current mode (it's already reset)
-         // router.push(`${basePath}?mode=${currentQueryModeInUrl}`); // Or explicitly refresh if needed
+         // No navigation needed, stay on form for current mode (it's already reset)
        } else {
-         router.push(basePath); // Default to history view
+         router.push(basePath); 
        }
     }
-    // For store portal, no explicit navigation needed here, stays on billing form with current mode.
   };
 
   const handleModeChange = (newModeString: string) => {
     const newMode = newModeString as BillMode;
     if (allowedModes && allowedModes.length > 0 && !allowedModes.includes(newMode)) {
-        // This check is mostly for store portal. Admin can always access all modes.
         toast({variant: "destructive", title: "Mode Not Allowed", description: `This terminal is not configured for ${newMode} operations.`});
         return;
     }
 
     if (newMode !== mode) {
-        // setMode(newMode); // Mode state will be updated by useEffect watching determineMode
-        // Update URL to reflect the new mode
-        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); // Fallback for safety
+        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
-        // resetFullForm(); // Form reset is now handled by useEffect watching determineMode -> mode
+        // Mode state and form reset are handled by the useEffect watching determineMode -> mode
     }
   };
 
   const handleEditProductClick = () => {
-    if (currentProductForSelection && isAdminContext) { // Only admin can edit from here
-      // Construct the returnTo URL properly including current query params
+    if (currentProductForSelection && isAdminContext) {
       const currentBillingUrl = pathname + searchParamsHook.toString();
-      // Pass existing params from billing form to product form for return navigation
       router.push(`/admin/products/${currentProductForSelection.id}?returnTo=${encodeURIComponent(currentBillingUrl)}`);
     }
   };
@@ -685,23 +626,21 @@ export function BillingForm({
 
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, // Unique ID for service item
-      productName: serviceDescription, // Use the description as the name
+      productId: `SERVICE_ITEM_${uuidv4()}`,
+      productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0, // Cost is amount if buying (expense), 0 if selling
-      sellPrice: amount, // Sell price is always the amount
-      isDefective: undefined, // Not applicable for services
-      selectedVariantOptions: undefined, // Not applicable for services
+      costPrice: mode === 'buy' ? amount : 0,
+      sellPrice: amount,
+      isDefective: undefined,
+      selectedVariantOptions: undefined,
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
     setServiceDescription('');
     setServiceAmount('');
-    setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0); // Focus description for next service
+    setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0);
   };
 
-
-  // Determine which tabs to display based on allowedModes (for store portal) or all for admin
   const displayModes = allowedModes || ['sell', 'buy', 'return'];
   const activeModeConfig = {
     sell: { icon: Send, color: "data-[state=active]:bg-primary data-[state=active]:text-primary-foreground", label: "Sales" },
@@ -716,12 +655,10 @@ export function BillingForm({
         billMode={lastSavedBillMode}
         onClose={handleAnimationClose}
       />
-      {/* EmployeePasskeyDialog is specific to store portal usage when saving a bill */}
       {(!isAdminContext && storeIdFromProp) && (
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
-              // If dialog is cancelled by user, clear pending data
               if(!open && isVerifyEmployeeDialogOpen) { 
                   setPendingBillPayload(null); 
               }
@@ -765,7 +702,6 @@ export function BillingForm({
 
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
-          {/* Admin Store Selector - Only if in admin context and multiple stores exist */}
           {isAdminContext && allStores.length > 1 && (
               <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
                 <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium">
@@ -785,17 +721,15 @@ export function BillingForm({
               </div>
           )}
 
-          {/* Item Entry Section */}
           <div className="space-y-4 pb-4 border-b border-dashed">
             <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
             </h3>
             <div className={cn(
               "grid gap-4 items-baseline", 
-              "grid-cols-1", // Default to single column for mobile
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]" // Desktop layout: Product takes flex space, others take auto
+              "grid-cols-1", 
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]"
             )}>
-              {/* Product Name Input */}
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name / SKU</Label>
                 <div className="flex items-center gap-2">
@@ -804,18 +738,18 @@ export function BillingForm({
                     value={productNameQuery}
                     onValueChange={(v) => {
                         setProductNameQuery(v);
-                        if (!v) { // If input is cleared, reset related states
+                        if (!v) { 
                             setCurrentProductForSelection(null);
                             setSelectedVariantOptions({});
                             setProductNotFoundHint('');
-                            updateSkuDisplayInfo(undefined); // Clear SKU display info
+                            updateSkuDisplayInfo(undefined); 
                         }
                     }}
                     onProductSelect={handleProductSelectFromSearch}
                     onEnterWithoutSelection={() => handleEnterNavigation('productName')}
                     placeholder={mode === 'return' ? 'Search product to return' : 'Scan or type product name/SKU'}
                     id="productNameGlobal"
-                    className="flex-grow" // Ensure input takes available space
+                    className="flex-grow" 
                   />
                   {currentProductForSelection && isAdminContext && (
                     <TooltipProvider>
@@ -830,10 +764,9 @@ export function BillingForm({
                     </TooltipProvider>
                   )}
                 </div>
-                {/* Display selected product/SKU info */}
                 {currentProductForSelection && (
                   <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
-                    <span>Selected: {(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort()))?.skuIdentifier) || currentProductForSelection.name}</span>
+                    <span>Selected: {(getSkuDetails(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())))?.skuIdentifier) || currentProductForSelection.name}</span>
                     {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
                       <span className="block">Total Stock: {currentSkuStock}</span>
                     )}
@@ -845,7 +778,6 @@ export function BillingForm({
                     )}
                   </div>
                 )}
-                {/* Hint for adding new product */}
                 {productNotFoundHint && productNameQuery === productNotFoundHint && (
                     <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
                         <Info size={16} className="text-accent shrink-0" />
@@ -854,7 +786,6 @@ export function BillingForm({
                 )}
               </div>
 
-              {/* Quantity Input */}
               <div className="space-y-1.5 w-full md:w-24">
                 <Label htmlFor="quantityGlobal">Quantity</Label>
                 <Input
@@ -870,7 +801,6 @@ export function BillingForm({
                 />
               </div>
 
-              {/* Conditional fields for 'buy' (Expense) mode */}
               {mode === 'buy' ? (
                 <>
                   <div className="space-y-1.5 w-full md:w-32">
@@ -903,18 +833,16 @@ export function BillingForm({
                         <PlusCircle className="mr-2 h-4 w-4" /> Add
                    </Button>
                 </>
-              ) : ( // Sell or Return mode - "Add Item" button is next to quantity
+              ) : ( 
                  <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Item
                  </Button>
               )}
             </div>
 
-            {/* Variant Selection Dropdowns */}
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
               <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
                 {currentProductForSelection.variants.map((variant, index) => {
-                   // Ensure ref is created for each variant select trigger
                    if (!variantSelectRefs.current[variant.id]) {
                       variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
                     }
@@ -929,17 +857,17 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
-                            // Autopilot: Move to next variant or quantity
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { // Use timeout to ensure state updates propagate
+                                setTimeout(() => { 
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                  // Focus handled by useEffect watching variantDropdownOpenState for this nextVariantId
+                                  const elToFocus = variantSelectRefs.current[nextVariantId]?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
+                                  (elToFocus as HTMLElement)?.focus();
                                 }, 50); 
-                            } else { // Last variant selected
+                            } else { 
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -956,8 +884,21 @@ export function BillingForm({
                                 e.preventDefault();
                                 setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
                             } else if (e.key === 'Enter' && variantDropdownOpenState[variant.id]) {
-                                // If dropdown is open and Enter is pressed, Radix Select handles selection.
-                                // The onValueChange will then trigger focus to next element.
+                                // Radix Select handles selection. onValueChange will trigger focus.
+                            } else if (e.key === 'ArrowRight' || e.key === 'Tab') {
+                                if (!e.shiftKey && index < currentProductForSelection!.variants!.length -1) {
+                                    e.preventDefault();
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                    const nextVariantId = currentProductForSelection!.variants![index + 1].id;
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
+                                    const elToFocus = variantSelectRefs.current[nextVariantId]?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
+                                    (elToFocus as HTMLElement)?.focus();
+                                } else if (!e.shiftKey && index === currentProductForSelection!.variants!.length -1) {
+                                    e.preventDefault();
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                    quantityInputRef.current?.focus();
+                                    quantityInputRef.current?.select();
+                                }
                             }
                           }}
                         >
@@ -976,7 +917,6 @@ export function BillingForm({
               </div>
             )}
 
-            {/* Defective Item Switch for Return Mode */}
             {mode === 'return' && (
               <div className="flex items-center space-x-2 pt-2">
                 <Switch
@@ -989,11 +929,9 @@ export function BillingForm({
             )}
           </div>
 
-
-          {/* Bill Items List */}
           <div className="flex-grow overflow-hidden">
             {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
-            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> {/* Constrained height for scroll */}
+            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> 
               {currentBillItems.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
               ) : (
@@ -1013,9 +951,8 @@ export function BillingForm({
             </ScrollArea>
           </div>
 
-          {/* Ad-hoc Service/Charge Section - Only for Sales and Expense */}
           {(mode === 'sell' || mode === 'buy') && (
-            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> {/* Ensure it's pushed down */}
+            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> 
               <h3 className="text-md font-medium text-foreground flex items-center gap-2">
                 <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
               </h3>
@@ -1055,7 +992,6 @@ export function BillingForm({
         </CardContent>
         <Separator className="my-0"/>
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
-          {/* Customer/Vendor Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div className="space-y-1.5">
                 <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
@@ -1067,7 +1003,6 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
                 />
             </div>
-            {/* Customer Phone - Only for Sales and Return */}
             {mode !== 'buy' && ( 
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
@@ -1081,7 +1016,6 @@ export function BillingForm({
                     />
                 </div>
             )}
-            {/* Notes - Span full width if phone is not shown */}
              <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
                 <Label htmlFor="notes">Notes</Label>
                 <Input
@@ -1095,9 +1029,7 @@ export function BillingForm({
 
           <Separator className="my-2"/>
 
-          {/* Totals and Payment Status */}
           <div className="flex justify-between items-center">
-            {/* Payment Status Switch - Only for Sales and Expense */}
             {(mode === 'sell' || mode === 'buy') && (
                 <div className="flex items-center space-x-2">
                 <Switch
@@ -1111,7 +1043,6 @@ export function BillingForm({
                 </Label>
                 </div>
             )}
-            {/* Totals Display */}
              <div className="flex flex-col items-end ml-auto">
                 <div className="flex justify-between text-lg font-semibold text-foreground">
                     <span>Total:</span>
@@ -1126,12 +1057,15 @@ export function BillingForm({
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex gap-3 mt-2">
             <Button variant="outline" onClick={resetFullForm} className="flex-1">
               <Eraser className="mr-2 h-4 w-4" /> Clear Bill
             </Button>
-            <Button onClick={handleSaveBill} className="flex-1" disabled={currentBillItems.length === 0}>
+            <Button 
+              onClick={handleSaveBill} 
+              className="flex-1" 
+              disabled={currentBillItems.length === 0 || isVerifyEmployeeDialogOpen}
+            >
               <Save className="mr-2 h-4 w-4" /> Save Bill
             </Button>
           </div>
@@ -1141,3 +1075,4 @@ export function BillingForm({
   );
 }
 
+    
