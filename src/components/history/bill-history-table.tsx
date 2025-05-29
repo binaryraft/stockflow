@@ -16,7 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
+import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -31,10 +31,6 @@ import { useToast } from '@/hooks/use-toast';
 type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
 type BillFilterType = 'all' | BillMode;
 
-interface BillHistoryTableProps {
-  filterByStoreId?: string;
-}
-
 const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
   const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
   if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
@@ -46,6 +42,11 @@ const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: st
 const getBillTypeName = (bill: Bill): string => {
   return getBillTypeIconAndColor(bill).name;
 };
+
+
+interface BillHistoryTableProps {
+  filterByStoreId?: string;
+}
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const { bills, getProductById, userProfile, deleteBill, getSkuDetails } = useInventoryStore();
@@ -223,7 +224,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-            printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
+             printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
@@ -288,12 +289,19 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       if (billToPrint.type === 'buy') { // Expense Bill
         const expectedRevenue = billToPrint.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // green or red
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; 
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') { // Sales Bill
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+        // Cost of Goods Sold and Profit for sales bill (removed as per user request in previous iteration)
+        // const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+        // const profit = billToPrint.totalAmount - costOfGoodsSold;
+        // const profitColor = profit >= 0 ? '#166534' : '#b91c1c';
+        // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
+        // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profit.toFixed(2)}</td></tr>`);
+
       } else { // Return bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
@@ -341,7 +349,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
           <DialogContent className="sm:max-w-3xl max-h-[90vh]"> 
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
-                {React.cloneElement(getBillTypeIconAndColor(selectedBill).icon, { className: cn(getBillTypeIconAndColor(selectedBill).icon.props.className, "h-5 w-5")})}
+                {React.cloneElement(getBillTypeIconAndColor(selectedBill).icon, { className: cn(getBillTypeIconAndColor(selectedBill).icon.props.className, "h-6 w-6")})}
                 Bill Details
               </DialogTitle>
               <DialogDescription>
@@ -442,14 +450,13 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <TableRow>
                           <TableHead>Product Details</TableHead>
                           <TableHead className="text-right">Qty Purchased</TableHead>
-                          <TableHead className="text-right">Cost/Unit</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Cost/Unit</TableHead>
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const currentSKU = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                            const skuDetails = getSkuDetails(currentSKU);
+                            const skuDetails = getSkuDetails(findProductSKUfromStore(item.productId, item.selectedVariantOptions));
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -464,9 +471,12 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                   <div className="text-xs text-muted-foreground mt-1">
                                       Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                   </div>
+                                  {/* Removed 'Current SKU Stock' and 'Purchased:' as it made it too complex.
+                                      The core info for an expense item is what was bought at what cost.
+                                  */}
                                 </TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
-                                <TableCell className="text-right py-3 align-top">₹{item.costPrice.toFixed(2)}</TableCell>
+                                <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
                             </TableRow>
                             );
@@ -658,30 +668,30 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[150px] py-3 px-4">
+              <TableHead className="py-2 px-3 w-[150px]">
                 Date / Time
               </TableHead>
-              <TableHead className="w-[140px] py-3 px-4">ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 w-[160px] py-3 px-4"> 
+              <TableHead className="py-3 px-4 hidden md:table-cell">ID</TableHead>
+              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
                 Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
                 Store <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right w-[80px] py-3 px-4">Items</TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4" onClick={() => requestSort('totalAmount')} >
+              <TableHead className="text-right py-3 px-4">Items</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('totalAmount')} >
                 Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-               <TableHead className="text-center cursor-pointer hover:bg-muted/50 w-[120px] py-3 px-4" onClick={() => requestSort('paymentStatus')}>
+               <TableHead className="text-center cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('paymentStatus')}>
                 Payment <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right w-[80px] py-3 px-4">Actions</TableHead>
+              <TableHead className="text-right py-3 px-4">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -698,8 +708,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs py-3 px-4 w-[140px]">{bill.id}</TableCell>
-                  <TableCell className="py-3 px-4 w-[160px]">
+                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell">{bill.id}</TableCell>
+                  <TableCell className="py-3 px-4">
                     <div className="flex flex-col items-start gap-0.5">
                         <Badge
                         className={cn(
@@ -712,7 +722,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="py-3 px-4">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell">
                     {bill.billedByStaffName ? (
                         <div className="text-sm flex items-center gap-1">
                             <Users size={14} className="text-muted-foreground shrink-0" />
@@ -720,7 +730,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         </div>
                     ) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="py-3 px-4">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell">
                      {bill.storeName ? (
                         <div className="text-sm flex items-center gap-1">
                             <BuildingIcon size={14} className="text-muted-foreground shrink-0" />
@@ -732,9 +742,9 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
                       {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                  <TableCell className="text-center py-3 px-4 w-[120px]">
+                  <TableCell className="text-right py-3 px-4">{bill.items.length}</TableCell>
+                  <TableCell className="text-right font-semibold text-primary py-3 px-4">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-center py-3 px-4">
                     {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus ? (
                       <Badge 
                         className={cn(
@@ -744,13 +754,13 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                             : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
                         )}
                       >
-                        {selectedBill?.paymentStatus}
+                        {bill.paymentStatus}
                       </Badge>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 w-[80px]">
+                  <TableCell className="text-right py-3 px-4">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -805,3 +815,5 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
+
+    
