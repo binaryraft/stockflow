@@ -12,14 +12,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer, BillMode } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, Bill, BillMode, StockLayer, ProductSKU } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, CornerDownLeft } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation'; // Changed to useNextSearchParams
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { format } from 'date-fns';
 import {
@@ -48,13 +48,13 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
-  sku: z.string().optional(), // Base SKU for the product
+  sku: z.string().optional(),
   expiryDate: z.string().optional(),
-  costPrice: z.preprocess( // For non-tracked items
+  costPrice: z.preprocess(
     (val) => (val === "" ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
   ),
-  sellPrice: z.preprocess( // For non-tracked items
+  sellPrice: z.preprocess(
     (val) => (val === "" ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
@@ -140,7 +140,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
-              <TooltipProvider>
+               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                       <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
@@ -182,20 +182,25 @@ interface ProductFormProps {
 function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
     const item = bill.items.find(i => i.productId === productId);
     const quantity = item ? item.quantity : 0;
+    const isDefectiveReturn = bill.type === 'return' && item?.isDefective;
 
     switch (bill.type) {
       case 'sell':
-        return { quantity, label: 'Sold', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600' };
+        return { quantity, label: 'Sold', colorClass: 'bg-primary text-primary-foreground' };
       case 'buy':
-        return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
+        return { quantity, label: 'Purchased', colorClass: 'bg-destructive text-destructive-foreground' };
       case 'return':
-        return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
-      default: 
+        if (isDefectiveReturn) {
+            return { quantity, label: 'Defective Return', colorClass: 'bg-amber-500 text-amber-950' };
+        }
+        return { quantity, label: 'Restocked Return', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' };
+      default:
         return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
     }
 }
 
-export function ProductForm({ initialData, searchParams }: ProductFormProps) {
+
+export function ProductForm({ initialData, searchParams: routeSearchParams }: ProductFormProps) {
   const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore(
     (state) => ({
       addProduct: state.addProduct,
@@ -208,6 +213,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
   );
   const { toast } = useToast();
   const router = useRouter();
+  const nextSearchParams = useNextSearchParams(); // Use alias to avoid confusion
+
   const isEditing = !!initialData;
   const [productBills, setProductBills] = useState<Bill[]>([]);
 
@@ -218,7 +225,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       description: '',
       category: '',
       trackQuantity: true,
-      sku: '', 
+      sku: '',
       costPrice: undefined,
       sellPrice: undefined,
       expiryDate: '',
@@ -235,20 +242,18 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
 
   useEffect(() => {
     if (isEditing && initialData) {
-      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0 
-        ? initialData.productSKUs[0] 
+      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
+        ? getSkuDetails(initialData.productSKUs[0])
         : undefined;
-      
-      const defaultSkuStockLayer = defaultSkuForNonVariant?.stockLayers[0];
 
       formReset({
         name: initialData.name,
         description: initialData.description || '',
         category: initialData.category || '',
         trackQuantity: initialData.trackQuantity,
-        sku: initialData.sku || '', // Product-level SKU
-        costPrice: initialData.trackQuantity === false && defaultSkuStockLayer ? defaultSkuStockLayer.costPrice : undefined,
-        sellPrice: initialData.trackQuantity === false && defaultSkuStockLayer ? defaultSkuStockLayer.sellPrice : undefined,
+        sku: initialData.sku || '',
+        costPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.averageCostPrice ?? undefined : undefined,
+        sellPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.currentSellPrice ?? undefined : undefined,
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         variants: initialData.variants?.map(v => ({
           id: v.id,
@@ -257,21 +262,21 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         })) || [],
       });
       setProductBills(getBillsForProduct(initialData.id));
-    } else if (!isEditing && searchParams) {
+    } else if (!isEditing && routeSearchParams) { // Use the prop 'routeSearchParams'
       formReset({
-        name: typeof searchParams.name === 'string' ? searchParams.name : '',
+        name: typeof routeSearchParams.name === 'string' ? routeSearchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: true, 
+        trackQuantity: true,
         sku: '',
-        costPrice: searchParams.costPrice ? parseFloat(searchParams.costPrice as string) : undefined,
-        sellPrice: searchParams.sellPrice ? parseFloat(searchParams.sellPrice as string) : undefined,
+        costPrice: routeSearchParams.costPrice ? parseFloat(routeSearchParams.costPrice as string) : undefined,
+        sellPrice: routeSearchParams.sellPrice ? parseFloat(routeSearchParams.sellPrice as string) : undefined,
         expiryDate: '',
         variants: [],
       });
     }
     setTimeout(() => setFocus('name'), 50);
-  }, [isEditing, initialData, formReset, setFocus, searchParams, getBillsForProduct]);
+  }, [isEditing, initialData, formReset, setFocus, routeSearchParams, getBillsForProduct, getSkuDetails]);
 
   const trackQuantityValue = watch('trackQuantity');
   const currentVariants = watch('variants');
@@ -290,31 +295,39 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     if (data.category && !categories.some(c => c.name.toLowerCase() === data.category!.toLowerCase())) {
       addCategoryToStore(data.category!);
     }
-    
+
     const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name,
       description: data.description,
       category: data.category,
       trackQuantity: data.trackQuantity,
-      sku: data.sku, 
+      sku: data.sku,
       expiryDate: data.expiryDate,
       variants: productVariantsPayload,
     };
 
-    if (!data.trackQuantity && !hasVariants) {
+    if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
         productToSaveBase.costPriceForNonTracked = data.costPrice;
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
 
-
+    let savedProductId = '';
     if (isEditing && initialData) {
       updateProduct(initialData.id, productToSaveBase);
+      savedProductId = initialData.id;
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      addProduct(productToSaveBase);
+      const newProduct = addProduct(productToSaveBase);
+      savedProductId = newProduct.id;
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
-    router.push('/admin/products');
+
+    const returnToParam = nextSearchParams.get('returnTo');
+    if (returnToParam) {
+      router.push(`${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProductId}`);
+    } else {
+      router.push('/admin/products');
+    }
   };
 
   return (
@@ -350,7 +363,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                 <div className="space-y-1.5">
                     <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
@@ -372,15 +385,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               />
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
-            
-            {trackQuantityValue && (
-                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
-                    </span>
-                </div>
-            )}
 
             {!trackQuantityValue && !hasVariants && (
                  <>
@@ -404,17 +408,27 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                     </div>
                  </>
             )}
+
+            {trackQuantityValue && (
+                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
+                    </span>
+                </div>
+            )}
+
             {!trackQuantityValue && hasVariants && (
                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                     <span>
-                        For non-tracked products with variants (e.g., different service tiers), specific pricing for each variant combination should be managed via a dedicated SKU pricing interface or when adding to bills (functionality may vary).
+                        For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination (feature for direct form entry not yet implemented here; prices may be inferred or set during billing).
                     </span>
                 </div>
             )}
-            
+
             <Separator className="my-6"/>
-            
+
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <Label className="text-lg font-semibold text-primary">Variants (Max 2 types, e.g., Color, Size)</Label>
@@ -444,7 +458,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
             </div>
 
-            {isEditing && initialData && trackQuantityValue && (
+            {isEditing && initialData && (
               <>
                 <Separator className="my-6"/>
                 <div className="space-y-4">
@@ -457,7 +471,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
                         {initialData.productSKUs.map(sku => {
-                          const skuDetails = getSkuDetails(sku);
                           return (
                             <Card key={sku.id} className="bg-card shadow-sm">
                               <CardHeader className="pb-2 pt-3 px-4">
@@ -469,7 +482,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                     </span>
                                   )}
                                 </CardTitle>
-                                <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock}</CardDescription>
+                                <CardDescription>Current Total Stock for this Variant: {getSkuDetails(sku).totalStock ?? 'N/A'}</CardDescription>
                               </CardHeader>
                               <CardContent className="px-4 pb-3">
                                 {sku.stockLayers.length === 0 ? (
@@ -535,15 +548,17 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {productBills.map(bill => {
-                                      if (!initialData) return null; 
+                                      if (!initialData) return null;
                                       const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
                                       return (
                                         <TableRow key={bill.id}>
                                             <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
                                             <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
-                                            <TableCell className="capitalize">{bill.type}</TableCell>
-                                            <TableCell className="text-right">
-                                              {transactionInfo.quantity} <Badge variant="outline" className={cn("ml-1 text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
+                                            <TableCell>
+                                              <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label.replace(' Return', '')}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right font-semibold">
+                                              {transactionInfo.quantity} unit(s)
                                             </TableCell>
                                         </TableRow>
                                       );
@@ -555,7 +570,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                  </div>
               </>
             )}
-            
+
             <CardFooter className="flex justify-end gap-3 pt-8 border-t">
               <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting}>
                 Cancel
@@ -570,3 +585,5 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     </Card>
   );
 }
+
+    

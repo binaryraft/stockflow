@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added usePathname
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,10 +24,13 @@ import { BillSaveAnimation } from './bill-save-animation';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { EmployeePasskeyDialog } from './employee-passkey-dialog';
 
+// Interface for pre-filling Add Product Page
 interface NewProductPrefillParams {
   name?: string;
-  // Quantity, costPrice, sellPrice pre-filling for new product dialog is removed
-  // as these are now primarily set via Expense Bills for new SKUs.
+  quantity?: string;
+  costPrice?: string;
+  sellPrice?: string;
+  returnTo?: string; // To navigate back to billing form
 }
 
 type PendingBillPayload = {
@@ -42,7 +45,7 @@ type PendingBillPayload = {
 
 
 interface BillingFormProps {
-  storeId?: string; // storeIdFromProp
+  storeId?: string;
   allowedModes?: BillMode[];
   initialModeProp?: BillMode | null;
   isAdminContext?: boolean;
@@ -56,6 +59,7 @@ export function BillingForm({
 }: BillingFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = usePathname(); // Get current pathname
   const { toast } = useToast();
   const { getProductByName, addBill, searchProducts, getProductById, getAllStores, findOrCreateProductSKU, getSkuDetails } = useInventoryStore();
   const allStores = getAllStores();
@@ -68,11 +72,11 @@ export function BillingForm({
         }
     }
     if (allowedModes && allowedModes.length > 0) return allowedModes[0];
-    return 'sell'; 
+    return 'sell';
   }, [initialModeProp, allowedModes, searchParams]);
-  
+
   const [mode, setMode] = useState<BillMode>(determineMode());
-  
+
   const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(
     isAdminContext && allStores.length === 1 ? allStores[0].id : undefined
   );
@@ -80,15 +84,15 @@ export function BillingForm({
   const resetFormFields = useCallback((focusProductName = true) => {
     setProductNameQuery('');
     setQuantity(1);
-    setCostPrice(''); // For expense mode
-    setSellPrice(''); // For expense mode (sell price at purchase) or sales mode (actual sell price)
+    setCostPrice('');
+    setSellPrice('');
     setCurrentSkuStock(null);
     setReturnItemIsDefective(false);
     setCurrentProductForSelection(null);
     setSelectedVariantOptions({});
     setVariantDropdownOpenState({});
     setProductNotFoundHint('');
-    setCurrentSkuSellPrice(null); // Reset derived sell price
+    setCurrentSkuSellPrice(null);
     if (focusProductName) {
       setTimeout(() => productNameInputRef.current?.focus(), 0);
     }
@@ -102,7 +106,7 @@ export function BillingForm({
     setIsPaid(true);
     setServiceDescription('');
     setServiceAmount('');
-    resetFormFields(true); 
+    resetFormFields(true);
   }, [resetFormFields]);
 
   useEffect(() => {
@@ -113,6 +117,27 @@ export function BillingForm({
     }
   }, [determineMode, mode, resetFullForm]);
 
+  // Effect to handle newly added product redirection
+  useEffect(() => {
+    const newlyAddedProductId = searchParams.get('newlyAddedProductId');
+    if (newlyAddedProductId) {
+      const product = getProductById(newlyAddedProductId);
+      if (product) {
+        handleProductSelect(product);
+      }
+      // Clean up URL params
+      const newParams = new URLSearchParams(searchParams.toString());
+      newParams.delete('newlyAddedProductId');
+      newParams.delete('name'); // Also remove prefill params if they were there
+      newParams.delete('quantity');
+      newParams.delete('costPrice');
+      newParams.delete('sellPrice');
+      newParams.delete('returnTo');
+      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, getProductById, router, pathname]); // handleProductSelect is not stable, so omit it or wrap in useCallback
+
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -121,10 +146,10 @@ export function BillingForm({
 
   const [productNameQuery, setProductNameQuery] = useState('');
   const [quantity, setQuantity] = useState<number | string>(1);
-  const [costPrice, setCostPrice] = useState<number | string>(''); // Used for Expense mode input
-  const [sellPrice, setSellPrice] = useState<number | string>(''); // Used for Expense mode (sell price set at purchase) and Sales mode (actual transaction sell price from SKU)
+  const [costPrice, setCostPrice] = useState<number | string>('');
+  const [sellPrice, setSellPrice] = useState<number | string>('');
   const [currentSkuStock, setCurrentSkuStock] = useState<number | null>(null);
-  const [currentSkuSellPrice, setCurrentSkuSellPrice] = useState<number | null>(null); // For displaying SKU's current sell price
+  const [currentSkuSellPrice, setCurrentSkuSellPrice] = useState<number | null>(null);
 
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
   const [productNotFoundHint, setProductNotFoundHint] = useState('');
@@ -139,7 +164,7 @@ export function BillingForm({
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
-  const costPriceInputRef = useRef<HTMLInputElement>(null); // For Expense mode
+  const costPriceInputRef = useRef<HTMLInputElement>(null);
   const sellPriceInputRef = useRef<HTMLInputElement>(null); // For Expense mode (sell price at purchase)
   const customerVendorNameInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneInputRef = useRef<HTMLInputElement>(null);
@@ -149,12 +174,12 @@ export function BillingForm({
   const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
   const serviceAmountInputRef = useRef<HTMLInputElement>(null);
 
-  const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false); 
+  const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false);
   const [pendingBillPayload, setPendingBillPayload] = useState<PendingBillPayload | null>(null);
 
   useEffect(() => {
     setTimeout(() => productNameInputRef.current?.focus(), 0);
-  }, [mode]); 
+  }, [mode]);
 
   const updateSkuDisplayInfo = useCallback(() => {
     if (currentProductForSelection) {
@@ -164,7 +189,7 @@ export function BillingForm({
         const details = getSkuDetails(sku);
         if(currentProductForSelection.trackQuantity) setCurrentSkuStock(details.totalStock);
         setCurrentSkuSellPrice(details.currentSellPrice);
-        
+
         if (mode === 'sell' || mode === 'return') {
           setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
         } else if (mode === 'buy') {
@@ -173,7 +198,7 @@ export function BillingForm({
             } else {
                 setSellPrice('');
             }
-            setCostPrice(''); 
+            setCostPrice('');
         }
       } else {
         setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
@@ -184,14 +209,14 @@ export function BillingForm({
     }
   }, [currentProductForSelection, selectedVariantOptions, findOrCreateProductSKU, getSkuDetails, mode]);
 
-  const handleProductSelect = (product: Product) => {
+  const handleProductSelect = useCallback((product: Product) => {
     setProductNameQuery(product.name);
     setCurrentProductForSelection(product);
     setSelectedVariantOptions({});
     setProductNotFoundHint('');
-    
+
     if (!product.variants || product.variants.length === 0) {
-        updateSkuDisplayInfo(); 
+        updateSkuDisplayInfo();
         setTimeout(() => {
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
@@ -199,20 +224,22 @@ export function BillingForm({
     } else {
         setCurrentSkuStock(null);
         setCurrentSkuSellPrice(null);
-        setSellPrice(''); 
+        setSellPrice('');
         if (mode === 'buy') setCostPrice('');
 
         const firstVariantId = product.variants[0].id;
         if (firstVariantId) {
             setVariantDropdownOpenState({ [firstVariantId]: true });
-             setTimeout(() => { 
+             setTimeout(() => {
               const firstVariantRef = variantSelectRefs.current[firstVariantId];
               const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstVariantId}-trigger`);
               (elToFocus as HTMLElement)?.focus();
             }, 100);
         }
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [updateSkuDisplayInfo, mode]); // Removed variantSelectRefs from dependency to avoid re-creation
+
 
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
@@ -222,10 +249,10 @@ export function BillingForm({
             setTimeout(() => {
                 const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
                 (elToFocus as HTMLElement)?.focus();
-            }, 100); 
+            }, 100);
         }
     }
-  }, [variantDropdownOpenState]); // Only depend on variantDropdownOpenState
+  }, [variantDropdownOpenState]);
 
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
@@ -233,14 +260,13 @@ export function BillingForm({
         (v) => selectedVariantOptions[v.name]
       );
       if (allVariantsSelected) {
-        updateSkuDisplayInfo(); 
+        updateSkuDisplayInfo();
         const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
-        // Only focus quantity if dropdown for last variant is not open and quantity input isn't already focused
         if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
              setTimeout(() => {
                 quantityInputRef.current?.focus();
                 quantityInputRef.current?.select();
-            }, 100); 
+            }, 100);
         }
       }
     }
@@ -258,10 +284,19 @@ export function BillingForm({
     let product = currentProductForSelection || getProductByName(productNameQuery);
 
     if (!product) {
-      const params: NewProductPrefillParams = { name: productNameQuery };
+      // Navigate to add product page with pre-filled data and returnTo path
+      const params: NewProductPrefillParams = {
+        name: productNameQuery,
+        returnTo: encodeURIComponent(pathname + searchParams.toString()) // Capture full current URL
+      };
+      if (mode === 'buy') {
+        params.quantity = currentQuantity.toString();
+        params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
+        params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+      }
       const query = new URLSearchParams(params as Record<string, string>).toString();
       router.push(`/admin/products/add?${query}`);
-      setProductNotFoundHint(''); 
+      setProductNotFoundHint('');
       return;
     }
 
@@ -280,38 +315,38 @@ export function BillingForm({
     }
 
     const selectedOpts = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
-    const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts); 
-    const skuDetails = getSkuDetails(targetSkuFromStore); 
+    const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts);
+    const skuDetails = getSkuDetails(targetSkuFromStore);
 
     if (mode === 'sell' && product.trackQuantity) {
-      if (skuDetails.totalStock < currentQuantity) {
-        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${skuDetails.totalStock} of ${product.name} (selected variant) available.` });
+      if (skuDetails.totalStock === null || skuDetails.totalStock < currentQuantity) {
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${skuDetails.totalStock ?? 0} of ${product.name} (selected variant) available.` });
         return;
       }
     }
-    
+
     let itemCostPrice: number;
     let itemSellPrice: number;
 
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
-      itemSellPrice = parseFloat(sellPrice.toString()) || 0; 
-       if (itemCostPrice <= 0 && currentQuantity > 0) { 
+      itemSellPrice = parseFloat(sellPrice.toString()) || 0;
+       if (itemCostPrice <= 0 && currentQuantity > 0) {
         toast({ variant: "destructive", title: "Invalid Cost Price", description: "Cost Price must be greater than 0 for purchases."});
         costPriceInputRef.current?.focus();
         return;
       }
     } else if (mode === 'sell') {
-      itemCostPrice = 0; 
-      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0; // Use the state `sellPrice` which is auto-populated
-      if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) { 
+      itemCostPrice = 0; // COGS will be determined in addBill
+      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
+      if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0. Check inventory pricing."});
         return;
       }
     } else { // Return mode
-      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0; // Use the state `sellPrice` which is auto-populated
-      itemCostPrice = skuDetails.averageCostPrice || 0; 
-      if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) { 
+      itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
+      itemCostPrice = skuDetails.averageCostPrice || 0;
+      if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0. Check inventory pricing."});
         return;
       }
@@ -329,41 +364,50 @@ export function BillingForm({
     };
 
     setCurrentBillItems(prevItems => [...prevItems, newItem]);
-    resetFormFields(true); 
+    resetFormFields(true);
   };
 
   const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
     if (currentField === 'productName') {
        const productsFound = searchProducts(productNameQuery);
        if (productsFound.length === 1 && !currentProductForSelection && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
-            handleProductSelect(productsFound[0]); 
+            handleProductSelect(productsFound[0]);
        } else {
-            if (currentProductForSelection) { 
+            if (currentProductForSelection) {
                 if (!currentProductForSelection.variants || currentProductForSelection.variants.length === 0) {
                      quantityInputRef.current?.focus();
                      quantityInputRef.current?.select();
-                } else { 
+                } else {
                     const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                     const firstVariantId = currentProductForSelection.variants[0]?.id;
                     if(firstUnselectedVariant && firstVariantId){
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstVariantId]: true }));
-                        setTimeout(() => { 
+                        setTimeout(() => {
                             const firstVariantRef = variantSelectRefs.current[firstVariantId];
                             const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstVariantId}-trigger`);
                             (elToFocus as HTMLElement)?.focus();
                         }, 100);
-                    } else { 
+                    } else {
                         quantityInputRef.current?.focus();
                         quantityInputRef.current?.select();
                     }
                 }
             } else if (productNotFoundHint === productNameQuery && productNameQuery.trim() !== '') {
-                const params: NewProductPrefillParams = { name: productNameQuery };
+                const params: NewProductPrefillParams = {
+                  name: productNameQuery,
+                  returnTo: encodeURIComponent(pathname + searchParams.toString()) // Capture full current URL
+                };
+                if (mode === 'buy') {
+                  const currentQty = typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1;
+                  params.quantity = currentQty.toString();
+                  params.costPrice = (typeof costPrice === 'string' ? costPrice : costPrice?.toString()) || '0';
+                  params.sellPrice = (typeof sellPrice === 'string' ? sellPrice : sellPrice?.toString()) || '0';
+                }
                 const query = new URLSearchParams(params as Record<string, string>).toString();
                 router.push(`/admin/products/add?${query}`);
                 resetFormFields(true);
             } else if (productNameQuery.trim() !== '') {
-                setProductNotFoundHint(productNameQuery); 
+                setProductNotFoundHint(productNameQuery);
             }
        }
     } else if (currentField === 'quantity') {
@@ -371,16 +415,15 @@ export function BillingForm({
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       } else if (mode === 'sell' || mode === 'return') {
-        // Sell price is auto-fetched, directly add item
         handleAddNewItem();
       }
-    } else if (currentField === 'costPrice') { // Only applicable for 'buy' mode
+    } else if (currentField === 'costPrice') {
       if (mode === 'buy') {
         sellPriceInputRef.current?.focus();
         sellPriceInputRef.current?.select();
       }
-    } else if (currentField === 'sellPrice') { // Only applicable for 'buy' mode (as it's the "sell price at purchase" input)
-      handleAddNewItem(); 
+    } else if (currentField === 'sellPrice') {
+      if (mode === 'buy') handleAddNewItem();
     } else if (currentField === 'serviceDescription') {
       serviceAmountInputRef.current?.focus();
       serviceAmountInputRef.current?.select();
@@ -393,15 +436,15 @@ export function BillingForm({
     setCurrentBillItems(prevItems =>
       prevItems.map(item => {
         if (item.id === itemId) {
-          return { ...item, quantity: Math.max(0, newQuantity) }; 
+          return { ...item, quantity: Math.max(0, newQuantity) };
         }
         return item;
-      }).filter(item => item.quantity > 0) 
+      }).filter(item => item.quantity > 0)
     );
   };
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    if (mode !== 'buy') return; 
+    if (mode !== 'buy') return;
     setCurrentBillItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
@@ -415,14 +458,14 @@ export function BillingForm({
 
   const calculateTotal = () => {
     return currentBillItems.reduce((acc, item) => {
-      const price = mode === 'buy' ? item.costPrice : item.sellPrice;
+      const price = mode === 'buy' ? (parseFloat(item.costPrice.toString()) || 0) : (parseFloat(item.sellPrice.toString()) || 0);
       return acc + (price * item.quantity);
     }, 0);
   };
 
   const calculatePotentialSellTotalForBuy = () => {
     if (mode !== 'buy') return 0;
-    return currentBillItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
+    return currentBillItems.reduce((acc, item) => acc + ((parseFloat(item.sellPrice.toString()) || 0) * item.quantity), 0);
   };
 
   const proceedWithSave = (staffId: string) => {
@@ -451,7 +494,7 @@ export function BillingForm({
 
     setLastSavedBillMode(billType);
     setIsSavingAnimationVisible(true);
-    setPendingBillPayload(null); 
+    setPendingBillPayload(null);
   };
 
   const handleSaveBill = () => {
@@ -470,10 +513,10 @@ export function BillingForm({
     }
     const billItemsForStore = currentBillItems.map(item => ({
       productId: item.productId,
-      productName: item.productName, 
+      productName: item.productName,
       quantity: item.quantity,
-      costPrice: item.costPrice,
-      sellPrice: item.sellPrice,
+      costPrice: parseFloat(item.costPrice.toString()) || 0,
+      sellPrice: parseFloat(item.sellPrice.toString()) || 0,
       isDefective: item.isDefective,
       selectedVariantOptions: item.selectedVariantOptions,
     }));
@@ -488,19 +531,19 @@ export function BillingForm({
       items: billItemsForStore,
       storeIdForBill: finalStoreId,
     };
-    
-    if (!isAdminContext && storeIdFromProp) { 
+
+    if (!isAdminContext && storeIdFromProp) {
         setPendingBillPayload(currentBillPayload);
-        setIsVerifyEmployeeDialogOpen(true); 
-    } else { 
-      setPendingBillPayload(currentBillPayload); 
-      proceedWithSave('admin_self_billed'); 
+        setIsVerifyEmployeeDialogOpen(true);
+    } else {
+      setPendingBillPayload(currentBillPayload);
+      proceedWithSave('admin_self_billed');
     }
   };
 
   const handleEmployeeVerifiedForBill = (staff: Staff) => {
     setIsVerifyEmployeeDialogOpen(false);
-    if (pendingBillPayload) { 
+    if (pendingBillPayload) {
       proceedWithSave(staff.id);
     } else {
         toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
@@ -510,17 +553,16 @@ export function BillingForm({
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
-    resetFullForm(); 
+    resetFullForm();
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParams.get('mode');
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
          // No navigation, stay on the current mode page
        } else {
-         router.push(basePath); // Default to history view if no mode was specified for a new bill
+         router.push(basePath);
        }
     }
-    // For store portal, no explicit navigation needed here, stays on billing form with current mode.
   };
 
   const handleModeChange = (newModeString: string) => {
@@ -531,15 +573,16 @@ export function BillingForm({
     }
     if (newMode !== mode) {
         setMode(newMode);
-        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); 
+        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
-        resetFullForm(); 
+        resetFullForm();
     }
   };
 
   const handleEditProductClick = () => {
     if (currentProductForSelection) {
-      router.push(`/admin/products/${currentProductForSelection.id}`);
+      const currentBillingUrl = pathname + searchParams.toString();
+      router.push(`/admin/products/${currentProductForSelection.id}?returnTo=${encodeURIComponent(currentBillingUrl)}`);
     }
   };
 
@@ -552,11 +595,11 @@ export function BillingForm({
     const amount = parseFloat(serviceAmount.toString());
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, 
+      productId: `SERVICE_ITEM_${uuidv4()}`,
       productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0, 
-      sellPrice: amount, 
+      costPrice: mode === 'buy' ? amount : 0,
+      sellPrice: amount,
       isDefective: undefined,
       selectedVariantOptions: undefined,
     };
@@ -572,7 +615,7 @@ export function BillingForm({
     buy: { icon: ShoppingBag, color: "data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground", label: "Expense" },
     return: { icon: RotateCcw, color: "data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950", label: "Return" },
   };
-  
+
   return (
     <div className="flex flex-col gap-6">
       <BillSaveAnimation
@@ -584,8 +627,8 @@ export function BillingForm({
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
-              if(!open && isVerifyEmployeeDialogOpen) { 
-                  setPendingBillPayload(null); 
+              if(!open && isVerifyEmployeeDialogOpen) {
+                  setPendingBillPayload(null);
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -651,7 +694,7 @@ export function BillingForm({
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
             </h3>
             <div className={cn(
-              "grid gap-4 items-baseline", 
+              "grid gap-4 items-baseline",
               "grid-cols-1",
               mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]"
             )}>
@@ -668,15 +711,17 @@ export function BillingForm({
                     id="productNameGlobal"
                     className="flex-grow"
                   />
-                  {currentProductForSelection && isAdminContext && ( 
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
-                          <Edit3 className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Edit {currentProductForSelection.name}</p></TooltipContent>
-                    </Tooltip>
+                  {currentProductForSelection && isAdminContext && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
+                            <Edit3 className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Edit {currentProductForSelection.name}</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   )}
                 </div>
                 {currentProductForSelection && <span className="text-xs text-muted-foreground ml-1">Selected: {currentProductForSelection.name} {currentProductForSelection.trackQuantity && currentSkuStock !== null ? `(Stock: ${currentSkuStock})` : ''} {currentSkuSellPrice !== null ? `(Price: ₹${currentSkuSellPrice.toFixed(2)})` : ''}</span>}
@@ -702,7 +747,7 @@ export function BillingForm({
                   placeholder="1"
                 />
               </div>
-              {mode === 'buy' ? (
+              {mode === 'buy' && (
                 <>
                   <div className="space-y-1.5 w-full md:w-32">
                     <Label htmlFor="costPrice">Cost Price/Unit</Label>
@@ -723,7 +768,7 @@ export function BillingForm({
                       id="sellPriceGlobalBuy"
                       ref={sellPriceInputRef}
                       type="number"
-                      value={sellPrice} // For buy mode, this is the sell price to be set for the incoming stock layer
+                      value={sellPrice}
                       onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
                       onFocus={(e) => e.target.select()}
@@ -731,7 +776,7 @@ export function BillingForm({
                     />
                   </div>
                 </>
-              ) : null /* Sell Price input removed for Sales/Return modes */ }
+              )}
                <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                </Button>
@@ -754,17 +799,16 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { 
+                                setTimeout(() => {
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                  const nextVariantRef = variantSelectRefs.current[nextVariantId];
-                                  const elToFocus = nextVariantRef?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
+                                  const elToFocus = variantSelectRefs.current[nextVariantId]?.current || document.getElementById(`variant-select-${nextVariantId}-trigger`);
                                    (elToFocus as HTMLElement)?.focus();
-                                }, 50); 
-                            } else { 
+                                }, 50);
+                            } else {
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -812,7 +856,7 @@ export function BillingForm({
 
           <div className="flex-grow overflow-hidden">
             {currentBillItems.length > 0 && <BillItemHeader mode={mode} />}
-            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]"> 
+            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]">
               {currentBillItems.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
               ) : (
@@ -833,7 +877,7 @@ export function BillingForm({
           </div>
 
           {(mode === 'sell' || mode === 'buy') && (
-            <div className="pt-4 border-t border-dashed mt-auto space-y-3"> 
+            <div className="pt-4 border-t border-dashed mt-auto space-y-3">
               <h3 className="text-md font-medium text-foreground flex items-center gap-2">
                 <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
               </h3>
@@ -884,7 +928,7 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : 'customer'} name (optional)`}
                 />
             </div>
-            {mode !== 'buy' && ( // Only show phone for Sales and Return
+            {mode !== 'buy' && (
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
                     <Input
@@ -897,7 +941,7 @@ export function BillingForm({
                     />
                 </div>
             )}
-             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}> {/* Notes spans full width if phone is hidden */}
+             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
                 <Label htmlFor="notes">Notes</Label>
                 <Input
                 id="notes"
@@ -937,7 +981,7 @@ export function BillingForm({
                 )}
             </div>
           </div>
-          
+
           <div className="flex gap-3 mt-2">
             <Button variant="outline" onClick={resetFullForm} className="flex-1">
               <Eraser className="mr-2 h-4 w-4" /> Clear Bill
