@@ -43,14 +43,14 @@ interface InventoryState {
   messagesByStore: Record<string, ChatMessage[]>;
 
   // Product methods
-  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { variants?: Array<{ name: string, options: Array<{ value: string}> }>, costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => Product;
-  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: Array<{ name: string, options: Array<{ value: string}> }>, costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => void;
+  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => Product;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => void;
   deleteProduct: (productId: string) => void;
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
   searchProducts: (searchTerm: string) => Product[];
   getLowStockProductCount: (threshold: number) => number;
-  findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>) => ProductSKU | undefined;
+  findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>, isPurchase?: boolean, costPrice?: number, sellPrice?: number) => ProductSKU | undefined;
   getSkuDetails: (sku: ProductSKU | undefined) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
   getSkuIdentifier: (productName: string, optionValues: Record<string, string>) => string;
 
@@ -127,12 +127,14 @@ export const useInventoryStore = create<InventoryState>()(
       messagesByStore: {},
 
       getSkuIdentifier: (productName, optionValues) => {
+        if (!productName) return "Unknown Product";
         if (!optionValues || Object.keys(optionValues).length === 0) return productName;
         const sortedOptionsString = Object.entries(optionValues)
+          .filter(([, value]) => typeof value === 'string') // Ensure values are strings
           .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
           .map(([, value]) => value)
           .join(' - ');
-        return `${productName} (${sortedOptionsString})`;
+        return sortedOptionsString ? `${productName} (${sortedOptionsString})` : productName;
       },
 
       addProduct: (productData) => {
@@ -149,7 +151,7 @@ export const useInventoryStore = create<InventoryState>()(
           name: productData.name,
           category: productData.category,
           trackQuantity: productData.trackQuantity,
-          sku: productData.sku,
+          sku: productData.sku, // Main product code/base SKU
           expiryDate: productData.expiryDate,
           description: productData.description,
           variants: productVariants,
@@ -161,25 +163,25 @@ export const useInventoryStore = create<InventoryState>()(
           imageUrl: `https://placehold.co/100x100.png?text=${encodeURIComponent(productData.name.substring(0,10))}&font=roboto`,
           productSKUs: [],
         };
-        
-        if (newProduct.trackQuantity === false && (!productVariants || productVariants.length === 0)) {
+
+        if (!newProduct.trackQuantity && (!productVariants || productVariants.length === 0)) {
+            const skuIdentifier = get().getSkuIdentifier(newProduct.name, {});
             const defaultSku: ProductSKU = {
                 id: generateId(),
                 optionValues: {},
-                skuIdentifier: get().getSkuIdentifier(newProduct.name, {}),
+                skuIdentifier: skuIdentifier,
                 stockLayers: [{
                     id: generateId(),
                     purchaseBillId: 'INITIAL_SETUP_NON_TRACKED',
                     purchaseDate: new Date().toISOString(),
                     initialQuantity: 0, 
-                    quantity: 0,
+                    quantity: 0, 
                     costPrice: productData.costPriceForNonTracked ?? 0,
                     sellPrice: productData.sellPriceForNonTracked ?? 0,
                 }],
             };
             newProduct.productSKUs.push(defaultSku);
         }
-
 
         set((state) => ({ products: [...state.products, newProduct] }));
         if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
@@ -211,12 +213,11 @@ export const useInventoryStore = create<InventoryState>()(
                   };
                 });
               }
-               // Update SKU identifiers if name or variants changed
+              
               updatedProduct.productSKUs = updatedProduct.productSKUs.map(sku => ({
                 ...sku,
                 skuIdentifier: get().getSkuIdentifier(updatedProduct.name, sku.optionValues)
               }));
-
 
               if (updatedProduct.trackQuantity === false && (!updatedProduct.variants || updatedProduct.variants.length === 0)) {
                 let defaultSku = updatedProduct.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
@@ -225,11 +226,11 @@ export const useInventoryStore = create<InventoryState>()(
 
                 if (defaultSku) {
                   defaultSku.stockLayers = [{
-                      id: defaultSku.stockLayers[0]?.id || generateId(), // Reuse existing layer ID if possible
+                      id: defaultSku.stockLayers[0]?.id || generateId(),
                       purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date().toISOString(),
                       initialQuantity: 0, quantity: 0, costPrice, sellPrice,
                   }];
-                   defaultSku.skuIdentifier = get().getSkuIdentifier(updatedProduct.name, defaultSku.optionValues);
+                  defaultSku.skuIdentifier = get().getSkuIdentifier(updatedProduct.name, defaultSku.optionValues);
                 } else { 
                   defaultSku = {
                     id: generateId(), optionValues: {}, skuIdentifier: get().getSkuIdentifier(updatedProduct.name, {}),
@@ -254,21 +255,20 @@ export const useInventoryStore = create<InventoryState>()(
       deleteProduct: (productId: string) => {
         set((state) => {
           const updatedProducts = state.products.filter((p) => p.id !== productId);
-          // Remove items of this product from existing bills
           const updatedBills = state.bills.map(bill => ({
             ...bill,
             items: bill.items.filter(item => item.productId !== productId)
-          })).filter(bill => bill.items.length > 0); // Remove bills if they become empty
+          })).filter(bill => bill.items.length > 0);
 
           return { products: updatedProducts, bills: updatedBills };
         });
       },
 
-      findOrCreateProductSKU: (productId, optionValues) => {
+      findOrCreateProductSKU: (productId, optionValues, isPurchase = false, costPrice = 0, sellPrice = 0) => {
         const products = get().products;
         const productIndex = products.findIndex(p => p.id === productId);
         if (productIndex === -1) return undefined;
-
+        
         const product = products[productIndex];
         const stringifiedTargetOptions = JSON.stringify(Object.fromEntries(Object.entries(optionValues).sort()));
 
@@ -277,16 +277,40 @@ export const useInventoryStore = create<InventoryState>()(
         );
 
         if (!sku) {
+          const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
           sku = {
             id: generateId(),
             optionValues: { ...optionValues },
-            skuIdentifier: get().getSkuIdentifier(product.name, optionValues),
+            skuIdentifier: skuIdentifier,
             stockLayers: [],
           };
+          if (isPurchase && !product.trackQuantity) { // For non-tracked items, initialize with one price layer
+            sku.stockLayers.push({
+              id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date().toISOString(),
+              initialQuantity: 0, quantity: 0, costPrice, sellPrice,
+            });
+          }
           const updatedProductSKUs = [...product.productSKUs, sku];
           const updatedProducts = [...products];
           updatedProducts[productIndex] = { ...product, productSKUs: updatedProductSKUs };
           set({ products: updatedProducts });
+        } else if (isPurchase && !product.trackQuantity) { // Update price layer for existing non-tracked SKU
+            if (sku.stockLayers.length === 0) {
+                 sku.stockLayers.push({
+                    id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date().toISOString(),
+                    initialQuantity: 0, quantity: 0, costPrice, sellPrice,
+                 });
+            } else {
+                sku.stockLayers[0].costPrice = costPrice;
+                sku.stockLayers[0].sellPrice = sellPrice;
+            }
+             sku.skuIdentifier = get().getSkuIdentifier(product.name, sku.optionValues); // Ensure identifier is up-to-date
+             const updatedProducts = [...products];
+             updatedProducts[productIndex] = {
+                ...product,
+                productSKUs: product.productSKUs.map(s => s.id === sku!.id ? sku! : s)
+             };
+             set({ products: updatedProducts });
         }
         return sku;
       },
@@ -301,7 +325,6 @@ export const useInventoryStore = create<InventoryState>()(
         }
 
         if (product.trackQuantity === false) {
-          // For non-tracked items, price comes from its single conceptual layer
           const priceLayer = sku.stockLayers[0];
           return {
             totalStock: null, 
@@ -321,7 +344,13 @@ export const useInventoryStore = create<InventoryState>()(
           if (oldestLayerWithStock && typeof oldestLayerWithStock.sellPrice === 'number') {
             currentSellPrice = oldestLayerWithStock.sellPrice;
           }
+        } else if (sku.stockLayers.length > 0) { // If out of stock, suggest sell price from newest layer if available
+            const newestLayer = [...sku.stockLayers].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
+            if (newestLayer && typeof newestLayer.sellPrice === 'number') {
+                currentSellPrice = newestLayer.sellPrice;
+            }
         }
+
 
         let averageCostPrice: number | null = null;
         if (totalStock > 0) {
@@ -354,7 +383,8 @@ export const useInventoryStore = create<InventoryState>()(
           const product = productIndex !== -1 ? tempProducts[productIndex] : null;
           
           if (billData.type === 'buy' && product && product.trackQuantity === false) {
-             return null;
+             console.warn(`Attempted to add non-tracked product ${product.name} to expense bill. This should be blocked by UI.`);
+             return null; 
           }
 
           let sku: ProductSKU | undefined = undefined;
@@ -363,28 +393,33 @@ export const useInventoryStore = create<InventoryState>()(
           let billItemSellPrice = typeof itemData.sellPrice === 'number' ? itemData.sellPrice : 0;
           let itemProductNameForBill = product?.name || itemData.productName || 'Service/Charge';
 
-
           if (product) {
             const selectedOpts = itemData.selectedVariantOptions || {};
-            const targetSkuInstance = get().findOrCreateProductSKU(product.id, selectedOpts);
-             if(!targetSkuInstance) {
-                console.error(`SKU could not be found or created for ${product.name} with options ${JSON.stringify(selectedOpts)}`);
-                continue;
+            let targetSkuInstance = product.productSKUs.find(s => 
+                JSON.stringify(Object.fromEntries(Object.entries(s.optionValues).sort())) === 
+                JSON.stringify(Object.fromEntries(Object.entries(selectedOpts).sort()))
+            );
+
+            if (!targetSkuInstance) { // If SKU doesn't exist for this variant combination
+                const newSkuIdentifier = get().getSkuIdentifier(product.name, selectedOpts);
+                targetSkuInstance = {
+                    id: generateId(),
+                    optionValues: { ...selectedOpts },
+                    skuIdentifier: newSkuIdentifier,
+                    stockLayers: [],
+                };
+                product.productSKUs.push(targetSkuInstance);
+                tempProducts[productIndex] = product; // Update product in tempProducts array
+                productsUpdated = true;
             }
-            const refreshedProduct = tempProducts.find(p => p.id === product.id);
-            if (!refreshedProduct) continue;
-            skuIndexInProduct = refreshedProduct.productSKUs.findIndex(s => s.id === targetSkuInstance.id);
-            if (skuIndexInProduct === -1) { // Should not happen if findOrCreate worked
-                console.error("SKU index not found after creation attempt.");
-                continue;
-            }
-            sku = refreshedProduct.productSKUs[skuIndexInProduct];
-            itemProductNameForBill = sku.skuIdentifier || get().getSkuIdentifier(refreshedProduct.name, sku.optionValues);
+            sku = targetSkuInstance;
+            skuIndexInProduct = product.productSKUs.findIndex(s => s.id === sku!.id); // Re-find index after potential push
+            itemProductNameForBill = sku.skuIdentifier || get().getSkuIdentifier(product.name, sku.optionValues);
 
             if (billData.type === 'buy') {
-                if (!product.trackQuantity) { // Double check for safety, though form should prevent
-                    console.warn(`Attempted to add non-tracked product ${product.name} to expense bill.`);
-                    return null;
+                if (!product.trackQuantity) {
+                    console.warn(`Non-tracked product ${product.name} cannot be added to Expense bill.`);
+                    return null; 
                 }
               const newLayer: StockLayer = {
                 id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
@@ -408,32 +443,33 @@ export const useInventoryStore = create<InventoryState>()(
                     productsUpdated = true;
                   }
                 }
-                if (quantityToSell > 0) {
+                if (quantityToSell > 0) { // Insufficient stock
                   return null;
                 }
                 billItemCostPrice = itemData.quantity > 0 ? costOfGoodsSoldThisItem / itemData.quantity : 0;
               } else { 
                 const skuDetails = get().getSkuDetails(sku);
                 billItemCostPrice = skuDetails.averageCostPrice ?? 0; 
-                // billItemSellPrice is already set from form, which got it from skuDetails.currentSellPrice
               }
             } else if (billData.type === 'return') {
               const skuDetails = get().getSkuDetails(sku);
               billItemCostPrice = skuDetails.averageCostPrice ?? 0;
 
               if (product.trackQuantity && !itemData.isDefective) {
-                const returnLayer: StockLayer = {
+                const returnLayer: StockLayer = { // Simplified return: adds as a new layer at average cost.
                   id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
                   initialQuantity: itemData.quantity, quantity: itemData.quantity,
                   costPrice: billItemCostPrice, 
-                  sellPrice: billItemSellPrice, 
+                  sellPrice: billItemSellPrice, // Use original sell price for return value
                 };
                 sku.stockLayers.push(returnLayer);
                 productsUpdated = true;
               }
             }
-            refreshedProduct.productSKUs[skuIndexInProduct] = sku;
-            tempProducts = tempProducts.map(p => p.id === refreshedProduct.id ? refreshedProduct : p);
+             if (skuIndexInProduct !== -1) { // Ensure sku was found or created and index is valid
+                product.productSKUs[skuIndexInProduct] = sku;
+             }
+             tempProducts = tempProducts.map(p_ => p_.id === product.id ? product : p_);
           } else if (itemData.productId.startsWith('SERVICE_ITEM_')) {
             billItemCostPrice = billData.type === 'buy' ? (itemData.costPrice ?? 0) : 0;
             billItemSellPrice = itemData.sellPrice ?? 0;
@@ -517,7 +553,7 @@ export const useInventoryStore = create<InventoryState>()(
         }));
       },
       deleteStaff: (staffId: string) => {
-        set((state) => ({
+         set((state) => ({
           staffs: state.staffs.filter((s) => s.id !== staffId),
           stores: state.stores.map(store => ({
             ...store,
@@ -531,6 +567,7 @@ export const useInventoryStore = create<InventoryState>()(
         const allStaff = get().staffs;
         return staffIds.map(id => allStaff.find(s => s.id === id)).filter(s => s !== undefined) as Staff[];
       },
+
 
       addStore: (storeData) => {
         const plan = get().getActiveSubscriptionPlan();
@@ -549,7 +586,7 @@ export const useInventoryStore = create<InventoryState>()(
         }));
       },
       deleteStore: (storeId: string) => {
-        set((state) => ({
+         set((state) => ({
           stores: state.stores.filter((s) => s.id !== storeId),
           staffs: state.staffs.map(staff => ({
             ...staff,
@@ -594,7 +631,7 @@ export const useInventoryStore = create<InventoryState>()(
           (p) =>
             p.name.toLowerCase().includes(lowerSearchTerm) ||
             (p.category && p.category.toLowerCase().includes(lowerSearchTerm)) ||
-            (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm)) ||
+            (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm)) || // Search main product SKU code
             p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm))
         );
       },
@@ -639,8 +676,8 @@ export const useInventoryStore = create<InventoryState>()(
         bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_')) return;
-              const productNameForItem = item.productName || 'Unknown Product';
+              if (item.productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+              const productNameForItem = item.productName || 'Unknown Product'; // item.productName is SKU identifier
               if (!productRevenue[productNameForItem]) {
                 productRevenue[productNameForItem] = { name: productNameForItem, revenue: 0 };
               }
@@ -654,7 +691,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getRecentExpenseBillsWithPotentialCoverage: (limit: number) => {
         const expenseBills = get().bills.filter(bill => bill.type === 'buy')
-          .sort((a, b) => b.timestamp - a.timestamp);
+          .sort((a, b) => b.timestamp - a.timestamp); // Sort by most recent
         return expenseBills.slice(0, limit).map(bill => {
           const totalCost = bill.totalAmount;
           const potentialRevenue = bill.items.reduce((acc, item) => acc + ((item.sellPrice ?? 0) * item.quantity), 0);
@@ -703,7 +740,10 @@ export const useInventoryStore = create<InventoryState>()(
           if (bill.type === 'sell') {
             totalRevenue += bill.totalAmount;
             bill.items.forEach(item => {
-              const costForItem = (item.costPrice || 0);
+              if (item.productId.startsWith('SERVICE_ITEM_')) { // Service items usually have 0 COGS
+                return;
+              }
+              const costForItem = (item.costPrice || 0); // costPrice on sell BillItem is COGS
               totalCOGS += costForItem * item.quantity;
             });
           } else if (bill.type === 'buy') {
@@ -711,7 +751,7 @@ export const useInventoryStore = create<InventoryState>()(
           }
         });
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses;
+        const netProfit = grossProfit - totalExpenses; // Simple Net Profit before other operating expenses
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
 
@@ -728,6 +768,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (bill.type === 'sell') {
             totalRevenue += bill.totalAmount;
             bill.items.forEach(item => {
+              if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const costForItem = (item.costPrice || 0);
               totalCOGS += costForItem * item.quantity;
             });
@@ -751,17 +792,21 @@ export const useInventoryStore = create<InventoryState>()(
         get().bills.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
-              // Use item.productName which should be the SKU identifier for accurate grouping
+              if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const skuIdentifier = item.productName; 
-              if (!productFinancials[skuIdentifier]) {
-                productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
+              if (skuIdentifier && typeof skuIdentifier === 'string') { // Ensure skuIdentifier is a valid string
+                if (!productFinancials[skuIdentifier]) {
+                  productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
+                }
+                const itemRevenue = (item.sellPrice || 0) * item.quantity;
+                const itemCogs = (item.costPrice || 0) * item.quantity; 
+        
+                productFinancials[skuIdentifier].revenue += itemRevenue;
+                productFinancials[skuIdentifier].cogs += itemCogs;
+                productFinancials[skuIdentifier].profit += (itemRevenue - itemCogs);
+              } else {
+                console.warn("Skipping item in profit calculation due to missing or invalid productName/skuIdentifier:", item);
               }
-              const itemRevenue = (item.sellPrice || 0) * item.quantity;
-              const itemCogs = (item.costPrice || 0) * item.quantity; // costPrice is COGS for sales items
-      
-              productFinancials[skuIdentifier].revenue += itemRevenue;
-              productFinancials[skuIdentifier].cogs += itemCogs;
-              productFinancials[skuIdentifier].profit += (itemRevenue - itemCogs);
             });
           }
         });
@@ -769,7 +814,7 @@ export const useInventoryStore = create<InventoryState>()(
         return Object.values(productFinancials)
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit)
-          .map(pf => ({ name: pf.name, revenue: pf.revenue, cogs: pf.cogs })); // Return only needed fields for chart
+          .map(pf => ({ name: pf.name, revenue: pf.revenue, cogs: pf.cogs }));
       },
 
 
@@ -824,11 +869,10 @@ export const useInventoryStore = create<InventoryState>()(
             const currentSubId = state.userProfile.activeSubscriptionId;
             const isValidSubId = SUBSCRIPTION_PLANS.some(plan => plan.id === currentSubId);
             if (!currentSubId || !isValidSubId) {
-              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
+              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN; // Default to a valid plan
               storeUpdated = true;
             }
-            state.userProfile.dataMode = state.userProfile.dataMode || 'local'; // Default dataMode
-            storeUpdated = true;
+            state.userProfile.dataMode = state.userProfile.dataMode || 'local'; 
           }
       
           if (!Array.isArray(state.categories)) { state.categories = []; storeUpdated = true; }
@@ -858,7 +902,7 @@ export const useInventoryStore = create<InventoryState>()(
               
               p.productSKUs = Array.isArray(p.productSKUs) ? p.productSKUs.map(sku_any => {
                 if(!sku_any || typeof sku_any !== 'object') return null;
-                const sku = { ...sku_any } as ProductSKU & { quantityInStock?: number; costPrice?: number; sellPrice?: number }; // temp allow old fields for migration
+                const sku = { ...sku_any } as ProductSKU & { quantityInStock?: number; costPrice?: number; sellPrice?: number };
                 sku.stockLayers = Array.isArray(sku.stockLayers) ? sku.stockLayers.map(layer_any => {
                     if(!layer_any || typeof layer_any !== 'object') return null;
                     const layer = { ...layer_any } as StockLayer;
@@ -875,17 +919,13 @@ export const useInventoryStore = create<InventoryState>()(
                     const oldCost = typeof sku.costPrice === 'number' ? sku.costPrice : 0;
                     const oldSell = typeof sku.sellPrice === 'number' ? sku.sellPrice : 0;
                     
-                    // Only create a placeholder layer if it was non-tracked or had actual stock
                     if (p.trackQuantity === false || (p.trackQuantity === true && oldQty > 0)) {
                         sku.stockLayers.push({
                             id: generateId(), purchaseBillId: 'hydrated_sku_stock', purchaseDate: new Date(0).toISOString(),
-                            initialQuantity: oldQty, // Use oldQty as initial and current for tracked
-                            quantity: oldQty,
-                            costPrice: oldCost,
-                            sellPrice: oldSell,
+                            initialQuantity: oldQty, quantity: oldQty, costPrice: oldCost, sellPrice: oldSell,
                         });
                         storeUpdated = true;
-                    } else if (p.trackQuantity === false) { // Specifically for non-tracked, ensure a price layer
+                    } else if (p.trackQuantity === false) {
                          sku.stockLayers.push({
                             id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date(0).toISOString(),
                             initialQuantity: 0, quantity: 0, costPrice: oldCost, sellPrice: oldSell,
@@ -901,29 +941,30 @@ export const useInventoryStore = create<InventoryState>()(
               }).filter(sku => sku !== null) : [];
       
               if ((!p.variants || p.variants.length === 0) && p.productSKUs.length === 0 && (p.hasOwnProperty('quantityInStock') || p.hasOwnProperty('costPrice') || p.hasOwnProperty('sellPrice'))) {
+                  const defaultSkuIdentifier = get().getSkuIdentifier(p.name, {});
                   const defaultSku: ProductSKU = {
-                    id: generateId(), optionValues: {}, skuIdentifier: get().getSkuIdentifier(p.name, {}), stockLayers: [],
+                    id: generateId(), optionValues: {}, skuIdentifier: defaultSkuIdentifier, stockLayers: [],
                   };
                   const oldQty = typeof p.quantityInStock === 'number' ? p.quantityInStock : 0;
                   const oldCost = typeof p.costPrice === 'number' ? p.costPrice : 0;
                   const oldSell = typeof p.sellPrice === 'number' ? p.sellPrice : 0;
                   
-                  if (p.trackQuantity === false || (p.trackQuantity === true && oldQty > 0)) {
+                  if (p.trackQuantity === false) { // For non-tracked, always create a price layer
                     defaultSku.stockLayers.push({
-                      id: generateId(), purchaseBillId: 'hydrated_product_stock', purchaseDate: new Date(0).toISOString(),
-                      initialQuantity: oldQty, 
-                      quantity: oldQty,
-                      costPrice: oldCost,
-                      sellPrice: oldSell,
-                    });
-                  } else if (p.trackQuantity === false) {
-                     defaultSku.stockLayers.push({
                         id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date(0).toISOString(),
                         initialQuantity: 0, quantity: 0, costPrice: oldCost, sellPrice: oldSell,
                     });
+                    storeUpdated = true;
+                  } else if (p.trackQuantity === true && oldQty > 0) { // For tracked, only if there was old stock
+                     defaultSku.stockLayers.push({
+                        id: generateId(), purchaseBillId: 'hydrated_product_stock', purchaseDate: new Date(0).toISOString(),
+                        initialQuantity: oldQty, quantity: oldQty, costPrice: oldCost, sellPrice: oldSell,
+                    });
+                    storeUpdated = true;
                   }
-                  p.productSKUs.push(defaultSku);
-                  storeUpdated = true;
+                  if (storeUpdated || defaultSku.stockLayers.length > 0) { // Only add if a layer was created
+                    p.productSKUs.push(defaultSku);
+                  }
               }
               delete p.quantityInStock; delete p.costPrice; delete p.sellPrice;
               return p;

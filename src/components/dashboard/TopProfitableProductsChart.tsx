@@ -31,8 +31,8 @@ const CustomTooltip = ({ active, payload, label, chartData }: any) => {
     const data = payload[0].payload; // The original data object for this category (product)
     
     // Find the original full name if it was truncated for Y-axis display
-    const originalItem = chartData.find((d: ProductFinancialData) => d.name === data.name || `${d.name.substring(0, 22)}...` === data.name);
-    const displayName = originalItem ? originalItem.name : data.name;
+    const originalItem = chartData.find((d: ProductFinancialData) => d.name === data.name || (typeof data.name === 'string' && typeof d.name === 'string' && `${d.name.substring(0, 22)}...` === data.name));
+    const displayName = originalItem && typeof originalItem.name === 'string' ? originalItem.name : (typeof data.name === 'string' ? data.name : "Unknown Product");
     const profit = data.revenue - data.cogs;
 
     return (
@@ -81,8 +81,11 @@ export function TopProfitableProductsChart() {
     return <div className="flex items-center justify-center h-full"><p>No profit data available for products.</p></div>;
   }
 
-  const formattedChartData = chartData.map(item => ({
+  const formattedChartData = chartData
+    .filter(item => typeof item.name === 'string' && item.name.trim() !== '') // Filter out items with invalid names
+    .map(item => ({
     ...item,
+    // Ensure item.name is a string before calling .length or .substring
     name: item.name.length > 25 ? `${item.name.substring(0, 22)}...` : item.name,
   }));
 
@@ -93,11 +96,11 @@ export function TopProfitableProductsChart() {
         layout="vertical"
         margin={{
           top: 5,
-          right: 20, // Increased right margin for values
+          right: 20, 
           left: 10, 
           bottom: 5,
         }}
-        barGap={4} // Add gap between groups of bars
+        barGap={4} 
       >
         <CartesianGrid horizontal={false} strokeDasharray="3 3" />
         <XAxis 
@@ -117,7 +120,7 @@ export function TopProfitableProductsChart() {
         />
         <Tooltip 
           cursor={{ fill: 'hsl(var(--muted))' }} 
-          content={<CustomTooltip chartData={chartData} />} // Pass original chartData for full names
+          content={<CustomTooltip chartData={chartData} />} 
         />
         <Legend verticalAlign="top" height={36}/>
         <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} barSize={15} name="Revenue" />
