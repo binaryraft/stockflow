@@ -36,7 +36,7 @@ const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { i
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
 };
 
-const getBillTypeName = (bill: Bill): string => { // Changed to accept full bill to check items for defective returns
+const getBillTypeName = (bill: Bill): string => {
   return getBillTypeIconAndColor(bill.type, bill.items).name;
 };
 
@@ -85,7 +85,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   type BillFilterType = 'all' | BillMode;
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
-    if (!getProductById) { // Guard against getProductById not being available
+    if (!getProductById) { 
         console.error("getProductById function is not available in findProductSKUfromStore");
         return undefined;
     }
@@ -117,7 +117,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Pass full bill
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || 
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
@@ -136,8 +136,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             valA = a.timestamp;
             valB = b.timestamp;
         } else if (sortConfig.key === 'type') {
-            valA = getBillTypeName(a); // Pass full bill
-            valB = getBillTypeName(b); // Pass full bill
+            valA = getBillTypeName(a); 
+            valB = getBillTypeName(b); 
         } else if (sortConfig.key === 'billedByStaffName') {
             valA = a.billedByStaffName || '';
             valB = b.billedByStaffName || '';
@@ -272,6 +272,13 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write('</span>');
             }
             printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
+             // For print, the "Qty Sold from this batch" is complex to derive without live store access.
+             // We will show the purchased quantity and remaining logic from the current state.
+            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
+            if(layerForThisBillItem){
+                printWindow.document.write(`<div class="item-sub-detail">Qty Sold from this batch: ${layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity} / ${layerForThisBillItem.initialQuantity}</div>`);
+            }
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
@@ -336,7 +343,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       if (billToPrint.type === 'buy') {
         const expectedRevenue = billToPrint.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // Green for profit, Red for loss
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; 
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
@@ -345,8 +352,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
          const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
          const profitColor = profitFromSale >= 0 ? '#166534' : '#b91c1c';
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-         // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
-         // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profitFromSale.toFixed(2)}</td></tr>`);
+         if(costOfGoodsSold > 0) { // Only show COGS and Profit if COGS is meaningful (i.e., tracked items were sold)
+            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
+            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profitFromSale.toFixed(2)}</td></tr>`);
+         }
       } else { // Return Bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
@@ -468,20 +477,17 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     <>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Product Details</TableHead>
-                          <TableHead className="text-right">Qty Purchased</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Cost/Unit</TableHead>
-                          <TableHead className="text-right">Item Total</TableHead>
+                          <TableHead className="align-top">Product Details</TableHead>
+                          <TableHead className="text-right align-top hidden sm:table-cell">Cost/Unit</TableHead>
+                          <TableHead className="text-right align-top">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const product = getProductById(item.productId);
-                            const sku = product ? findProductSKUfromStore(item.productId, item.selectedVariantOptions) : undefined;
-                            // Find the specific stock layer created by this bill for this item
+                            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+                            const skuDetails = getSkuDetails(sku);
                             const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
-                            const soldFromThisBatch = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
-
+                            
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -494,20 +500,27 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                       </div>
                                   )}
                                   <div className="text-xs text-muted-foreground mt-1">
+                                      Qty Purchased: {item.quantity}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground mt-0.5">
                                       Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                   </div>
                                   {layerForThisBillItem && (
                                     <>
                                       <div className="text-xs text-muted-foreground mt-0.5">
-                                        Qty Sold from this batch: <span className="text-green-600 font-medium">{soldFromThisBatch}</span> / {layerForThisBillItem.initialQuantity}
+                                        Qty Sold from this batch: <span className="text-green-600 font-medium">{layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity}</span> / {layerForThisBillItem.initialQuantity}
                                       </div>
                                       <div className="text-xs text-muted-foreground mt-0.5">
                                         Qty Remaining in this batch: {layerForThisBillItem.quantity}
                                       </div>
                                     </>
                                   )}
+                                  {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                          Current Total SKU Stock: {skuDetails.totalStock}
+                                      </div>
+                                  )}
                                 </TableCell>
-                                <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
                                 <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
                             </TableRow>
@@ -622,10 +635,33 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                             })()}
                         </>
                     ) : selectedBill.type === 'sell' ? ( 
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Total Sales Amount:</span>
-                            <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                        </div>
+                        <>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total Sales Amount:</span>
+                                <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                            </div>
+                            {(() => {
+                                const costOfGoodsSold = selectedBill.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+                                if (costOfGoodsSold > 0) { // Only show if COGS is meaningful
+                                    const profitFromSale = selectedBill.totalAmount - costOfGoodsSold;
+                                    return (
+                                        <>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Cost of Goods Sold:</span>
+                                                <span className="font-semibold">₹{costOfGoodsSold.toFixed(2)}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Profit from this Sale:</span>
+                                                <span className={cn("font-semibold", profitFromSale >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
+                                                    ₹{profitFromSale.toFixed(2)}
+                                                </span>
+                                            </div>
+                                        </>
+                                    );
+                                }
+                                return null;
+                            })()}
+                        </>
                     ) : ( // Return Bill
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Total Return Value:</span>
@@ -848,3 +884,5 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
+
+    

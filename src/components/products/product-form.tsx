@@ -14,7 +14,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, Package, Edit2, DollarSign, CalendarDays, Info, ListCollapse } from 'lucide-react';
+import { PlusCircle, Trash2, Package, Edit2, DollarSign, CalendarDays, Info, ListCollapse, PackageSearch } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -220,11 +220,13 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       });
       setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && searchParams) {
+      const initialQuantity = searchParams.quantity ? parseInt(searchParams.quantity as string) : undefined;
+      const trackQty = initialQuantity !== undefined && initialQuantity > 0;
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: searchParams.quantity !== undefined,
+        trackQuantity: trackQty,
         sku: '',
         expiryDate: '',
         variants: [],
@@ -251,37 +253,29 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       addCategoryToStore(data.category);
     }
     
+    const productToSave: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { productSKUs?: ProductSKU[] } = {
+      name: data.name,
+      description: data.description,
+      category: data.category,
+      trackQuantity: data.trackQuantity,
+      sku: data.sku,
+      expiryDate: data.expiryDate,
+      variants: productVariantsPayload,
+    };
+
     if (isEditing && initialData) {
-      const updatedProductData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { variants?: ProductVariantType[] } = {
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        trackQuantity: data.trackQuantity,
-        sku: data.sku,
-        expiryDate: data.expiryDate,
-        variants: productVariantsPayload,
-      };
-      updateProduct(initialData.id, updatedProductData);
+      updateProduct(initialData.id, productToSave);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      // For new products, productSKUs (and their stockLayers) will be initialized by the addProduct function.
-      // Price and stock are set via Expense Bills.
-      const newProductData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        trackQuantity: data.trackQuantity,
-        sku: data.sku,
-        expiryDate: data.expiryDate,
-        variants: productVariantsPayload,
-      };
-      addProduct(newProductData);
+      // When adding a new product, prices/stock are set via expense bills.
+      // If it's a non-variant product, a default SKU is created by addProduct, but its stock/price layers will be empty initially.
+      addProduct(productToSave as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>);
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
     router.push('/admin/products');
   };
 
-  const getQuantityInBill = (bill: Bill, productId: string) => {
+  const getQuantityInBill = (bill: Bill, productId: string): number => {
     const item = bill.items.find(i => i.productId === productId);
     return item ? item.quantity : 0;
   };
@@ -341,14 +335,24 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               />
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
+            
+            {!hasVariants && (
+                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For non-variant products, initial stock and pricing are established via the first <strong>Expense Bill</strong>.
+                    </span>
+                </div>
+            )}
 
-            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                <span>
-                    Initial stock and pricing for products (and their specific variant combinations/SKUs) are established via <strong>Expense Bills</strong>. 
-                    This form defines the product's core details and variant structure.
-                </span>
-            </div>
+            {hasVariants && (
+                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For products with variants, stock and pricing are managed per specific variant combination (SKU), also established via <strong>Expense Bills</strong>.
+                    </span>
+                </div>
+            )}
             
             <Separator className="my-6"/>
             
@@ -390,9 +394,11 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <>
                 <Separator className="my-6"/>
                 <div className="space-y-4">
-                  <Label className="text-lg font-semibold text-primary">SKU Stock Layers</Label>
+                  <Label className="text-lg font-semibold text-primary flex items-center gap-2">
+                    <ListCollapse size={20} /> SKU Stock Layers
+                  </Label>
                   {initialData.productSKUs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No stock layers found. Create an Expense Bill for this product to add stock and set prices.</p>
+                    <p className="text-sm text-muted-foreground">No stock layers found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
                   ) : (
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
@@ -400,7 +406,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                           <Card key={sku.id} className="bg-card shadow-sm">
                             <CardHeader className="pb-2 pt-3 px-4">
                               <CardTitle className="text-md text-primary">
-                                SKU: {sku.skuIdentifier || "Default"}
+                                SKU: {sku.skuIdentifier || "Default SKU"}
                                 {Object.keys(sku.optionValues).length > 0 && (
                                   <span className="text-xs font-normal text-muted-foreground ml-2">
                                     ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
@@ -410,7 +416,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                             </CardHeader>
                             <CardContent className="px-4 pb-3">
                               {sku.stockLayers.length === 0 ? (
-                                <p className="text-xs text-muted-foreground">No stock layers for this SKU.</p>
+                                <p className="text-xs text-muted-foreground">No stock layers for this SKU. (This SKU was likely defined but not yet purchased).</p>
                               ) : (
                                 <Table className="text-xs">
                                   <TableHeader>
@@ -447,7 +453,9 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
 
                 <Separator className="my-6"/>
                  <div className="space-y-4">
-                    <Label className="text-lg font-semibold text-primary">Product Transaction History</Label>
+                    <Label className="text-lg font-semibold text-primary flex items-center gap-2">
+                      <PackageSearch size={20} /> Product Transaction History
+                    </Label>
                     {productBills.length === 0 ? (
                         <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
                     ) : (
