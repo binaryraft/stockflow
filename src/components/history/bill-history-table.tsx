@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -27,17 +27,29 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper function definitions moved to the top
-const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
-  const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
-  if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
-  if (bill.type === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
+// Helper function definitions moved to the top level of the module
+const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string } => {
+  const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
+  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
+  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
   if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
 };
 
-const getBillTypeName = (bill: Bill): string => {
-  return getBillTypeIconAndColor(bill).name;
+const getBillTypeName = (billType: Bill['type'], items: BillItem[]): string => {
+  return getBillTypeIconAndColor(billType, items).name;
+};
+
+const getPartyDetailsTitle = (billType?: BillMode): string => {
+  if (billType === 'buy') return 'Vendor Details';
+  if (billType === 'sell' || billType === 'return') return 'Customer Details';
+  return 'Party Details';
+};
+
+const getPartyNameLabel = (billType?: BillMode): string => {
+  if (billType === 'buy') return 'Vendor Name';
+  if (billType === 'sell' || billType === 'return') return 'Customer Name';
+  return 'Name';
 };
 
 
@@ -46,12 +58,21 @@ interface BillHistoryTableProps {
 }
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
-  // Correctly select functions and state from the store
-  const bills = useInventoryStore(state => state.bills);
-  const getProductById = useInventoryStore(state => state.getProductById);
-  const userProfile = useInventoryStore(state => state.userProfile);
-  const deleteBill = useInventoryStore(state => state.deleteBill);
-  const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
+  const {
+    bills,
+    getProductById,
+    userProfile,
+    deleteBill,
+    getSkuDetails
+  } = useInventoryStore(
+    (state) => ({
+      bills: state.bills,
+      getProductById: state.getProductById,
+      userProfile: state.userProfile,
+      deleteBill: state.deleteBill,
+      getSkuDetails: state.getSkuDetails,
+    })
+  );
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -62,7 +83,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
   type BillFilterType = 'all' | BillMode;
-
 
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
@@ -81,7 +101,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || 
+        getBillTypeName(bill.type, bill.items).toLowerCase().includes(lowerSearchTerm) ||
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
@@ -100,8 +120,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             valA = a.timestamp;
             valB = b.timestamp;
         } else if (sortConfig.key === 'type') {
-            valA = getBillTypeName(a);
-            valB = getBillTypeName(b);
+            valA = getBillTypeName(a.type, a.items);
+            valB = getBillTypeName(b.type, b.items);
         } else if (sortConfig.key === 'billedByStaffName') {
             valA = a.billedByStaffName || '';
             valB = b.billedByStaffName || '';
@@ -158,7 +178,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       
       const styles =
         "<style>\n" +
-        "  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
+        "  body { font-family: Arial, Helvetica, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
         "  @page { size: auto; margin: 0.5in; }\n" +
         "  .print-container { max-width: 750px; margin: auto; }\n" +
         "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
@@ -190,7 +210,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write('<div class="print-container">');
 
       printWindow.document.write('<div class="header">');
-      printWindow.document.write(`<h1>${userProfile.companyName || DEFAULT_COMPANY_NAME}</h1>`);
+      printWindow.document.write(`<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`);
       printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
       printWindow.document.write('</div>');
@@ -208,7 +228,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<h4>Bill Information</h4>`);
       printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
       printWindow.document.write(`<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`);
-      printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
+      printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint.type, billToPrint.items)}</p>`);
       if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy')) {
          printWindow.document.write(`<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`);
       }
@@ -299,14 +319,14 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write('<h4>Summary</h4>');
       printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
       
-      if (billToPrint.type === 'buy') { // Expense Bill
+      if (billToPrint.type === 'buy') {
         const expectedRevenue = billToPrint.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; 
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c';
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
-      } else if (billToPrint.type === 'sell') { // Sales Bill
+      } else if (billToPrint.type === 'sell') {
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       } else { // Return bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
@@ -323,20 +343,12 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
   };
 
-  const getPartyDetailsTitle = (billType?: BillMode): string => {
-    if (billType === 'buy') return 'Vendor Details';
-    if (billType === 'sell' || billType === 'return') return 'Customer Details';
-    return 'Party Details';
-  };
-
-  const getPartyNameLabel = (billType?: BillMode): string => {
-    if (billType === 'buy') return 'Vendor Name';
-    if (billType === 'sell' || billType === 'return') return 'Customer Name';
-    return 'Name';
-  };
-
-  const findProductSKUfromStore = (productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
-    const product = getProductById(productId); // This is where the error occurs
+  const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
+    if (!getProductById) { // Guard clause
+      console.error("getProductById function is not available in findProductSKUfromStore");
+      return undefined;
+    }
+    const product = getProductById(productId);
     if (!product) return undefined;
     if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
 
@@ -345,7 +357,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort())) === 
       JSON.stringify(Object.fromEntries(Object.entries(targetOptionValues).sort()))
     );
-  };
+  }, [getProductById]);
 
 
   return (
@@ -355,18 +367,18 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
           <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg"> 
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
-                {React.cloneElement(getBillTypeIconAndColor(selectedBill).icon, { className: cn(getBillTypeIconAndColor(selectedBill).icon.props.className, "h-6 w-6")})}
+                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon, { className: cn(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon.props.className, "h-6 w-6")})}
                 Bill Details
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill)} Bill (ID: {selectedBill.id})
+                {getBillTypeName(selectedBill.type, selectedBill.items)} Bill (ID: {selectedBill.id})
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
             <div className="space-y-6 py-2 px-2">
 
               <div className="p-4 border rounded-md bg-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile.companyName || DEFAULT_COMPANY_NAME}</h3>
+                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
                   <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
                   <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
               </div>
@@ -405,7 +417,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                     </div>
                     <div>
                         <p className="text-xs text-muted-foreground">Bill Type</p>
-                        <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
+                        <p className="font-medium text-sm">{getBillTypeName(selectedBill.type, selectedBill.items)}</p>
                     </div>
                     {selectedBill.paymentStatus && (selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
                         <div>
@@ -481,7 +493,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                   <div className="text-xs text-muted-foreground mt-0.5">
                                     Purchased: {item.quantity}
                                   </div>
-                                  {sku && (
+                                  {/* Display Current SKU Stock only if SKU and details are available */}
+                                  {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
                                     <div className="text-xs text-muted-foreground mt-0.5">
                                       Current SKU Stock: {skuDetails.totalStock}
                                     </div>
@@ -709,7 +722,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
           <TableBody>
             {filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
-                const billDisplayInfo = getBillTypeIconAndColor(bill);
+                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items);
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
@@ -827,3 +840,5 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
+
+    
