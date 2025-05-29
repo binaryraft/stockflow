@@ -4,8 +4,9 @@
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { StatCard } from './stat-card';
-import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive } from 'lucide-react'; // Added ReceiptText, Archive
+import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive } from 'lucide-react';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface DailyStats {
   totalProducts: number;
@@ -13,10 +14,10 @@ interface DailyStats {
   purchasesToday: number;
   transactionsToday: number;
   defectivesToday: number;
-  lowStockCount: number; // Added for low stock
+  lowStockCount: number;
 }
 
-const LOW_STOCK_THRESHOLD = 5; // Define low stock threshold
+const LOW_STOCK_THRESHOLD = 5;
 
 export function OverviewStats() {
   const { products, bills, getLowStockProductCount } = useInventoryStore((state) => ({
@@ -44,27 +45,36 @@ export function OverviewStats() {
     let transactions = 0;
     let defectives = 0;
 
-    bills.forEach(bill => {
-      const billDateStr = format(new Date(bill.date), 'yyyy-MM-dd');
-      if (billDateStr === todayStr) {
-        transactions++;
-        if (bill.type === 'sell') {
-          sales += bill.totalAmount;
-        } else if (bill.type === 'buy') {
-          purchases += bill.totalAmount;
-        } else if (bill.type === 'return') {
-          bill.items.forEach(item => {
-            if (item.isDefective) {
-              defectives += item.quantity;
+    if (Array.isArray(bills)) {
+      bills.forEach(bill => {
+        const billDateStr = format(new Date(bill.date), 'yyyy-MM-dd');
+        if (billDateStr === todayStr) {
+          transactions++;
+          if (bill.type === 'sell') {
+            sales += bill.totalAmount;
+          } else if (bill.type === 'buy') {
+            purchases += bill.totalAmount;
+          } else if (bill.type === 'return') {
+            if (Array.isArray(bill.items)) {
+              bill.items.forEach(item => {
+                if (item.isDefective) {
+                  defectives += item.quantity;
+                }
+              });
             }
-          });
+          }
         }
-      }
-    });
+      });
+    }
     
-    const totalTrackedProducts = products.filter(p => p.trackQuantity).length;
-    // Correctly use getLowStockProductCount from the store instance
-    const lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
+    const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
+    
+    let lowStock = 0;
+    if (typeof getLowStockProductCount === 'function') {
+      lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
+    } else {
+      console.error("getLowStockProductCount is not a function in OverviewStats");
+    }
 
     setStats({
       totalProducts: totalTrackedProducts,
@@ -78,7 +88,7 @@ export function OverviewStats() {
   }, [products, bills, getLowStockProductCount]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"> {/* Adjusted for new stat card */}
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
       <StatCard
         title="Total Products"
         value={stats.totalProducts}
@@ -103,17 +113,17 @@ export function OverviewStats() {
       <StatCard
         title="Today's Transactions"
         value={stats.transactionsToday}
-        icon={ReceiptText} // Changed icon
+        icon={ReceiptText}
         description="Total bills processed today"
         isLoading={isLoading}
       />
       <StatCard
         title="Low Stock Products"
         value={stats.lowStockCount}
-        icon={Archive} // Using Archive as a placeholder for low stock
+        icon={Archive}
         description={`Products below ${LOW_STOCK_THRESHOLD} units`}
         isLoading={isLoading}
-        valueClassName={stats.lowStockCount > 0 ? "text-destructive" : undefined} // Highlight if low stock
+        valueClassName={stats.lowStockCount > 0 ? "text-destructive" : undefined}
       />
       <StatCard
         title="Defectives Today"
@@ -121,7 +131,7 @@ export function OverviewStats() {
         icon={AlertTriangle}
         description="Items marked defective in returns today"
         isLoading={isLoading}
-        valueClassName={stats.defectivesToday > 0 ? "text-amber-600 dark:text-amber-500" : undefined} // Highlight if defectives
+        valueClassName={stats.defectivesToday > 0 ? "text-amber-600 dark:text-amber-500" : undefined}
       />
     </div>
   );
