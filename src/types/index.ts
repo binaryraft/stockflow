@@ -11,19 +11,19 @@ export interface ProductVariant {
 }
 
 export interface StockLayer {
-  id: string; // Unique ID for this layer/batch
-  purchaseBillId: string; // ID of the expense bill this layer came from
-  purchaseDate: string; // ISO date string
-  initialQuantity: number; // Quantity originally purchased in this layer
-  quantity: number; // Quantity remaining in this layer
-  costPrice: number; // Cost price for items in this layer
-  sellPrice: number; // Sell price set for items from this layer (at time of purchase)
+  id: string; 
+  purchaseBillId: string; 
+  purchaseDate: string; 
+  initialQuantity: number; 
+  quantity: number; 
+  costPrice: number; 
+  sellPrice: number; 
 }
 
 export interface ProductSKU {
   id: string;
-  optionValues: Record<string, string>; // e.g., {"Color": "Red", "Size": "M"}
-  skuIdentifier?: string; // e.g., PNAME-RED-M
+  optionValues: Record<string, string>; 
+  skuIdentifier?: string; 
   stockLayers: StockLayer[];
 }
 
@@ -32,23 +32,23 @@ export interface Product {
   name: string;
   category?: string;
   trackQuantity: boolean;
-  sku?: string; // Base SKU for non-variant products, or general product code
+  sku?: string; 
   expiryDate?: string;
   imageUrl?: string;
   description?: string;
   variants?: ProductVariant[];
-  productSKUs: ProductSKU[]; // Holds all stock keeping units for this product
+  productSKUs: ProductSKU[]; 
 }
 
 export type BillMode = 'buy' | 'sell' | 'return';
 
 export interface BillItem {
   id: string;
-  productId: string; // Refers to the main Product ID
-  productName: string; // Denormalized for easy display
+  productId: string; 
+  productName: string; 
   quantity: number;
-  costPrice: number; // For sales/returns, this is COGS from FIFO. For purchases, it's the purchase cost.
-  sellPrice: number; // Price at the time of this transaction
+  costPrice: number; 
+  sellPrice: number; 
   isDefective?: boolean;
   selectedVariantOptions?: Record<string, string>;
 }
@@ -65,9 +65,9 @@ export interface Bill {
   notes?: string;
   paymentStatus?: 'paid' | 'unpaid';
   billedByStaffId?: string;
-  billedByStaffName?: string; // Denormalized for easier display
+  billedByStaffName?: string; 
   storeId?: string;
-  storeName?: string; // Denormalized for easier display
+  storeName?: string; 
 }
 
 export interface Category {
@@ -92,7 +92,7 @@ export interface Store {
   email: string;
   passkey: string;
   allowedStaffIds: string[];
-  allowedOperations: BillMode[]; // e.g., ['sell', 'return']
+  allowedOperations: BillMode[]; 
 }
 
 export interface SubscriptionPlan {
@@ -109,13 +109,28 @@ export interface SubscriptionPlan {
 export interface UserProfile {
   companyName: string;
   activeSubscriptionId: string;
+  dataMode: 'local' | 'global';
 }
 
 export interface ChatMessage {
   id: string;
   storeId: string;
-  senderId: 'admin' | string; // 'admin' or staffId
-  senderName: string; // "Admin" or staff's name
+  senderId: 'admin' | string; 
+  senderName: string; 
   text: string;
   timestamp: number;
+}
+
+// Added for new dashboard stats
+export interface FinancialSummary {
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  totalExpenses: number;
+  netProfit: number;
+}
+
+export interface TodaysFinancialSummary extends FinancialSummary {
+  transactionsToday: number;
+  defectivesToday: number;
 }

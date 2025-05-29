@@ -4,9 +4,12 @@
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { StatCard } from './stat-card';
-import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive } from 'lucide-react';
-import { format } from 'date-fns';
+import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive, TrendingUp } from 'lucide-react';
+import { format, isToday } from 'date-fns';
 import { cn } from '@/lib/utils';
+import type { TodaysFinancialSummary } from '@/types'; // Assuming FinancialSummary includes grossProfit
+
+const LOW_STOCK_THRESHOLD = 5;
 
 interface DailyStats {
   totalProducts: number;
@@ -15,15 +18,14 @@ interface DailyStats {
   transactionsToday: number;
   defectivesToday: number;
   lowStockCount: number;
+  grossProfitToday: number;
 }
 
-const LOW_STOCK_THRESHOLD = 5;
-
 export function OverviewStats() {
-  const { products, bills, getLowStockProductCount } = useInventoryStore((state) => ({
+  const { products, getLowStockProductCount, getTodaysFinancialSummary } = useInventoryStore((state) => ({
     products: state.products,
-    bills: state.bills,
     getLowStockProductCount: state.getLowStockProductCount,
+    getTodaysFinancialSummary: state.getTodaysFinancialSummary,
   }));
 
   const [stats, setStats] = useState<DailyStats>({
@@ -33,40 +35,15 @@ export function OverviewStats() {
     transactionsToday: 0,
     defectivesToday: 0,
     lowStockCount: 0,
+    grossProfitToday: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setIsLoading(true);
-    const todayStr = format(new Date(), 'yyyy-MM-dd');
-
-    let sales = 0;
-    let purchases = 0;
-    let transactions = 0;
-    let defectives = 0;
-
-    if (Array.isArray(bills)) {
-      bills.forEach(bill => {
-        const billDateStr = format(new Date(bill.date), 'yyyy-MM-dd');
-        if (billDateStr === todayStr) {
-          transactions++;
-          if (bill.type === 'sell') {
-            sales += bill.totalAmount;
-          } else if (bill.type === 'buy') {
-            purchases += bill.totalAmount;
-          } else if (bill.type === 'return') {
-            if (Array.isArray(bill.items)) {
-              bill.items.forEach(item => {
-                if (item.isDefective) {
-                  defectives += item.quantity;
-                }
-              });
-            }
-          }
-        }
-      });
-    }
     
+    const todaysFinancials = getTodaysFinancialSummary();
+
     const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
     
     let lowStock = 0;
@@ -78,17 +55,18 @@ export function OverviewStats() {
 
     setStats({
       totalProducts: totalTrackedProducts,
-      salesToday: sales,
-      purchasesToday: purchases,
-      transactionsToday: transactions,
-      defectivesToday: defectives,
+      salesToday: todaysFinancials.totalRevenue,
+      purchasesToday: todaysFinancials.totalExpenses, // Assuming totalExpenses from summary is purchases for today
+      transactionsToday: todaysFinancials.transactionsToday,
+      defectivesToday: todaysFinancials.defectivesToday,
       lowStockCount: lowStock,
+      grossProfitToday: todaysFinancials.grossProfit,
     });
     setIsLoading(false);
-  }, [products, bills, getLowStockProductCount]);
+  }, [products, getLowStockProductCount, getTodaysFinancialSummary]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7"> {/* Adjusted for 7 cards */}
       <StatCard
         title="Total Products"
         value={stats.totalProducts}
@@ -109,6 +87,14 @@ export function OverviewStats() {
         icon={ShoppingCart}
         description="Total cost of purchases today"
         isLoading={isLoading}
+      />
+      <StatCard
+        title="Today's Gross Profit"
+        value={`₹${stats.grossProfitToday.toFixed(2)}`}
+        icon={TrendingUp}
+        description="Sales minus Cost of Goods Sold today"
+        isLoading={isLoading}
+        valueClassName={stats.grossProfitToday >= 0 ? "text-primary" : "text-destructive"}
       />
       <StatCard
         title="Today's Transactions"
