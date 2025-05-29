@@ -4,14 +4,25 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Product } from '@/types';
+import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { cn } from '@/lib/utils';
+
+export interface ProductSearchSuggestion { // Exporting for potential use in BillingForm if needed for types
+  product: Product;
+  sku?: ProductSKU;
+  displayInfo: {
+    name: string;
+    stock: string | number | null;
+    price: string;
+    category?: string;
+  };
+}
 
 interface ProductSearchInputProps {
   value: string;
   onValueChange: (value: string) => void;
-  onProductSelect: (product: Product) => void;
+  onProductSelect: (product: Product, sku?: ProductSKU) => void;
   onEnterWithoutSelection?: () => void;
   placeholder?: string;
   className?: string;
@@ -29,31 +40,68 @@ export function ProductSearchInput({
   inputRef,
   id
 }: ProductSearchInputProps) {
-  const [suggestions, setSuggestions] = useState<Product[]>([]);
+  const [suggestions, setSuggestions] = useState<ProductSearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  const searchProducts = useInventoryStore((state) => state.searchProducts);
+  const { searchProducts, getSkuDetails, getSkuIdentifier } = useInventoryStore(state => ({
+    searchProducts: state.searchProducts,
+    getSkuDetails: state.getSkuDetails,
+    getSkuIdentifier: state.getSkuIdentifier,
+  }));
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (value.length > 0) {
       const foundProducts = searchProducts(value);
-      setSuggestions(foundProducts);
-      setShowSuggestions(true);
-      setActiveIndex(-1); 
+      const detailedSuggestions: ProductSearchSuggestion[] = [];
+
+      foundProducts.forEach(product => {
+        if (product.productSKUs && product.productSKUs.length > 0) {
+          product.productSKUs.forEach(sku => {
+            const skuDetails = getSkuDetails(sku);
+            const displayName = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
+            detailedSuggestions.push({
+              product,
+              sku,
+              displayInfo: {
+                name: displayName,
+                stock: product.trackQuantity ? (skuDetails.totalStock ?? 'N/A') : 'N/A',
+                price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+                category: product.category,
+              },
+            });
+          });
+        } else {
+          // Product with no defined SKUs (e.g., new product, or non-tracked with no default price set)
+          detailedSuggestions.push({
+            product,
+            displayInfo: {
+              name: product.name,
+              stock: product.trackQuantity ? '0' : 'N/A', // Assuming 0 if no SKUs and tracked
+              price: 'N/A',
+              category: product.category,
+            },
+          });
+        }
+      });
+
+      setSuggestions(detailedSuggestions);
+      setShowSuggestions(detailedSuggestions.length > 0); // Only show if there are suggestions
+      setActiveIndex(-1);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [value, searchProducts]);
+  }, [value, searchProducts, getSkuDetails, getSkuIdentifier]);
 
-  const handleSelectProduct = useCallback((product: Product) => {
-    onProductSelect(product); 
-    onValueChange(product.name); 
+  const handleSelectSuggestion = useCallback((suggestion: ProductSearchSuggestion) => {
+    onProductSelect(suggestion.product, suggestion.sku);
+    onValueChange(suggestion.displayInfo.name); // Update input to the specific SKU name
     setShowSuggestions(false);
     setSuggestions([]);
-  }, [onProductSelect, onValueChange]);
-  
+    inputRef?.current?.blur(); // Optionally blur after selection
+  }, [onProductSelect, onValueChange, inputRef]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
@@ -69,7 +117,7 @@ export function ProductSearchInput({
       if (containerRef.current && !containerRef.current.contains(document.activeElement as Node)) {
         setShowSuggestions(false);
       }
-    }, 150); // Delay to allow click on suggestion to register
+    }, 150);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -83,21 +131,21 @@ export function ProductSearchInput({
       } else if (e.key === 'Enter') {
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < suggestions.length) {
-          handleSelectProduct(suggestions[activeIndex]);
-        } else if (suggestions.length > 0) { 
-          handleSelectProduct(suggestions[0]); // Auto-select the first suggestion
-        } 
+          handleSelectSuggestion(suggestions[activeIndex]);
+        } else if (suggestions.length > 0) {
+          handleSelectSuggestion(suggestions[0]);
+        }
       } else if (e.key === 'Escape') {
         setShowSuggestions(false);
       }
-    } else if (e.key === 'Enter') { 
+    } else if (e.key === 'Enter') {
       e.preventDefault();
       if (onEnterWithoutSelection) {
-        onEnterWithoutSelection(); 
+        onEnterWithoutSelection();
       }
     }
   };
-  
+
   useEffect(() => {
     const activeItem = document.getElementById(`suggestion-${activeIndex}`);
     if (activeItem) {
@@ -105,16 +153,34 @@ export function ProductSearchInput({
     }
   }, [activeIndex]);
 
-
   return (
     <div className={cn("relative w-full", className)} ref={containerRef}>
       <Input
-        id={id} 
+        id={id}
         ref={inputRef}
         type="text"
         value={value}
-        onChange={(e) => onValueChange(e.target.value)}
-        onFocus={() => value && searchProducts(value).length > 0 && setShowSuggestions(true)} 
+        onChange={(e) => {
+            onValueChange(e.target.value);
+            if(e.target.value === "") {
+                 setSuggestions([]);
+                 setShowSuggestions(false);
+            }
+        }}
+        onFocus={() => {
+            // Re-evaluate if suggestions should be shown based on current value
+            if (value && value.length > 0) {
+                 const foundProducts = searchProducts(value); // Re-check if products still match
+                 if(foundProducts.length > 0){
+                    // This will trigger the useEffect to repopulate suggestions
+                    setShowSuggestions(true); // Tentatively show, useEffect will confirm
+                 } else {
+                    setShowSuggestions(false);
+                 }
+            } else {
+                setShowSuggestions(false);
+            }
+        }}
         onKeyDown={handleKeyDown}
         onBlur={handleInputBlur}
         placeholder={placeholder}
@@ -122,47 +188,33 @@ export function ProductSearchInput({
         className="w-full"
       />
       {showSuggestions && suggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60">
+        <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60">
           <ScrollArea className="max-h-60">
             <ul>
-              {suggestions.map((product, index) => {
-                const stockInfoString = product.trackQuantity
-                  ? `Stock: ${product.productSKUs.reduce((sum, sku) => sum + sku.quantityInStock, 0)}`
-                  : "";
-
-                let priceString = "Price: N/A";
-                if (product.productSKUs && product.productSKUs.length > 0) {
-                  const firstSku = product.productSKUs[0];
-                  if (firstSku && typeof firstSku.sellPrice === 'number') {
-                    priceString = `Price: ₹${firstSku.sellPrice.toFixed(2)}`;
-                  }
-                }
-                
-                return (
-                  <li
-                    key={product.id}
-                    id={`suggestion-${index}`}
-                    className={cn(
-                      "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
-                      index === activeIndex && "bg-accent text-accent-foreground"
-                    )}
-                    onMouseDown={(e) => { 
-                       e.preventDefault(); 
-                       handleSelectProduct(product);
-                    }}
-                  >
-                    <div className="flex justify-between">
-                      <span>{product.name}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {stockInfoString}
-                        {stockInfoString && priceString !== "Price: N/A" ? " " : ""} {/* Conditional space */}
-                        {priceString}
-                      </span>
-                    </div>
-                    {product.category && <div className="text-xs text-muted-foreground">{product.category}</div>}
-                  </li>
-                );
-              })}
+              {suggestions.map((suggestion, index) => (
+                <li
+                  key={`${suggestion.product.id}-${suggestion.sku?.id || 'base'}-${index}`}
+                  id={`suggestion-${index}`}
+                  className={cn(
+                    "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
+                    index === activeIndex && "bg-accent text-accent-foreground"
+                  )}
+                  onMouseDown={(e) => {
+                     e.preventDefault();
+                     handleSelectSuggestion(suggestion);
+                  }}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="truncate mr-2">{suggestion.displayInfo.name}</span>
+                    <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
+                      {suggestion.displayInfo.stock !== 'N/A' ? `Stock: ${suggestion.displayInfo.stock}` : ""}
+                      {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null) && suggestion.displayInfo.price !== 'N/A' ? " | " : ""}
+                      {suggestion.displayInfo.price}
+                    </span>
+                  </div>
+                  {suggestion.displayInfo.category && <div className="text-xs text-muted-foreground">{suggestion.displayInfo.category}</div>}
+                </li>
+              ))}
             </ul>
           </ScrollArea>
         </div>
