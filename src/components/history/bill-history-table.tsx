@@ -18,8 +18,8 @@ import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw
 import { format } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog'; // Keep existing Dialog imports
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog'; // Keep existing AlertDialog imports
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -27,10 +27,7 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
-type BillFilterType = 'all' | BillMode;
-
-// Helper functions moved to the top
+// Helper function definitions moved to the top
 const getBillTypeIconAndColor = (bill: Bill): { icon: JSX.Element; className: string; name: string } => {
   const isDefectiveReturn = bill.type === 'return' && bill.items.some(item => item.isDefective === true);
   if (bill.type === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
@@ -49,7 +46,12 @@ interface BillHistoryTableProps {
 }
 
 export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
-  const { bills, getProductById, userProfile, deleteBill, getSkuDetails } = useInventoryStore(); // Ensure getProductById is destructured
+  // Correctly select functions and state from the store
+  const bills = useInventoryStore(state => state.bills);
+  const getProductById = useInventoryStore(state => state.getProductById);
+  const userProfile = useInventoryStore(state => state.userProfile);
+  const deleteBill = useInventoryStore(state => state.deleteBill);
+  const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,6 +59,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   const [filterType, setFilterType] = useState<BillFilterType>('all');
+
+  type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
+  type BillFilterType = 'all' | BillMode;
+
 
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
@@ -75,7 +81,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Uses the helper defined above
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || 
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
@@ -472,7 +478,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                   <div className="text-xs text-muted-foreground mt-1">
                                       Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                   </div>
-                                   <div className="text-xs text-muted-foreground mt-0.5">
+                                  <div className="text-xs text-muted-foreground mt-0.5">
                                     Purchased: {item.quantity}
                                   </div>
                                   {sku && (
@@ -821,5 +827,3 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
-
-    
