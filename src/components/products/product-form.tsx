@@ -14,7 +14,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer, BillMode } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, CornerDownLeft } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -50,6 +50,14 @@ const productFormSchema = z.object({
   trackQuantity: z.boolean().default(true),
   sku: z.string().optional(), // Base SKU for the product
   expiryDate: z.string().optional(),
+  costPrice: z.preprocess( // For non-tracked items
+    (val) => (val === "" ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Cost price must be a number" }).optional()
+  ),
+  sellPrice: z.preprocess( // For non-tracked items
+    (val) => (val === "" ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Sell price must be a number" }).optional()
+  ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
 
@@ -211,6 +219,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       category: '',
       trackQuantity: true,
       sku: '', 
+      costPrice: undefined,
+      sellPrice: undefined,
       expiryDate: '',
       variants: [],
     },
@@ -225,12 +235,20 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
 
   useEffect(() => {
     if (isEditing && initialData) {
+      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0 
+        ? initialData.productSKUs[0] 
+        : undefined;
+      
+      const defaultSkuStockLayer = defaultSkuForNonVariant?.stockLayers[0];
+
       formReset({
         name: initialData.name,
         description: initialData.description || '',
         category: initialData.category || '',
         trackQuantity: initialData.trackQuantity,
         sku: initialData.sku || '', // Product-level SKU
+        costPrice: initialData.trackQuantity === false && defaultSkuStockLayer ? defaultSkuStockLayer.costPrice : undefined,
+        sellPrice: initialData.trackQuantity === false && defaultSkuStockLayer ? defaultSkuStockLayer.sellPrice : undefined,
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         variants: initialData.variants?.map(v => ({
           id: v.id,
@@ -246,6 +264,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         category: '',
         trackQuantity: true, 
         sku: '',
+        costPrice: searchParams.costPrice ? parseFloat(searchParams.costPrice as string) : undefined,
+        sellPrice: searchParams.sellPrice ? parseFloat(searchParams.sellPrice as string) : undefined,
         expiryDate: '',
         variants: [],
       });
@@ -271,7 +291,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       addCategoryToStore(data.category!);
     }
     
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -280,6 +300,12 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       expiryDate: data.expiryDate,
       variants: productVariantsPayload,
     };
+
+    if (!data.trackQuantity && !hasVariants) {
+        productToSaveBase.costPriceForNonTracked = data.costPrice;
+        productToSaveBase.sellPriceForNonTracked = data.sellPrice;
+    }
+
 
     if (isEditing && initialData) {
       updateProduct(initialData.id, productToSaveBase);
@@ -347,12 +373,45 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
             
-            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                <span>
-                    Pricing and initial stock for this product (or its specific variants/SKUs) are established via the first <strong>Expense Bill</strong> that includes it.
-                </span>
-            </div>
+            {trackQuantityValue && (
+                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
+                    </span>
+                </div>
+            )}
+
+            {!trackQuantityValue && !hasVariants && (
+                 <>
+                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                        <span>
+                            For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="costPrice">Cost Price</Label>
+                            <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
+                            {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="sellPrice">Sell Price</Label>
+                            <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
+                            {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
+                        </div>
+                    </div>
+                 </>
+            )}
+            {!trackQuantityValue && hasVariants && (
+                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For non-tracked products with variants (e.g., different service tiers), specific pricing for each variant combination should be managed via a dedicated SKU pricing interface or when adding to bills (functionality may vary).
+                    </span>
+                </div>
+            )}
             
             <Separator className="my-6"/>
             
@@ -371,7 +430,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type. Specific stock and pricing for each variant combination (SKU) are set via Expense Bills.
+                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type. Specific stock and pricing for each variant combination (SKU) are set via Expense Bills if quantity is tracked.
               </p>
               {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
 
@@ -385,7 +444,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
             </div>
 
-            {isEditing && initialData && (
+            {isEditing && initialData && trackQuantityValue && (
               <>
                 <Separator className="my-6"/>
                 <div className="space-y-4">
@@ -403,7 +462,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                             <Card key={sku.id} className="bg-card shadow-sm">
                               <CardHeader className="pb-2 pt-3 px-4">
                                 <CardTitle className="text-md text-primary">
-                                  Specific Variant (SKU): {sku.skuIdentifier || "Default"}
+                                  Variant: {sku.skuIdentifier || "Default"}
                                   {Object.keys(sku.optionValues).length > 0 && (
                                     <span className="text-xs font-normal text-muted-foreground ml-2">
                                       ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
@@ -511,5 +570,3 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     </Card>
   );
 }
-
-    
