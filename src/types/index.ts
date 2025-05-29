@@ -14,6 +14,7 @@ export interface StockLayer {
   id: string; // Unique ID for this layer/batch
   purchaseBillId: string; // ID of the expense bill this layer came from
   purchaseDate: string; // ISO date string
+  initialQuantity: number; // Quantity originally purchased in this layer
   quantity: number; // Quantity remaining in this layer
   costPrice: number; // Cost price for items in this layer
   sellPrice: number; // Sell price set for items from this layer (at time of purchase)

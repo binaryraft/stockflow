@@ -12,15 +12,25 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, ProductSKU, Bill, StockLayer } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Package, Edit2, DollarSign, CalendarDays, Info, ListCollapse } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import Link from 'next/link';
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -33,8 +43,6 @@ const productVariantFormSchema = z.object({
   options: z.array(productOptionSchema).min(1, "At least one option is required for a variant."),
 });
 
-// Removed initialStock, costPrice, sellPrice from top-level for non-variant products.
-// These are now managed via stockLayers in ProductSKU, typically initiated by an Expense Bill.
 const productFormSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
@@ -99,14 +107,16 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     <div className="space-y-3 border border-primary/20 p-4 rounded-md bg-tertiary shadow-sm">
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium text-primary">Variant Type {variantIndex + 1}</Label>
-        <Tooltip>
-            <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant Type">
-                    <Trash2 className="h-4 w-4 text-destructive"/>
-                </Button>
-            </TooltipTrigger>
-            <TooltipContent><p>Remove this variant type (e.g., Color, Size)</p></TooltipContent>
-        </Tooltip>
+        <TooltipProvider>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant Type">
+                        <Trash2 className="h-4 w-4 text-destructive"/>
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Remove this variant type (e.g., Color, Size)</p></TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
       </div>
       <Input
         {...register(`variants.${variantIndex}.name`)}
@@ -127,14 +137,16 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
-               <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
-                        <Trash2 className="h-3 w-3 text-destructive"/>
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Remove this option value</p></TooltipContent>
-              </Tooltip>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
+                          <Trash2 className="h-3 w-3 text-destructive"/>
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Remove this option value</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )}
           </div>
         ))}
@@ -165,10 +177,11 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ initialData, searchParams }: ProductFormProps) {
-  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore } = useInventoryStore();
+  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct } = useInventoryStore();
   const { toast } = useToast();
   const router = useRouter();
   const isEditing = !!initialData;
+  const [productBills, setProductBills] = useState<Bill[]>([]);
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
@@ -205,20 +218,20 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
           options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
       });
+      setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && searchParams) {
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: searchParams.quantity !== undefined, // Track if quantity was passed
+        trackQuantity: searchParams.quantity !== undefined,
         sku: '',
         expiryDate: '',
         variants: [],
-        // Initial stock & prices for non-variant products are no longer set here; they are set via Expense Bills.
       });
     }
     setTimeout(() => setFocus('name'), 50);
-  }, [isEditing, initialData, formReset, setFocus, searchParams]);
+  }, [isEditing, initialData, formReset, setFocus, searchParams, getBillsForProduct]);
 
   const trackQuantityValue = watch('trackQuantity');
   const currentVariants = watch('variants');
@@ -251,6 +264,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       updateProduct(initialData.id, updatedProductData);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
+      // For new products, productSKUs (and their stockLayers) will be initialized by the addProduct function.
+      // Price and stock are set via Expense Bills.
       const newProductData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
         name: data.name,
         description: data.description,
@@ -266,8 +281,13 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     router.push('/admin/products');
   };
 
+  const getQuantityInBill = (bill: Bill, productId: string) => {
+    const item = bill.items.find(i => i.productId === productId);
+    return item ? item.quantity : 0;
+  };
+
   return (
-    <Card className="w-full max-w-3xl mx-auto shadow-lg border-t-2 border-t-primary">
+    <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
       <CardContent className="pt-6">
         <FormProvider {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -322,15 +342,19 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
 
-            <p className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30">
-                Pricing and initial stock for products (and their specific variants/SKUs) are primarily set and updated via Expense Bills. This form defines the product structure.
-            </p>
+            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                <span>
+                    Initial stock and pricing for products (and their specific variant combinations/SKUs) are established via <strong>Expense Bills</strong>. 
+                    This form defines the product's core details and variant structure.
+                </span>
+            </div>
             
             <Separator className="my-6"/>
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <Label className="text-lg font-semibold text-primary">Variants (Max 2)</Label>
+                <Label className="text-lg font-semibold text-primary">Variants (Max 2 types, e.g., Color, Size)</Label>
                 {variantFields.length < 2 && (
                   <Button
                     type="button"
@@ -343,7 +367,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue; Small, Medium) are added below each type.
+                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type.
               </p>
               {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
 
@@ -361,15 +385,107 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               ))}
               {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
             </div>
+
+            {isEditing && initialData && (
+              <>
+                <Separator className="my-6"/>
+                <div className="space-y-4">
+                  <Label className="text-lg font-semibold text-primary">SKU Stock Layers</Label>
+                  {initialData.productSKUs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No stock layers found. Create an Expense Bill for this product to add stock and set prices.</p>
+                  ) : (
+                    <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
+                      <div className="p-4 space-y-4">
+                        {initialData.productSKUs.map(sku => (
+                          <Card key={sku.id} className="bg-card shadow-sm">
+                            <CardHeader className="pb-2 pt-3 px-4">
+                              <CardTitle className="text-md text-primary">
+                                SKU: {sku.skuIdentifier || "Default"}
+                                {Object.keys(sku.optionValues).length > 0 && (
+                                  <span className="text-xs font-normal text-muted-foreground ml-2">
+                                    ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
+                                  </span>
+                                )}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="px-4 pb-3">
+                              {sku.stockLayers.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">No stock layers for this SKU.</p>
+                              ) : (
+                                <Table className="text-xs">
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>Purchased</TableHead>
+                                      <TableHead>From Bill</TableHead>
+                                      <TableHead className="text-right">Initial Qty</TableHead>
+                                      <TableHead className="text-right">Remaining</TableHead>
+                                      <TableHead className="text-right">Cost/Unit</TableHead>
+                                      <TableHead className="text-right">Sell Price (Set)</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {sku.stockLayers.map(layer => (
+                                      <TableRow key={layer.id}>
+                                        <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
+                                        <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
+                                        <TableCell className="text-right">{layer.initialQuantity}</TableCell>
+                                        <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
+                                        <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+
+                <Separator className="my-6"/>
+                 <div className="space-y-4">
+                    <Label className="text-lg font-semibold text-primary">Product Transaction History</Label>
+                    {productBills.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
+                    ) : (
+                        <ScrollArea className="max-h-[300px] border rounded-md bg-tertiary/30">
+                             <Table className="text-xs">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Bill ID</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead className="text-right">Qty of Product</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {productBills.map(bill => (
+                                        <TableRow key={bill.id}>
+                                            <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
+                                            <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
+                                            <TableCell className="capitalize">{bill.type}</TableCell>
+                                            <TableCell className="text-right font-semibold">{getQuantityInBill(bill, initialData.id)}</TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </ScrollArea>
+                    )}
+                 </div>
+              </>
+            )}
             
-            <div className="flex justify-end gap-3 pt-6">
+            <CardFooter className="flex justify-end gap-3 pt-8 border-t">
               <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
               </Button>
-            </div>
+            </CardFooter>
           </form>
         </FormProvider>
       </CardContent>

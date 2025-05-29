@@ -15,8 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2 } from 'lucide-react';
-import { format } from 'date-fns';
-import type { Bill, ProductSKU, BillMode, BillItem } from '@/types';
+import { format, startOfDay } from 'date-fns';
+import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -27,7 +27,7 @@ import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/co
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
-// Helper function definitions moved to the top level of the module
+
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
   if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
@@ -36,8 +36,8 @@ const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { i
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
 };
 
-const getBillTypeName = (billType: Bill['type'], items: BillItem[]): string => {
-  return getBillTypeIconAndColor(billType, items).name;
+const getBillTypeName = (bill: Bill): string => { // Changed to accept full bill to check items for defective returns
+  return getBillTypeIconAndColor(bill.type, bill.items).name;
 };
 
 const getPartyDetailsTitle = (billType?: BillMode): string => {
@@ -63,7 +63,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     getProductById,
     userProfile,
     deleteBill,
-    getSkuDetails
+    getSkuDetails,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -84,6 +84,22 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
   type BillFilterType = 'all' | BillMode;
 
+  const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
+    if (!getProductById) { // Guard against getProductById not being available
+        console.error("getProductById function is not available in findProductSKUfromStore");
+        return undefined;
+    }
+    const product = getProductById(productId);
+    if (!product) return undefined;
+    if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
+
+    const targetOptionValues = selectedOptions || {};
+    return product.productSKUs.find(sku => 
+      JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort())) === 
+      JSON.stringify(Object.fromEntries(Object.entries(targetOptionValues).sort()))
+    );
+  }, [getProductById]);
+
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...bills];
 
@@ -101,7 +117,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         bill.id.toLowerCase().includes(lowerSearchTerm) ||
         (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
         (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill.type, bill.items).toLowerCase().includes(lowerSearchTerm) ||
+        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) || // Pass full bill
         format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
         bill.totalAmount.toString().includes(lowerSearchTerm) ||
         (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
@@ -120,8 +136,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             valA = a.timestamp;
             valB = b.timestamp;
         } else if (sortConfig.key === 'type') {
-            valA = getBillTypeName(a.type, a.items);
-            valB = getBillTypeName(b.type, b.items);
+            valA = getBillTypeName(a); // Pass full bill
+            valB = getBillTypeName(b); // Pass full bill
         } else if (sortConfig.key === 'billedByStaffName') {
             valA = a.billedByStaffName || '';
             valB = b.billedByStaffName || '';
@@ -129,7 +145,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             valA = a.storeName || '';
             valB = b.storeName || '';
         }
-
 
         let comparison = 0;
         if (typeof valA === 'string' && typeof valB === 'string') {
@@ -140,7 +155,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         
         if (valA === undefined || valA === null) comparison = -1;
         if (valB === undefined || valB === null) comparison = 1;
-
 
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
@@ -228,7 +242,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<h4>Bill Information</h4>`);
       printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
       printWindow.document.write(`<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`);
-      printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint.type, billToPrint.items)}</p>`);
+      printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
       if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy')) {
          printWindow.document.write(`<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`);
       }
@@ -257,7 +271,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-             printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
+            printWindow.document.write(`<div class="item-sub-detail">Sell Price set (this bill): ₹${item.sellPrice.toFixed(2)}</div>`);
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${item.costPrice.toFixed(2)}</td>`);
@@ -322,13 +336,18 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       if (billToPrint.type === 'buy') {
         const expectedRevenue = billToPrint.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
         const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c';
+        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; // Green for profit, Red for loss
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
       } else if (billToPrint.type === 'sell') {
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-      } else { // Return bill
+         const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+         const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
+         const profitColor = profitFromSale >= 0 ? '#166534' : '#b91c1c';
+         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+         // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
+         // printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profitFromSale.toFixed(2)}</td></tr>`);
+      } else { // Return Bill
          printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
       printWindow.document.write('</table>');
@@ -343,23 +362,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
   };
 
-  const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
-    if (!getProductById) { // Guard clause
-      console.error("getProductById function is not available in findProductSKUfromStore");
-      return undefined;
-    }
-    const product = getProductById(productId);
-    if (!product) return undefined;
-    if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
-
-    const targetOptionValues = selectedOptions || {};
-    return product.productSKUs.find(sku => 
-      JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort())) === 
-      JSON.stringify(Object.fromEntries(Object.entries(targetOptionValues).sort()))
-    );
-  }, [getProductById]);
-
-
   return (
     <>
       {selectedBill && (
@@ -371,7 +373,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 Bill Details
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill.type, selectedBill.items)} Bill (ID: {selectedBill.id})
+                {getBillTypeName(selectedBill)} Bill (ID: {selectedBill.id})
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
@@ -412,12 +414,12 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <p className="font-mono text-sm">{selectedBill.id}</p>
                     </div>
                     <div>
-                        <p className="text-xs text-muted-foreground">Date & Time</p>
+                        <p className="text-xs text-muted-foreground">Date &amp; Time</p>
                         <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
                     </div>
                     <div>
                         <p className="text-xs text-muted-foreground">Bill Type</p>
-                        <p className="font-medium text-sm">{getBillTypeName(selectedBill.type, selectedBill.items)}</p>
+                        <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
                     </div>
                     {selectedBill.paymentStatus && (selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
                         <div>
@@ -467,15 +469,19 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <TableHeader>
                         <TableRow>
                           <TableHead>Product Details</TableHead>
-                          <TableHead className="text-right hidden sm:table-cell">Cost/Unit</TableHead>
                           <TableHead className="text-right">Qty Purchased</TableHead>
+                          <TableHead className="text-right hidden sm:table-cell">Cost/Unit</TableHead>
                           <TableHead className="text-right">Item Total</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedBill.items.map(item => {
-                            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                            const skuDetails = getSkuDetails(sku);
+                            const product = getProductById(item.productId);
+                            const sku = product ? findProductSKUfromStore(item.productId, item.selectedVariantOptions) : undefined;
+                            // Find the specific stock layer created by this bill for this item
+                            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.initialQuantity === item.quantity && l.costPrice === item.costPrice);
+                            const soldFromThisBatch = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
+
                             return (
                             <TableRow key={item.id || item.productId}>
                                 <TableCell className="py-3 align-top">
@@ -490,18 +496,19 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                   <div className="text-xs text-muted-foreground mt-1">
                                       Sell Price set (this bill): ₹{item.sellPrice.toFixed(2)}
                                   </div>
-                                  <div className="text-xs text-muted-foreground mt-0.5">
-                                    Purchased: {item.quantity}
-                                  </div>
-                                  {/* Display Current SKU Stock only if SKU and details are available */}
-                                  {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
-                                    <div className="text-xs text-muted-foreground mt-0.5">
-                                      Current SKU Stock: {skuDetails.totalStock}
-                                    </div>
+                                  {layerForThisBillItem && (
+                                    <>
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                        Qty Sold from this batch: <span className="text-green-600 font-medium">{soldFromThisBatch}</span> / {layerForThisBillItem.initialQuantity}
+                                      </div>
+                                      <div className="text-xs text-muted-foreground mt-0.5">
+                                        Qty Remaining in this batch: {layerForThisBillItem.quantity}
+                                      </div>
+                                    </>
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right py-3 align-top">{item.quantity}</TableCell>
+                                <TableCell className="text-right py-3 align-top hidden sm:table-cell">₹{item.costPrice.toFixed(2)}</TableCell>
                                 <TableCell className="text-right font-medium py-3 align-top">₹{(item.quantity * item.costPrice).toFixed(2)}</TableCell>
                             </TableRow>
                             );
@@ -811,7 +818,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 <AlertDialogHead>
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
-                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}. Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
+                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}.
+                                    Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
                                 </AlertDialogDesc>
                                 </AlertDialogHead>
                                 <AlertDialogFoot>
@@ -840,5 +848,3 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
-
-    
