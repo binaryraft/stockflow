@@ -4,17 +4,18 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { Product, ProductSKU } from '@/types';
+import type { Product, ProductSKU, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { cn } from '@/lib/utils';
 
-export interface ProductSearchSuggestion { // Exporting for potential use in BillingForm if needed for types
+export interface ProductSearchSuggestion {
   product: Product;
-  sku?: ProductSKU;
+  sku: ProductSKU; // The SKU this suggestion always refers to
+  layer?: StockLayer; // The specific stock layer, if this suggestion is for a batch
   displayInfo: {
-    name: string;
-    stock: string | number | null;
-    price: string;
+    name: string; // e.g., "Chikengunia - Sell @ ₹10.00 (Qty: 5)"
+    stock: string | number | null; // Quantity in this specific layer, or total SKU stock
+    price: string; // Formatted sell price of this layer, or default SKU sell price
     category?: string;
   };
 }
@@ -22,12 +23,13 @@ export interface ProductSearchSuggestion { // Exporting for potential use in Bil
 interface ProductSearchInputProps {
   value: string;
   onValueChange: (value: string) => void;
-  onProductSelect: (product: Product, sku?: ProductSKU) => void;
+  onProductSelect: (suggestion: ProductSearchSuggestion) => void; // Updated signature
   onEnterWithoutSelection?: () => void;
   placeholder?: string;
   className?: string;
   inputRef?: React.RefObject<HTMLInputElement>;
   id?: string;
+  currentMode?: 'sell' | 'buy' | 'return'; // Added to determine suggestion detail
 }
 
 export function ProductSearchInput({
@@ -38,7 +40,8 @@ export function ProductSearchInput({
   placeholder = "Type product name...",
   className,
   inputRef,
-  id
+  id,
+  currentMode,
 }: ProductSearchInputProps) {
   const [suggestions, setSuggestions] = useState<ProductSearchSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -59,25 +62,48 @@ export function ProductSearchInput({
         if (product.productSKUs && product.productSKUs.length > 0) {
           product.productSKUs.forEach(sku => {
             const skuDetails = getSkuDetails(sku);
-            const displayName = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
-            detailedSuggestions.push({
-              product,
-              sku,
-              displayInfo: {
-                name: displayName,
-                stock: product.trackQuantity ? (skuDetails.totalStock ?? 'N/A') : 'N/A',
-                price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
-                category: product.category,
-              },
-            });
+            const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
+
+            if (currentMode === 'sell' && product.trackQuantity && sku.stockLayers && sku.stockLayers.length > 0) {
+              // For 'sell' mode and tracked items, create suggestions for each stock layer with quantity > 0
+              sku.stockLayers.forEach(layer => {
+                if (layer.quantity > 0) {
+                  detailedSuggestions.push({
+                    product,
+                    sku,
+                    layer,
+                    displayInfo: {
+                      name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
+                      stock: layer.quantity,
+                      price: `₹${layer.sellPrice.toFixed(2)}`,
+                      category: product.category,
+                    },
+                  });
+                }
+              });
+            } else {
+              // For other modes, or non-tracked items, or if no specific layers, show general SKU info
+              detailedSuggestions.push({
+                product,
+                sku,
+                displayInfo: {
+                  name: baseSkuIdentifier,
+                  stock: product.trackQuantity ? (skuDetails.totalStock ?? 'N/A') : 'N/A',
+                  price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+                  category: product.category,
+                },
+              });
+            }
           });
         } else {
-          // Product with no defined SKUs (e.g., new product, or non-tracked with no default price set)
+          // Product with no defined SKUs
           detailedSuggestions.push({
             product,
+            // Create a dummy SKU for display purposes if none exist
+            sku: { id: product.id + '_defaultSKU', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
             displayInfo: {
               name: product.name,
-              stock: product.trackQuantity ? '0' : 'N/A', // Assuming 0 if no SKUs and tracked
+              stock: product.trackQuantity ? '0' : 'N/A',
               price: 'N/A',
               category: product.category,
             },
@@ -86,20 +112,20 @@ export function ProductSearchInput({
       });
 
       setSuggestions(detailedSuggestions);
-      setShowSuggestions(detailedSuggestions.length > 0); // Only show if there are suggestions
+      setShowSuggestions(detailedSuggestions.length > 0);
       setActiveIndex(-1);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [value, searchProducts, getSkuDetails, getSkuIdentifier]);
+  }, [value, searchProducts, getSkuDetails, getSkuIdentifier, currentMode]);
 
   const handleSelectSuggestion = useCallback((suggestion: ProductSearchSuggestion) => {
-    onProductSelect(suggestion.product, suggestion.sku);
-    onValueChange(suggestion.displayInfo.name); // Update input to the specific SKU name
+    onProductSelect(suggestion); // Pass the whole suggestion object
+    onValueChange(suggestion.displayInfo.name);
     setShowSuggestions(false);
     setSuggestions([]);
-    inputRef?.current?.blur(); // Optionally blur after selection
+    inputRef?.current?.blur();
   }, [onProductSelect, onValueChange, inputRef]);
 
   useEffect(() => {
@@ -132,7 +158,7 @@ export function ProductSearchInput({
         e.preventDefault();
         if (activeIndex >= 0 && activeIndex < suggestions.length) {
           handleSelectSuggestion(suggestions[activeIndex]);
-        } else if (suggestions.length > 0) {
+        } else if (suggestions.length > 0) { // Auto-select first suggestion on Enter if none highlighted
           handleSelectSuggestion(suggestions[0]);
         }
       } else if (e.key === 'Escape') {
@@ -168,12 +194,10 @@ export function ProductSearchInput({
             }
         }}
         onFocus={() => {
-            // Re-evaluate if suggestions should be shown based on current value
             if (value && value.length > 0) {
-                 const foundProducts = searchProducts(value); // Re-check if products still match
+                 const foundProducts = searchProducts(value);
                  if(foundProducts.length > 0){
-                    // This will trigger the useEffect to repopulate suggestions
-                    setShowSuggestions(true); // Tentatively show, useEffect will confirm
+                    setShowSuggestions(true); 
                  } else {
                     setShowSuggestions(false);
                  }
@@ -193,7 +217,7 @@ export function ProductSearchInput({
             <ul>
               {suggestions.map((suggestion, index) => (
                 <li
-                  key={`${suggestion.product.id}-${suggestion.sku?.id || 'base'}-${index}`}
+                  key={`${suggestion.product.id}-${suggestion.sku.id}-${suggestion.layer?.id || 'no-layer'}-${index}`}
                   id={`suggestion-${index}`}
                   className={cn(
                     "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground",
@@ -207,9 +231,9 @@ export function ProductSearchInput({
                   <div className="flex justify-between items-center">
                     <span className="truncate mr-2">{suggestion.displayInfo.name}</span>
                     <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
-                      {suggestion.displayInfo.stock !== 'N/A' ? `Stock: ${suggestion.displayInfo.stock}` : ""}
-                      {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null) && suggestion.displayInfo.price !== 'N/A' ? " | " : ""}
-                      {suggestion.displayInfo.price}
+                      {suggestion.displayInfo.stock !== 'N/A' ? `Qty: ${suggestion.displayInfo.stock}` : ""}
+                      {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null) && suggestion.displayInfo.price !== 'N/A' ? " " : ""}
+                       {suggestion.displayInfo.price !== 'N/A' && currentMode === 'buy' ? `(Cost: ${suggestion.displayInfo.price})` : suggestion.displayInfo.price}
                     </span>
                   </div>
                   {suggestion.displayInfo.category && <div className="text-xs text-muted-foreground">{suggestion.displayInfo.category}</div>}
