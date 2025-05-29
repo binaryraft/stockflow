@@ -47,8 +47,8 @@ const productFormSchema = z.object({
   name: z.string().min(2, { message: "Product name must be at least 2 characters." }),
   description: z.string().optional(),
   category: z.string().optional().default(''),
-  trackQuantity: z.boolean().default(false),
-  sku: z.string().optional(), // Base Product SKU/Code for non-variant or overall product
+  trackQuantity: z.boolean().default(true), // Default to true
+  sku: z.string().optional(), 
   expiryDate: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -73,13 +73,16 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
   const variantName = watch(`variants.${variantIndex}.name`);
 
-  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, currentOptionIndex: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      appendOption({ value: '' });
-      setTimeout(() => {
-        setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
-      }, 50);
+      const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
+      if (currentOptionValue.trim() !== '') { // Only append if current option has some value
+        appendOption({ value: '' });
+        setTimeout(() => {
+          setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
+        }, 50);
+      }
     }
   };
 
@@ -126,7 +129,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
               placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
               aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={handleOptionEnter}
+              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
               <TooltipProvider>
@@ -190,7 +193,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       name: '',
       description: '',
       category: '',
-      trackQuantity: false,
+      trackQuantity: true, // Default to true
       sku: '',
       expiryDate: '',
       variants: [],
@@ -221,13 +224,11 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       });
       setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && searchParams) {
-      // Pre-filling from billing form if adding a new product
-      const initialQuantity = searchParams.quantity ? parseInt(searchParams.quantity as string) : undefined;
       formReset({
         name: typeof searchParams.name === 'string' ? searchParams.name : '',
         description: '',
         category: '',
-        trackQuantity: !!initialQuantity && initialQuantity > 0, // Track if initial quantity suggested
+        trackQuantity: true, // If coming from billing, assume tracking is intended
         sku: '',
         expiryDate: '',
         variants: [],
@@ -285,10 +286,11 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
         return { quantity, label: 'Purchased', colorClass: 'bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600' };
       case 'return':
         return { quantity, label: 'Returned', colorClass: 'bg-amber-100 text-amber-700 dark:bg-amber-700/20 dark:text-amber-300 border-amber-300 dark:border-amber-600' };
-      default: // Should not happen
+      default:
         return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
     }
   };
+
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -346,22 +348,12 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
             
-            {!hasVariants && trackQuantityValue && (
-                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        Initial stock quantities and pricing (cost & sell price) for this product will be established via the first <strong>Expense Bill</strong> that includes it.
-                    </span>
-                </div>
-            )}
-            {hasVariants && (
-                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For products with variants, stock and pricing for each specific combination (SKU) are established and managed via <strong>Expense Bills</strong>.
-                    </span>
-                </div>
-            )}
+            <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                <span>
+                    Initial stock quantities, cost prices, and sell prices (for each specific SKU/variant or the base product) are established via the first <strong>Expense Bill</strong> that includes it.
+                </span>
+            </div>
             
             <Separator className="my-6"/>
             
@@ -423,13 +415,13 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                               </CardHeader>
                               <CardContent className="px-4 pb-3">
                                 {sku.stockLayers.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No active stock layers for this SKU (might be fully depleted or defined but not yet purchased).</p>
+                                  <p className="text-xs text-muted-foreground">No active stock layers for this SKU.</p>
                                 ) : (
                                   <Table className="text-xs">
                                     <TableHeader>
                                       <TableRow>
-                                        <TableHead>Purchased</TableHead>
-                                        <TableHead>From Bill</TableHead>
+                                        <TableHead>Purchased On</TableHead>
+                                        <TableHead>From Bill ID</TableHead>
                                         <TableHead className="text-right">Initial Qty</TableHead>
                                         <TableHead className="text-right">Sold Qty</TableHead>
                                         <TableHead className="text-right">Remaining Qty</TableHead>
@@ -445,8 +437,12 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                           <TableCell className="text-right">{layer.initialQuantity}</TableCell>
                                           <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
                                           <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
-                                          <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
-                                          <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right">
+                                            ₹{typeof layer.costPrice === 'number' ? layer.costPrice.toFixed(2) : '0.00'}
+                                          </TableCell>
+                                          <TableCell className="text-right">
+                                            ₹{typeof layer.sellPrice === 'number' ? layer.sellPrice.toFixed(2) : '0.00'}
+                                          </TableCell>
                                         </TableRow>
                                       ))}
                                     </TableBody>
@@ -481,14 +477,14 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                 </TableHeader>
                                 <TableBody>
                                     {productBills.map(bill => {
-                                      if (!initialData) return null; // Should not happen if productBills is populated
+                                      if (!initialData) return null;
                                       const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
                                       return (
                                         <TableRow key={bill.id}>
                                             <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
                                             <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
                                             <TableCell className="capitalize">{bill.type}</TableCell>
-                                            <TableCell className="text-right font-semibold">
+                                            <TableCell className="text-right">
                                               {transactionInfo.quantity} <Badge variant="outline" className={cn("ml-1 text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
                                             </TableCell>
                                         </TableRow>
@@ -516,3 +512,5 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
     </Card>
   );
 }
+
+    
