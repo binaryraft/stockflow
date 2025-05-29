@@ -267,8 +267,6 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
       updateProduct(initialData.id, productToSave);
       toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
     } else {
-      // When adding a new product, prices/stock are set via expense bills.
-      // If it's a non-variant product, a default SKU is created by addProduct, but its stock/price layers will be empty initially.
       addProduct(productToSave as Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>);
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
@@ -340,7 +338,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                     <span>
-                        For non-variant products, initial stock and pricing are established via the first <strong>Expense Bill</strong>.
+                        For non-variant products, initial stock and pricing are established via the first <strong>Expense Bill</strong> that includes this product.
                     </span>
                 </div>
             )}
@@ -424,7 +422,8 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                       <TableHead>Purchased</TableHead>
                                       <TableHead>From Bill</TableHead>
                                       <TableHead className="text-right">Initial Qty</TableHead>
-                                      <TableHead className="text-right">Remaining</TableHead>
+                                      <TableHead className="text-right">Sold Qty</TableHead>
+                                      <TableHead className="text-right">Remaining Qty</TableHead>
                                       <TableHead className="text-right">Cost/Unit</TableHead>
                                       <TableHead className="text-right">Sell Price (Set)</TableHead>
                                     </TableRow>
@@ -435,6 +434,7 @@ export function ProductForm({ initialData, searchParams }: ProductFormProps) {
                                         <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
                                         <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
                                         <TableCell className="text-right">{layer.initialQuantity}</TableCell>
+                                        <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
                                         <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
                                         <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
                                         <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
