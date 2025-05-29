@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput } from './product-search-input';
+import type { ProductSearchSuggestion } from './product-search-input';
 import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -143,13 +144,77 @@ export function BillingForm({
     }
   }, [determineMode, mode, resetFullForm]);
 
+  const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU) => {
+    if (skuToUse && currentProductForSelection) {
+      const details = getSkuDetails(skuToUse);
+      if(currentProductForSelection.trackQuantity) setCurrentSkuStock(details.totalStock);
+      else setCurrentSkuStock(null);
+
+      setCurrentSkuSellPrice(details.currentSellPrice);
+
+      if (mode === 'sell' || mode === 'return') {
+        setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
+      } else if (mode === 'buy') {
+          setCostPrice(''); // Cost price is entered manually for buys
+          setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : ''); // Sell price for this batch is also entered
+      }
+    } else if (currentProductForSelection && !skuToUse) { 
+        setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
+        setCurrentSkuSellPrice(null);
+        setSellPrice('');
+        if (mode === 'buy') setCostPrice('');
+    } else { 
+      setCurrentSkuStock(null);
+      setCurrentSkuSellPrice(null);
+      setSellPrice('');
+      if (mode === 'buy') setCostPrice('');
+    }
+  }, [getSkuDetails, mode, currentProductForSelection]);
+
+  const handleProductSelectFromSearch = useCallback((product: Product, selectedSku?: ProductSKU) => {
+    setCurrentProductForSelection(product);
+    setProductNotFoundHint('');
+
+    if (selectedSku) {
+      const skuDisplayName = selectedSku.skuIdentifier || getSkuIdentifier(product.name, selectedSku.optionValues);
+      setProductNameQuery(skuDisplayName);
+      setSelectedVariantOptions(selectedSku.optionValues || {});
+      updateSkuDisplayInfo(selectedSku);
+      setTimeout(() => {
+          quantityInputRef.current?.focus();
+          quantityInputRef.current?.select();
+      }, 50);
+    } else if (product.variants && product.variants.length > 0) {
+      setProductNameQuery(product.name);
+      setSelectedVariantOptions({});
+      updateSkuDisplayInfo(undefined);
+      const firstVariantId = product.variants[0].id;
+      if (firstVariantId) {
+        setTimeout(() => { // Give Select a moment to render if it was conditional
+            setVariantDropdownOpenState({ [firstVariantId]: true });
+            // Focus will be handled by useEffect watching variantDropdownOpenState
+        }, 50);
+      }
+    } else {
+      setProductNameQuery(product.name);
+      setSelectedVariantOptions({});
+      const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
+      updateSkuDisplayInfo(defaultSku);
+      setTimeout(() => {
+          quantityInputRef.current?.focus();
+          quantityInputRef.current?.select();
+      }, 50);
+    }
+  }, [updateSkuDisplayInfo, getSkuIdentifier]);
+
+
   useEffect(() => {
     const newlyAddedProductId = searchParamsHook.get('newlyAddedProductId');
     if (newlyAddedProductId) {
       const product = getProductById(newlyAddedProductId);
       if (product) {
         const firstSku = product.productSKUs && product.productSKUs.length > 0 ? product.productSKUs[0] : undefined;
-        handleProductSelect(product, firstSku);
+        handleProductSelectFromSearch(product, firstSku);
       }
       const newParams = new URLSearchParams(searchParamsHook.toString());
       newParams.delete('newlyAddedProductId');
@@ -161,7 +226,7 @@ export function BillingForm({
       router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
       setTimeout(() => productNameInputRef.current?.focus(), 50);
     }
-  }, [searchParamsHook, getProductById, router, pathname, handleProductSelect]);
+  }, [searchParamsHook, getProductById, router, pathname, handleProductSelectFromSearch]);
 
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
   const [customerVendorName, setCustomerVendorName] = useState('');
@@ -196,71 +261,6 @@ export function BillingForm({
     setTimeout(() => productNameInputRef.current?.focus(), 0);
   }, [mode]);
 
-  const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU) => {
-    if (skuToUse && currentProductForSelection) {
-      const details = getSkuDetails(skuToUse);
-      if(currentProductForSelection.trackQuantity) setCurrentSkuStock(details.totalStock);
-      else setCurrentSkuStock(null);
-
-      setCurrentSkuSellPrice(details.currentSellPrice);
-
-      if (mode === 'sell' || mode === 'return') {
-        setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
-      } else if (mode === 'buy') {
-          setCostPrice('');
-          setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
-      }
-    } else if (currentProductForSelection && !skuToUse) { // Product selected, but no specific SKU (e.g. new product with no purchases)
-        setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
-        setCurrentSkuSellPrice(null);
-        setSellPrice('');
-        if (mode === 'buy') setCostPrice('');
-    } else { // No product selected
-      setCurrentSkuStock(null);
-      setCurrentSkuSellPrice(null);
-      setSellPrice('');
-      if (mode === 'buy') setCostPrice('');
-    }
-  }, [getSkuDetails, mode, currentProductForSelection]);
-
-
-  const handleProductSelectFromSearch = useCallback((product: Product, selectedSku?: ProductSKU) => {
-    setCurrentProductForSelection(product);
-    setProductNotFoundHint('');
-
-    if (selectedSku) {
-      // Use the SKU's identifier for the input field if available, otherwise product name
-      const skuDisplayName = selectedSku.skuIdentifier || getSkuIdentifier(product.name, selectedSku.optionValues);
-      setProductNameQuery(skuDisplayName);
-      setSelectedVariantOptions(selectedSku.optionValues || {});
-      updateSkuDisplayInfo(selectedSku);
-      // Focus quantity input after SKU selection
-      setTimeout(() => {
-          quantityInputRef.current?.focus();
-          quantityInputRef.current?.select();
-      }, 50);
-    } else if (product.variants && product.variants.length > 0) {
-      // Product has variants, but no specific SKU was selected (e.g., user typed base name)
-      setProductNameQuery(product.name); // Keep base name in input
-      setSelectedVariantOptions({}); // Clear previous selections
-      updateSkuDisplayInfo(undefined); // Clear SKU specific info
-      const firstVariantId = product.variants[0].id;
-      if (firstVariantId) {
-        setVariantDropdownOpenState({ [firstVariantId]: true });
-      }
-    } else {
-      // Non-variant product, or variant product with no SKUs yet (treat as base product)
-      setProductNameQuery(product.name);
-      setSelectedVariantOptions({});
-      const defaultSku = product.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
-      updateSkuDisplayInfo(defaultSku); // Try to use default SKU if exists
-      setTimeout(() => {
-          quantityInputRef.current?.focus();
-          quantityInputRef.current?.select();
-      }, 50);
-    }
-  }, [updateSkuDisplayInfo, getSkuIdentifier]);
-
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
         const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
@@ -277,24 +277,24 @@ export function BillingForm({
 
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
-      const allVariantsSelected = currentProductForSelection.variants.every(
-        (v) => selectedVariantOptions[v.name]
-      );
-      const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
-
-      if (allVariantsSelected) {
-        const currentSku = currentProductForSelection.productSKUs.find(sku =>
-          JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
+        const allVariantsSelected = currentProductForSelection.variants.every(
+          (v) => selectedVariantOptions[v.name]
         );
-        updateSkuDisplayInfo(currentSku);
+        const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
 
-        if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
-             setTimeout(() => {
-                quantityInputRef.current?.focus();
-                quantityInputRef.current?.select();
-            }, 100);
+        if (allVariantsSelected) {
+          const currentSku = currentProductForSelection.productSKUs.find(sku =>
+            JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
+          );
+          updateSkuDisplayInfo(currentSku);
+
+          if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
+              setTimeout(() => {
+                  quantityInputRef.current?.focus();
+                  quantityInputRef.current?.select();
+              }, 100);
+          }
         }
-      }
     }
   }, [selectedVariantOptions, currentProductForSelection, updateSkuDisplayInfo, variantDropdownOpenState]);
 
@@ -330,23 +330,25 @@ export function BillingForm({
     }
 
     const selectedOpts = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
-    // Ensure SKU exists, especially important if user selected base product name but then selected variants
     const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts);
     if (!targetSkuFromStore) {
         toast({ variant: "destructive", title: "SKU Error", description: "Could not identify the product variant. Please re-select." });
         return;
     }
     const skuDetails = getSkuDetails(targetSkuFromStore);
+    const itemProductNameForBill = skuDetails.skuIdentifier || product.name;
 
-    if (mode === 'buy' && product.trackQuantity === false) {
-      toast({ variant: "destructive", title: "Invalid Action", description: "Non-tracked items/services cannot be added to Expense bills."});
-      return;
-    }
-
-    if ((mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) && product.trackQuantity) {
-      if (skuDetails.totalStock === null || skuDetails.totalStock < currentQuantity) {
-        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${skuDetails.totalStock ?? 0} of ${targetSkuFromStore.skuIdentifier || product.name} available.` });
-        return;
+    if (mode === 'buy') {
+        if(product.trackQuantity === false) {
+             toast({ variant: "destructive", title: "Invalid Action", description: "Non-tracked items/services cannot be added to Expense bills."});
+             return;
+        }
+    } else if (mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) {
+      if (product.trackQuantity) {
+        if (skuDetails.totalStock === null || skuDetails.totalStock < currentQuantity) {
+          toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${skuDetails.totalStock ?? 0} of ${itemProductNameForBill} available.` });
+          return;
+        }
       }
     }
 
@@ -362,31 +364,25 @@ export function BillingForm({
         return;
       }
     } else if (mode === 'sell') {
-      itemCostPrice = 0;
+      itemCostPrice = product.trackQuantity ? 0 : (skuDetails.averageCostPrice ?? 0); // COGS for tracked items determined in addBill, for non-tracked use SKU avg cost
       itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
       if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0. Check inventory pricing."});
         return;
       }
-      if(product.trackQuantity === false){
-        itemCostPrice = skuDetails.averageCostPrice || 0;
-      }
     } else { // Return mode
       itemSellPrice = parseFloat(sellPrice.toString()) || skuDetails.currentSellPrice || 0;
-      itemCostPrice = skuDetails.averageCostPrice || 0;
+      itemCostPrice = skuDetails.averageCostPrice ?? 0; // Use average cost for return valuation
       if (itemSellPrice <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0. Check inventory pricing."});
         return;
-      }
-       if(product.trackQuantity === false){
-        itemCostPrice = skuDetails.averageCostPrice || 0;
       }
     }
 
     const newItem: BillItem = {
       id: uuidv4(),
       productId: product.id,
-      productName: targetSkuFromStore.skuIdentifier || product.name, // Use SKU identifier for bill item name
+      productName: itemProductNameForBill,
       quantity: currentQuantity,
       costPrice: itemCostPrice,
       sellPrice: itemSellPrice,
@@ -404,7 +400,7 @@ export function BillingForm({
            const productsFound = searchProducts(productNameQuery);
            if (productsFound.length === 1 && productsFound[0].productSKUs.length <= 1 && productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
                 const productToSelect = productsFound[0];
-                const skuToSelect = productToSelect.productSKUs[0]; // Auto select first/only SKU
+                const skuToSelect = productToSelect.productSKUs[0]; 
                 handleProductSelectFromSearch(productToSelect, skuToSelect);
            } else if (productNotFoundHint === productNameQuery) {
                 const params: NewProductPrefillParams = {
@@ -420,8 +416,8 @@ export function BillingForm({
                 const query = new URLSearchParams(params as Record<string, string>).toString();
                 router.push(`/admin/products/add?${query}`);
                 resetFormFields(false);
-            } else if (productsFound.length > 0) { // If suggestions are shown but user presses enter
-                // This case is handled by ProductSearchInput's internal Enter handling (selects first/active)
+            } else if (productsFound.length > 0) { 
+                // This case is handled by ProductSearchInput's internal Enter handling
             } else {
                 setProductNotFoundHint(productNameQuery);
             }
@@ -444,7 +440,7 @@ export function BillingForm({
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       } else if (mode === 'sell' || mode === 'return') {
-        handleAddNewItem();
+        handleAddNewItem(); // Direct add for sell/return if price is auto-fetched
       }
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') {
@@ -560,15 +556,16 @@ export function BillingForm({
       paymentStatus: billPaymentStatus,
       items: billItemsForStore,
       storeIdForBill: finalStoreId,
-      billedByStaffId: undefined,
+      billedByStaffId: undefined, // To be filled by verification or admin context
     };
 
     if (!isAdminContext && storeIdFromProp) {
         setPendingBillPayload(currentBillPayload);
         setIsVerifyEmployeeDialogOpen(true);
     } else {
-      setPendingBillPayload({...currentBillPayload, billedByStaffId: 'admin_self_billed'});
-      proceedWithSave('admin_self_billed');
+      // Admin context, or store context where staff is already identified (if that flow is re-added)
+      // For now, admin bills are "self-billed"
+      proceedWithSave('admin_self_billed'); 
     }
   };
 
@@ -579,6 +576,7 @@ export function BillingForm({
     } else {
         toast({ variant: "destructive", title: "Error", description: "Could not proceed with saving the bill after verification." });
     }
+    // pendingBillPayload is cleared within proceedWithSave or if dialog is cancelled
   };
 
   const handleAnimationClose = () => {
@@ -589,11 +587,12 @@ export function BillingForm({
       const currentQueryModeInUrl = searchParamsHook.get('mode');
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
-         // No navigation
+         // No navigation, stay on form for current mode
        } else {
-         router.push(basePath);
+         router.push(basePath); // Default to history view
        }
     }
+    // For store portal, no explicit navigation needed here, stays on billing form with current mode.
   };
 
   const handleModeChange = (newModeString: string) => {
@@ -611,7 +610,7 @@ export function BillingForm({
   };
 
   const handleEditProductClick = () => {
-    if (currentProductForSelection) {
+    if (currentProductForSelection && isAdminContext) { // Only admin can edit from here
       const currentBillingUrl = pathname + searchParamsHook.toString();
       router.push(`/admin/products/${currentProductForSelection.id}?returnTo=${encodeURIComponent(currentBillingUrl)}`);
     }
@@ -766,8 +765,7 @@ export function BillingForm({
                 {currentProductForSelection && (
                   <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
                     <span>Selected: {
-                      selectedVariantOptions && Object.keys(selectedVariantOptions).length > 0 ?
-                      getSkuIdentifier(currentProductForSelection.name, selectedVariantOptions) :
+                      (getSkuDetails(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())))?.skuIdentifier) ||
                       currentProductForSelection.name
                     }</span>
                     {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
@@ -831,16 +829,15 @@ export function BillingForm({
                       step="0.01" min="0" placeholder="0.00"
                     />
                   </div>
+                   <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add
+                   </Button>
                 </>
-              ) : ( // Sales or Return mode - Sell Price is not an input, but we need to keep alignment
-                <div className="space-y-1.5 w-full md:w-32 opacity-0 pointer-events-none"> {/* Hidden placeholder for alignment */}
-                    <Label htmlFor="sellPriceHidden">Hidden Price Label</Label>
-                    <Input id="sellPriceHidden" disabled />
-                </div>
+              ) : ( 
+                 <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Item
+                 </Button>
               )}
-               <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add
-               </Button>
             </div>
 
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
@@ -980,16 +977,16 @@ export function BillingForm({
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div className="space-y-1.5">
-                <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : 'Customer Name'}</Label>
+                <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
                 <Input
                 id="customerVendorName"
                 ref={customerVendorNameInputRef}
                 value={customerVendorName}
                 onChange={(e) => setCustomerVendorName(e.target.value)}
-                placeholder={`Enter ${mode === 'buy' ? 'vendor' : 'customer'} name (optional)`}
+                placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
                 />
             </div>
-            {mode !== 'buy' && (
+            {mode !== 'buy' && ( // Only show phone for Sales and Return
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
                     <Input
@@ -1056,3 +1053,5 @@ export function BillingForm({
     </div>
   );
 }
+
+      
