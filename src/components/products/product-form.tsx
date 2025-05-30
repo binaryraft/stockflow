@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useForm, Controller, useFieldArray, FormProvider, useFormContext } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -12,8 +12,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU } from '@/types';
-import { CategorySearchInput } from '@/components/billing/category-search-input'; // Re-use this
+import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType } from '@/types';
+import { CategorySearchInput } from '@/components/billing/category-search-input';
 import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -48,9 +48,8 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
-  sku: z.string().optional(), // Main product code/base SKU
+  sku: z.string().optional(), 
   expiryDate: z.string().optional(),
-  // These are specifically for non-variant, non-tracked items, or for initial values for non-variant, tracked items.
   costPrice: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
@@ -59,7 +58,7 @@ const productFormSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
-  initialStock: z.preprocess( // Only relevant for non-variant, tracked items
+  initialStock: z.preprocess( 
     (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
@@ -90,7 +89,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
-      if (currentOptionValue && currentOptionValue.trim() !== '') { // Check if currentOptionValue is not undefined
+      if (currentOptionValue && currentOptionValue.trim() !== '') { 
         appendOption({ value: '' });
         setTimeout(() => {
           setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
@@ -181,40 +180,47 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 interface ProductFormProps {
   initialData?: Product | null;
-  // searchParams are passed when navigating from BillingForm for a new product
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
 function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
     const item = bill.items.find(i => i.productId === productId);
     const quantity = item ? item.quantity : 0;
-    const isDefectiveReturn = bill.type === 'return' && item?.isDefective;
-
-    switch (bill.type) {
-      case 'sell':
-        return { quantity, label: 'Sold', colorClass: 'bg-primary text-primary-foreground' };
-      case 'buy':
-        return { quantity, label: 'Purchased', colorClass: 'bg-destructive text-destructive-foreground' };
-      case 'return':
-        if (isDefectiveReturn) {
-            return { quantity, label: 'Def. Return', colorClass: 'bg-amber-500 text-amber-950' };
-        }
-        return { quantity, label: 'Restock Return', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' };
-      default:
-        return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
+    
+    if (bill.type === 'sell') {
+        return { quantity, label: 'Sold', colorClass: 'bg-primary text-primary-foreground hover:bg-primary/90' };
+    } else if (bill.type === 'buy') {
+        return { quantity, label: 'Purchased', colorClass: 'bg-destructive text-destructive-foreground hover:bg-destructive/90' };
+    } else if (bill.type === 'return') {
+        const isDefectiveReturn = item?.isDefective;
+        return { 
+            quantity, 
+            label: isDefectiveReturn ? 'Def. Return' : 'Restock Return', 
+            colorClass: isDefectiveReturn 
+                ? 'bg-amber-500 text-amber-950 dark:bg-amber-600 dark:text-amber-50' 
+                : 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' 
+        };
     }
+    return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
 }
 
 
 export function ProductForm({ initialData, searchParams: routeSearchParamsProp }: ProductFormProps) {
-  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore();
+  const addProduct = useInventoryStore(state => state.addProduct);
+  const updateProduct = useInventoryStore(state => state.updateProduct);
+  const categories = useInventoryStore(state => state.categories);
+  const addCategoryToStore = useInventoryStore(state => state.addCategory);
+  const getBillsForProduct = useInventoryStore(state => state.getBillsForProduct);
+  const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
+
   const { toast } = useToast();
   const router = useRouter();
   const nextSearchParams = useNextSearchParams(); 
+  
   const [hasMounted, setHasMounted] = useState(false);
+  const [productBills, setProductBills] = useState<Bill[]>([]);
 
   const isEditing = !!initialData;
-  const [productBills, setProductBills] = useState<Bill[]>([]);
 
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
@@ -227,13 +233,54 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
 
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, watch, reset: formReset, setValue, setFocus } = form;
 
-  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-    control, name: "variants",
-  });
-
   const trackQuantityValue = watch('trackQuantity');
   const currentVariants = watch('variants');
   const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
+
+  const memoizedDefaultValues = useMemo(() => {
+    let defaults: ProductFormData = {
+      name: '', description: '', category: '', trackQuantity: true, sku: '',
+      costPrice: undefined, sellPrice: undefined, initialStock: undefined,
+      expiryDate: '', variants: [],
+    };
+
+    if (isEditing && initialData) {
+      const currentTrackQuantity = initialData.trackQuantity;
+      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
+        ? getSkuDetails(initialData.productSKUs[0]) // getSkuDetails should be stable if selected properly
+        : undefined;
+
+      defaults = {
+        name: initialData.name,
+        description: initialData.description || '',
+        category: initialData.category || '',
+        trackQuantity: currentTrackQuantity,
+        sku: initialData.sku || '',
+        costPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.averageCostPrice === 'number') ? defaultSkuForNonVariant.averageCostPrice : undefined,
+        sellPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.currentSellPrice === 'number') ? defaultSkuForNonVariant.currentSellPrice : undefined,
+        initialStock: undefined,
+        expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
+        variants: initialData.variants?.map(v => ({
+          id: v.id, name: v.name,
+          options: v.options.map(o => ({ id: o.id, value: o.value }))
+        })) || [],
+      };
+    } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
+      const initialTrackQuantityFromParams = routeSearchParamsProp.quantity ? true : true;
+      const hasVariantsForParamsPreFill = false; 
+
+      defaults = {
+        name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
+        description: '', category: '', trackQuantity: initialTrackQuantityFromParams, sku: '',
+        costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
+        sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
+        initialStock: (routeSearchParamsProp.quantity && !hasVariantsForParamsPreFill) ? parseInt(routeSearchParamsProp.quantity as string) : undefined,
+        expiryDate: '', variants: [],
+      };
+    }
+    return defaults;
+  }, [isEditing, initialData, routeSearchParamsProp, getSkuDetails]);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -242,41 +289,22 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   useEffect(() => {
     if (!hasMounted) return;
 
-    if (isEditing && initialData) {
-      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
-        ? getSkuDetails(initialData.productSKUs[0])
-        : undefined;
+    formReset(memoizedDefaultValues); 
 
-      formReset({
-        name: initialData.name,
-        description: initialData.description || '',
-        category: initialData.category || '',
-        trackQuantity: initialData.trackQuantity,
-        sku: initialData.sku || '',
-        costPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.averageCostPrice ?? undefined : undefined,
-        sellPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.currentSellPrice ?? undefined : undefined,
-        initialStock: undefined, // Stock is managed via layers, not a single initial stock field for edits
-        expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
-        variants: initialData.variants?.map(v => ({
-          id: v.id, name: v.name,
-          options: v.options.map(o => ({ id: o.id, value: o.value }))
-        })) || [],
-      });
-      setProductBills(getBillsForProduct(initialData.id));
-    } else if (!isEditing && routeSearchParamsProp) {
-      formReset({
-        name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
-        description: '', category: '', trackQuantity: true, sku: '',
-        costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
-        sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
-        // initialStock is handled by the first expense bill for tracked items
-        initialStock: routeSearchParamsProp.quantity && !(productFormSchema.shape.variants.parse(currentVariants || [])?.length > 0) ? parseInt(routeSearchParamsProp.quantity as string) : undefined,
-        expiryDate: '', variants: [],
-      });
+    if (isEditing && initialData?.id) {
+        setProductBills(getBillsForProduct(initialData.id));
+    } else {
+        setProductBills([]); 
     }
+    
     setTimeout(() => setFocus('name'), 50);
-  }, [hasMounted, isEditing, initialData, formReset, setFocus, routeSearchParamsProp, getBillsForProduct, getSkuDetails, currentVariants]);
 
+  }, [hasMounted, memoizedDefaultValues, formReset, setFocus, getBillsForProduct, isEditing, initialData?.id]);
+
+
+  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
+    control, name: "variants",
+  });
 
   const onSubmit = (data: ProductFormData) => {
     const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
@@ -292,22 +320,16 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       addCategoryToStore(data.category!);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStockForTrackedNonVariant?: number } = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name, description: data.description, category: data.category,
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       variants: productVariantsPayload,
     };
     
-    // If not tracking quantity AND it's not a variant product, save cost/sell price
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
         productToSaveBase.costPriceForNonTracked = data.costPrice;
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
-    // If tracking quantity AND it's not a variant product AND initialStock is provided (e.g. from billing prefill)
-    if (data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0) && data.initialStock !== undefined) {
-        productToSaveBase.initialStockForTrackedNonVariant = data.initialStock;
-    }
-
 
     let savedProductId = '';
     if (isEditing && initialData) {
@@ -320,9 +342,8 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
 
-    const returnToParam = nextSearchParams.get('returnTo'); // This is from the URL directly
+    const returnToParam = nextSearchParams.get('returnTo');
     if (returnToParam) {
-      // Append newlyAddedProductId only if it's a new product and we are returning to billing
       const isNewProductFlow = !isEditing;
       const finalReturnUrl = isNewProductFlow 
         ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProductId}`
@@ -336,7 +357,6 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   if (!hasMounted && (isEditing || routeSearchParamsProp)) {
      return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
   }
-
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -371,7 +391,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
             </div>
-
+            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                 <div className="space-y-1.5">
                     <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
@@ -394,13 +414,11 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
             
-            {/* Conditional Price/Stock Fields */}
             {trackQuantityValue && (
                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                     <span>
                         For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
-                        {initialData?.initialStockForTrackedNonVariant !== undefined && ` Initial stock of ${initialData.initialStockForTrackedNonVariant} was set up and will be part of the first batch upon an Expense Bill.`}
                     </span>
                 </div>
             )}
@@ -482,13 +500,14 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
                     <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
                       <div className="p-4 space-y-4">
                         {initialData.productSKUs.map(sku => {
+                           const skuDetails = getSkuDetails(sku); // getSkuDetails should be stable
                           return (
                             <Card key={sku.id} className="bg-card shadow-sm">
                               <CardHeader className="pb-2 pt-3 px-4">
                                 <CardTitle className="text-md text-primary">
                                   Variant: {sku.skuIdentifier || "Default"}
                                 </CardTitle>
-                                <CardDescription>Current Total Stock for this Variant: {getSkuDetails(sku).totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
+                                <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
                               </CardHeader>
                               <CardContent className="px-4 pb-3">
                                 {sku.stockLayers.length === 0 ? (
@@ -561,7 +580,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
                                             <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
                                             <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
                                             <TableCell>
-                                              <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label.replace(' Return', '')}</Badge>
+                                              <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
                                             </TableCell>
                                             <TableCell className="text-right font-semibold">
                                               {transactionInfo.quantity} unit(s)
@@ -591,5 +610,5 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     </Card>
   );
 }
-    
+
     
