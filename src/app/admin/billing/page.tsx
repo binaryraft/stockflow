@@ -19,15 +19,14 @@ function BillingContent() {
   const searchParams = useSearchParams();
   const action = searchParams.get('action');
   const modeFromUrl = searchParams.get('mode') as BillMode | null;
-  const storeIdFromUrl = searchParams.get('storeId'); 
+  const storeIdFromUrl = searchParams.get('storeId');
 
-  const { getAllStores, getActiveSubscriptionPlan } = useInventoryStore(state => ({
-    getAllStores: state.getAllStores,
-    getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
-  }));
+  const getAllStores = useInventoryStore(state => state.getAllStores);
+  const getActiveSubscriptionPlan = useInventoryStore(state => state.getActiveSubscriptionPlan);
+
 
   const [allStores, setAllStores] = useState<Store[]>([]);
-  const [activePlanId, setActivePlanId] = useState<string | undefined>(undefined);
+  const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
   const [currentContextStoreId, setCurrentContextStoreId] = useState<string | undefined>(undefined);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -36,26 +35,30 @@ function BillingContent() {
     const stores = getAllStores();
     const plan = getActiveSubscriptionPlan();
     setAllStores(stores);
-    setActivePlanId(plan?.id);
+    setActivePlan(plan);
 
-    if (plan?.id !== SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN && stores.length === 1) {
+    if (plan?.id !== SUBSCRIPTION_PLAN_IDS.STARTER && stores.length === 1) { // Check against new Starter plan
+      setCurrentContextStoreId(stores[0].id);
+    } else if (plan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && stores.length > 0) { // For Starter, if store exists, default to it
       setCurrentContextStoreId(stores[0].id);
     } else {
-      setCurrentContextStoreId(undefined); 
+      setCurrentContextStoreId(undefined);
     }
-  }, [getAllStores, getActiveSubscriptionPlan]);
+  }, [getAllStores, getActiveSubscriptionPlan, hasMounted]);
 
 
   const isNewBillAction = action === 'new' || !!modeFromUrl;
-  const isBasicAdminPlan = activePlanId === SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN;
+  // Basic plan now allows 1 store, so this check needs to be if current plan is not Starter OR if they have 0 stores
+  const isStarterPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER;
 
-  let effectiveModeForTitle: BillMode = 'sell'; 
+
+  let effectiveModeForTitle: BillMode = 'sell';
   if (modeFromUrl && ['sell', 'buy', 'return'].includes(modeFromUrl)) {
     effectiveModeForTitle = modeFromUrl;
   }
 
   if (isNewBillAction) {
-    let title = "New Sales Bill"; 
+    let title = "New Sales Bill";
     let icon = Send;
 
     if (effectiveModeForTitle === 'buy') {
@@ -68,7 +71,28 @@ function BillingContent() {
       title = "New Return Entry";
       icon = RotateCcw;
     }
-    
+
+    if (isAdminContext && allStores.length === 0 && activePlan && activePlan.maxStores > 0) {
+      return (
+        <>
+          <PageTitle
+            title="Cannot Create Bill"
+            icon={Building}
+            actions={
+              <Button asChild variant="outline">
+                <Link href="/admin/stores">
+                   Add Store
+                </Link>
+              </Button>
+            }
+          />
+           <p className="text-center text-destructive">
+            You need to add at least one store before creating bills. Please go to Store Management.
+          </p>
+        </>
+      );
+    }
+
     return (
       <>
         <PageTitle
@@ -82,18 +106,19 @@ function BillingContent() {
             </Button>
           }
         />
-        <BillingForm 
-          key={`${modeFromUrl || 'default_admin_bill_form'}-${storeIdFromUrl || 'no_store'}`} 
-          initialModeProp={modeFromUrl} 
+        <BillingForm
+          key={`${modeFromUrl || 'default_admin_bill_form'}-${storeIdFromUrl || 'no_store'}`}
+          initialModeProp={modeFromUrl}
           isAdminContext={true}
-          preselectedStoreId={storeIdFromUrl} 
+          preselectedStoreId={storeIdFromUrl || (allStores.length === 1 ? allStores[0].id : undefined)}
         />
       </>
     );
   }
 
   const newBillHref = `/admin/billing?mode=sell${currentContextStoreId ? `&storeId=${currentContextStoreId}` : ''}`;
-  
+  const isAdminContext = true; // This page is always admin context
+
   return (
     <>
       <PageTitle
@@ -101,7 +126,7 @@ function BillingContent() {
         icon={HistoryIcon}
         actions={
           <div className="flex items-center gap-3">
-            {hasMounted && !isBasicAdminPlan && allStores.length > 0 && (
+            {hasMounted && allStores.length > 0 && ( // Show if any stores exist
               <div className="flex items-center gap-2">
                 <Label htmlFor="store-context-select" className="text-sm font-medium whitespace-nowrap">
                   New Bill Context:
@@ -113,16 +138,15 @@ function BillingContent() {
                   </span>
                 ) : (
                   <Select
-                    value={currentContextStoreId || "all_stores"}
+                    value={currentContextStoreId || ""} // Ensure value is not undefined for Select
                     onValueChange={(value) => {
-                      setCurrentContextStoreId(value === "all_stores" ? undefined : value);
+                      setCurrentContextStoreId(value); // Removed "all_stores" logic, value is store ID
                     }}
                   >
                     <SelectTrigger id="store-context-select" className="w-auto min-w-[180px] h-9 select-trigger-class">
                       <SelectValue placeholder="Select Store..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all_stores">All Stores (No Specific Context)</SelectItem>
                       {allStores.map(store => (
                         <SelectItem key={store.id} value={store.id}>
                           {store.name}
@@ -133,11 +157,14 @@ function BillingContent() {
                 )}
               </div>
             )}
-            <Button asChild>
-              <Link href={newBillHref}> 
+            <Button asChild disabled={allStores.length === 0 && activePlan && activePlan.maxStores > 0}>
+              <Link href={newBillHref}>
                 <PlusCircle className="mr-2 h-4 w-4" /> Create New Bill
               </Link>
             </Button>
+            {allStores.length === 0 && activePlan && activePlan.maxStores > 0 && (
+                 <p className="text-xs text-muted-foreground">Add a store first</p>
+            )}
           </div>
         }
       />
@@ -148,11 +175,10 @@ function BillingContent() {
 
 export default function AdminBillingPage() {
   return (
-    <div className="flex flex-col gap-6"> 
+    <div className="flex flex-col gap-6">
       <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Bill Information...</div>}>
         <BillingContent />
       </Suspense>
     </div>
   );
 }
-    

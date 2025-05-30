@@ -33,57 +33,58 @@ export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow
 
 
 export const SUBSCRIPTION_PLAN_IDS = {
-  BASIC_ADMIN: 'plan_basic_admin',
-  GROWTH_BUSINESS: 'plan_growth_business',
-  SCALE_PRO: 'plan_scale_pro',
+  STARTER: 'plan_starter',
+  GROWTH: 'plan_growth',
+  PRO: 'plan_pro',
   ENTERPRISE: 'plan_enterprise_contact',
 };
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
-    id: SUBSCRIPTION_PLAN_IDS.BASIC_ADMIN,
-    name: 'Basic Admin',
+    id: SUBSCRIPTION_PLAN_IDS.STARTER,
+    name: 'Starter',
     price: 199,
     priceSuffix: '/ month',
     features: [
-        'Admin Access Only', 
-        'Unlimited Products', 
-        'Unlimited Bills', 
+        '1 Store',
+        'Up to 2 Employees',
+        'Unlimited Products',
+        'Unlimited Bills',
         'Basic Reporting'
     ],
-    maxStores: 0,
-    maxEmployees: 0,
+    maxStores: 1,
+    maxEmployees: 2,
   },
   {
-    id: SUBSCRIPTION_PLAN_IDS.GROWTH_BUSINESS,
-    name: 'Growth Business',
-    price: 499,
+    id: SUBSCRIPTION_PLAN_IDS.GROWTH,
+    name: 'Growth',
+    price: 1999,
     priceSuffix: '/ month',
     features: [
-        'Up to 2 Stores', 
-        'Up to 10 Employees', 
-        'Full Admin Features',
-        'Advanced Reporting', 
+        'Up to 3 Stores',
+        'Up to 10 Employees',
+        'All Starter Features',
+        'Advanced Reporting',
         'Priority Support'
     ],
-    maxStores: 2,
+    maxStores: 3,
     maxEmployees: 10,
     isPopular: true,
   },
   {
-    id: SUBSCRIPTION_PLAN_IDS.SCALE_PRO,
-    name: 'Scale Pro',
-    price: 999,
+    id: SUBSCRIPTION_PLAN_IDS.PRO,
+    name: 'Pro',
+    price: 9999,
     priceSuffix: '/ month',
     features: [
-        'Up to 10 Stores', 
-        'Up to 50 Employees',
+        'Unlimited Stores',
+        'Unlimited Employees',
         'All Growth Features',
         'Premium Support',
         'API Access (soon)'
     ],
-    maxStores: 10,
-    maxEmployees: 50,
+    maxStores: Infinity,
+    maxEmployees: Infinity,
   },
   {
     id: SUBSCRIPTION_PLAN_IDS.ENTERPRISE,
@@ -91,14 +92,12 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     price: -1, // Indicates "Contact Us"
     priceSuffix: 'Custom Pricing',
     features: [
-        'Unlimited Stores', 
-        'Unlimited Employees', 
-        'All Scale Pro Features',
-        'Dedicated Account Manager', 
+        'Custom Store & Employee Limits',
+        'All Pro Features',
+        'Dedicated Account Manager',
         'Custom Integrations & Features'
     ],
-    maxStores: Infinity,
-    maxEmployees: Infinity,
+    maxStores: Infinity, // Represented as Infinity, but truly custom
+    maxEmployees: Infinity, // Represented as Infinity, but truly custom
   },
 ];
-
