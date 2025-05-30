@@ -9,7 +9,7 @@ import { BillingForm } from '@/components/billing/billing-form';
 import { BillHistoryTable } from '@/components/history/bill-history-table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { DollarSign, PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, Building } from 'lucide-react';
+import { PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, Building } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
@@ -24,11 +24,13 @@ function BillingContent() {
   const getAllStores = useInventoryStore(state => state.getAllStores);
   const getActiveSubscriptionPlan = useInventoryStore(state => state.getActiveSubscriptionPlan);
 
-
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
   const [currentContextStoreId, setCurrentContextStoreId] = useState<string | undefined>(undefined);
   const [hasMounted, setHasMounted] = useState(false);
+
+  // Define isAdminContext at the beginning of the component scope
+  const isAdminContext = true; 
 
   useEffect(() => {
     setHasMounted(true);
@@ -37,9 +39,11 @@ function BillingContent() {
     setAllStores(stores);
     setActivePlan(plan);
 
-    if (plan?.id !== SUBSCRIPTION_PLAN_IDS.STARTER && stores.length === 1) { // Check against new Starter plan
+    if (plan?.id !== SUBSCRIPTION_PLAN_IDS.STARTER && stores.length === 1) {
       setCurrentContextStoreId(stores[0].id);
-    } else if (plan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && stores.length > 0) { // For Starter, if store exists, default to it
+    } else if (plan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && stores.length > 0) {
+      setCurrentContextStoreId(stores[0].id);
+    } else if (stores.length > 0) { // Default to first store if multiple and none specifically selected
       setCurrentContextStoreId(stores[0].id);
     } else {
       setCurrentContextStoreId(undefined);
@@ -48,7 +52,6 @@ function BillingContent() {
 
 
   const isNewBillAction = action === 'new' || !!modeFromUrl;
-  // Basic plan now allows 1 store, so this check needs to be if current plan is not Starter OR if they have 0 stores
   const isStarterPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER;
 
 
@@ -72,6 +75,7 @@ function BillingContent() {
       icon = RotateCcw;
     }
 
+    // This check is now correctly placed after isAdminContext is defined.
     if (isAdminContext && allStores.length === 0 && activePlan && activePlan.maxStores > 0) {
       return (
         <>
@@ -107,17 +111,16 @@ function BillingContent() {
           }
         />
         <BillingForm
-          key={`${modeFromUrl || 'default_admin_bill_form'}-${storeIdFromUrl || 'no_store'}`}
+          key={`${modeFromUrl || 'default_admin_bill_form'}-${storeIdFromUrl || currentContextStoreId || 'no_store'}`}
           initialModeProp={modeFromUrl}
           isAdminContext={true}
-          preselectedStoreId={storeIdFromUrl || (allStores.length === 1 ? allStores[0].id : undefined)}
+          preselectedStoreId={storeIdFromUrl || (currentContextStoreId)}
         />
       </>
     );
   }
 
   const newBillHref = `/admin/billing?mode=sell${currentContextStoreId ? `&storeId=${currentContextStoreId}` : ''}`;
-  const isAdminContext = true; // This page is always admin context
 
   return (
     <>
@@ -126,7 +129,7 @@ function BillingContent() {
         icon={HistoryIcon}
         actions={
           <div className="flex items-center gap-3">
-            {hasMounted && allStores.length > 0 && ( // Show if any stores exist
+            {hasMounted && allStores.length > 0 && ( 
               <div className="flex items-center gap-2">
                 <Label htmlFor="store-context-select" className="text-sm font-medium whitespace-nowrap">
                   New Bill Context:
@@ -138,9 +141,9 @@ function BillingContent() {
                   </span>
                 ) : (
                   <Select
-                    value={currentContextStoreId || ""} // Ensure value is not undefined for Select
+                    value={currentContextStoreId || ""} 
                     onValueChange={(value) => {
-                      setCurrentContextStoreId(value); // Removed "all_stores" logic, value is store ID
+                      setCurrentContextStoreId(value); 
                     }}
                   >
                     <SelectTrigger id="store-context-select" className="w-auto min-w-[180px] h-9 select-trigger-class">
