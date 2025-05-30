@@ -12,14 +12,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, Bill, BillMode, StockLayer, ProductSKU } from '@/types';
-import { CategorySearchInput } from '@/components/billing/category-search-input';
+import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU } from '@/types';
+import { CategorySearchInput } from '@/components/billing/category-search-input'; // Re-use this
 import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation'; // Changed to useNextSearchParams
+import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { format } from 'date-fns';
 import {
@@ -48,15 +48,20 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
-  sku: z.string().optional(),
+  sku: z.string().optional(), // Main product code/base SKU
   expiryDate: z.string().optional(),
+  // These are specifically for non-variant, non-tracked items, or for initial values for non-variant, tracked items.
   costPrice: z.preprocess(
-    (val) => (val === "" ? undefined : parseFloat(String(val))),
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
   ),
   sellPrice: z.preprocess(
-    (val) => (val === "" ? undefined : parseFloat(String(val))),
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
+  ),
+  initialStock: z.preprocess( // Only relevant for non-variant, tracked items
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
+    z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -85,7 +90,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
-      if (currentOptionValue.trim() !== '') {
+      if (currentOptionValue && currentOptionValue.trim() !== '') { // Check if currentOptionValue is not undefined
         appendOption({ value: '' });
         setTimeout(() => {
           setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
@@ -93,17 +98,17 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       }
     }
   };
-
+  
   const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
-     if (e.key === 'Enter') {
-        e.preventDefault();
-        if (optionFields.length === 0) {
-          appendOption({ value: '' });
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-        } else {
-          setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-        }
-      }
+    if (e.key === 'Enter') {
+       e.preventDefault();
+       if (optionFields.length === 0) {
+         appendOption({ value: '' });
+         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+       } else {
+         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+       }
+     }
   }
 
   return (
@@ -176,6 +181,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 interface ProductFormProps {
   initialData?: Product | null;
+  // searchParams are passed when navigating from BillingForm for a new product
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
@@ -191,29 +197,21 @@ function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { qu
         return { quantity, label: 'Purchased', colorClass: 'bg-destructive text-destructive-foreground' };
       case 'return':
         if (isDefectiveReturn) {
-            return { quantity, label: 'Defective Return', colorClass: 'bg-amber-500 text-amber-950' };
+            return { quantity, label: 'Def. Return', colorClass: 'bg-amber-500 text-amber-950' };
         }
-        return { quantity, label: 'Restocked Return', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' };
+        return { quantity, label: 'Restock Return', colorClass: 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' };
       default:
         return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
     }
 }
 
 
-export function ProductForm({ initialData, searchParams: routeSearchParams }: ProductFormProps) {
-  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore(
-    (state) => ({
-      addProduct: state.addProduct,
-      updateProduct: state.updateProduct,
-      categories: state.categories,
-      addCategory: state.addCategory,
-      getBillsForProduct: state.getBillsForProduct,
-      getSkuDetails: state.getSkuDetails,
-    })
-  );
+export function ProductForm({ initialData, searchParams: routeSearchParamsProp }: ProductFormProps) {
+  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, getBillsForProduct, getSkuDetails } = useInventoryStore();
   const { toast } = useToast();
   const router = useRouter();
-  const nextSearchParams = useNextSearchParams(); // Use alias to avoid confusion
+  const nextSearchParams = useNextSearchParams(); 
+  const [hasMounted, setHasMounted] = useState(false);
 
   const isEditing = !!initialData;
   const [productBills, setProductBills] = useState<Bill[]>([]);
@@ -221,26 +219,29 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
   const form = useForm<ProductFormData>({
     resolver: zodResolver(productFormSchema),
     defaultValues: {
-      name: '',
-      description: '',
-      category: '',
-      trackQuantity: true,
-      sku: '',
-      costPrice: undefined,
-      sellPrice: undefined,
-      expiryDate: '',
-      variants: [],
+      name: '', description: '', category: '', trackQuantity: true, sku: '',
+      costPrice: undefined, sellPrice: undefined, initialStock: undefined,
+      expiryDate: '', variants: [],
     },
   });
 
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, watch, reset: formReset, setValue, setFocus } = form;
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-    control: control,
-    name: "variants",
+    control, name: "variants",
   });
 
+  const trackQuantityValue = watch('trackQuantity');
+  const currentVariants = watch('variants');
+  const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
+
   useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasMounted) return;
+
     if (isEditing && initialData) {
       const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
         ? getSkuDetails(initialData.productSKUs[0])
@@ -254,33 +255,28 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
         sku: initialData.sku || '',
         costPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.averageCostPrice ?? undefined : undefined,
         sellPrice: !initialData.trackQuantity && defaultSkuForNonVariant ? defaultSkuForNonVariant.currentSellPrice ?? undefined : undefined,
+        initialStock: undefined, // Stock is managed via layers, not a single initial stock field for edits
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         variants: initialData.variants?.map(v => ({
-          id: v.id,
-          name: v.name,
+          id: v.id, name: v.name,
           options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
       });
       setProductBills(getBillsForProduct(initialData.id));
-    } else if (!isEditing && routeSearchParams) { // Use the prop 'routeSearchParams'
+    } else if (!isEditing && routeSearchParamsProp) {
       formReset({
-        name: typeof routeSearchParams.name === 'string' ? routeSearchParams.name : '',
-        description: '',
-        category: '',
-        trackQuantity: true,
-        sku: '',
-        costPrice: routeSearchParams.costPrice ? parseFloat(routeSearchParams.costPrice as string) : undefined,
-        sellPrice: routeSearchParams.sellPrice ? parseFloat(routeSearchParams.sellPrice as string) : undefined,
-        expiryDate: '',
-        variants: [],
+        name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
+        description: '', category: '', trackQuantity: true, sku: '',
+        costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
+        sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
+        // initialStock is handled by the first expense bill for tracked items
+        initialStock: routeSearchParamsProp.quantity && !(productFormSchema.shape.variants.parse(currentVariants || [])?.length > 0) ? parseInt(routeSearchParamsProp.quantity as string) : undefined,
+        expiryDate: '', variants: [],
       });
     }
     setTimeout(() => setFocus('name'), 50);
-  }, [isEditing, initialData, formReset, setFocus, routeSearchParams, getBillsForProduct, getSkuDetails]);
+  }, [hasMounted, isEditing, initialData, formReset, setFocus, routeSearchParamsProp, getBillsForProduct, getSkuDetails, currentVariants]);
 
-  const trackQuantityValue = watch('trackQuantity');
-  const currentVariants = watch('variants');
-  const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
 
   const onSubmit = (data: ProductFormData) => {
     const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
@@ -296,20 +292,22 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
       addCategoryToStore(data.category!);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
-      name: data.name,
-      description: data.description,
-      category: data.category,
-      trackQuantity: data.trackQuantity,
-      sku: data.sku,
-      expiryDate: data.expiryDate,
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStockForTrackedNonVariant?: number } = {
+      name: data.name, description: data.description, category: data.category,
+      trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       variants: productVariantsPayload,
     };
-
+    
+    // If not tracking quantity AND it's not a variant product, save cost/sell price
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
         productToSaveBase.costPriceForNonTracked = data.costPrice;
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
+    // If tracking quantity AND it's not a variant product AND initialStock is provided (e.g. from billing prefill)
+    if (data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0) && data.initialStock !== undefined) {
+        productToSaveBase.initialStockForTrackedNonVariant = data.initialStock;
+    }
+
 
     let savedProductId = '';
     if (isEditing && initialData) {
@@ -322,13 +320,23 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
       toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
     }
 
-    const returnToParam = nextSearchParams.get('returnTo');
+    const returnToParam = nextSearchParams.get('returnTo'); // This is from the URL directly
     if (returnToParam) {
-      router.push(`${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProductId}`);
+      // Append newlyAddedProductId only if it's a new product and we are returning to billing
+      const isNewProductFlow = !isEditing;
+      const finalReturnUrl = isNewProductFlow 
+        ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProductId}`
+        : decodeURIComponent(returnToParam);
+      router.push(finalReturnUrl);
     } else {
       router.push('/admin/products');
     }
   };
+
+  if (!hasMounted && (isEditing || routeSearchParamsProp)) {
+     return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
+  }
+
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -385,6 +393,17 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
               />
               <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
             </div>
+            
+            {/* Conditional Price/Stock Fields */}
+            {trackQuantityValue && (
+                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
+                        {initialData?.initialStockForTrackedNonVariant !== undefined && ` Initial stock of ${initialData.initialStockForTrackedNonVariant} was set up and will be part of the first batch upon an Expense Bill.`}
+                    </span>
+                </div>
+            )}
 
             {!trackQuantityValue && !hasVariants && (
                  <>
@@ -408,24 +427,16 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
                     </div>
                  </>
             )}
-
-            {trackQuantityValue && (
-                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
-                    </span>
-                </div>
-            )}
-
+            
             {!trackQuantityValue && hasVariants && (
                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                     <span>
-                        For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination (feature for direct form entry not yet implemented here; prices may be inferred or set during billing).
+                        For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
                     </span>
                 </div>
             )}
+
 
             <Separator className="my-6"/>
 
@@ -476,17 +487,12 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
                               <CardHeader className="pb-2 pt-3 px-4">
                                 <CardTitle className="text-md text-primary">
                                   Variant: {sku.skuIdentifier || "Default"}
-                                  {Object.keys(sku.optionValues).length > 0 && (
-                                    <span className="text-xs font-normal text-muted-foreground ml-2">
-                                      ({Object.entries(sku.optionValues).map(([k,v]) => `${k}: ${v}`).join(', ')})
-                                    </span>
-                                  )}
                                 </CardTitle>
-                                <CardDescription>Current Total Stock for this Variant: {getSkuDetails(sku).totalStock ?? 'N/A'}</CardDescription>
+                                <CardDescription>Current Total Stock for this Variant: {getSkuDetails(sku).totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
                               </CardHeader>
                               <CardContent className="px-4 pb-3">
                                 {sku.stockLayers.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill.</p>
+                                  <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill if quantity is tracked, or set prices directly if not tracked and non-variant.</p>
                                 ) : (
                                   <Table className="text-xs">
                                     <TableHeader>
@@ -585,5 +591,5 @@ export function ProductForm({ initialData, searchParams: routeSearchParams }: Pr
     </Card>
   );
 }
-
+    
     
