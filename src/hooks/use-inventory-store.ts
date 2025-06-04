@@ -46,6 +46,7 @@ interface InventoryState {
   ) => Bill | null;
   deleteBill: (billId: string) => void;
   getBillById: (billId: string) => Bill | undefined;
+  updateBillNonCriticalDetails: (billId: string, details: { paymentStatus?: Bill['paymentStatus'], notes?: string }) => void;
   getRecentBills: (limit: number) => Bill[];
   getBillsForProduct: (productId: string) => Bill[];
 
@@ -112,7 +113,8 @@ interface ExpenseSummary {
 
 const defaultUserProfile: UserProfile = {
   companyName: DEFAULT_COMPANY_NAME,
-  activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER, // Default to Starter plan
+  activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
+  dataMode: 'local', // Added missing dataMode
 };
 
 export const useInventoryStore = create<InventoryState>()(
@@ -305,10 +307,13 @@ export const useInventoryStore = create<InventoryState>()(
           return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };
         }
 
-        const relevantStockLayers = sku.stockLayers.filter(layer => layer.storeId === targetStoreId);
+        const relevantStockLayers = targetStoreId 
+            ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId)
+            : sku.stockLayers; // If no targetStoreId, consider all layers (for global views)
+
 
         if (product.trackQuantity === false) {
-          const priceLayer = sku.stockLayers.find(layer => layer.storeId === targetStoreId) || sku.stockLayers[0]; // Non-tracked items store their price on layers
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; 
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -501,6 +506,19 @@ export const useInventoryStore = create<InventoryState>()(
         }));
       },
       getBillById: (billId) => get().bills.find((b) => b.id === billId),
+      updateBillNonCriticalDetails: (billId, details) => {
+        set((state) => ({
+          bills: state.bills.map((bill) =>
+            bill.id === billId
+              ? {
+                  ...bill,
+                  paymentStatus: details.paymentStatus !== undefined ? details.paymentStatus : bill.paymentStatus,
+                  notes: details.notes !== undefined ? details.notes : bill.notes,
+                }
+              : bill
+          ),
+        }));
+      },
       getRecentBills: (limit: number) => {
         return [...get().bills]
           .slice(0, limit);
@@ -638,25 +656,25 @@ export const useInventoryStore = create<InventoryState>()(
 
       getDailySalesAndExpenses: (days) => {
         const bills = get().bills;
-        const dailyData: Array<{ date: string; sales: number; expenses: number }> = [];
+        const dailyDataMap: Record<string, { sales: number; expenses: number }> = {};
+
         for (let i = 0; i < days; i++) {
           const targetDate = startOfDay(subDays(new Date(), i));
           const dateStr = format(targetDate, 'MMM d');
-          let sales = 0;
-          let expenses = 0;
-
-          bills.forEach(bill => {
-            if (startOfDay(new Date(bill.date)).getTime() === targetDate.getTime()) {
-              if (bill.type === 'sell') {
-                sales += bill.totalAmount;
-              } else if (bill.type === 'buy') {
-                expenses += bill.totalAmount;
-              }
-            }
-          });
-          dailyData.unshift({ date: dateStr, sales, expenses });
+          dailyDataMap[dateStr] = { sales: 0, expenses: 0 };
         }
-        return dailyData;
+
+        bills.forEach(bill => {
+          const billDateStr = format(startOfDay(new Date(bill.date)), 'MMM d');
+          if (dailyDataMap[billDateStr]) {
+            if (bill.type === 'sell') {
+              dailyDataMap[billDateStr].sales += bill.totalAmount;
+            } else if (bill.type === 'buy') {
+              dailyDataMap[billDateStr].expenses += bill.totalAmount;
+            }
+          }
+        });
+        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse(); // reverse to have oldest first
       },
       getTopSellingProductsByRevenue: (limit: number) => {
         const bills = get().bills;
@@ -870,6 +888,7 @@ export const useInventoryStore = create<InventoryState>()(
               state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.STARTER;
               storeUpdated = true;
             }
+             state.userProfile.dataMode = state.userProfile.dataMode || 'local'; // Ensure dataMode exists
           }
 
           if (!Array.isArray(state.categories)) { state.categories = []; storeUpdated = true; }
@@ -1026,3 +1045,5 @@ if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
       (useInventoryStore.getState() as any).__hydrated = true;
   }
 }
+
+    

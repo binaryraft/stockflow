@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -12,9 +12,10 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2 } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save } from 'lucide-react';
 import { format } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -22,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -64,6 +66,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     deleteBill,
     getProductById,
     getSkuDetails,
+    updateBillNonCriticalDetails,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -71,6 +74,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       userProfile: state.userProfile,
       deleteBill: state.deleteBill,
       getSkuDetails: state.getSkuDetails,
+      updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
     })
   );
   const { toast } = useToast();
@@ -80,6 +84,11 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   const [filterType, setFilterType] = useState<BillFilterType>('all');
+
+  // State for editing within the dialog
+  const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
+  const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
+  const [editableNotes, setEditableNotes] = useState<string>('');
 
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
   type BillFilterType = 'all' | BillMode;
@@ -179,6 +188,9 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
   const handleViewBill = (bill: Bill) => {
     setSelectedBill(bill);
+    setIsEditingBillDetails(false); // Ensure view mode on open
+    setEditablePaymentStatus(bill.paymentStatus);
+    setEditableNotes(bill.notes || '');
     setIsViewDialogOpen(true);
   };
 
@@ -186,6 +198,37 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     deleteBill(billId);
     toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
   };
+  
+  const handleEnterEditMode = () => {
+    if (selectedBill) {
+      setEditablePaymentStatus(selectedBill.paymentStatus);
+      setEditableNotes(selectedBill.notes || '');
+      setIsEditingBillDetails(true);
+    }
+  };
+
+  const handleCancelEditMode = () => {
+    setIsEditingBillDetails(false);
+    // Optionally reset editable fields if needed, though they'll be repopulated on next edit anyway
+  };
+
+  const handleSaveBillDetails = () => {
+    if (selectedBill) {
+      updateBillNonCriticalDetails(selectedBill.id, {
+        paymentStatus: editablePaymentStatus,
+        notes: editableNotes,
+      });
+      // Update selectedBill state to reflect changes immediately in the dialog
+      setSelectedBill(prev => prev ? {
+        ...prev,
+        paymentStatus: editablePaymentStatus,
+        notes: editableNotes
+      } : null);
+      toast({ title: "Bill Updated", description: "Payment status and/or notes have been updated." });
+      setIsEditingBillDetails(false);
+    }
+  };
+
 
   const handlePrintBill = (billToPrint: Bill | null) => {
     if (!billToPrint || !userProfile) return;
@@ -389,7 +432,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   return (
     <>
       {selectedBill && (
-        <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
+            if (!open) setIsEditingBillDetails(false); // Reset edit mode on dialog close
+            setIsViewDialogOpen(open);
+        }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg"> 
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className="flex items-center gap-2 text-xl">
@@ -445,19 +491,36 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         <p className="text-xs text-muted-foreground">Bill Type</p>
                         <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
                     </div>
-                    {selectedBill.paymentStatus && (selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
-                        <div>
-                            <p className="text-xs text-muted-foreground">Payment Status</p>
-                            <Badge 
-                                className={cn(
-                                    "capitalize text-xs", 
-                                    selectedBill.paymentStatus === 'paid' 
-                                    ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
-                                    : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                                )}
-                            >
-                                {selectedBill.paymentStatus}
-                            </Badge>
+                    {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
+                        <div className="space-y-1">
+                            <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
+                            {isEditingBillDetails ? (
+                                <Select
+                                    value={editablePaymentStatus || undefined}
+                                    onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
+                                >
+                                    <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
+                                        <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="paid">Paid</SelectItem>
+                                        <SelectItem value="unpaid">Unpaid</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                selectedBill.paymentStatus ? (
+                                    <Badge 
+                                        className={cn(
+                                            "capitalize text-xs", 
+                                            selectedBill.paymentStatus === 'paid' 
+                                            ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                            : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                                        )}
+                                    >
+                                        {selectedBill.paymentStatus}
+                                    </Badge>
+                                ) : <p className="text-sm font-medium text-muted-foreground">-</p>
+                            )}
                         </div>
                     )}
                 </div>
@@ -619,14 +682,25 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 </Table>
               </div>
 
-              {selectedBill.notes && (
-                <div className="p-4 border rounded-md bg-tertiary shadow-sm">
-                    <h4 className="text-md font-semibold text-tertiary-foreground mb-1">Notes:</h4>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {selectedBill.notes}
-                    </p>
-                </div>
-              )}
+              <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
+                  <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
+                  {isEditingBillDetails ? (
+                      <Textarea
+                          id="notesView"
+                          value={editableNotes}
+                          onChange={(e) => setEditableNotes(e.target.value)}
+                          placeholder="Add notes for this bill..."
+                          rows={3}
+                          className="text-sm"
+                      />
+                  ) : (
+                    selectedBill.notes ? (
+                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                          {selectedBill.notes}
+                      </p>
+                    ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
+                  )}
+              </div>
 
               <div className="p-4 border rounded-md bg-card shadow-sm">
                 <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
@@ -684,41 +758,64 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
             </div>
             </ScrollArea>
-            <DialogFooter className="pt-4 border-t mt-4">
-              <Button variant="outline" onClick={() => handlePrintBill(selectedBill)}>
-                <Printer className="mr-2 h-4 w-4" /> Print
-              </Button>
-               <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" className="ml-auto">
-                    <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+             <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
+              <div className="flex gap-2 mt-2 sm:mt-0">
+                 {!isEditingBillDetails && (
+                  <Button variant="outline" onClick={handleEnterEditMode}>
+                    <Edit2 className="mr-2 h-4 w-4" /> Edit
                   </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHead>
-                    <AlertDialogTit>Are you sure?</AlertDialogTit>
-                    <AlertDialogDesc>
-                      This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
-                      Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
-                    </AlertDialogDesc>
-                  </AlertDialogHead>
-                  <AlertDialogFoot>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => {
-                        handleDeleteBillClick(selectedBill.id, selectedBill.id);
-                        setIsViewDialogOpen(false); 
-                      }}
-                      className="bg-destructive hover:bg-destructive/90"
-                    >
-                      Delete Bill
-                    </AlertDialogAction>
-                  </AlertDialogFoot>
-                </AlertDialogContent>
-              </AlertDialog>
-              <DialogClose asChild>
-                <Button type="button">Close</Button>
-              </DialogClose>
+                )}
+                {isEditingBillDetails && (
+                  <>
+                    <Button variant="default" onClick={handleSaveBillDetails}>
+                      <Save className="mr-2 h-4 w-4" /> Save Changes
+                    </Button>
+                    <Button variant="outline" onClick={handleCancelEditMode}>
+                      Cancel
+                    </Button>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2">
+                  {!isEditingBillDetails && (
+                    <>
+                        <Button variant="outline" onClick={() => handlePrintBill(selectedBill)}>
+                            <Printer className="mr-2 h-4 w-4" /> Print
+                        </Button>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                            <Button variant="destructive">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+                            </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                            <AlertDialogHead>
+                                <AlertDialogTit>Are you sure?</AlertDialogTit>
+                                <AlertDialogDesc>
+                                This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
+                                Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
+                                </AlertDialogDesc>
+                            </AlertDialogHead>
+                            <AlertDialogFoot>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                onClick={() => {
+                                    handleDeleteBillClick(selectedBill.id, selectedBill.id);
+                                    setIsViewDialogOpen(false); 
+                                }}
+                                className="bg-destructive hover:bg-destructive/90"
+                                >
+                                Delete Bill
+                                </AlertDialogAction>
+                            </AlertDialogFoot>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </>
+                  )}
+                <DialogClose asChild>
+                  <Button type="button" variant={isEditingBillDetails ? "ghost" : "default"}>Close</Button>
+                </DialogClose>
+              </div>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -850,7 +947,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                         <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                          <Eye className="mr-2 h-4 w-4" /> View Details
+                          <Eye className="mr-2 h-4 w-4" /> View / Edit Details
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handlePrintBill(bill)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Bill
