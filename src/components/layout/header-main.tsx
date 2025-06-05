@@ -101,8 +101,10 @@ export function HeaderMain() {
            <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
-                <Menu className="h-5 w-5" />
-                <span className="sr-only">Toggle navigation menu</span>
+                <>
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Toggle navigation menu</span>
+                </>
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col p-0">
@@ -135,8 +137,10 @@ export function HeaderMain() {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
-                <UserCircle className="h-6 w-6" />
-                <span className="sr-only">User Menu</span>
+                <>
+                  <UserCircle className="h-6 w-6" />
+                  <span className="sr-only">User Menu</span>
+                </>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
