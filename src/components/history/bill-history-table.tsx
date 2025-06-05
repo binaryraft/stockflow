@@ -15,8 +15,8 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save } from 'lucide-react';
-import { format } from 'date-fns';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string } => {
@@ -83,15 +85,17 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
-  const [filterType, setFilterType] = useState<BillFilterType>('all');
-
-  // State for editing within the dialog
-  const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
-  const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
-  const [editableNotes, setEditableNotes] = useState<string>('');
-
+  
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
-  type BillFilterType = 'all' | BillMode;
+  
+  type BillTypeFilter = 'all' | BillMode;
+  const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
+
+  type TimePeriodFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'thisYear' | 'custom';
+  const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilter>('all');
+  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
+  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
+
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     if (!getProductById) { 
@@ -115,9 +119,31 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     if (filterByStoreId) {
       processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
     }
+    
+    // Apply time period filter first
+    const now = new Date();
+    if (timePeriodFilter === 'today') {
+      processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
+    } else if (timePeriodFilter === 'thisWeek') {
+      processBills = processBills.filter(bill => isThisWeek(new Date(bill.timestamp), { weekStartsOn: 1 }));
+    } else if (timePeriodFilter === 'thisMonth') {
+      processBills = processBills.filter(bill => isThisMonth(new Date(bill.timestamp)));
+    } else if (timePeriodFilter === 'thisYear') {
+      processBills = processBills.filter(bill => isThisYear(new Date(bill.timestamp)));
+    } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
+      const start = startOfDay(customStartDate);
+      const end = endOfDay(customEndDate);
+      if (isValid(start) && isValid(end) && end >= start) {
+        processBills = processBills.filter(bill => {
+          const billDate = new Date(bill.timestamp);
+          return isWithinInterval(billDate, { start, end });
+        });
+      }
+    }
 
-    if (filterType !== 'all') {
-      processBills = processBills.filter(bill => bill.type === filterType);
+
+    if (billTypeFilter !== 'all') {
+      processBills = processBills.filter(bill => bill.type === billTypeFilter);
     }
 
     if (searchTerm) {
@@ -176,7 +202,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, filterType, filterByStoreId]); 
+  }, [bills, searchTerm, sortConfig, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]); 
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -185,10 +211,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     }
     setSortConfig({ key, direction });
   };
+  
+  // State for editing within the dialog
+  const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
+  const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
+  const [editableNotes, setEditableNotes] = useState<string>('');
 
   const handleViewBill = (bill: Bill) => {
     setSelectedBill(bill);
-    setIsEditingBillDetails(false); // Ensure view mode on open
+    setIsEditingBillDetails(false); 
     setEditablePaymentStatus(bill.paymentStatus);
     setEditableNotes(bill.notes || '');
     setIsViewDialogOpen(true);
@@ -209,7 +240,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
   const handleCancelEditMode = () => {
     setIsEditingBillDetails(false);
-    // Optionally reset editable fields if needed, though they'll be repopulated on next edit anyway
   };
 
   const handleSaveBillDetails = () => {
@@ -218,7 +248,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         paymentStatus: editablePaymentStatus,
         notes: editableNotes,
       });
-      // Update selectedBill state to reflect changes immediately in the dialog
       setSelectedBill(prev => prev ? {
         ...prev,
         paymentStatus: editablePaymentStatus,
@@ -433,7 +462,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     <>
       {selectedBill && (
         <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
-            if (!open) setIsEditingBillDetails(false); // Reset edit mode on dialog close
+            if (!open) { 
+              setIsEditingBillDetails(false);
+              setSelectedBill(null); // Clear selected bill on dialog close
+            }
             setIsViewDialogOpen(open);
         }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg"> 
@@ -447,318 +479,326 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
-            <div className="space-y-6 py-2 px-2">
+              <Accordion type="single" collapsible className="w-full" defaultValue="bill-items">
+                <div className="space-y-6 py-2 px-2">
+                  <div className="p-4 border rounded-md bg-card shadow-sm">
+                      <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
+                      <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
+                      <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
+                  </div>
+                  <Separator />
 
-              <div className="p-4 border rounded-md bg-card shadow-sm">
-                  <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
-                  <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
-                  <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
-              </div>
-              <Separator />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
-                    <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                    <h4 className="text-md font-semibold text-foreground mb-1">
-                        {getPartyDetailsTitle(selectedBill.type)}
-                    </h4>
-                    {selectedBill.vendorOrCustomerName && (
-                        <div>
-                            <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
-                            <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
+                        <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                        <h4 className="text-md font-semibold text-foreground mb-1">
+                            {getPartyDetailsTitle(selectedBill.type)}
+                        </h4>
+                        {selectedBill.vendorOrCustomerName && (
+                            <div>
+                                <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
+                                <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
+                            </div>
+                        )}
+                        {selectedBill.customerPhone && (
+                            <div>
+                                <p className="text-xs text-muted-foreground">Phone</p>
+                                <p className="font-medium text-sm">{selectedBill.customerPhone}</p>
+                            </div>
+                        )}
                         </div>
                     )}
-                    {selectedBill.customerPhone && (
-                        <div>
-                            <p className="text-xs text-muted-foreground">Phone</p>
-                            <p className="font-medium text-sm">{selectedBill.customerPhone}</p>
-                        </div>
-                    )}
-                    </div>
-                )}
 
-                <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
-                    <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
-                    <div>
-                        <p className="text-xs text-muted-foreground">Bill ID</p>
-                        <p className="font-mono text-sm">{selectedBill.id}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground">Date & Time</p>
-                        <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
-                    </div>
-                    <div>
-                        <p className="text-xs text-muted-foreground">Bill Type</p>
-                        <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
-                    </div>
-                    {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
-                        <div className="space-y-1">
-                            <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
-                            {isEditingBillDetails ? (
-                                <Select
-                                    value={editablePaymentStatus || undefined}
-                                    onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
-                                >
-                                    <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
-                                        <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="paid">Paid</SelectItem>
-                                        <SelectItem value="unpaid">Unpaid</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                selectedBill.paymentStatus ? (
-                                    <Badge 
-                                        className={cn(
-                                            "capitalize text-xs", 
-                                            selectedBill.paymentStatus === 'paid' 
-                                            ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
-                                            : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                                        )}
+                    <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
+                        <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
+                        <div>
+                            <p className="text-xs text-muted-foreground">Bill ID</p>
+                            <p className="font-mono text-sm">{selectedBill.id}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground">Date & Time</p>
+                            <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-muted-foreground">Bill Type</p>
+                            <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
+                        </div>
+                        {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
+                            <div className="space-y-1">
+                                <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
+                                {isEditingBillDetails ? (
+                                    <Select
+                                        value={editablePaymentStatus || undefined}
+                                        onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
                                     >
-                                        {selectedBill.paymentStatus}
-                                    </Badge>
-                                ) : <p className="text-sm font-medium text-muted-foreground">-</p>
-                            )}
-                        </div>
-                    )}
-                </div>
-              </div>
-
-              {(selectedBill.billedByStaffName || selectedBill.storeName) && (
-                <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                  <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
-                   {selectedBill.storeName && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Store</p>
-                      <p className="font-medium text-sm flex items-center gap-1.5">
-                        <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
-                      </p>
-                    </div>
-                  )}
-                  {selectedBill.billedByStaffName && (
-                    <div>
-                      <p className="text-xs text-muted-foreground">Billed by</p>
-                      <p className="font-medium text-sm flex items-center gap-1.5">
-                        <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="p-4 border rounded-md bg-card shadow-sm">
-                <h4 className="text-md font-semibold text-foreground mb-3 border-b pb-2">Items</h4>
-                <Table className="mt-0">
-                 {selectedBill.type === 'buy' ? ( 
-                    <>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="align-top w-[35%]">Product Details</TableHead>
-                          <TableHead className="text-right align-top">Purch. Qty</TableHead>
-                          <TableHead className="text-right align-top">Sold Qty</TableHead>
-                          <TableHead className="text-right align-top">Rem. Qty</TableHead>
-                          <TableHead className="text-right align-top">Cost/Unit</TableHead>
-                          <TableHead className="text-right align-top">Sell Price (Set)</TableHead>
-                          <TableHead className="text-right align-top">Item Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedBill.items.map(item => {
-                            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                            const skuDetails = getSkuDetails(sku); 
-                            const layerForThisBillItem = sku?.stockLayers.find(
-                                l => l.purchaseBillId === selectedBill.id && 
-                                l.costPrice === item.costPrice && 
-                                Math.abs(l.initialQuantity - item.quantity) < 0.001 
-                            );
-                            
-                            const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
-                            const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
-                            const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
-                            const costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
-                            const sellPriceSet = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-
-
-                            return (
-                            <TableRow key={item.id || item.productId}>
-                                <TableCell className="py-2 align-top w-[35%]">
-                                  <div>{item.productName}</div>
-                                  {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                      <div className="text-xs text-muted-foreground mt-0.5">
-                                      {Object.entries(item.selectedVariantOptions)
-                                          .map(([key, value]) => `${key}: ${value}`)
-                                          .join('; ')}
-                                      </div>
-                                  )}
-                                   {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
-                                      <div className="text-xs text-muted-foreground mt-0.5">
-                                          Current Total SKU Stock: {skuDetails.totalStock}
-                                      </div>
-                                  )}
-                                </TableCell>
-                                <TableCell className="text-right py-2 align-top">{purchasedQty}</TableCell>
-                                <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty}</TableCell>
-                                <TableCell className="text-right py-2 align-top font-semibold">{remainingQty}</TableCell>
-                                <TableCell className="text-right py-2 align-top">₹{costPrice.toFixed(2)}</TableCell>
-                                <TableCell className="text-right py-2 align-top">₹{sellPriceSet.toFixed(2)}</TableCell>
-                                <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * costPrice).toFixed(2)}</TableCell>
-                            </TableRow>
-                            );
-                        })}
-                      </TableBody>
-                    </>
-                  ) : selectedBill.type === 'sell' ? ( 
-                    <>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40%]">Product</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Price/Unit</TableHead>
-                          <TableHead className="text-right">Item Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedBill.items.map(item => {
-                          const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-                          return (
-                          <TableRow key={item.id || item.productId}>
-                            <TableCell className="py-2 align-top w-[40%]">
-                              <div>{item.productName}</div>
-                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {Object.entries(item.selectedVariantOptions)
-                                    .map(([key, value]) => `${key}: ${value}`)
-                                    .join('; ')}
-                                </div>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
-                            <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
-                          </TableRow>
-                        )})}
-                      </TableBody>
-                    </>
-                  ) : ( // Return Bill
-                    <>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[40%]">Product</TableHead>
-                          <TableHead className="text-right">Qty</TableHead>
-                          <TableHead className="text-right">Price/Unit</TableHead>
-                          <TableHead className="text-right">Item Total</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {selectedBill.items.map(item => {
-                          const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-                          return(
-                          <TableRow key={item.id || item.productId}>
-                            <TableCell className="py-2 align-top w-[40%]">
-                              <div>{item.productName}</div>
-                              {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                <div className="text-xs text-muted-foreground mt-0.5">
-                                  {Object.entries(item.selectedVariantOptions)
-                                    .map(([key, value]) => `${key}: ${value}`)
-                                    .join('; ')}
-                                </div>
-                              )}
-                              {item.isDefective ? (
-                                <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                              ) : (
-                                <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
-                            <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                            <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
-                          </TableRow>
-                        )})}
-                      </TableBody>
-                    </>
-                  )}
-                </Table>
-              </div>
-
-              <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
-                  <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
-                  {isEditingBillDetails ? (
-                      <Textarea
-                          id="notesView"
-                          value={editableNotes}
-                          onChange={(e) => setEditableNotes(e.target.value)}
-                          placeholder="Add notes for this bill..."
-                          rows={3}
-                          className="text-sm"
-                      />
-                  ) : (
-                    selectedBill.notes ? (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                          {selectedBill.notes}
-                      </p>
-                    ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
-                  )}
-              </div>
-
-              <div className="p-4 border rounded-md bg-card shadow-sm">
-                <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
-                <div className="space-y-1 text-sm">
-                    {selectedBill.type === 'buy' ? ( 
-                        <>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
-                                <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                                        <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
+                                            <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="paid">Paid</SelectItem>
+                                            <SelectItem value="unpaid">Unpaid</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    selectedBill.paymentStatus ? (
+                                        <Badge 
+                                            className={cn(
+                                                "capitalize text-xs", 
+                                                selectedBill.paymentStatus === 'paid' 
+                                                ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                                : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                                            )}
+                                        >
+                                            {selectedBill.paymentStatus}
+                                        </Badge>
+                                    ) : <p className="text-sm font-medium text-muted-foreground">-</p>
+                                )}
                             </div>
-                            {(() => {
-                                const expectedRevenue = selectedBill.items.reduce((acc, item) => {
+                        )}
+                    </div>
+                  </div>
+
+                  {(selectedBill.billedByStaffName || selectedBill.storeName) && (
+                    <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                      <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
+                      {selectedBill.storeName && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Store</p>
+                          <p className="font-medium text-sm flex items-center gap-1.5">
+                            <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
+                          </p>
+                        </div>
+                      )}
+                      {selectedBill.billedByStaffName && (
+                        <div>
+                          <p className="text-xs text-muted-foreground">Billed by</p>
+                          <p className="font-medium text-sm flex items-center gap-1.5">
+                            <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <AccordionItem value="bill-items">
+                    <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
+                      <h4 className="text-md font-semibold text-foreground">
+                        Bill Items ({selectedBill.items.length} item(s))
+                      </h4>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-0">
+                        <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
+                        <Table className="mt-0">
+                        {selectedBill.type === 'buy' ? ( 
+                            <>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="align-top w-[35%]">Product Details</TableHead>
+                                  <TableHead className="text-right align-top">Purch. Qty</TableHead>
+                                  <TableHead className="text-right align-top">Sold Qty</TableHead>
+                                  <TableHead className="text-right align-top">Rem. Qty</TableHead>
+                                  <TableHead className="text-right align-top">Cost/Unit</TableHead>
+                                  <TableHead className="text-right align-top">Sell Price (Set)</TableHead>
+                                  <TableHead className="text-right align-top">Item Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedBill.items.map(item => {
                                     const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                                    const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-                                    let sellPriceForCalc = 0;
-                                    if (layerForThisBillItem && typeof layerForThisBillItem.sellPrice === 'number') {
-                                        sellPriceForCalc = layerForThisBillItem.sellPrice;
-                                    } else if (typeof item.sellPrice === 'number') {
-                                        sellPriceForCalc = item.sellPrice;
-                                    }
-                                    return acc + (sellPriceForCalc * item.quantity);
-                                }, 0);
-                                const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
-                                return (
-                                <>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
-                                        <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
-                                        <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
-                                            ₹{expectedProfitOrLoss.toFixed(2)}
-                                        </span>
-                                    </div>
-                                </>
-                                );
-                            })()}
-                        </>
-                    ) : selectedBill.type === 'sell' ? ( 
-                        <>
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Total Sales Amount:</span>
-                                <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                            </div>
-                        </>
-                    ) : ( // Return Bill
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Total Return Value:</span>
-                            <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                        </div>
-                    )}
-                </div>
-              </div>
+                                    const skuDetails = getSkuDetails(sku); 
+                                    const layerForThisBillItem = sku?.stockLayers.find(
+                                        l => l.purchaseBillId === selectedBill.id && 
+                                        l.costPrice === item.costPrice && 
+                                        Math.abs(l.initialQuantity - item.quantity) < 0.001 
+                                    );
+                                    
+                                    const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
+                                    const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
+                                    const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
+                                    const costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
+                                    const sellPriceSet = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
 
-            </div>
+
+                                    return (
+                                    <TableRow key={item.id || item.productId}>
+                                        <TableCell className="py-2 align-top w-[35%]">
+                                          <div>{item.productName}</div>
+                                          {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                              <div className="text-xs text-muted-foreground mt-0.5">
+                                              {Object.entries(item.selectedVariantOptions)
+                                                  .map(([key, value]) => `${key}: ${value}`)
+                                                  .join('; ')}
+                                              </div>
+                                          )}
+                                          {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
+                                              <div className="text-xs text-muted-foreground mt-0.5">
+                                                  Current Total SKU Stock: {skuDetails.totalStock}
+                                              </div>
+                                          )}
+                                        </TableCell>
+                                        <TableCell className="text-right py-2 align-top">{purchasedQty}</TableCell>
+                                        <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty}</TableCell>
+                                        <TableCell className="text-right py-2 align-top font-semibold">{remainingQty}</TableCell>
+                                        <TableCell className="text-right py-2 align-top">₹{costPrice.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right py-2 align-top">₹{sellPriceSet.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * costPrice).toFixed(2)}</TableCell>
+                                    </TableRow>
+                                    );
+                                })}
+                              </TableBody>
+                            </>
+                          ) : selectedBill.type === 'sell' ? ( 
+                            <>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[40%]">Product</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Price/Unit</TableHead>
+                                  <TableHead className="text-right">Item Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedBill.items.map(item => {
+                                  const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
+                                  return (
+                                  <TableRow key={item.id || item.productId}>
+                                    <TableCell className="py-2 align-top w-[40%]">
+                                      <div>{item.productName}</div>
+                                      {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                          {Object.entries(item.selectedVariantOptions)
+                                            .map(([key, value]) => `${key}: ${value}`)
+                                            .join('; ')}
+                                        </div>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
+                                    <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
+                                  </TableRow>
+                                )})}
+                              </TableBody>
+                            </>
+                          ) : ( // Return Bill
+                            <>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-[40%]">Product</TableHead>
+                                  <TableHead className="text-right">Qty</TableHead>
+                                  <TableHead className="text-right">Price/Unit</TableHead>
+                                  <TableHead className="text-right">Item Total</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {selectedBill.items.map(item => {
+                                  const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
+                                  return(
+                                  <TableRow key={item.id || item.productId}>
+                                    <TableCell className="py-2 align-top w-[40%]">
+                                      <div>{item.productName}</div>
+                                      {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
+                                        <div className="text-xs text-muted-foreground mt-0.5">
+                                          {Object.entries(item.selectedVariantOptions)
+                                            .map(([key, value]) => `${key}: ${value}`)
+                                            .join('; ')}
+                                        </div>
+                                      )}
+                                      {item.isDefective ? (
+                                        <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
+                                      ) : (
+                                        <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
+                                      )}
+                                    </TableCell>
+                                    <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
+                                    <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
+                                  </TableRow>
+                                )})}
+                              </TableBody>
+                            </>
+                          )}
+                        </Table>
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
+                      <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
+                      {isEditingBillDetails ? (
+                          <Textarea
+                              id="notesView"
+                              value={editableNotes}
+                              onChange={(e) => setEditableNotes(e.target.value)}
+                              placeholder="Add notes for this bill..."
+                              rows={3}
+                              className="text-sm"
+                          />
+                      ) : (
+                        selectedBill.notes ? (
+                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                              {selectedBill.notes}
+                          </p>
+                        ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
+                      )}
+                  </div>
+
+                  <div className="p-4 border rounded-md bg-card shadow-sm">
+                    <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
+                    <div className="space-y-1 text-sm">
+                        {selectedBill.type === 'buy' ? ( 
+                            <>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
+                                    <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                                </div>
+                                {(() => {
+                                    const expectedRevenue = selectedBill.items.reduce((acc, item) => {
+                                        const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+                                        const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
+                                        let sellPriceForCalc = 0;
+                                        if (layerForThisBillItem && typeof layerForThisBillItem.sellPrice === 'number') {
+                                            sellPriceForCalc = layerForThisBillItem.sellPrice;
+                                        } else if (typeof item.sellPrice === 'number') {
+                                            sellPriceForCalc = item.sellPrice;
+                                        }
+                                        return acc + (sellPriceForCalc * item.quantity);
+                                    }, 0);
+                                    const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
+                                    return (
+                                    <>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
+                                            <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
+                                            <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
+                                                ₹{expectedProfitOrLoss.toFixed(2)}
+                                            </span>
+                                        </div>
+                                    </>
+                                    );
+                                })()}
+                            </>
+                        ) : selectedBill.type === 'sell' ? ( 
+                            <>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Total Sales Amount:</span>
+                                    <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                                </div>
+                            </>
+                        ) : ( // Return Bill
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total Return Value:</span>
+                                <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                            </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              </Accordion>
             </ScrollArea>
-             <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
+            <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
               <div className="flex gap-2 mt-2 sm:mt-0">
                  {!isEditingBillDetails && (
                   <Button variant="outline" onClick={handleEnterEditMode}>
@@ -821,25 +861,112 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         </Dialog>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-3">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
         <Input
           placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Payment Status, Product, Staff, Store)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md w-full md:w-auto"
+          className="max-w-md w-full md:w-auto bg-background"
         />
-        <Select value={filterType} onValueChange={(value) => setFilterType(value as BillFilterType)}>
-            <SelectTrigger className="w-full md:w-[180px] select-trigger-class">
-                <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="all">All Bills</SelectItem>
-                <SelectItem value="sell">Sales Bills</SelectItem>
-                <SelectItem value="buy">Expense Bills</SelectItem>
-                <SelectItem value="return">Return Bills</SelectItem>
-            </SelectContent>
-        </Select>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-3 w-full md:w-auto">
+            <Select value={timePeriodFilter} onValueChange={(value) => setTimePeriodFilter(value as TimePeriodFilter)}>
+                <SelectTrigger className="w-full md:w-[160px] select-trigger-class bg-background">
+                    <SelectValue placeholder="Filter by period" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Time</SelectItem>
+                    <SelectItem value="today">Today</SelectItem>
+                    <SelectItem value="thisWeek">This Week</SelectItem>
+                    <SelectItem value="thisMonth">This Month</SelectItem>
+                    <SelectItem value="thisYear">This Year</SelectItem>
+                    <SelectItem value="custom">Custom Range</SelectItem>
+                </SelectContent>
+            </Select>
+            <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
+                <SelectTrigger className="w-full md:w-[160px] select-trigger-class bg-background">
+                    <SelectValue placeholder="Filter by type" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">All Bill Types</SelectItem>
+                    <SelectItem value="sell">Sales Bills</SelectItem>
+                    <SelectItem value="buy">Expense Bills</SelectItem>
+                    <SelectItem value="return">Return Bills</SelectItem>
+                </SelectContent>
+            </Select>
+        </div>
       </div>
+
+      {timePeriodFilter === 'custom' && (
+        <div className="flex flex-col sm:flex-row gap-3 mb-4 p-4 border rounded-lg bg-muted/50 shadow items-end">
+          <div className="flex-1 space-y-1.5 w-full sm:w-auto">
+            <Label htmlFor="customStartDate">Start Date</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="customStartDate"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-background",
+                    !customStartDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customStartDate ? format(customStartDate, "PPP") : <span>Pick a start date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={customStartDate}
+                  onSelect={setCustomStartDate}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+          <div className="flex-1 space-y-1.5 w-full sm:w-auto">
+            <Label htmlFor="customEndDate">End Date</Label>
+             <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="customEndDate"
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal bg-background",
+                    !customEndDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {customEndDate ? format(customEndDate, "PPP") : <span>Pick an end date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={customEndDate}
+                  onSelect={setCustomEndDate}
+                  disabled={(date) =>
+                    customStartDate ? date < customStartDate : false
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+           <Button 
+              variant="outline"
+              onClick={() => {
+                setCustomStartDate(undefined);
+                setCustomEndDate(undefined);
+                setTimePeriodFilter('all'); // Optionally revert to 'all time' or keep 'custom'
+              }}
+              className="w-full sm:w-auto bg-background"
+            >
+              Clear Range
+            </Button>
+        </div>
+      )}
+
       <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
           <TableHeader>
