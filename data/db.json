@@ -1,11 +1,62 @@
+
 {
+  "companies": [
+    {
+      "id": "comp_default_001",
+      "name": "StockFlow Solutions Inc.",
+      "token": "COMPANY_SECRET_STOCKFLOW_INC"
+    }
+  ],
   "users": [
     {
-      "id": "admin001",
-      "username": "admin",
+      "id": "user_admin_stockflow",
+      "companyId": "comp_default_001",
+      "email": "admin@stockflow.app",
       "password": "password123",
       "role": "admin",
-      "name": "Administrator"
+      "name": "StockFlow Admin"
+    },
+    {
+      "id": "user_emp_001",
+      "companyId": "comp_default_001",
+      "employeeId": "EMP001",
+      "password": "empPass1",
+      "role": "employee",
+      "name": "John Doe",
+      "assignedStoreIds": ["store_main_001", "store_branch_002"]
+    },
+    {
+      "id": "user_emp_002",
+      "companyId": "comp_default_001",
+      "employeeId": "EMP002",
+      "password": "empPass2",
+      "role": "employee",
+      "name": "Jane Smith",
+      "assignedStoreIds": ["store_main_001"]
+    }
+  ],
+  "stores": [
+    {
+      "id": "store_main_001",
+      "companyId": "comp_default_001",
+      "name": "Main Street Store",
+      "location": "123 Main St, Anytown",
+      "phone": "555-0101",
+      "email": "main@stockflow.app",
+      "passkey": "storePassMain",
+      "allowedStaffIds": ["user_emp_001", "user_emp_002"],
+      "allowedOperations": ["sell", "return", "buy"]
+    },
+    {
+      "id": "store_branch_002",
+      "companyId": "comp_default_001",
+      "name": "Elm Avenue Branch",
+      "location": "456 Elm Ave, Anytown",
+      "phone": "555-0102",
+      "email": "elm@stockflow.app",
+      "passkey": "storePassElm",
+      "allowedStaffIds": ["user_emp_001"],
+      "allowedOperations": ["sell", "return"]
     }
   ],
   "staff": []

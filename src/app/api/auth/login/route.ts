@@ -1,70 +1,65 @@
+
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import type { User, Company } from '@/types'; // Assuming types are updated
 
 const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
 const SHARED_AUTH_TOKEN = "DEMO_SHARED_AUTH_TOKEN_ADMIN_EMPLOYEE"; // Shared token
 
-interface User {
-  id: string;
-  username: string;
-  password?: string; // Password for direct user login
-  passkey?: string;  // Passkey for staff terminal access
-  role: 'admin' | 'staff';
-  name: string;
+interface Database {
+  companies: Company[];
+  users: User[];
+  stores: any[]; // Keep other parts of DB for now
 }
 
-interface StaffMember extends User {
-  role: 'staff';
-  email: string;
-  phone: string;
-  accessibleStoreIds: string[];
-}
-
-
-async function readDB(): Promise<{ users: User[], staff: StaffMember[] }> {
+async function readDB(): Promise<Database> {
   try {
     const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data);
+    return JSON.parse(data) as Database;
   } catch (error) {
     console.error("Error reading DB:", error);
-    // If DB doesn't exist or is corrupted, return empty structure
-    return { users: [], staff: [] };
+    return { companies: [], users: [], stores: [] };
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { username, password, loginType } = await req.json();
+    const { loginType, email, password, employeeId } = await req.json();
 
-    if (!username || !password) {
-      return NextResponse.json({ success: false, message: 'Username and password are required' }, { status: 400 });
+    if (!loginType) {
+      return NextResponse.json({ success: false, message: 'Login type is required' }, { status: 400 });
     }
 
     const db = await readDB();
-    
-    let user: User | StaffMember | undefined = undefined;
+    let authenticatedUser: User | undefined = undefined;
 
     if (loginType === 'admin') {
-        user = db.users.find(u => u.username === username && u.password === password && u.role === 'admin');
-    } else if (loginType === 'employee_passkey') {
-        // This part is a placeholder. For a real app, staff would be in db.json or a proper DB.
-        // Here we assume the client (EmployeePasskeyDialog) still handles passkey verification against Zustand.
-        // If we were to fully implement server-side staff passkey auth, we'd search db.staff.
-        // For now, to fulfill the "same token" if an employee *were* to log in this way:
-        // This is a conceptual path that's not fully wired up from the employee passkey dialog yet.
-        // It's here to show how the shared token *would* be issued.
-        // A real implementation would require the employee passkey dialog to call this endpoint.
-        // For demo, let's assume if username is 'staffdemo' and password is 'staffpass', it's a valid conceptual staff login.
-        if (username === 'staffdemo' && password === 'staffpass') {
-            user = { id: 'staffdemo001', username: 'staffdemo', role: 'staff', name: 'Demo Staff Member' } as User; // Simplified
-        }
+      if (!email || !password) {
+        return NextResponse.json({ success: false, message: 'Email and password are required for admin login' }, { status: 400 });
+      }
+      authenticatedUser = db.users.find(u => u.role === 'admin' && u.email === email && u.password === password);
+    } else if (loginType === 'employee') {
+      if (!employeeId || !password) {
+        return NextResponse.json({ success: false, message: 'Employee ID and password are required for employee login' }, { status: 400 });
+      }
+      authenticatedUser = db.users.find(u => u.role === 'employee' && u.employeeId === employeeId && u.password === password);
+    } else {
+      return NextResponse.json({ success: false, message: 'Invalid login type' }, { status: 400 });
     }
 
-
-    if (user) {
+    if (authenticatedUser) {
       // In a real app, generate a secure JWT. For this demo, use a shared static token.
-      return NextResponse.json({ success: true, token: SHARED_AUTH_TOKEN, userName: user.name, role: user.role });
+      // The token itself doesn't encode role/company; that info is sent separately.
+      return NextResponse.json({
+        success: true,
+        token: SHARED_AUTH_TOKEN,
+        userId: authenticatedUser.id,
+        userName: authenticatedUser.name,
+        role: authenticatedUser.role,
+        companyId: authenticatedUser.companyId,
+        assignedStoreIds: authenticatedUser.role === 'employee' ? authenticatedUser.assignedStoreIds : undefined,
+      });
     } else {
       return NextResponse.json({ success: false, message: 'Invalid credentials' }, { status: 401 });
     }

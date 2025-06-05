@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from '@/components/ui/button';
@@ -22,55 +23,62 @@ const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
 export function HeaderMain() {
   const router = useRouter();
-  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false); // Generic login state
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+
+  const updateAuthState = () => {
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      const name = localStorage.getItem('userName');
+      const role = localStorage.getItem('userRole');
+      setIsUserLoggedIn(!!token);
+      setUserName(name);
+      setUserRole(role);
+    }
+  };
 
   useEffect(() => {
     setHasMounted(true);
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-      setIsUserLoggedIn(!!token);
-      if (token) {
-        setUserName(localStorage.getItem('userName'));
-      }
-    }
+    updateAuthState(); // Initial check
   }, []);
 
-  // This effect will re-check login state if localStorage changes, e.g., after login/logout
   useEffect(() => {
+    if (!hasMounted) return;
+
     const handleStorageChange = () => {
-      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-      setIsUserLoggedIn(!!token);
-      setUserName(token ? localStorage.getItem('userName') : null);
+      updateAuthState();
     };
 
-    window.addEventListener('storage', handleStorageChange); // Listen for changes from other tabs
-    // Also check on focus in case login happened in another tab and this one wasn't notified by 'storage' event
-    window.addEventListener('focus', handleStorageChange);
-
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('focus', handleStorageChange); // Check on focus as well
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('focus', handleStorageChange);
     };
-  }, []);
+  }, [hasMounted]);
 
 
   const handleLogout = () => {
     localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+    localStorage.removeItem('userId');
     localStorage.removeItem('userName');
     localStorage.removeItem('userRole');
+    localStorage.removeItem('companyId');
+    localStorage.removeItem('assignedStoreIds');
+
     setIsUserLoggedIn(false);
     setUserName(null);
-    
-    // Clear store-specific session storage
+    setUserRole(null);
+
     Object.keys(sessionStorage).forEach(key => {
       if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/'); 
+    router.push('/');
   };
 
 
@@ -100,13 +108,13 @@ export function HeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0">
               <nav className="grid gap-2 text-lg font-medium p-4">
                 <Link
-                  href="/admin"
+                  href={userRole === 'admin' ? "/admin" : "/"} // Redirect to admin if admin, else homepage
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
                   <Package2 className="h-6 w-6 text-primary" />
                   <span className="">{APP_NAME}</span>
                 </Link>
-                {NAV_LINKS.map(link => (
+                {NAV_LINKS.map(link => ( // Assuming NAV_LINKS are for admin. Employee nav would be different.
                     <Link
                         key={link.href}
                         href={link.href}
@@ -132,21 +140,25 @@ export function HeaderMain() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>{userName || 'My Account'}</DropdownMenuLabel>
+              <DropdownMenuLabel>{userName || (userRole === 'admin' ? 'Admin Account' : 'My Account')}</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/admin/profile">
-                  <UserIcon className="mr-2 h-4 w-4" />
-                  Profile
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/admin/settings">
-                  <SettingsIcon className="mr-2 h-4 w-4" />
-                  Settings
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {userRole === 'admin' && (
+                <>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/profile">
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      Profile
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/settings">
+                      <SettingsIcon className="mr-2 h-4 w-4" />
+                      Settings
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
@@ -155,7 +167,7 @@ export function HeaderMain() {
           </DropdownMenu>
         ) : (
           <Button asChild variant="outline" size="sm">
-            <Link href="/">Login</Link>
+            <Link href="/">Login</Link> {/* Landing page handles showing login options */}
           </Button>
         )}
       </div>

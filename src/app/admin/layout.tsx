@@ -1,4 +1,5 @@
-"use client"; 
+
+"use client";
 
 import { AppShell } from '@/components/layout/app-shell';
 import { useEffect, useState } from 'react';
@@ -6,8 +7,8 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Key for storing the token
-const ADMIN_ROLE = "admin"; // Define the role for admin access
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
+const ADMIN_ROLE = "admin";
 
 export default function AdminLayout({
   children,
@@ -25,36 +26,37 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (!hasMounted) {
-      return; 
+      return;
     }
 
-    setIsLoadingAuth(true); 
+    setIsLoadingAuth(true);
     const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-    const userRole = localStorage.getItem('userRole');
+    const userRole = localStorage.getItem('userRole'); // Role is stored upon login
 
-    if (token && userRole === ADMIN_ROLE) { // Check for token and admin role
+    if (token && userRole === ADMIN_ROLE) {
       setIsAuthenticated(true);
     } else {
-      setIsAuthenticated(false); // Set auth state first
-      if (token && userRole !== ADMIN_ROLE) {
-        // Token exists but not admin role, clear and redirect (or handle differently)
-        localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
-        localStorage.removeItem('userName');
-        localStorage.removeItem('userRole');
-      }
-      router.replace('/'); // Redirect to main landing page for embedded login
+      setIsAuthenticated(false);
+      // If token exists but role is not admin, or no token, clear all auth-related local storage
+      localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+      localStorage.removeItem('userId');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userRole');
+      localStorage.removeItem('companyId');
+      localStorage.removeItem('assignedStoreIds'); // Clear employee-specific data too
+      router.replace('/'); // Redirect to main landing page (which handles login)
     }
-    setIsLoadingAuth(false); 
+    setIsLoadingAuth(false);
   }, [router, hasMounted]);
 
-  if (!hasMounted) { 
+  if (!hasMounted) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={80} 
-          height={80} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={80}
+          height={80}
           className="mb-6 rounded-xl shadow-lg animate-pulse"
           data-ai-hint="logo company"
         />
@@ -62,15 +64,15 @@ export default function AdminLayout({
       </div>
     );
   }
-  
+
   if (isLoadingAuth) {
      return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={80} 
-          height={80} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={80}
+          height={80}
           className="mb-6 rounded-xl shadow-lg animate-pulse"
           data-ai-hint="logo company"
         />
@@ -80,9 +82,7 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // This state should ideally be brief as router.replace('/') would have been called.
-    // Returning null lets the router handle the redirect without flashing content.
-    return null; 
+    return null;
   }
 
   return <AppShell>{children}</AppShell>;

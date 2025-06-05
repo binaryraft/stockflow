@@ -8,30 +8,37 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { LogIn, XCircle } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast'; // Added useToast
+import { useToast } from '@/hooks/use-toast';
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
   onCancel: () => void;
 }
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Key for storing the token
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
 export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbeddedProps) {
   const router = useRouter();
-  const { toast } = useToast(); // Initialize toast
+  const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+
+  // Use states for input fields if we were to make them dynamic
+  // const [email, setEmail] = useState('admin@stockflow.app');
+  // const [password, setPassword] = useState('password123');
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
   useEffect(() => {
-    if (hasMounted && localStorage.getItem(SHARED_AUTH_TOKEN_KEY)) { // Check for the generic token
-      // Potentially verify token role if needed, for now just presence
-      router.replace('/admin');
-      onLoginSuccess(); 
+    if (hasMounted) {
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      const userRole = localStorage.getItem('userRole');
+      if (token && userRole === 'admin') {
+        router.replace('/admin');
+        onLoginSuccess();
+      }
     }
   }, [router, hasMounted, onLoginSuccess]);
 
@@ -40,19 +47,29 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     setIsSubmitting(true);
 
     try {
+      // In a real form, these would come from state linked to input fields
+      const adminEmail = 'admin@stockflow.app';
+      const adminPassword = 'password123';
+
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // For demo, hardcoding admin credentials. In a real app, these would come from input fields.
-        body: JSON.stringify({ username: 'admin', password: 'password123', loginType: 'admin' }),
+        body: JSON.stringify({
+          loginType: 'admin',
+          email: adminEmail, // Use dynamic email if form exists
+          password: adminPassword, // Use dynamic password if form exists
+        }),
       });
 
       const data = await response.json();
 
       if (response.ok && data.success && data.token) {
         localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
-        localStorage.setItem('userName', data.userName || 'Admin'); // Store user name
-        localStorage.setItem('userRole', data.role || 'admin'); // Store user role
+        localStorage.setItem('userId', data.userId);
+        localStorage.setItem('userName', data.userName || 'Admin');
+        localStorage.setItem('userRole', data.role || 'admin');
+        localStorage.setItem('companyId', data.companyId || 'comp_default_001'); // Store companyId
+
         toast({ title: "Login Successful", description: `Welcome, ${data.userName || 'Admin'}!` });
         router.replace('/admin');
         onLoginSuccess();
@@ -66,15 +83,15 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
       setIsSubmitting(false);
     }
   };
-  
+
   if (!hasMounted) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={64} 
-          height={64} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={64}
+          height={64}
           className="mb-3 rounded-lg shadow-md animate-pulse"
           data-ai-hint="logo company"
         />
@@ -91,11 +108,11 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
         </Button>
       </div>
       <div className="flex flex-col items-center mb-8">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={64} 
-          height={64} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={64}
+          height={64}
           className="mb-3 rounded-lg shadow-md"
           data-ai-hint="logo company"
         />
@@ -105,12 +122,13 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
       <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <CardDescription>Access the administration panel. <br/> (Demo: admin/password123)</CardDescription>
+          <CardDescription>Access the administration panel. <br/> (Demo: admin@stockflow.app / password123)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
            <p className="text-sm text-muted-foreground text-center">
             For this demo, click the button below to log in as admin.
           </p>
+          {/* Future: Add actual input fields here for email and password */}
         </CardContent>
         <CardFooter>
           <Button onClick={handleLogin} className="w-full" disabled={isSubmitting}>
