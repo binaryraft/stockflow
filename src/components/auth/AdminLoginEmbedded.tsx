@@ -8,14 +8,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { LogIn, XCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast'; // Added useToast
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
   onCancel: () => void;
 }
 
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Key for storing the token
+
 export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbeddedProps) {
   const router = useRouter();
+  const { toast } = useToast(); // Initialize toast
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -24,27 +28,48 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
   }, []);
 
   useEffect(() => {
-    if (hasMounted && localStorage.getItem('isAdminLoggedIn') === 'true') {
+    if (hasMounted && localStorage.getItem(SHARED_AUTH_TOKEN_KEY)) { // Check for the generic token
+      // Potentially verify token role if needed, for now just presence
       router.replace('/admin');
       onLoginSuccess(); 
     }
   }, [router, hasMounted, onLoginSuccess]);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!hasMounted) return;
-
     setIsSubmitting(true);
-    setTimeout(() => {
-      localStorage.setItem('isAdminLoggedIn', 'true');
-      router.replace('/admin');
-      onLoginSuccess(); 
+
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // For demo, hardcoding admin credentials. In a real app, these would come from input fields.
+        body: JSON.stringify({ username: 'admin', password: 'password123', loginType: 'admin' }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success && data.token) {
+        localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
+        localStorage.setItem('userName', data.userName || 'Admin'); // Store user name
+        localStorage.setItem('userRole', data.role || 'admin'); // Store user role
+        toast({ title: "Login Successful", description: `Welcome, ${data.userName || 'Admin'}!` });
+        router.replace('/admin');
+        onLoginSuccess();
+      } else {
+        toast({ variant: "destructive", title: "Login Failed", description: data.message || "Invalid credentials or server error." });
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({ variant: "destructive", title: "Login Error", description: "Could not connect to the server." });
+    } finally {
       setIsSubmitting(false);
-    }, 500);
+    }
   };
   
   if (!hasMounted) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40">
         <Image 
           src="https://placehold.co/128x128.png" 
           alt={`${APP_NAME} Logo`} 
@@ -80,7 +105,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
       <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <CardDescription>Access the administration panel.</CardDescription>
+          <CardDescription>Access the administration panel. <br/> (Demo: admin/password123)</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
            <p className="text-sm text-muted-foreground text-center">
@@ -95,7 +120,4 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
         </CardFooter>
       </Card>
     </div>
-  );
-}
-
-    
+  

@@ -1,4 +1,3 @@
-
 "use client"; 
 
 import { AppShell } from '@/components/layout/app-shell';
@@ -6,6 +5,9 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
+
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Key for storing the token
+const ADMIN_ROLE = "admin"; // Define the role for admin access
 
 export default function AdminLayout({
   children,
@@ -27,16 +29,22 @@ export default function AdminLayout({
     }
 
     setIsLoadingAuth(true); 
-    const adminLoggedIn = localStorage.getItem('isAdminLoggedIn');
+    const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+    const userRole = localStorage.getItem('userRole');
 
-    if (adminLoggedIn === 'true') {
+    if (token && userRole === ADMIN_ROLE) { // Check for token and admin role
       setIsAuthenticated(true);
-      setIsLoadingAuth(false);
     } else {
       setIsAuthenticated(false); // Set auth state first
+      if (token && userRole !== ADMIN_ROLE) {
+        // Token exists but not admin role, clear and redirect (or handle differently)
+        localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userRole');
+      }
       router.replace('/'); // Redirect to main landing page for embedded login
-      setIsLoadingAuth(false); 
     }
+    setIsLoadingAuth(false); 
   }, [router, hasMounted]);
 
   if (!hasMounted) { 
@@ -79,4 +87,3 @@ export default function AdminLayout({
 
   return <AppShell>{children}</AppShell>;
 }
-    

@@ -1,9 +1,8 @@
-
 "use client";
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react'; // Removed Wifi, WifiOff, Database
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { Package2 } from 'lucide-react';
@@ -18,37 +17,62 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-// Removed: import { useInventoryStore } from '@/hooks/use-inventory-store';
-// Removed: import { useToast } from '@/hooks/use-toast';
-// Removed: import { Switch } from '@/components/ui/switch';
-// Removed: import { Label } from '@/components/ui/label';
-// Removed: import { cn } from '@/lib/utils';
+
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
 export function HeaderMain() {
   const router = useRouter();
-  // const { toast } = useToast(); // Removed toast as data mode toggle is removed
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isUserLoggedIn, setIsUserLoggedIn] = useState(false); // Generic login state
+  const [userName, setUserName] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
-  // Removed userProfile and setDataMode from useInventoryStore as data mode toggle is removed
 
   useEffect(() => {
     setHasMounted(true);
     if (typeof window !== 'undefined') {
-      setIsAdminLoggedIn(localStorage.getItem('isAdminLoggedIn') === 'true');
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      setIsUserLoggedIn(!!token);
+      if (token) {
+        setUserName(localStorage.getItem('userName'));
+      }
     }
   }, []);
 
+  // This effect will re-check login state if localStorage changes, e.g., after login/logout
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      setIsUserLoggedIn(!!token);
+      setUserName(token ? localStorage.getItem('userName') : null);
+    };
+
+    window.addEventListener('storage', handleStorageChange); // Listen for changes from other tabs
+    // Also check on focus in case login happened in another tab and this one wasn't notified by 'storage' event
+    window.addEventListener('focus', handleStorageChange);
+
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('focus', handleStorageChange);
+    };
+  }, []);
+
+
   const handleLogout = () => {
-    localStorage.removeItem('isAdminLoggedIn');
+    localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    setIsUserLoggedIn(false);
+    setUserName(null);
+    
+    // Clear store-specific session storage
     Object.keys(sessionStorage).forEach(key => {
       if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
         sessionStorage.removeItem(key);
       }
     });
-    router.push('/'); // Redirect to main landing page
+    router.push('/'); 
   };
 
-  // Removed handleDataModeToggle function
 
   if (!hasMounted) {
     return (
@@ -62,7 +86,6 @@ export function HeaderMain() {
     );
   }
 
-  // Removed currentDataMode variable
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
@@ -99,9 +122,8 @@ export function HeaderMain() {
         </div>
 
       <div className="flex w-full items-center justify-end gap-3 md:ml-auto">
-        {/* Data Mode Toggle UI Removed */}
         <ThemeToggle />
-        {isAdminLoggedIn ? (
+        {isUserLoggedIn ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
@@ -110,7 +132,7 @@ export function HeaderMain() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+              <DropdownMenuLabel>{userName || 'My Account'}</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/admin/profile">
@@ -133,7 +155,7 @@ export function HeaderMain() {
           </DropdownMenu>
         ) : (
           <Button asChild variant="outline" size="sm">
-            <Link href="/">Admin Login (from Landing)</Link> {/* This button might be less relevant if AdminLayout handles redirect */}
+            <Link href="/">Login</Link>
           </Button>
         )}
       </div>
