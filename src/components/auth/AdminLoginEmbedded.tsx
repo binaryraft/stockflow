@@ -120,4 +120,5 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
         </CardFooter>
       </Card>
     </div>
-  
+  );
+}
