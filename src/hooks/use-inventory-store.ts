@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, Staff, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, Staff, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
@@ -85,6 +85,7 @@ interface InventoryState {
   getOverallFinancialSummary: () => FinancialSummary;
   getTodaysFinancialSummary: () => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number) => ProductProfitabilityData[];
+  getProductLedgerSummary: () => ProductLedgerEntry[];
 
 
   // Chat methods
@@ -114,7 +115,7 @@ interface ExpenseSummary {
 const defaultUserProfile: UserProfile = {
   companyName: DEFAULT_COMPANY_NAME,
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
-  dataMode: 'local', // Added missing dataMode
+  dataMode: 'local',
 };
 
 export const useInventoryStore = create<InventoryState>()(
@@ -828,6 +829,58 @@ export const useInventoryStore = create<InventoryState>()(
         return Object.values(productFinancials)
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit);
+      },
+
+      getProductLedgerSummary: (): ProductLedgerEntry[] => {
+        const products = get().products;
+        const bills = get().bills;
+        const ledgerMap: Record<string, Omit<ProductLedgerEntry, 'productId' | 'productName' | 'currentStock' | 'category'>> = {};
+
+        bills.forEach(bill => {
+          bill.items.forEach(item => {
+            const productId = item.productId;
+            if (productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+
+            if (!ledgerMap[productId]) {
+              ledgerMap[productId] = {
+                totalPurchased: 0,
+                totalSold: 0,
+                totalRestockedReturns: 0,
+                totalDefectiveReturns: 0,
+              };
+            }
+
+            if (bill.type === 'buy') {
+              ledgerMap[productId].totalPurchased += item.quantity;
+            } else if (bill.type === 'sell') {
+              ledgerMap[productId].totalSold += item.quantity;
+            } else if (bill.type === 'return') {
+              if (item.isDefective) {
+                ledgerMap[productId].totalDefectiveReturns += item.quantity;
+              } else {
+                ledgerMap[productId].totalRestockedReturns += item.quantity;
+              }
+            }
+          });
+        });
+
+        return products.map(product => {
+          const summary = ledgerMap[product.id] || {
+            totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
+          };
+          let currentStock: number | 'N/A' = 'N/A';
+          if (product.trackQuantity) {
+            currentStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0);
+          }
+
+          return {
+            productId: product.id,
+            productName: product.name,
+            category: product.category,
+            ...summary,
+            currentStock,
+          };
+        }).sort((a, b) => a.productName.localeCompare(b.productName));
       },
 
 

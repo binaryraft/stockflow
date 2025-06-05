@@ -150,3 +150,14 @@ export interface TodaysFinancialSummary extends FinancialSummary {
   transactionsToday: number;
   defectivesToday: number;
 }
+
+export interface ProductLedgerEntry {
+  productId: string;
+  productName: string;
+  category?: string;
+  totalPurchased: number;
+  totalSold: number;
+  totalRestockedReturns: number;
+  totalDefectiveReturns: number;
+  currentStock: number | 'N/A'; // 'N/A' for non-tracked items
+}
