@@ -30,14 +30,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 
-const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string } => {
+const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
-  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense' };
-  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales' };
-  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)' };
-  return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return' };
+  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
+  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales', titleColor: 'text-primary' };
+  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
+  return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return', titleColor: 'text-amber-600 dark:text-amber-500' };
 };
 
 const getBillTypeName = (bill: Bill): string => {
@@ -120,7 +121,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
     }
     
-    // Apply time period filter first
     const now = new Date();
     if (timePeriodFilter === 'today') {
       processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
@@ -212,7 +212,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     setSortConfig({ key, direction });
   };
   
-  // State for editing within the dialog
   const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
   const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
   const [editableNotes, setEditableNotes] = useState<string>('');
@@ -464,122 +463,125 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
             if (!open) { 
               setIsEditingBillDetails(false);
-              setSelectedBill(null); // Clear selected bill on dialog close
+              setSelectedBill(null); 
             }
             setIsViewDialogOpen(open);
         }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg"> 
             <DialogHeader className="border-b pb-4 mb-4">
-              <DialogTitle className="flex items-center gap-2 text-xl">
+              <DialogTitle className={cn(
+                  "flex items-center gap-2 text-xl",
+                  getBillTypeIconAndColor(selectedBill.type, selectedBill.items).titleColor
+              )}>
                 {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon, { className: cn(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon.props.className, "h-6 w-6")})}
                 Bill Details
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill)} Bill (ID: {selectedBill.id})
+                {getBillTypeName(selectedBill)} Bill (ID: <span className="font-mono text-secondary">{selectedBill.id}</span>)
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
-              <Accordion type="single" collapsible className="w-full" defaultValue="bill-items">
-                <div className="space-y-6 py-2 px-2">
-                  <div className="p-4 border rounded-md bg-card shadow-sm">
-                      <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
-                      <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
-                      <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
-                  </div>
-                  <Separator />
+              <div className="space-y-6 py-2 px-2">
+                <div className="p-4 border rounded-md bg-card shadow-sm">
+                    <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
+                    <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
+                    <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
+                </div>
+                <Separator />
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
-                        <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                        <h4 className="text-md font-semibold text-foreground mb-1">
-                            {getPartyDetailsTitle(selectedBill.type)}
-                        </h4>
-                        {selectedBill.vendorOrCustomerName && (
-                            <div>
-                                <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
-                                <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
-                            </div>
-                        )}
-                        {selectedBill.customerPhone && (
-                            <div>
-                                <p className="text-xs text-muted-foreground">Phone</p>
-                                <p className="font-medium text-sm">{selectedBill.customerPhone}</p>
-                            </div>
-                        )}
-                        </div>
-                    )}
-
-                    <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
-                        <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Bill ID</p>
-                            <p className="font-mono text-sm">{selectedBill.id}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Date & Time</p>
-                            <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-muted-foreground">Bill Type</p>
-                            <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
-                        </div>
-                        {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
-                            <div className="space-y-1">
-                                <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
-                                {isEditingBillDetails ? (
-                                    <Select
-                                        value={editablePaymentStatus || undefined}
-                                        onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
-                                    >
-                                        <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
-                                            <SelectValue placeholder="Select status" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="paid">Paid</SelectItem>
-                                            <SelectItem value="unpaid">Unpaid</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    selectedBill.paymentStatus ? (
-                                        <Badge 
-                                            className={cn(
-                                                "capitalize text-xs", 
-                                                selectedBill.paymentStatus === 'paid' 
-                                                ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
-                                                : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                                            )}
-                                        >
-                                            {selectedBill.paymentStatus}
-                                        </Badge>
-                                    ) : <p className="text-sm font-medium text-muted-foreground">-</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-                  </div>
-
-                  {(selectedBill.billedByStaffName || selectedBill.storeName) && (
-                    <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                      <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
-                      {selectedBill.storeName && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Store</p>
-                          <p className="font-medium text-sm flex items-center gap-1.5">
-                            <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
-                          </p>
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
+                      <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                      <h4 className="text-md font-semibold text-foreground mb-1">
+                          {getPartyDetailsTitle(selectedBill.type)}
+                      </h4>
+                      {selectedBill.vendorOrCustomerName && (
+                          <div>
+                              <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
+                              <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
+                          </div>
                       )}
-                      {selectedBill.billedByStaffName && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Billed by</p>
-                          <p className="font-medium text-sm flex items-center gap-1.5">
-                            <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
-                          </p>
-                        </div>
+                      {selectedBill.customerPhone && (
+                          <div>
+                              <p className="text-xs text-muted-foreground">Phone</p>
+                              <p className="font-medium text-sm">{selectedBill.customerPhone}</p>
+                          </div>
                       )}
-                    </div>
+                      </div>
                   )}
 
+                  <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
+                      <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
+                      <div>
+                          <p className="text-xs text-muted-foreground">Bill ID</p>
+                          <p className="font-mono text-sm text-secondary">{selectedBill.id}</p>
+                      </div>
+                      <div>
+                          <p className="text-xs text-muted-foreground">Date & Time</p>
+                          <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
+                      </div>
+                      <div>
+                          <p className="text-xs text-muted-foreground">Bill Type</p>
+                          <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
+                      </div>
+                      {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
+                          <div className="space-y-1">
+                              <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
+                              {isEditingBillDetails ? (
+                                  <Select
+                                      value={editablePaymentStatus || undefined}
+                                      onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
+                                  >
+                                      <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
+                                          <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                          <SelectItem value="paid">Paid</SelectItem>
+                                          <SelectItem value="unpaid">Unpaid</SelectItem>
+                                      </SelectContent>
+                                  </Select>
+                              ) : (
+                                  selectedBill.paymentStatus ? (
+                                      <Badge 
+                                          className={cn(
+                                              "capitalize text-xs", 
+                                              selectedBill.paymentStatus === 'paid' 
+                                              ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                              : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                                          )}
+                                      >
+                                          {selectedBill.paymentStatus}
+                                      </Badge>
+                                  ) : <p className="text-sm font-medium text-muted-foreground">-</p>
+                              )}
+                          </div>
+                      )}
+                  </div>
+                </div>
+
+                {(selectedBill.billedByStaffName || selectedBill.storeName) && (
+                  <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                    <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
+                    {selectedBill.storeName && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Store</p>
+                        <p className="font-medium text-sm flex items-center gap-1.5">
+                          <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
+                        </p>
+                      </div>
+                    )}
+                    {selectedBill.billedByStaffName && (
+                      <div>
+                        <p className="text-xs text-muted-foreground">Billed by</p>
+                        <p className="font-medium text-sm flex items-center gap-1.5">
+                          <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <Accordion type="single" collapsible className="w-full">
                   <AccordionItem value="bill-items">
                     <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
                       <h4 className="text-md font-semibold text-foreground">
@@ -721,82 +723,82 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                         </div>
                     </AccordionContent>
                   </AccordionItem>
+                </Accordion>
 
-                  <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
-                      <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
-                      {isEditingBillDetails ? (
-                          <Textarea
-                              id="notesView"
-                              value={editableNotes}
-                              onChange={(e) => setEditableNotes(e.target.value)}
-                              placeholder="Add notes for this bill..."
-                              rows={3}
-                              className="text-sm"
-                          />
-                      ) : (
-                        selectedBill.notes ? (
-                          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                              {selectedBill.notes}
-                          </p>
-                        ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
+                <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
+                    <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
+                    {isEditingBillDetails ? (
+                        <Textarea
+                            id="notesView"
+                            value={editableNotes}
+                            onChange={(e) => setEditableNotes(e.target.value)}
+                            placeholder="Add notes for this bill..."
+                            rows={3}
+                            className="text-sm"
+                        />
+                    ) : (
+                      selectedBill.notes ? (
+                        <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                            {selectedBill.notes}
+                        </p>
+                      ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
+                    )}
+                </div>
+
+                <div className="p-4 border rounded-md bg-card shadow-sm">
+                  <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
+                  <div className="space-y-1 text-sm">
+                      {selectedBill.type === 'buy' ? ( 
+                          <>
+                              <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
+                                  <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                              </div>
+                              {(() => {
+                                  const expectedRevenue = selectedBill.items.reduce((acc, item) => {
+                                      const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
+                                      const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
+                                      let sellPriceForCalc = 0;
+                                      if (layerForThisBillItem && typeof layerForThisBillItem.sellPrice === 'number') {
+                                          sellPriceForCalc = layerForThisBillItem.sellPrice;
+                                      } else if (typeof item.sellPrice === 'number') {
+                                          sellPriceForCalc = item.sellPrice;
+                                      }
+                                      return acc + (sellPriceForCalc * item.quantity);
+                                  }, 0);
+                                  const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
+                                  return (
+                                  <>
+                                      <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
+                                          <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
+                                      </div>
+                                      <div className="flex justify-between">
+                                          <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
+                                          <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
+                                              ₹{expectedProfitOrLoss.toFixed(2)}
+                                          </span>
+                                      </div>
+                                  </>
+                                  );
+                              })()}
+                          </>
+                      ) : selectedBill.type === 'sell' ? ( 
+                          <>
+                              <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Total Sales Amount:</span>
+                                  <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                              </div>
+                          </>
+                      ) : ( // Return Bill
+                          <div className="flex justify-between">
+                              <span className="text-muted-foreground">Total Return Value:</span>
+                              <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                          </div>
                       )}
                   </div>
-
-                  <div className="p-4 border rounded-md bg-card shadow-sm">
-                    <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
-                    <div className="space-y-1 text-sm">
-                        {selectedBill.type === 'buy' ? ( 
-                            <>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
-                                    <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                                </div>
-                                {(() => {
-                                    const expectedRevenue = selectedBill.items.reduce((acc, item) => {
-                                        const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                                        const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-                                        let sellPriceForCalc = 0;
-                                        if (layerForThisBillItem && typeof layerForThisBillItem.sellPrice === 'number') {
-                                            sellPriceForCalc = layerForThisBillItem.sellPrice;
-                                        } else if (typeof item.sellPrice === 'number') {
-                                            sellPriceForCalc = item.sellPrice;
-                                        }
-                                        return acc + (sellPriceForCalc * item.quantity);
-                                    }, 0);
-                                    const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
-                                    return (
-                                    <>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
-                                            <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
-                                            <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
-                                                ₹{expectedProfitOrLoss.toFixed(2)}
-                                            </span>
-                                        </div>
-                                    </>
-                                    );
-                                })()}
-                            </>
-                        ) : selectedBill.type === 'sell' ? ( 
-                            <>
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground">Total Sales Amount:</span>
-                                    <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                                </div>
-                            </>
-                        ) : ( // Return Bill
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Total Return Value:</span>
-                                <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                            </div>
-                        )}
-                    </div>
-                  </div>
                 </div>
-              </Accordion>
+              </div>
             </ScrollArea>
             <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
               <div className="flex gap-2 mt-2 sm:mt-0">
@@ -958,7 +960,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               onClick={() => {
                 setCustomStartDate(undefined);
                 setCustomEndDate(undefined);
-                setTimePeriodFilter('all'); // Optionally revert to 'all time' or keep 'custom'
+                setTimePeriodFilter('all'); 
               }}
               className="w-full sm:w-auto bg-background"
             >
@@ -1011,7 +1013,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                       <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell w-[180px]">{bill.id}</TableCell>
+                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell w-[180px] text-secondary">{bill.id}</TableCell>
                   <TableCell className="py-3 px-4 w-[150px]">
                     <div className="flex flex-col items-start gap-0.5">
                         <Badge

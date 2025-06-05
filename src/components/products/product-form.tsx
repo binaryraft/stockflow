@@ -31,6 +31,8 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -247,7 +249,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     if (isEditing && initialData) {
       const currentTrackQuantity = initialData.trackQuantity;
       const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
-        ? getSkuDetails(initialData.productSKUs[0]) // getSkuDetails should be stable if selected properly
+        ? getSkuDetails(initialData.productSKUs[0]) 
         : undefined;
 
       defaults = {
@@ -490,109 +492,122 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
             {isEditing && initialData && (
               <>
                 <Separator className="my-6"/>
-                <div className="space-y-4">
-                  <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-                    <ListCollapse size={20} /> Purchase Batches & Stock Details
-                  </Label>
-                  {initialData.productSKUs.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
-                  ) : (
-                    <ScrollArea className="max-h-[400px] border rounded-md bg-tertiary/30">
-                      <div className="p-4 space-y-4">
-                        {initialData.productSKUs.map(sku => {
-                           const skuDetails = getSkuDetails(sku); // getSkuDetails should be stable
-                          return (
-                            <Card key={sku.id} className="bg-card shadow-sm">
-                              <CardHeader className="pb-2 pt-3 px-4">
-                                <CardTitle className="text-md text-primary">
-                                  Variant: {sku.skuIdentifier || "Default"}
-                                </CardTitle>
-                                <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
-                              </CardHeader>
-                              <CardContent className="px-4 pb-3">
-                                {sku.stockLayers.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill if quantity is tracked, or set prices directly if not tracked and non-variant.</p>
-                                ) : (
-                                  <Table className="text-xs">
+                <Accordion type="single" collapsible className="w-full space-y-4">
+                  <AccordionItem value="stock-details">
+                    <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
+                        <Label className="text-lg font-semibold text-primary flex items-center gap-2">
+                          <ListCollapse size={20} /> Purchase Batches & Stock Details
+                        </Label>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-0">
+                      <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
+                        {initialData.productSKUs.length === 0 ? (
+                          <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
+                        ) : (
+                          <ScrollArea className="max-h-[400px] -mx-4 px-4">
+                            <div className="space-y-4">
+                              {initialData.productSKUs.map(sku => {
+                                const skuDetails = getSkuDetails(sku); 
+                                return (
+                                  <Card key={sku.id} className="bg-tertiary/50 shadow-inner">
+                                    <CardHeader className="pb-2 pt-3 px-4">
+                                      <CardTitle className="text-md text-primary">
+                                        Variant: {sku.skuIdentifier || "Default"}
+                                      </CardTitle>
+                                      <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-3">
+                                      {sku.stockLayers.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill if quantity is tracked, or set prices directly if not tracked and non-variant.</p>
+                                      ) : (
+                                        <Table className="text-xs">
+                                          <TableHeader>
+                                            <TableRow>
+                                              <TableHead>Purchased On</TableHead>
+                                              <TableHead>From Bill ID</TableHead>
+                                              <TableHead className="text-right">Initial Qty</TableHead>
+                                              <TableHead className="text-right">Sold Qty</TableHead>
+                                              <TableHead className="text-right">Rem. Qty</TableHead>
+                                              <TableHead className="text-right">Cost/Unit</TableHead>
+                                              <TableHead className="text-right">Sell Price (Set)</TableHead>
+                                            </TableRow>
+                                          </TableHeader>
+                                          <TableBody>
+                                            {sku.stockLayers.map(layer => (
+                                              <TableRow key={layer.id}>
+                                                <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
+                                                <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
+                                                <TableCell className="text-right">{layer.initialQuantity}</TableCell>
+                                                <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
+                                                <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
+                                                <TableCell className="text-right">
+                                                  ₹{typeof layer.costPrice === 'number' ? layer.costPrice.toFixed(2) : '0.00'}
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                  ₹{typeof layer.sellPrice === 'number' ? layer.sellPrice.toFixed(2) : '0.00'}
+                                                </TableCell>
+                                              </TableRow>
+                                            ))}
+                                          </TableBody>
+                                        </Table>
+                                      )}
+                                    </CardContent>
+                                  </Card>
+                                );
+                              })}
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="transaction-history">
+                     <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
+                        <Label className="text-lg font-semibold text-primary flex items-center gap-2">
+                            <PackageSearch size={20} /> Product Transaction History
+                        </Label>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-0">
+                      <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
+                        {productBills.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
+                        ) : (
+                            <ScrollArea className="max-h-[300px] -mx-4 px-4">
+                                <Table className="text-xs">
                                     <TableHeader>
-                                      <TableRow>
-                                        <TableHead>Purchased On</TableHead>
-                                        <TableHead>From Bill ID</TableHead>
-                                        <TableHead className="text-right">Initial Qty</TableHead>
-                                        <TableHead className="text-right">Sold Qty</TableHead>
-                                        <TableHead className="text-right">Remaining Qty</TableHead>
-                                        <TableHead className="text-right">Cost/Unit (at purchase)</TableHead>
-                                        <TableHead className="text-right">Sell Price (set at purchase)</TableHead>
-                                      </TableRow>
+                                        <TableRow>
+                                            <TableHead>Bill ID</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Transaction Details</TableHead>
+                                        </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                      {sku.stockLayers.map(layer => (
-                                        <TableRow key={layer.id}>
-                                          <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
-                                          <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
-                                          <TableCell className="text-right">{layer.initialQuantity}</TableCell>
-                                          <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
-                                          <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
-                                          <TableCell className="text-right">
-                                            ₹{typeof layer.costPrice === 'number' ? layer.costPrice.toFixed(2) : '0.00'}
-                                          </TableCell>
-                                          <TableCell className="text-right">
-                                            ₹{typeof layer.sellPrice === 'number' ? layer.sellPrice.toFixed(2) : '0.00'}
-                                          </TableCell>
-                                        </TableRow>
-                                      ))}
+                                        {productBills.map(bill => {
+                                        if (!initialData) return null;
+                                        const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
+                                        return (
+                                            <TableRow key={bill.id}>
+                                                <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
+                                                <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
+                                                <TableCell>
+                                                <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right font-semibold">
+                                                {transactionInfo.quantity} unit(s)
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                        })}
                                     </TableBody>
-                                  </Table>
-                                )}
-                              </CardContent>
-                            </Card>
-                          );
-                        })}
+                                </Table>
+                            </ScrollArea>
+                        )}
                       </div>
-                    </ScrollArea>
-                  )}
-                </div>
-
-                <Separator className="my-6"/>
-                 <div className="space-y-4">
-                    <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-                      <PackageSearch size={20} /> Product Transaction History
-                    </Label>
-                    {productBills.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
-                    ) : (
-                        <ScrollArea className="max-h-[300px] border rounded-md bg-tertiary/30">
-                             <Table className="text-xs">
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Bill ID</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Transaction Details</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {productBills.map(bill => {
-                                      if (!initialData) return null;
-                                      const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
-                                      return (
-                                        <TableRow key={bill.id}>
-                                            <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
-                                            <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
-                                            <TableCell>
-                                              <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
-                                            </TableCell>
-                                            <TableCell className="text-right font-semibold">
-                                              {transactionInfo.quantity} unit(s)
-                                            </TableCell>
-                                        </TableRow>
-                                      );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        </ScrollArea>
-                    )}
-                 </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               </>
             )}
 
