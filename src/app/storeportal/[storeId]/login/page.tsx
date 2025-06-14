@@ -20,7 +20,7 @@ export default function StoreLoginPage() {
   const router = useRouter();
   const params = useParams();
   const storeId = params.storeId as string;
-  
+
   const { getStoreById } = useInventoryStore();
   const { toast } = useToast();
 
@@ -28,7 +28,7 @@ export default function StoreLoginPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [storeName, setStoreName] = useState('');
   const [hasMounted, setHasMounted] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true); 
+  const [initialLoading, setInitialLoading] = useState(true);
 
   useEffect(() => {
     setHasMounted(true);
@@ -40,7 +40,7 @@ export default function StoreLoginPage() {
     if (!storeId) {
       toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
       router.replace('/storeportal');
-      setInitialLoading(false); 
+      setInitialLoading(false);
       return;
     }
 
@@ -50,7 +50,7 @@ export default function StoreLoginPage() {
       // Check if already authenticated for this store in this session
       if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
         router.replace(`/storeportal/${storeId}/billing`);
-        return; 
+        return;
       }
     } else {
       toast({
@@ -58,11 +58,11 @@ export default function StoreLoginPage() {
         title: "Store Not Found",
         description: "The requested store does not exist.",
       });
-      router.replace('/storeportal'); 
-      setInitialLoading(false); 
+      router.replace('/storeportal');
+      setInitialLoading(false);
       return;
     }
-    setInitialLoading(false); 
+    setInitialLoading(false);
   }, [storeId, getStoreById, router, toast, hasMounted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -70,7 +70,7 @@ export default function StoreLoginPage() {
     if (!hasMounted || !storeId) return;
 
     setIsSubmitting(true);
-    
+
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -87,6 +87,7 @@ export default function StoreLoginPage() {
 
       if (response.ok && data.success) {
         sessionStorage.setItem(`authenticatedStore_${storeId}`, 'true');
+        sessionStorage.setItem('lastAuthenticatedStoreId', storeId); // Added
         toast({
           title: "Login Successful",
           description: `Welcome to ${data.storeName || storeName} terminal.`,
@@ -106,15 +107,15 @@ export default function StoreLoginPage() {
       setIsSubmitting(false);
     }
   };
-  
-  if (!hasMounted || initialLoading) { 
+
+  if (!hasMounted || initialLoading) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={64} 
-          height={64} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={64}
+          height={64}
           className="mb-3 rounded-lg shadow-md animate-pulse"
           data-ai-hint="logo company"
         />
@@ -126,11 +127,11 @@ export default function StoreLoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="flex flex-col items-center mb-8">
-        <Image 
-          src="https://placehold.co/128x128.png" 
-          alt={`${APP_NAME} Logo`} 
-          width={64} 
-          height={64} 
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={64}
+          height={64}
           className="mb-3 rounded-lg shadow-md"
           data-ai-hint="logo company"
         />

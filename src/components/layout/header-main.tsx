@@ -69,6 +69,7 @@ export function HeaderMain() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('companyId');
     localStorage.removeItem('assignedStoreIds');
+    sessionStorage.removeItem('lastAuthenticatedStoreId'); // Added
 
     setIsUserLoggedIn(false);
     setUserName(null);
