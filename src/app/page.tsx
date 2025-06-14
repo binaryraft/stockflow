@@ -12,8 +12,9 @@ import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/call-to-action-section';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
+import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded'; // New import
 
-type UIMode = 'landing' | 'adminLogin' | 'storeSelect';
+type UIMode = 'landing' | 'adminLogin' | 'adminSignup' | 'storeSelect';
 
 export default function HomePage() {
   const [uiMode, setUiMode] = useState<UIMode>('landing');
@@ -24,13 +25,13 @@ export default function HomePage() {
   }, []);
 
   const showAdminLogin = () => setUiMode('adminLogin');
-  const hideAdminLogin = () => setUiMode('landing');
+  const showAdminSignup = () => setUiMode('adminSignup');
+  const hideAuthForms = () => setUiMode('landing');
 
   const showStoreSelect = () => setUiMode('storeSelect');
   const hideStoreSelect = () => setUiMode('landing');
 
   if (!hasMounted) {
-    // Render nothing or a minimal loader to prevent hydration mismatch with uiMode
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
         <p className="text-lg text-muted-foreground">Loading Application...</p>
@@ -56,7 +57,19 @@ export default function HomePage() {
       )}
 
       {uiMode === 'adminLogin' && (
-        <AdminLoginEmbedded onLoginSuccess={hideAdminLogin} onCancel={hideAdminLogin} />
+        <AdminLoginEmbedded 
+          onLoginSuccess={hideAuthForms} 
+          onCancel={hideAuthForms} 
+          onSwitchToSignup={showAdminSignup}
+        />
+      )}
+      
+      {uiMode === 'adminSignup' && (
+        <AdminSignupEmbedded 
+          onSignupSuccess={hideAuthForms} 
+          onCancel={hideAuthForms}
+          onSwitchToLogin={showAdminLogin}
+        />
       )}
 
       {uiMode === 'storeSelect' && (
@@ -65,5 +78,5 @@ export default function HomePage() {
     </div>
   );
 }
-
+    
     

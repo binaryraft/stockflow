@@ -15,11 +15,12 @@ import { Label } from '@/components/ui/label';
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
   onCancel: () => void;
+  onSwitchToSignup: () => void; // New prop to switch to signup
 }
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
-export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbeddedProps) {
+export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup }: AdminLoginEmbeddedProps) {
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -36,7 +37,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
       const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
       const userRole = localStorage.getItem('userRole');
       if (token && userRole === 'admin') {
-        router.replace('/admin');
+        // router.replace('/admin'); // Let onLoginSuccess handle redirection to avoid race conditions with HomePage UI mode
         onLoginSuccess();
       }
     }
@@ -65,11 +66,11 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
         localStorage.setItem('userId', data.userId);
         localStorage.setItem('userName', data.userName || 'Admin');
         localStorage.setItem('userRole', data.role || 'admin');
-        localStorage.setItem('companyId', data.companyId);
+        localStorage.setItem('companyId', data.companyId); // Ensure companyId is stored
 
         toast({ title: "Login Successful", description: `Welcome, ${data.userName || 'Admin'}!` });
-        router.replace('/admin');
-        onLoginSuccess();
+        onLoginSuccess(); // Callback will handle UI switch and potential redirection
+        router.replace('/admin'); // Explicitly redirect after success callback
       } else {
         toast({ variant: "destructive", title: "Login Failed", description: data.message || "Invalid credentials or server error." });
       }
@@ -150,10 +151,13 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
               />
             </div>
           </CardContent>
-          <CardFooter>
+          <CardFooter className="flex-col gap-3">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               <LogIn className="mr-2 h-5 w-5" />
               {isSubmitting ? 'Logging In...' : 'Login as Admin'}
+            </Button>
+            <Button variant="link" size="sm" onClick={onSwitchToSignup} className="text-xs">
+              New user? Sign up
             </Button>
           </CardFooter>
         </form>
@@ -161,3 +165,4 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     </div>
   );
 }
+    
