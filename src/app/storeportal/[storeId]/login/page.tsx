@@ -13,6 +13,9 @@ import { APP_NAME } from '@/lib/constants';
 import { KeyRound, LogIn } from 'lucide-react';
 import Image from 'next/image';
 
+// For this prototype, assuming a single default company for store portal context
+const DEFAULT_COMPANY_ID_FOR_STORE_PORTAL = "comp_default_001";
+
 export default function StoreLoginPage() {
   const router = useRouter();
   const params = useParams();
@@ -44,6 +47,7 @@ export default function StoreLoginPage() {
     const store = getStoreById(storeId);
     if (store) {
       setStoreName(store.name);
+      // Check if already authenticated for this store in this session
       if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
         router.replace(`/storeportal/${storeId}/billing`);
         return; 
@@ -61,27 +65,44 @@ export default function StoreLoginPage() {
     setInitialLoading(false); 
   }, [storeId, getStoreById, router, toast, hasMounted]);
 
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasMounted) return;
+    if (!hasMounted || !storeId) return;
 
     setIsSubmitting(true);
-    const store = getStoreById(storeId);
+    
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          loginType: 'store',
+          companyId: DEFAULT_COMPANY_ID_FOR_STORE_PORTAL, // Using default company ID for prototype
+          storeId: storeId,
+          storePasskey: passkey,
+        }),
+      });
 
-    if (store && store.passkey === passkey) {
-      sessionStorage.setItem(`authenticatedStore_${storeId}`, 'true');
-      toast({
-        title: "Login Successful",
-        description: `Welcome to ${store.name} terminal.`,
-      });
-      router.replace(`/storeportal/${storeId}/billing`);
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Login Failed",
-        description: "Invalid store passkey. Please try again.",
-      });
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        sessionStorage.setItem(`authenticatedStore_${storeId}`, 'true');
+        toast({
+          title: "Login Successful",
+          description: `Welcome to ${data.storeName || storeName} terminal.`,
+        });
+        router.replace(`/storeportal/${storeId}/billing`);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Login Failed",
+          description: data.message || "Invalid store passkey or server error.",
+        });
+      }
+    } catch (error) {
+      console.error("Store login error:", error);
+      toast({ variant: "destructive", title: "Login Error", description: "Could not connect to the server." });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -103,7 +124,7 @@ export default function StoreLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4"> {/* Page handles its own full-screen centering */}
+    <div className="flex min-h-screen flex-col items-center justify-center p-4">
       <div className="flex flex-col items-center mb-8">
         <Image 
           src="https://placehold.co/128x128.png" 

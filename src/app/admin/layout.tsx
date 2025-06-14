@@ -31,20 +31,20 @@ export default function AdminLayout({
 
     setIsLoadingAuth(true);
     const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-    const userRole = localStorage.getItem('userRole'); // Role is stored upon login
+    const userRole = localStorage.getItem('userRole');
+    // const companyId = localStorage.getItem('companyId'); // Company ID is now stored
 
-    if (token && userRole === ADMIN_ROLE) {
+    if (token && userRole === ADMIN_ROLE) { // Basic check, could add companyId check if needed
       setIsAuthenticated(true);
     } else {
       setIsAuthenticated(false);
-      // If token exists but role is not admin, or no token, clear all auth-related local storage
       localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
       localStorage.removeItem('userId');
       localStorage.removeItem('userName');
       localStorage.removeItem('userRole');
       localStorage.removeItem('companyId');
-      localStorage.removeItem('assignedStoreIds'); // Clear employee-specific data too
-      router.replace('/'); // Redirect to main landing page (which handles login)
+      localStorage.removeItem('assignedStoreIds');
+      router.replace('/');
     }
     setIsLoadingAuth(false);
   }, [router, hasMounted]);
@@ -82,7 +82,7 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null; 
   }
 
   return <AppShell>{children}</AppShell>;

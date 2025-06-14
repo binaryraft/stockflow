@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
-import { LogIn, XCircle } from 'lucide-react';
+import { LogIn, XCircle, Mail, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
@@ -22,10 +24,8 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
-
-  // Use states for input fields if we were to make them dynamic
-  // const [email, setEmail] = useState('admin@stockflow.app');
-  // const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   useEffect(() => {
     setHasMounted(true);
@@ -42,22 +42,19 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
     }
   }, [router, hasMounted, onLoginSuccess]);
 
-  const handleLogin = async () => {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!hasMounted) return;
     setIsSubmitting(true);
 
     try {
-      // In a real form, these would come from state linked to input fields
-      const adminEmail = 'admin@stockflow.app';
-      const adminPassword = 'password123';
-
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           loginType: 'admin',
-          email: adminEmail, // Use dynamic email if form exists
-          password: adminPassword, // Use dynamic password if form exists
+          email: email,
+          password: password,
         }),
       });
 
@@ -68,7 +65,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
         localStorage.setItem('userId', data.userId);
         localStorage.setItem('userName', data.userName || 'Admin');
         localStorage.setItem('userRole', data.role || 'admin');
-        localStorage.setItem('companyId', data.companyId || 'comp_default_001'); // Store companyId
+        localStorage.setItem('companyId', data.companyId);
 
         toast({ title: "Login Successful", description: `Welcome, ${data.userName || 'Admin'}!` });
         router.replace('/admin');
@@ -122,20 +119,44 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel }: AdminLoginEmbed
       <Card className="w-full max-w-sm shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Admin Login</CardTitle>
-          <CardDescription>Access the administration panel. <br/> (Demo: admin@stockflow.app / password123)</CardDescription>
+          <CardDescription>Access the administration panel.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-           <p className="text-sm text-muted-foreground text-center">
-            For this demo, click the button below to log in as admin.
-          </p>
-          {/* Future: Add actual input fields here for email and password */}
-        </CardContent>
-        <CardFooter>
-          <Button onClick={handleLogin} className="w-full" disabled={isSubmitting}>
-            <LogIn className="mr-2 h-5 w-5" />
-            {isSubmitting ? 'Logging In...' : 'Login as Admin'}
-          </Button>
-        </CardFooter>
+        <form onSubmit={handleLogin}>
+          <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-email">
+                <Mail className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Email
+              </Label>
+              <Input
+                id="admin-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-password">
+                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password
+              </Label>
+              <Input
+                id="admin-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button type="submit" className="w-full" disabled={isSubmitting}>
+              <LogIn className="mr-2 h-5 w-5" />
+              {isSubmitting ? 'Logging In...' : 'Login as Admin'}
+            </Button>
+          </CardFooter>
+        </form>
       </Card>
     </div>
   );

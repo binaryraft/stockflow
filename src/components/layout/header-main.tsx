@@ -33,7 +33,8 @@ export function HeaderMain() {
       const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
       const name = localStorage.getItem('userName');
       const role = localStorage.getItem('userRole');
-      setIsUserLoggedIn(!!token);
+      // const companyId = localStorage.getItem('companyId');
+      setIsUserLoggedIn(!!token); // User is logged in if token exists
       setUserName(name);
       setUserRole(role);
     }
@@ -41,7 +42,7 @@ export function HeaderMain() {
 
   useEffect(() => {
     setHasMounted(true);
-    updateAuthState(); // Initial check
+    updateAuthState();
   }, []);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export function HeaderMain() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', handleStorageChange); // Check on focus as well
+    window.addEventListener('focus', handleStorageChange);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -74,7 +75,7 @@ export function HeaderMain() {
     setUserRole(null);
 
     Object.keys(sessionStorage).forEach(key => {
-      if (key.startsWith('authenticatedStore_') || key.startsWith('currentStaff_')) {
+      if (key.startsWith('authenticatedStore_')) {
         sessionStorage.removeItem(key);
       }
     });
@@ -110,13 +111,13 @@ export function HeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0">
               <nav className="grid gap-2 text-lg font-medium p-4">
                 <Link
-                  href={userRole === 'admin' ? "/admin" : "/"} // Redirect to admin if admin, else homepage
+                  href={userRole === 'admin' ? "/admin" : "/"}
                   className="flex items-center gap-2 text-lg font-semibold mb-4"
                 >
                   <Package2 className="h-6 w-6 text-primary" />
                   <span className="">{APP_NAME}</span>
                 </Link>
-                {NAV_LINKS.map(link => ( // Assuming NAV_LINKS are for admin. Employee nav would be different.
+                {userRole === 'admin' && NAV_LINKS.map(link => ( 
                     <Link
                         key={link.href}
                         href={link.href}
@@ -126,6 +127,7 @@ export function HeaderMain() {
                         {link.label}
                     </Link>
                 ))}
+                {/* Add employee-specific nav links here if needed */}
               </nav>
             </SheetContent>
           </Sheet>
@@ -163,6 +165,7 @@ export function HeaderMain() {
                   <DropdownMenuSeparator />
                 </>
               )}
+              {/* Add employee-specific profile/settings links here if needed */}
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive focus:bg-destructive/10">
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
@@ -171,7 +174,7 @@ export function HeaderMain() {
           </DropdownMenu>
         ) : (
           <Button asChild variant="outline" size="sm">
-            <Link href="/">Login</Link> {/* Landing page handles showing login options */}
+            <Link href="/">Login</Link>
           </Button>
         )}
       </div>

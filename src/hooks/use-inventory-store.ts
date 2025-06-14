@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, Staff, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types'; // Changed Staff to User
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
@@ -22,14 +22,14 @@ interface InventoryState {
   products: Product[];
   bills: Bill[];
   categories: Category[];
-  staffs: Staff[];
+  staffs: User[]; // Changed from Staff[] to User[]
   stores: Store[];
   userProfile: UserProfile;
   messagesByStore: Record<string, ChatMessage[]>;
 
   // Product methods
-  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => Product;
-  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => void;
+  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string }) => Product;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => void;
   deleteProduct: (productId: string) => void;
   getProductById: (productId: string) => Product | undefined;
   getProductByName: (name: string) => Product | undefined;
@@ -41,7 +41,7 @@ interface InventoryState {
 
   // Bill methods
   addBill: (
-    billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName'> & { billedByStaffId?: string; storeId?: string; },
+    billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName' | 'companyId'> & { billedByStaffId?: string; storeId?: string; companyId: string; },
     items: Omit<BillItem, 'id'|'productName'>[]
   ) => Bill | null;
   deleteBill: (billId: string) => void;
@@ -55,17 +55,17 @@ interface InventoryState {
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
 
-  // Staff methods
-  addStaff: (staffData: Omit<Staff, 'id'>) => Staff | null;
-  updateStaff: (staffId: string, staffData: Partial<Omit<Staff, 'id'>>) => void;
+  // Staff (User) methods
+  addStaff: (staffData: Omit<User, 'id' | 'role'> & {companyId: string}) => User | null; // Role will be 'employee'
+  updateStaff: (staffId: string, staffData: Partial<Omit<User, 'id' | 'role' | 'companyId'>>) => void;
   deleteStaff: (staffId: string) => void;
-  getStaffById: (staffId: string) => Staff | undefined;
-  getAllStaff: () => Staff[];
-  getStaffDetailsByIds: (staffIds: string[]) => Staff[];
+  getStaffById: (staffId: string) => User | undefined; // Changed return type
+  getAllStaff: () => User[]; // Changed return type
+  getStaffDetailsByIds: (staffIds: string[]) => User[]; // Changed return type
 
   // Store methods
-  addStore: (storeData: Omit<Store, 'id'>) => Store | null;
-  updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id'>>) => void;
+  addStore: (storeData: Omit<Store, 'id' | 'companyId'> & {companyId: string}) => Store | null;
+  updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id' | 'companyId'>>) => void;
   deleteStore: (storeId: string) => void;
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
@@ -78,14 +78,14 @@ interface InventoryState {
   canAddStaff: () => boolean;
 
   // Dashboard selectors
-  getDailySalesAndExpenses: (days: number) => Array<{ date: string; sales: number; expenses: number }>;
-  getTopSellingProductsByRevenue: (limit: number) => Array<{ name: string; revenue: number }>;
-  getRecentExpenseBillsWithPotentialCoverage: (limit: number) => ExpenseBillWithCoverage[];
-  getExpenseSummaryStats: () => ExpenseSummary;
-  getOverallFinancialSummary: () => FinancialSummary;
-  getTodaysFinancialSummary: () => TodaysFinancialSummary;
-  getTopProfitableProducts: (limit: number) => ProductProfitabilityData[];
-  getProductLedgerSummary: () => ProductLedgerEntry[];
+  getDailySalesAndExpenses: (days: number, companyId?: string) => Array<{ date: string; sales: number; expenses: number }>;
+  getTopSellingProductsByRevenue: (limit: number, companyId?: string) => Array<{ name: string; revenue: number }>;
+  getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId?: string) => ExpenseBillWithCoverage[];
+  getExpenseSummaryStats: (companyId?: string) => ExpenseSummary;
+  getOverallFinancialSummary: (companyId?: string) => FinancialSummary;
+  getTodaysFinancialSummary: (companyId?: string) => TodaysFinancialSummary;
+  getTopProfitableProducts: (limit: number, companyId?: string) => ProductProfitabilityData[];
+  getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
 
 
   // Chat methods
@@ -155,6 +155,9 @@ export const useInventoryStore = create<InventoryState>()(
           trackQuantity: productData.trackQuantity, sku: productData.sku,
           expiryDate: productData.expiryDate, description: productData.description,
           variants: productVariants,
+          companyId: productData.companyId, // Assign companyId
+          sgstRate: productData.sgstRate,
+          cgstRate: productData.cgstRate,
         };
 
         const newProduct: Product = {
@@ -193,7 +196,7 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({
           products: state.products.map((p) => {
             if (p.id === productId) {
-              const updatedProduct: Product = { ...p, ...productData } as Product;
+              const updatedProduct: Product = { ...p, ...productData, companyId: p.companyId } as Product; // Ensure companyId is preserved
 
               if (productData.variants !== undefined) {
                 updatedProduct.variants = productData.variants.map((variantData, variantIdx) => {
@@ -259,15 +262,9 @@ export const useInventoryStore = create<InventoryState>()(
       deleteProduct: (productId: string) => {
         set((state) => {
           const updatedProducts = state.products.filter((p) => p.id !== productId);
-          const updatedBills = state.bills.map(bill => {
-            const items = bill.items.filter(item => item.productId !== productId);
-            if (items.length === 0 && bill.items.length > 0) {
-              return { ...bill, items, totalAmount: 0 };
-            }
-            const totalAmount = items.reduce((acc, item) => acc + ((bill.type === 'buy' ? item.costPrice : item.sellPrice) * item.quantity), 0);
-            return { ...bill, items, totalAmount };
-          }).filter(bill => bill !== null) as Bill[];
-          return { products: updatedProducts, bills: updatedBills };
+          // Note: Bill items refer to products by ID, but deletion doesn't cascade to bill items in this model.
+          // This is acceptable for a prototype. A real backend might handle this differently (e.g., soft delete, disallow delete if referenced).
+          return { products: updatedProducts };
         });
       },
 
@@ -308,13 +305,13 @@ export const useInventoryStore = create<InventoryState>()(
           return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };
         }
 
-        const relevantStockLayers = targetStoreId 
+        const relevantStockLayers = targetStoreId
             ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId)
-            : sku.stockLayers; // If no targetStoreId, consider all layers (for global views)
+            : sku.stockLayers;
 
 
         if (product.trackQuantity === false) {
-          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; 
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0];
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -362,12 +359,13 @@ export const useInventoryStore = create<InventoryState>()(
         let tempProducts = JSON.parse(JSON.stringify(get().products)) as Product[];
         let productsUpdated = false;
         const storeIdForBill = billData.storeId;
+        const companyIdForBill = billData.companyId;
 
         for (const itemData of billItemsData) {
-          const productIndex = tempProducts.findIndex(p => p.id === itemData.productId);
+          const productIndex = tempProducts.findIndex(p => p.id === itemData.productId && p.companyId === companyIdForBill);
 
           if (productIndex === -1 && !itemData.productId.startsWith('SERVICE_ITEM_')) {
-            console.error(`Product not found for ID: ${itemData.productId} in addBill. Skipping item.`);
+            console.error(`Product not found for ID: ${itemData.productId} in company ${companyIdForBill}. Skipping item.`);
             continue;
           }
           const product = productIndex !== -1 ? tempProducts[productIndex] : null;
@@ -384,7 +382,7 @@ export const useInventoryStore = create<InventoryState>()(
 
           if (product) {
             const selectedOpts = itemData.selectedVariantOptions || {};
-            const currentProductRef = tempProducts[productIndex]; // Use the one from tempProducts
+            const currentProductRef = tempProducts[productIndex];
             if (!currentProductRef) { console.error("Product ref disappeared in tempProducts"); continue; }
 
             const stringifiedTargetOptions = JSON.stringify(Object.fromEntries(Object.entries(selectedOpts).sort()));
@@ -429,7 +427,6 @@ export const useInventoryStore = create<InventoryState>()(
                   const sellFromThisLayer = Math.min(quantityToSell, layer.quantity);
                   costOfGoodsSoldThisItem += sellFromThisLayer * layer.costPrice;
 
-                  // Update the original layer in tempProducts
                   const originalSku = tempProducts[productIndex].productSKUs.find(s => s.id === sku!.id);
                   const originalLayer = originalSku?.stockLayers.find(l => l.id === layer.id);
                   if (originalLayer) {
@@ -487,15 +484,16 @@ export const useInventoryStore = create<InventoryState>()(
           totalAmount = newBillItems.reduce((acc, item) => acc + (item.quantity * (item.sellPrice || 0)), 0);
         }
 
-        const staffMember = billData.billedByStaffId ? get().getStaffById(billData.billedByStaffId) : undefined;
+        const staffUser = billData.billedByStaffId ? get().getStaffById(billData.billedByStaffId) : undefined;
         const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
 
         const newBill: Bill = {
           id: newBillId, type: billData.type, date: currentDate.toISOString(), timestamp: billTimestamp,
           vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
           items: newBillItems, totalAmount, notes: billData.notes, paymentStatus: billData.paymentStatus,
-          billedByStaffId: staffMember?.id, billedByStaffName: staffMember?.name,
+          billedByStaffId: staffUser?.id, billedByStaffName: staffUser?.name,
           storeId: storeLocation?.id, storeName: storeLocation?.name,
+          companyId: companyIdForBill,
         };
 
         set((state) => ({ bills: [newBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
@@ -549,13 +547,13 @@ export const useInventoryStore = create<InventoryState>()(
       addStaff: (staffData) => {
         const plan = get().getActiveSubscriptionPlan();
         if (!plan || get().staffs.length >= plan.maxEmployees) return null;
-        const newStaff: Staff = { id: generateId(), ...staffData };
+        const newStaff: User = { id: generateId(), role: 'employee', ...staffData };
         set((state) => ({ staffs: [...state.staffs, newStaff] }));
         return newStaff;
       },
       updateStaff: (staffId, staffData) => {
         set((state) => ({
-          staffs: state.staffs.map((s) => (s.id === staffId ? { ...s, ...staffData } : s)),
+          staffs: state.staffs.map((s) => (s.id === staffId ? { ...s, ...staffData, role: 'employee', companyId: s.companyId } : s)),
         }));
       },
       deleteStaff: (staffId: string) => {
@@ -571,7 +569,7 @@ export const useInventoryStore = create<InventoryState>()(
       getAllStaff: () => get().staffs,
       getStaffDetailsByIds: (staffIds: string[]) => {
         const allStaff = get().staffs;
-        return staffIds.map(id => allStaff.find(s => s.id === id)).filter(s => !!s) as Staff[];
+        return staffIds.map(id => allStaff.find(s => s.id === id)).filter(s => !!s) as User[];
       },
 
 
@@ -588,7 +586,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       updateStore: (storeId, storeData) => {
         set((state) => ({
-          stores: state.stores.map((s) => (s.id === storeId ? { ...s, ...storeData } : s)),
+          stores: state.stores.map((s) => (s.id === storeId ? { ...s, ...storeData, companyId: s.companyId } : s)),
         }));
       },
       deleteStore: (storeId: string) => {
@@ -596,7 +594,7 @@ export const useInventoryStore = create<InventoryState>()(
           stores: state.stores.filter((s) => s.id !== storeId),
           staffs: state.staffs.map(staff => ({
             ...staff,
-            accessibleStoreIds: staff.accessibleStoreIds.filter(id => id !== storeId)
+            assignedStoreIds: (staff.assignedStoreIds || []).filter(id => id !== storeId)
           }))
         }));
       },
@@ -646,7 +644,7 @@ export const useInventoryStore = create<InventoryState>()(
       getLowStockProductCount: (threshold: number) => {
         return get().products.reduce((count, product) => {
           if (product.trackQuantity) {
-            const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, undefined).totalStock ?? 0), 0); // Global low stock check
+            const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, undefined).totalStock ?? 0), 0);
             if (totalStock > 0 && totalStock < threshold) {
               return count + 1;
             }
@@ -655,8 +653,11 @@ export const useInventoryStore = create<InventoryState>()(
         }, 0);
       },
 
-      getDailySalesAndExpenses: (days) => {
-        const bills = get().bills;
+      getDailySalesAndExpenses: (days, companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
         const dailyDataMap: Record<string, { sales: number; expenses: number }> = {};
 
         for (let i = 0; i < days; i++) {
@@ -665,7 +666,7 @@ export const useInventoryStore = create<InventoryState>()(
           dailyDataMap[dateStr] = { sales: 0, expenses: 0 };
         }
 
-        bills.forEach(bill => {
+        billsToConsider.forEach(bill => {
           const billDateStr = format(startOfDay(new Date(bill.date)), 'MMM d');
           if (dailyDataMap[billDateStr]) {
             if (bill.type === 'sell') {
@@ -675,13 +676,16 @@ export const useInventoryStore = create<InventoryState>()(
             }
           }
         });
-        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse(); // reverse to have oldest first
+        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse();
       },
-      getTopSellingProductsByRevenue: (limit: number) => {
-        const bills = get().bills;
+      getTopSellingProductsByRevenue: (limit: number, companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
         const productRevenue: Record<string, { name: string; revenue: number }> = {};
 
-        bills.forEach(bill => {
+        billsToConsider.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
@@ -697,8 +701,12 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, limit);
       },
-      getRecentExpenseBillsWithPotentialCoverage: (limit: number) => {
-        const expenseBills = get().bills.filter(bill => bill.type === 'buy')
+      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+        const expenseBills = billsToConsider.filter(bill => bill.type === 'buy')
           .sort((a, b) => b.timestamp - a.timestamp);
         return expenseBills.slice(0, limit).map(bill => {
           const totalCost = bill.totalAmount;
@@ -706,18 +714,21 @@ export const useInventoryStore = create<InventoryState>()(
              const product = get().getProductById(item.productId);
              if (product && product.trackQuantity === false) {
                 const defaultSku = product.productSKUs.find(s => Object.keys(s.optionValues).length === 0);
-                const skuDetails = get().getSkuDetails(defaultSku, bill.storeId); // Use bill's store context
+                const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
-             // For tracked items, item.sellPrice on an expense bill is the intended sell price for that batch's stock layer
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
           return { ...bill, totalCost, potentialRevenue, coverageStatus };
         });
       },
-      getExpenseSummaryStats: (): ExpenseSummary => {
-        const expenseBills = get().bills.filter(bill => bill.type === 'buy');
+      getExpenseSummaryStats: (companyId): ExpenseSummary => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+        const expenseBills = billsToConsider.filter(bill => bill.type === 'buy');
         let totalCoveredExpenseValue = 0;
         let totalUncoveredExpenseValue = 0;
         let totalPotentialProfitOnCoveredExpenses = 0;
@@ -752,11 +763,14 @@ export const useInventoryStore = create<InventoryState>()(
           coveredBillCount, uncoveredBillCount,
         };
       },
-      getOverallFinancialSummary: (): FinancialSummary => {
-        const bills = get().bills;
+      getOverallFinancialSummary: (companyId): FinancialSummary => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
         let totalRevenue = 0; let totalCOGS = 0; let totalExpenses = 0;
 
-        bills.forEach(bill => {
+        billsToConsider.forEach(bill => {
           if (bill.type === 'sell') {
             totalRevenue += bill.totalAmount;
             bill.items.forEach(item => {
@@ -773,12 +787,16 @@ export const useInventoryStore = create<InventoryState>()(
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
 
-      getTodaysFinancialSummary: (): TodaysFinancialSummary => {
-        const bills = get().bills.filter(bill => isToday(new Date(bill.date)));
+      getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => {
+         let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+        const todaysBills = billsToConsider.filter(bill => isToday(new Date(bill.date)));
         let totalRevenue = 0; let totalCOGS = 0; let totalExpenses = 0;
         let transactionsToday = 0; let defectivesToday = 0;
 
-        bills.forEach(bill => {
+        todaysBills.forEach(bill => {
           transactionsToday++;
           if (bill.type === 'sell') {
             totalRevenue += bill.totalAmount;
@@ -802,9 +820,13 @@ export const useInventoryStore = create<InventoryState>()(
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, transactionsToday, defectivesToday };
       },
 
-      getTopProfitableProducts: (limit: number): ProductProfitabilityData[] => {
+      getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
         const productFinancials: Record<string, { name: string; revenue: number; cogs: number; profit: number }> = {};
-        get().bills.forEach(bill => {
+        billsToConsider.forEach(bill => {
           if (bill.type === 'sell') {
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
@@ -831,15 +853,32 @@ export const useInventoryStore = create<InventoryState>()(
           .slice(0, limit);
       },
 
-      getProductLedgerSummary: (): ProductLedgerEntry[] => {
-        const products = get().products;
-        const bills = get().bills;
+      getProductLedgerSummary: (params): ProductLedgerEntry[] => {
+        const { companyId, startDate, endDate } = params || {};
+        let productsToConsider = get().products;
+        let billsToConsider = get().bills;
+
+        if (companyId) {
+          productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
+          billsToConsider = billsToConsider.filter(b => b.companyId === companyId);
+        }
+        
+        if (startDate && endDate) {
+            const start = startOfDay(startDate).getTime();
+            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 -1); // end of day
+            billsToConsider = billsToConsider.filter(bill => {
+                const billTimestamp = new Date(bill.timestamp).getTime();
+                return billTimestamp >= start && billTimestamp <= end;
+            });
+        }
+
+
         const ledgerMap: Record<string, Omit<ProductLedgerEntry, 'productId' | 'productName' | 'currentStock' | 'category'>> = {};
 
-        bills.forEach(bill => {
+        billsToConsider.forEach(bill => {
           bill.items.forEach(item => {
             const productId = item.productId;
-            if (productId.startsWith('SERVICE_ITEM_')) return; // Skip service items
+            if (productId.startsWith('SERVICE_ITEM_')) return;
 
             if (!ledgerMap[productId]) {
               ledgerMap[productId] = {
@@ -864,7 +903,7 @@ export const useInventoryStore = create<InventoryState>()(
           });
         });
 
-        return products.map(product => {
+        return productsToConsider.map(product => {
           const summary = ledgerMap[product.id] || {
             totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
           };
@@ -941,7 +980,7 @@ export const useInventoryStore = create<InventoryState>()(
               state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.STARTER;
               storeUpdated = true;
             }
-             state.userProfile.dataMode = state.userProfile.dataMode || 'local'; // Ensure dataMode exists
+             state.userProfile.dataMode = state.userProfile.dataMode || 'local';
           }
 
           if (!Array.isArray(state.categories)) { state.categories = []; storeUpdated = true; }
@@ -960,7 +999,7 @@ export const useInventoryStore = create<InventoryState>()(
             state.products = state.products.map(p_any => {
               if (!p_any || typeof p_any !== 'object' || !p_any.id || !p_any.name) return null;
               let p = { ...p_any } as Product;
-
+              p.companyId = p.companyId || "comp_default_001"; // Default company ID if missing
               p.trackQuantity = typeof p.trackQuantity === 'boolean' ? p.trackQuantity : true;
               p.variants = Array.isArray(p.variants) ? p.variants.map(v_any => {
                 if(!v_any || typeof v_any !== 'object') return null;
@@ -985,7 +1024,7 @@ export const useInventoryStore = create<InventoryState>()(
                     layer.purchaseDate = layer.purchaseDate || new Date(0).toISOString();
                     layer.purchaseBillId = layer.purchaseBillId || 'unknown_hydrated';
                     layer.id = layer.id || generateId();
-                    layer.storeId = layer.storeId || undefined; // Ensure storeId exists
+                    layer.storeId = layer.storeId || undefined;
                     return layer;
                 }).filter(l => l !== null) : [];
 
@@ -999,7 +1038,6 @@ export const useInventoryStore = create<InventoryState>()(
                   const defaultSku: ProductSKU = {
                     id: generateId(), optionValues: {}, skuIdentifier: defaultSkuIdentifier, stockLayers: [],
                   };
-                  // if old structure had direct price/stock, migrate to a stock layer for non-tracked
                   if (p.trackQuantity === false && (p as any).costPriceForNonTracked !== undefined) {
                      defaultSku.stockLayers.push({
                         id: generateId(), purchaseBillId: 'hydrated_nontracked_price', purchaseDate: new Date(0).toISOString(),
@@ -1023,6 +1061,7 @@ export const useInventoryStore = create<InventoryState>()(
             state.bills = state.bills.map(bill_any => {
               if (!bill_any || typeof bill_any !== 'object') return null;
               const bill = { ...bill_any } as Bill;
+              bill.companyId = bill.companyId || "comp_default_001"; // Default company ID
               bill.items = Array.isArray(bill.items) ? bill.items.map(item_any => {
                 if (!item_any || typeof item_any !== 'object') return null;
                 const item = { ...item_any } as BillItem;
@@ -1046,12 +1085,19 @@ export const useInventoryStore = create<InventoryState>()(
           }
 
           if(!Array.isArray(state.staffs)) { state.staffs = []; storeUpdated = true;}
-          state.staffs = state.staffs.map(s => (s && typeof s === 'object' ? s : null)).filter(s => s !== null) as Staff[];
+          state.staffs = state.staffs.map(s_any => {
+             if (!s_any || typeof s_any !== 'object') return null;
+             const s = { ...s_any } as User;
+             s.companyId = s.companyId || "comp_default_001"; // Default company
+             s.role = s.role || 'employee'; // Default role
+             return s;
+          }).filter(s => s !== null) as User[];
 
           if(!Array.isArray(state.stores)) { state.stores = []; storeUpdated = true;}
           state.stores = state.stores.map(s_any => {
             if (!s_any || typeof s_any !== 'object') return null;
             const s = { ...s_any } as Store;
+            s.companyId = s.companyId || "comp_default_001"; // Default company
             s.allowedOperations = Array.isArray(s.allowedOperations) && s.allowedOperations.length > 0 ? s.allowedOperations : ['sell', 'buy', 'return'];
             return s;
           }).filter(s => s !== null) as Store[];
@@ -1098,5 +1144,3 @@ if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
       (useInventoryStore.getState() as any).__hydrated = true;
   }
 }
-
-    
