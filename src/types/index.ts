@@ -52,11 +52,11 @@ export interface BillItem {
   productName: string;
   quantity: number;
   costPrice: number; // For 'buy' it's purchase cost, for 'sell' it's COGS
-  sellPrice: number; // For 'sell'/'return' it's transaction price, for 'buy' it's the intended sell price of the batch
+  sellPrice: number; // For 'sell'/'return' it's transaction price (pre-tax), for 'buy' it's the intended sell price of the batch
   isDefective?: boolean;
   selectedVariantOptions?: Record<string, string>;
-  sgstAmount?: number;
-  cgstAmount?: number;
+  sgstAmount?: number; // Calculated SGST for this item
+  cgstAmount?: number; // Calculated CGST for this item
 }
 
 export interface Bill {
@@ -67,10 +67,11 @@ export interface Bill {
   vendorOrCustomerName?: string;
   customerPhone?: string;
   items: BillItem[];
-  totalAmount: number; // This should be the grand total including taxes
+  totalAmount: number; // This is the grand total including taxes
   subTotal?: number; // Total before taxes
-  totalSGST?: number;
-  totalCGST?: number;
+  totalSGST?: number; // Total SGST for the bill
+  totalCGST?: number; // Total CGST for the bill
+  isEstimate?: boolean; // Flag if the bill (especially sales) is an estimate
   notes?: string;
   paymentStatus?: 'paid' | 'unpaid';
   billedByStaffId?: string; // User ID of the employee
@@ -100,8 +101,6 @@ export interface User {
   password?: string; // Plaintext for prototype, should be hashed
   role: 'admin' | 'employee';
   assignedStoreIds?: string[]; // Employee: list of store IDs they are assigned to work at
-  // 'passkey' field removed, using 'password' for direct employee login now.
-  // Employee passkey for billing operations will be their main password.
 }
 
 export interface Store {
@@ -112,7 +111,7 @@ export interface Store {
   phone: string;
   email: string;
   passkey: string; // For store terminal login
-  allowedStaffIds: string[]; // User IDs of employees explicitly allowed to operate this terminal after their own login. If empty, any employee of the company might be able to (logic TBD).
+  allowedStaffIds: string[]; 
   allowedOperations: BillMode[];
 }
 
@@ -136,7 +135,7 @@ export interface UserProfile {
 export interface ChatMessage {
   id: string;
   storeId: string;
-  senderId: 'admin' | string; // 'admin' or a User ID
+  senderId: 'admin' | string; 
   senderName: string;
   text: string;
   timestamp: number;

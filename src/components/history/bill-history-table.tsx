@@ -33,16 +33,17 @@ import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 
 
-const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[]): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
+const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
   if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
-  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales', titleColor: 'text-primary' };
+  if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-primary/70 text-primary-foreground hover:bg-primary/60', name: 'Estimate', titleColor: 'text-primary/80' };
+  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
   if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return', titleColor: 'text-amber-600 dark:text-amber-500' };
 };
 
 const getBillTypeName = (bill: Bill): string => {
-  return getBillTypeIconAndColor(bill.type, bill.items).name;
+  return getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate).name;
 };
 
 const getPartyDetailsTitle = (billType?: BillMode): string => {
@@ -60,9 +61,14 @@ const getPartyNameLabel = (billType?: BillMode): string => {
 
 interface BillHistoryTableProps {
   filterByStoreId?: string;
+  timePeriodFilter: TimePeriodFilterOption;
+  customStartDate?: Date;
+  customEndDate?: Date;
 }
+export type TimePeriodFilterOption = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'thisYear' | 'custom';
 
-export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
+
+export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate }: BillHistoryTableProps) {
   const {
     bills,
     userProfile,
@@ -89,14 +95,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
   
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
   
-  type BillTypeFilter = 'all' | BillMode;
+  type BillTypeFilter = 'all' | BillMode | 'estimate'; // Added 'estimate'
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
-
-  type TimePeriodFilter = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'thisYear' | 'custom';
-  const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilter>('all');
-  const [customStartDate, setCustomStartDate] = useState<Date | undefined>(undefined);
-  const [customEndDate, setCustomEndDate] = useState<Date | undefined>(undefined);
-
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     if (!getProductById) { 
@@ -121,7 +121,6 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
     }
     
-    const now = new Date();
     if (timePeriodFilter === 'today') {
       processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
     } else if (timePeriodFilter === 'thisWeek') {
@@ -143,7 +142,11 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
 
 
     if (billTypeFilter !== 'all') {
-      processBills = processBills.filter(bill => bill.type === billTypeFilter);
+      if (billTypeFilter === 'estimate') {
+        processBills = processBills.filter(bill => bill.type === 'sell' && bill.isEstimate === true);
+      } else {
+        processBills = processBills.filter(bill => bill.type === billTypeFilter && bill.isEstimate !== true);
+      }
     }
 
     if (searchTerm) {
@@ -301,6 +304,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`);
       printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
       printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
+      printWindow.document.write(`<h2>${billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE' : (billToPrint.type === 'sell' ? 'TAX INVOICE' : getBillTypeName(billToPrint).toUpperCase())}</h2>`);
       printWindow.document.write('</div>');
 
       printWindow.document.write('<table style="width:100%; margin-bottom: 20px; border:0;"><tr><td style="width:50%; vertical-align:top; border:0;">');
@@ -316,8 +320,10 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write(`<h4>Bill Information</h4>`);
       printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
       printWindow.document.write(`<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`);
-      printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
-      if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy')) {
+      if (!(billToPrint.type === 'sell' && billToPrint.isEstimate)) { // Don't show type if it's already in main header as estimate/invoice
+         printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
+      }
+      if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy') && !billToPrint.isEstimate) {
          printWindow.document.write(`<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`);
       }
       printWindow.document.write('</div>');
@@ -334,6 +340,8 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
       printWindow.document.write('<div class="items-section">');
       printWindow.document.write('<h3>Items</h3>');
       
+      const showTaxDetailsInItems = billToPrint.type === 'sell' && !billToPrint.isEstimate;
+
       if (billToPrint.type === 'buy') { 
         printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Purch. Qty</th><th>Sold Qty</th><th>Rem. Qty</th><th>Cost/Unit</th><th>Sell Price (Set)</th><th>Item Total</th></tr></thead><tbody>');
         billToPrint.items.forEach((item, index) => {
@@ -364,10 +372,21 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * costPrice).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
-      } else if (billToPrint.type === 'sell') {
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
+      } else { // Sell or Return
+        const itemSubTotalColName = showTaxDetailsInItems ? "Subtotal" : "Item Total";
+        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th>');
+        if (showTaxDetailsInItems) {
+          printWindow.document.write('<th>SGST</th><th>CGST</th>');
+        }
+        printWindow.document.write(`<th class="text-right">${itemSubTotalColName}</th></tr></thead><tbody>`);
+        
         billToPrint.items.forEach((item, index) => {
             const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
+            const itemPreTaxSubtotal = item.quantity * sellPrice;
+            const itemSgst = item.sgstAmount || 0;
+            const itemCgst = item.cgstAmount || 0;
+            const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
+
             printWindow.document.write('<tr>');
             printWindow.document.write(`<td>${index + 1}</td>`);
             printWindow.document.write(`<td>${item.productName}`);
@@ -376,33 +395,21 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
               printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
               printWindow.document.write('</span>');
             }
-            printWindow.document.write('</td>');
-            printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
-            printWindow.document.write(`<td class="text-right">₹${sellPrice.toFixed(2)}</td>`);
-            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * sellPrice).toFixed(2)}</td>`);
-            printWindow.document.write('</tr>');
-        });
-      } else { // Return bill
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th><th>Item Total</th></tr></thead><tbody>');
-        billToPrint.items.forEach((item, index) => {
-            const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-            printWindow.document.write('<tr>');
-            printWindow.document.write(`<td>${index + 1}</td>`);
-            printWindow.document.write(`<td>${item.productName}`);
-            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-              printWindow.document.write('<span class="variant-options">');
-              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
-              printWindow.document.write('</span>');
-            }
-            if (item.isDefective) {
-              printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
-            } else {
-              printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
+            if (billToPrint.type === 'return') {
+               if (item.isDefective) {
+                printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
+              } else {
+                printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
+              }
             }
             printWindow.document.write('</td>');
             printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
             printWindow.document.write(`<td class="text-right">₹${sellPrice.toFixed(2)}</td>`);
-            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * sellPrice).toFixed(2)}</td>`);
+            if (showTaxDetailsInItems) {
+              printWindow.document.write(`<td class="text-right">₹${itemSgst.toFixed(2)}</td>`);
+              printWindow.document.write(`<td class="text-right">₹${itemCgst.toFixed(2)}</td>`);
+            }
+            printWindow.document.write(`<td class="text-right font-medium">₹${(showTaxDetailsInItems ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</td>`);
             printWindow.document.write('</tr>');
         });
       }
@@ -433,17 +440,15 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
         printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
-      } else if (billToPrint.type === 'sell') {
-         const costOfGoodsSold = billToPrint.items.reduce((acc, item) => acc + ((typeof item.costPrice === 'number' ? item.costPrice : 0) * item.quantity), 0);
-         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #166534;"><strong>Total Sales Amount:</strong></td><td class="text-right" style="border: none; color: #166534;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-         if (costOfGoodsSold > 0) { // Only show COGS and Profit if COGS is calculated
-            const profitFromSale = billToPrint.totalAmount - costOfGoodsSold;
-            const profitColor = profitFromSale >= 0 ? '#166534' : '#b91c1c';
-            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Cost of Goods Sold:</td><td class="text-right" style="border: none;">₹${costOfGoodsSold.toFixed(2)}</td></tr>`);
-            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Profit from this Sale:</td><td class="text-right" style="color:${profitColor}; border: none; font-weight: bold;">₹${profitFromSale.toFixed(2)}</td></tr>`);
+      } else if (billToPrint.type === 'sell' || billToPrint.type === 'return') {
+         if (showTaxDetailsInItems) { // Bill is a Sales Invoice (not estimate)
+            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Subtotal:</td><td class="text-right" style="border: none;">₹${(billToPrint.subTotal || 0).toFixed(2)}</td></tr>`);
+            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Total SGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`);
+            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Total CGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`);
          }
-      } else { 
-         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b45309;"><strong>Total Return Value:</strong></td><td class="text-right" style="border: none; color: #b45309;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
+         const totalRowColor = billToPrint.type === 'sell' ? (billToPrint.isEstimate ? '#1d4ed8' : '#166534') : '#b45309';
+         const totalLabel = billToPrint.type === 'sell' && billToPrint.isEstimate ? 'Estimate Total:' : 'Grand Total:';
+         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: ${totalRowColor};"><strong>${totalLabel}</strong></td><td class="text-right" style="border: none; color: ${totalRowColor};"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
       }
       printWindow.document.write('</table>');
       printWindow.document.write('</div>');
@@ -471,13 +476,13 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             <DialogHeader className="border-b pb-4 mb-4">
               <DialogTitle className={cn(
                   "flex items-center gap-2 text-xl",
-                  getBillTypeIconAndColor(selectedBill.type, selectedBill.items).titleColor
+                  getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor
               )}>
-                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon, { className: cn(getBillTypeIconAndColor(selectedBill.type, selectedBill.items).icon.props.className, "h-6 w-6")})}
-                Bill Details
+                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon, { className: cn(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon.props.className, "h-6 w-6")})}
+                Bill Details {selectedBill.type === 'sell' && selectedBill.isEstimate && "(Estimate)"}
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill)} Bill (ID: <span className="font-mono text-secondary">{selectedBill.id}</span>)
+                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-secondary">{selectedBill.id}</span>)
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
@@ -524,7 +529,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                           <p className="text-xs text-muted-foreground">Bill Type</p>
                           <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
                       </div>
-                      {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && (
+                      {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && !selectedBill.isEstimate && (
                           <div className="space-y-1">
                               <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
                               {isEditingBillDetails ? (
@@ -581,7 +586,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                   </div>
                 )}
                 
-                <Accordion type="single" collapsible className="w-full">
+                <Accordion type="single" collapsible className="w-full" defaultValue="bill-items">
                   <AccordionItem value="bill-items">
                     <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
                       <h4 className="text-md font-semibold text-foreground">
@@ -649,19 +654,29 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                 })}
                               </TableBody>
                             </>
-                          ) : selectedBill.type === 'sell' ? ( 
+                          ) : ( // Sell or Return Bill
                             <>
                               <TableHeader>
                                 <TableRow>
                                   <TableHead className="w-[40%]">Product</TableHead>
                                   <TableHead className="text-right">Qty</TableHead>
                                   <TableHead className="text-right">Price/Unit</TableHead>
+                                  {selectedBill.type==='sell' && !selectedBill.isEstimate && (
+                                    <>
+                                      <TableHead className="text-right">SGST</TableHead>
+                                      <TableHead className="text-right">CGST</TableHead>
+                                    </>
+                                  )}
                                   <TableHead className="text-right">Item Total</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
                                 {selectedBill.items.map(item => {
                                   const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
+                                  const itemPreTaxSubtotal = item.quantity * sellPrice;
+                                  const itemSgst = item.sgstAmount || 0;
+                                  const itemCgst = item.cgstAmount || 0;
+                                  const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
                                   return (
                                   <TableRow key={item.id || item.productId}>
                                     <TableCell className="py-2 align-top w-[40%]">
@@ -673,47 +688,22 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                                             .join('; ')}
                                         </div>
                                       )}
-                                    </TableCell>
-                                    <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
-                                    <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
-                                  </TableRow>
-                                )})}
-                              </TableBody>
-                            </>
-                          ) : ( // Return Bill
-                            <>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[40%]">Product</TableHead>
-                                  <TableHead className="text-right">Qty</TableHead>
-                                  <TableHead className="text-right">Price/Unit</TableHead>
-                                  <TableHead className="text-right">Item Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {selectedBill.items.map(item => {
-                                  const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-                                  return(
-                                  <TableRow key={item.id || item.productId}>
-                                    <TableCell className="py-2 align-top w-[40%]">
-                                      <div>{item.productName}</div>
-                                      {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                        <div className="text-xs text-muted-foreground mt-0.5">
-                                          {Object.entries(item.selectedVariantOptions)
-                                            .map(([key, value]) => `${key}: ${value}`)
-                                            .join('; ')}
-                                        </div>
-                                      )}
-                                      {item.isDefective ? (
+                                       {selectedBill.type === 'return' && item.isDefective && (
                                         <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                                      ) : (
+                                      )}
+                                      {selectedBill.type === 'return' && !item.isDefective && (
                                         <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                                       )}
                                     </TableCell>
                                     <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
                                     <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                                    <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * sellPrice).toFixed(2)}</TableCell>
+                                     {selectedBill.type==='sell' && !selectedBill.isEstimate && (
+                                        <>
+                                          <TableCell className="text-right py-2 align-top">₹{itemSgst.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right py-2 align-top">₹{itemCgst.toFixed(2)}</TableCell>
+                                        </>
+                                    )}
+                                    <TableCell className="text-right font-medium py-2 align-top">₹{(selectedBill.type === 'sell' && !selectedBill.isEstimate ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
                                   </TableRow>
                                 )})}
                               </TableBody>
@@ -748,54 +738,33 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                 <div className="p-4 border rounded-md bg-card shadow-sm">
                   <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
                   <div className="space-y-1 text-sm">
-                      {selectedBill.type === 'buy' ? ( 
-                          <>
-                              <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Total Cost (This Expense Bill):</span>
-                                  <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                              </div>
-                              {(() => {
-                                  const expectedRevenue = selectedBill.items.reduce((acc, item) => {
-                                      const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                                      const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === selectedBill.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-                                      let sellPriceForCalc = 0;
-                                      if (layerForThisBillItem && typeof layerForThisBillItem.sellPrice === 'number') {
-                                          sellPriceForCalc = layerForThisBillItem.sellPrice;
-                                      } else if (typeof item.sellPrice === 'number') {
-                                          sellPriceForCalc = item.sellPrice;
-                                      }
-                                      return acc + (sellPriceForCalc * item.quantity);
-                                  }, 0);
-                                  const expectedProfitOrLoss = expectedRevenue - selectedBill.totalAmount;
-                                  return (
-                                  <>
-                                      <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Expected Revenue (from items in this bill):</span>
-                                          <span className="font-semibold">₹{expectedRevenue.toFixed(2)}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                          <span className="text-muted-foreground">Expected Profit/(Loss) (from items in this bill):</span>
-                                          <span className={cn("font-semibold", expectedProfitOrLoss >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')}>
-                                              ₹{expectedProfitOrLoss.toFixed(2)}
-                                          </span>
-                                      </div>
-                                  </>
-                                  );
-                              })()}
-                          </>
-                      ) : selectedBill.type === 'sell' ? ( 
-                          <>
-                              <div className="flex justify-between">
-                                  <span className="text-muted-foreground">Total Sales Amount:</span>
-                                  <span className="font-semibold text-primary">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                              </div>
-                          </>
-                      ) : ( // Return Bill
+                      {selectedBill.type === 'buy' && ( 
                           <div className="flex justify-between">
-                              <span className="text-muted-foreground">Total Return Value:</span>
-                              <span className="font-semibold text-amber-600 dark:text-amber-500">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                                <span className="text-muted-foreground">Total Cost (Expense Bill):</span>
+                                <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                           </div>
                       )}
+                       {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && (selectedBill.totalSGST ?? 0) > 0 && (selectedBill.totalCGST ?? 0) > 0 && (
+                          <>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Subtotal (Before Tax):</span>
+                                <span className="font-medium">₹{(selectedBill.subTotal || 0).toFixed(2)}</span>
+                            </div>
+                             <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total SGST:</span>
+                                <span className="font-medium">₹{(selectedBill.totalSGST || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground">Total CGST:</span>
+                                <span className="font-medium">₹{(selectedBill.totalCGST || 0).toFixed(2)}</span>
+                            </div>
+                            <Separator className="my-1.5"/>
+                          </>
+                       )}
+                        <div className="flex justify-between font-semibold text-lg">
+                            <span>{selectedBill.type === 'sell' && selectedBill.isEstimate ? 'Estimate Total:' : 'Grand Total:'}</span>
+                            <span className={getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor}>₹{selectedBill.totalAmount.toFixed(2)}</span>
+                        </div>
                   </div>
                 </div>
               </div>
@@ -803,7 +772,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
             <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
               <div className="flex gap-2 mt-2 sm:mt-0">
                  {!isEditingBillDetails && (
-                  <Button variant="outline" onClick={handleEnterEditMode}>
+                  <Button variant="outline" onClick={handleEnterEditMode} disabled={selectedBill.type === 'sell' && selectedBill.isEstimate}>
                     <Edit2 className="mr-2 h-4 w-4" /> Edit
                   </Button>
                 )}
@@ -871,103 +840,22 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
           className="max-w-md w-full md:w-auto bg-background"
         />
         <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-3 w-full md:w-auto">
-            <Select value={timePeriodFilter} onValueChange={(value) => setTimePeriodFilter(value as TimePeriodFilter)}>
-                <SelectTrigger className="w-full md:w-[160px] select-trigger-class bg-background">
-                    <SelectValue placeholder="Filter by period" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="today">Today</SelectItem>
-                    <SelectItem value="thisWeek">This Week</SelectItem>
-                    <SelectItem value="thisMonth">This Month</SelectItem>
-                    <SelectItem value="thisYear">This Year</SelectItem>
-                    <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-            </Select>
-            <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
-                <SelectTrigger className="w-full md:w-[160px] select-trigger-class bg-background">
-                    <SelectValue placeholder="Filter by type" />
-                </SelectTrigger>
-                <SelectContent>
-                    <SelectItem value="all">All Bill Types</SelectItem>
-                    <SelectItem value="sell">Sales Bills</SelectItem>
-                    <SelectItem value="buy">Expense Bills</SelectItem>
-                    <SelectItem value="return">Return Bills</SelectItem>
-                </SelectContent>
-            </Select>
+            {/* Date Filter Placeholder - Implemented in AdminBillingPage */}
         </div>
+        <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
+            <SelectTrigger className="w-full md:w-[180px] select-trigger-class bg-background">
+                <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="all">All Bill Types</SelectItem>
+                <SelectItem value="sell">Sales Invoices</SelectItem>
+                <SelectItem value="estimate">Estimates</SelectItem>
+                <SelectItem value="buy">Expense Bills</SelectItem>
+                <SelectItem value="return">Return Bills</SelectItem>
+            </SelectContent>
+        </Select>
       </div>
 
-      {timePeriodFilter === 'custom' && (
-        <div className="flex flex-col sm:flex-row gap-3 mb-4 p-4 border rounded-lg bg-muted/50 shadow items-end">
-          <div className="flex-1 space-y-1.5 w-full sm:w-auto">
-            <Label htmlFor="customStartDate">Start Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="customStartDate"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal bg-background",
-                    !customStartDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customStartDate ? format(customStartDate, "PPP") : <span>Pick a start date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={customStartDate}
-                  onSelect={setCustomStartDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-          <div className="flex-1 space-y-1.5 w-full sm:w-auto">
-            <Label htmlFor="customEndDate">End Date</Label>
-             <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="customEndDate"
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal bg-background",
-                    !customEndDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {customEndDate ? format(customEndDate, "PPP") : <span>Pick an end date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={customEndDate}
-                  onSelect={setCustomEndDate}
-                  disabled={(date) =>
-                    customStartDate ? date < customStartDate : false
-                  }
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-           <Button 
-              variant="outline"
-              onClick={() => {
-                setCustomStartDate(undefined);
-                setCustomEndDate(undefined);
-                setTimePeriodFilter('all'); 
-              }}
-              className="w-full sm:w-auto bg-background"
-            >
-              Clear Range
-            </Button>
-        </div>
-      )}
 
       <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
@@ -1002,7 +890,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
           <TableBody>
             {filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
-                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items);
+                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
@@ -1050,7 +938,7 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
                   <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
                   <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-center py-3 px-4 w-[100px]">
-                    {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus ? (
+                    {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate ? (
                       <Badge 
                         className={cn(
                             "capitalize text-xs", 
@@ -1121,5 +1009,3 @@ export function BillHistoryTable({ filterByStoreId }: BillHistoryTableProps) {
     </>
   );
 }
-
-    

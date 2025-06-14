@@ -14,7 +14,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -63,6 +63,14 @@ const productFormSchema = z.object({
   initialStock: z.preprocess( 
     (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
+  ),
+  sgstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "SGST rate must be a number" }).min(0, "SGST rate cannot be negative").optional()
+  ),
+  cgstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -214,6 +222,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   const addCategoryToStore = useInventoryStore(state => state.addCategory);
   const getBillsForProduct = useInventoryStore(state => state.getBillsForProduct);
   const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
+  const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001"); // Get companyId
 
   const { toast } = useToast();
   const router = useRouter();
@@ -229,7 +238,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     defaultValues: {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
-      expiryDate: '', variants: [],
+      expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
     },
   });
 
@@ -243,7 +252,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     let defaults: ProductFormData = {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
-      expiryDate: '', variants: [],
+      expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
     };
 
     if (isEditing && initialData) {
@@ -260,8 +269,10 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
         sku: initialData.sku || '',
         costPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.averageCostPrice === 'number') ? defaultSkuForNonVariant.averageCostPrice : undefined,
         sellPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.currentSellPrice === 'number') ? defaultSkuForNonVariant.currentSellPrice : undefined,
-        initialStock: undefined,
+        initialStock: undefined, 
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
+        sgstRate: initialData.sgstRate,
+        cgstRate: initialData.cgstRate,
         variants: initialData.variants?.map(v => ({
           id: v.id, name: v.name,
           options: v.options.map(o => ({ id: o.id, value: o.value }))
@@ -277,7 +288,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
         costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
         initialStock: (routeSearchParamsProp.quantity && !hasVariantsForParamsPreFill) ? parseInt(routeSearchParamsProp.quantity as string) : undefined,
-        expiryDate: '', variants: [],
+        expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       };
     }
     return defaults;
@@ -322,10 +333,12 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       addCategoryToStore(data.category!);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string } = {
       name: data.name, description: data.description, category: data.category,
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
+      sgstRate: data.sgstRate, cgstRate: data.cgstRate,
       variants: productVariantsPayload,
+      companyId: companyId, // Add companyId
     };
     
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
@@ -404,6 +417,23 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
                     <Input id="expiryDate" type="date" {...register("expiryDate")} />
                 </div>
             </div>
+
+            <div className="space-y-3 pt-2">
+              <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1.5">
+                  <Label htmlFor="sgstRate">SGST Rate (%)</Label>
+                  <Input id="sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
+                  {errors.sgstRate && <p className="text-sm text-destructive mt-1">{errors.sgstRate.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="cgstRate">CGST Rate (%)</Label>
+                  <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                  {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
+                </div>
+              </div>
+            </div>
+
 
             <div className="flex items-center space-x-3 pt-2 pb-2">
               <Controller
@@ -625,5 +655,3 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     </Card>
   );
 }
-
-    

@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types'; // Changed Staff to User
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
@@ -22,7 +22,7 @@ interface InventoryState {
   products: Product[];
   bills: Bill[];
   categories: Category[];
-  staffs: User[]; // Changed from Staff[] to User[]
+  staffs: User[]; 
   stores: Store[];
   userProfile: UserProfile;
   messagesByStore: Record<string, ChatMessage[]>;
@@ -41,8 +41,8 @@ interface InventoryState {
 
   // Bill methods
   addBill: (
-    billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName' | 'companyId'> & { billedByStaffId?: string; storeId?: string; companyId: string; },
-    items: Omit<BillItem, 'id'|'productName'>[]
+    billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName' | 'companyId' | 'subTotal' | 'totalSGST' | 'totalCGST'> & { billedByStaffId?: string; storeId?: string; companyId: string; isEstimate?: boolean },
+    items: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'>[]
   ) => Bill | null;
   deleteBill: (billId: string) => void;
   getBillById: (billId: string) => Bill | undefined;
@@ -56,12 +56,12 @@ interface InventoryState {
   searchCategories: (searchTerm: string) => string[];
 
   // Staff (User) methods
-  addStaff: (staffData: Omit<User, 'id' | 'role'> & {companyId: string}) => User | null; // Role will be 'employee'
+  addStaff: (staffData: Omit<User, 'id' | 'role'> & {companyId: string}) => User | null; 
   updateStaff: (staffId: string, staffData: Partial<Omit<User, 'id' | 'role' | 'companyId'>>) => void;
   deleteStaff: (staffId: string) => void;
-  getStaffById: (staffId: string) => User | undefined; // Changed return type
-  getAllStaff: () => User[]; // Changed return type
-  getStaffDetailsByIds: (staffIds: string[]) => User[]; // Changed return type
+  getStaffById: (staffId: string) => User | undefined; 
+  getAllStaff: () => User[]; 
+  getStaffDetailsByIds: (staffIds: string[]) => User[]; 
 
   // Store methods
   addStore: (storeData: Omit<Store, 'id' | 'companyId'> & {companyId: string}) => Store | null;
@@ -155,7 +155,7 @@ export const useInventoryStore = create<InventoryState>()(
           trackQuantity: productData.trackQuantity, sku: productData.sku,
           expiryDate: productData.expiryDate, description: productData.description,
           variants: productVariants,
-          companyId: productData.companyId, // Assign companyId
+          companyId: productData.companyId,
           sgstRate: productData.sgstRate,
           cgstRate: productData.cgstRate,
         };
@@ -196,7 +196,7 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({
           products: state.products.map((p) => {
             if (p.id === productId) {
-              const updatedProduct: Product = { ...p, ...productData, companyId: p.companyId } as Product; // Ensure companyId is preserved
+              const updatedProduct: Product = { ...p, ...productData, companyId: p.companyId } as Product; 
 
               if (productData.variants !== undefined) {
                 updatedProduct.variants = productData.variants.map((variantData, variantIdx) => {
@@ -229,7 +229,7 @@ export const useInventoryStore = create<InventoryState>()(
                   if (defaultSku.stockLayers.length > 0) {
                     defaultSku.stockLayers[0].costPrice = costPrice;
                     defaultSku.stockLayers[0].sellPrice = sellPrice;
-                    defaultSku.stockLayers[0].quantity = 0;
+                    defaultSku.stockLayers[0].quantity = 0; 
                     defaultSku.stockLayers[0].initialQuantity = 0;
                   } else {
                     defaultSku.stockLayers.push({
@@ -262,8 +262,6 @@ export const useInventoryStore = create<InventoryState>()(
       deleteProduct: (productId: string) => {
         set((state) => {
           const updatedProducts = state.products.filter((p) => p.id !== productId);
-          // Note: Bill items refer to products by ID, but deletion doesn't cascade to bill items in this model.
-          // This is acceptable for a prototype. A real backend might handle this differently (e.g., soft delete, disallow delete if referenced).
           return { products: updatedProducts };
         });
       },
@@ -360,15 +358,20 @@ export const useInventoryStore = create<InventoryState>()(
         let productsUpdated = false;
         const storeIdForBill = billData.storeId;
         const companyIdForBill = billData.companyId;
+        const isSalesEstimate = billData.type === 'sell' && billData.isEstimate === true;
+
+        let billSubTotal = 0;
+        let billTotalSGST = 0;
+        let billTotalCGST = 0;
 
         for (const itemData of billItemsData) {
           const productIndex = tempProducts.findIndex(p => p.id === itemData.productId && p.companyId === companyIdForBill);
-
-          if (productIndex === -1 && !itemData.productId.startsWith('SERVICE_ITEM_')) {
+          let product = productIndex !== -1 ? tempProducts[productIndex] : null;
+          
+          if (!product && !itemData.productId.startsWith('SERVICE_ITEM_')) {
             console.error(`Product not found for ID: ${itemData.productId} in company ${companyIdForBill}. Skipping item.`);
             continue;
           }
-          const product = productIndex !== -1 ? tempProducts[productIndex] : null;
 
           if (billData.type === 'buy' && product && product.trackQuantity === false) {
              console.error(`Attempt to add non-tracked product ${product.name} to expense bill.`);
@@ -377,8 +380,10 @@ export const useInventoryStore = create<InventoryState>()(
 
           let sku: ProductSKU | undefined = undefined;
           let billItemCostPrice = typeof itemData.costPrice === 'number' ? itemData.costPrice : 0;
-          let billItemSellPrice = typeof itemData.sellPrice === 'number' ? itemData.sellPrice : 0;
+          let billItemSellPrice = typeof itemData.sellPrice === 'number' ? itemData.sellPrice : 0; // This is pre-tax sell price
           let itemProductNameForBill = product?.name || (itemData.productId.startsWith('SERVICE_ITEM_') ? (itemData.productName || 'Service/Charge') : 'Unknown Product');
+          let itemSgstAmount = 0;
+          let itemCgstAmount = 0;
 
           if (product) {
             const selectedOpts = itemData.selectedVariantOptions || {};
@@ -401,6 +406,14 @@ export const useInventoryStore = create<InventoryState>()(
             }
             itemProductNameForBill = sku.skuIdentifier || get().getSkuIdentifier(currentProductRef.name, selectedOpts);
 
+            if (billData.type === 'sell' && !isSalesEstimate) {
+                const itemSubTotal = billItemSellPrice * itemData.quantity;
+                const sgstRate = currentProductRef.sgstRate || 0;
+                const cgstRate = currentProductRef.cgstRate || 0;
+                itemSgstAmount = (itemSubTotal * sgstRate) / 100;
+                itemCgstAmount = (itemSubTotal * cgstRate) / 100;
+            }
+
 
             if (billData.type === 'buy') {
               if (!currentProductRef.trackQuantity) {
@@ -410,7 +423,7 @@ export const useInventoryStore = create<InventoryState>()(
               const newLayer: StockLayer = {
                 id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
                 initialQuantity: itemData.quantity, quantity: itemData.quantity,
-                costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
+                costPrice: billItemCostPrice, sellPrice: billItemSellPrice, // sellPrice here is for the batch
                 storeId: storeIdForBill,
               };
               sku.stockLayers.push(newLayer);
@@ -438,31 +451,34 @@ export const useInventoryStore = create<InventoryState>()(
                 }
                 if (quantityToSell > 0) {
                   console.error(`Stock ran out for ${itemProductNameForBill} at store ${storeIdForBill}. Remaining to sell: ${quantityToSell}`);
-                  return null;
+                  return null; 
                 }
                 billItemCostPrice = itemData.quantity > 0 ? costOfGoodsSoldThisItem / itemData.quantity : 0;
-              } else {
+              } else { // Non-tracked product sale
                 const skuDetails = get().getSkuDetails(sku, storeIdForBill);
                 billItemCostPrice = skuDetails.averageCostPrice ?? 0;
               }
             } else if (billData.type === 'return') {
               const skuDetails = get().getSkuDetails(sku, storeIdForBill);
-              billItemCostPrice = skuDetails.averageCostPrice ?? 0;
+              billItemCostPrice = skuDetails.averageCostPrice ?? 0; // For COGS adjustment if applicable
               if (currentProductRef.trackQuantity && !itemData.isDefective) {
                 const returnLayer: StockLayer = {
                   id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
                   initialQuantity: itemData.quantity, quantity: itemData.quantity,
-                  costPrice: billItemCostPrice,
-                  sellPrice: billItemSellPrice,
+                  costPrice: billItemCostPrice, // Use average cost as new cost for this restocked layer
+                  sellPrice: billItemSellPrice, // Use the return price as the new sell price for this layer
                   storeId: storeIdForBill,
                 };
                 sku.stockLayers.push(returnLayer);
                 productsUpdated = true;
               }
             }
-          } else if (itemData.productId.startsWith('SERVICE_ITEM_')) {
+          } else if (itemData.productId.startsWith('SERVICE_ITEM_')) { // Service Item
             billItemCostPrice = billData.type === 'buy' ? (itemData.costPrice ?? 0) : 0;
             billItemSellPrice = itemData.sellPrice ?? 0;
+            // Services generally don't have product-specific GST rates; they might have a general service tax rate
+            // For simplicity, we are not applying product-level SGST/CGST to ad-hoc service items here.
+            // A more advanced system might allow specifying tax rates for services too.
           }
 
           newBillItems.push({
@@ -470,19 +486,40 @@ export const useInventoryStore = create<InventoryState>()(
             productId: itemData.productId, quantity: itemData.quantity,
             costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
             isDefective: itemData.isDefective, selectedVariantOptions: itemData.selectedVariantOptions,
+            sgstAmount: itemSgstAmount, cgstAmount: itemCgstAmount,
           });
+
+          billSubTotal += billItemSellPrice * itemData.quantity;
+          billTotalSGST += itemSgstAmount;
+          billTotalCGST += itemCgstAmount;
         }
 
         if (productsUpdated) {
           set({ products: tempProducts });
         }
 
-        let totalAmount = 0;
-        if (billData.type === 'buy') {
-          totalAmount = newBillItems.reduce((acc, buyItem) => acc + (buyItem.quantity * (buyItem.costPrice || 0)), 0);
-        } else {
-          totalAmount = newBillItems.reduce((acc, item) => acc + (item.quantity * (item.sellPrice || 0)), 0);
+        let grandTotalAmount = 0;
+        if (billData.type === 'buy') { // Expense bills are based on cost price, no GST in this prototype for purchases
+          grandTotalAmount = newBillItems.reduce((acc, buyItem) => acc + (buyItem.quantity * (buyItem.costPrice || 0)), 0);
+          // For buy bills, subTotal and tax totals are typically not stored this way, as it's an expense.
+          // We'll store the grandTotalAmount as the totalAmount for simplicity.
+          billSubTotal = grandTotalAmount;
+          billTotalSGST = 0;
+          billTotalCGST = 0;
+        } else if (billData.type === 'sell') {
+            if (isSalesEstimate) {
+                grandTotalAmount = billSubTotal; // No tax for estimates
+                billTotalSGST = 0;
+                billTotalCGST = 0;
+            } else {
+                grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
+            }
+        } else { // Return bills
+            grandTotalAmount = billSubTotal; // Returns are based on sell price, tax implications handled by reversal (not in this simple model)
+            billTotalSGST = 0; // Assuming returns don't add new tax, but reverse original.
+            billTotalCGST = 0;
         }
+
 
         const staffUser = billData.billedByStaffId ? get().getStaffById(billData.billedByStaffId) : undefined;
         const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
@@ -490,7 +527,13 @@ export const useInventoryStore = create<InventoryState>()(
         const newBill: Bill = {
           id: newBillId, type: billData.type, date: currentDate.toISOString(), timestamp: billTimestamp,
           vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
-          items: newBillItems, totalAmount, notes: billData.notes, paymentStatus: billData.paymentStatus,
+          items: newBillItems, 
+          subTotal: billSubTotal,
+          totalSGST: billTotalSGST,
+          totalCGST: billTotalCGST,
+          totalAmount: grandTotalAmount, 
+          isEstimate: billData.isEstimate,
+          notes: billData.notes, paymentStatus: billData.paymentStatus,
           billedByStaffId: staffUser?.id, billedByStaffName: staffUser?.name,
           storeId: storeLocation?.id, storeName: storeLocation?.name,
           companyId: companyIdForBill,
@@ -669,8 +712,8 @@ export const useInventoryStore = create<InventoryState>()(
         billsToConsider.forEach(bill => {
           const billDateStr = format(startOfDay(new Date(bill.date)), 'MMM d');
           if (dailyDataMap[billDateStr]) {
-            if (bill.type === 'sell') {
-              dailyDataMap[billDateStr].sales += bill.totalAmount;
+            if (bill.type === 'sell' && !bill.isEstimate) { // Only count non-estimate sales bills towards revenue
+              dailyDataMap[billDateStr].sales += bill.totalAmount; // totalAmount includes tax
             } else if (bill.type === 'buy') {
               dailyDataMap[billDateStr].expenses += bill.totalAmount;
             }
@@ -686,13 +729,14 @@ export const useInventoryStore = create<InventoryState>()(
         const productRevenue: Record<string, { name: string; revenue: number }> = {};
 
         billsToConsider.forEach(bill => {
-          if (bill.type === 'sell') {
+          if (bill.type === 'sell' && !bill.isEstimate) { // Only count non-estimate sales
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const productNameForItem = item.productName || 'Unknown Product';
               if (!productRevenue[productNameForItem]) {
                 productRevenue[productNameForItem] = { name: productNameForItem, revenue: 0 };
               }
+              // Revenue for top selling should be based on pre-tax sell price
               productRevenue[productNameForItem].revenue += (item.sellPrice ?? 0) * item.quantity;
             });
           }
@@ -717,6 +761,7 @@ export const useInventoryStore = create<InventoryState>()(
                 const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
+             // item.sellPrice in a 'buy' bill item is the sell price set for that batch
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
@@ -745,6 +790,7 @@ export const useInventoryStore = create<InventoryState>()(
                 const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
+             // item.sellPrice in a 'buy' bill item is the sell price set for that batch
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           if (potentialRevenue >= totalCost) {
@@ -771,8 +817,8 @@ export const useInventoryStore = create<InventoryState>()(
         let totalRevenue = 0; let totalCOGS = 0; let totalExpenses = 0;
 
         billsToConsider.forEach(bill => {
-          if (bill.type === 'sell') {
-            totalRevenue += bill.totalAmount;
+          if (bill.type === 'sell' && !bill.isEstimate) { // Only consider non-estimate sales for financial summary
+            totalRevenue += bill.subTotal ?? bill.totalAmount; // Use subTotal if available (pre-tax)
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const costForItem = (item.costPrice || 0);
@@ -798,8 +844,8 @@ export const useInventoryStore = create<InventoryState>()(
 
         todaysBills.forEach(bill => {
           transactionsToday++;
-          if (bill.type === 'sell') {
-            totalRevenue += bill.totalAmount;
+          if (bill.type === 'sell' && !bill.isEstimate) {
+            totalRevenue += bill.subTotal ?? bill.totalAmount; // Use subTotal (pre-tax) for revenue
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const costForItem = (item.costPrice || 0);
@@ -827,7 +873,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
         const productFinancials: Record<string, { name: string; revenue: number; cogs: number; profit: number }> = {};
         billsToConsider.forEach(bill => {
-          if (bill.type === 'sell') {
+          if (bill.type === 'sell' && !bill.isEstimate) { // Only consider non-estimate sales
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_')) return;
               const skuIdentifier = item.productName;
@@ -835,6 +881,7 @@ export const useInventoryStore = create<InventoryState>()(
                 if (!productFinancials[skuIdentifier]) {
                   productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
                 }
+                // Revenue here should be pre-tax
                 const itemRevenue = (item.sellPrice || 0) * item.quantity;
                 const itemCogs = (item.costPrice || 0) * item.quantity;
 
@@ -865,7 +912,7 @@ export const useInventoryStore = create<InventoryState>()(
         
         if (startDate && endDate) {
             const start = startOfDay(startDate).getTime();
-            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 -1); // end of day
+            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 -1); 
             billsToConsider = billsToConsider.filter(bill => {
                 const billTimestamp = new Date(bill.timestamp).getTime();
                 return billTimestamp >= start && billTimestamp <= end;
@@ -891,7 +938,7 @@ export const useInventoryStore = create<InventoryState>()(
 
             if (bill.type === 'buy') {
               ledgerMap[productId].totalPurchased += item.quantity;
-            } else if (bill.type === 'sell') {
+            } else if (bill.type === 'sell' && !bill.isEstimate) { // Only count non-estimate sales towards sold quantity
               ledgerMap[productId].totalSold += item.quantity;
             } else if (bill.type === 'return') {
               if (item.isDefective) {
@@ -999,8 +1046,10 @@ export const useInventoryStore = create<InventoryState>()(
             state.products = state.products.map(p_any => {
               if (!p_any || typeof p_any !== 'object' || !p_any.id || !p_any.name) return null;
               let p = { ...p_any } as Product;
-              p.companyId = p.companyId || "comp_default_001"; // Default company ID if missing
+              p.companyId = p.companyId || "comp_default_001"; 
               p.trackQuantity = typeof p.trackQuantity === 'boolean' ? p.trackQuantity : true;
+              p.sgstRate = typeof p.sgstRate === 'number' ? p.sgstRate : undefined;
+              p.cgstRate = typeof p.cgstRate === 'number' ? p.cgstRate : undefined;
               p.variants = Array.isArray(p.variants) ? p.variants.map(v_any => {
                 if(!v_any || typeof v_any !== 'object') return null;
                 const v = v_any as ProductVariantType;
@@ -1061,7 +1110,7 @@ export const useInventoryStore = create<InventoryState>()(
             state.bills = state.bills.map(bill_any => {
               if (!bill_any || typeof bill_any !== 'object') return null;
               const bill = { ...bill_any } as Bill;
-              bill.companyId = bill.companyId || "comp_default_001"; // Default company ID
+              bill.companyId = bill.companyId || "comp_default_001"; 
               bill.items = Array.isArray(bill.items) ? bill.items.map(item_any => {
                 if (!item_any || typeof item_any !== 'object') return null;
                 const item = { ...item_any } as BillItem;
@@ -1069,9 +1118,17 @@ export const useInventoryStore = create<InventoryState>()(
                 item.sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
                 item.quantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
                 item.productName = item.productName || 'Unknown Item';
+                item.sgstAmount = typeof item.sgstAmount === 'number' ? item.sgstAmount : 0;
+                item.cgstAmount = typeof item.cgstAmount === 'number' ? item.cgstAmount : 0;
                 return item;
               }).filter(item => item !== null) : [];
-              bill.totalAmount = typeof bill.totalAmount === 'number' ? bill.totalAmount : 0;
+              bill.subTotal = typeof bill.subTotal === 'number' ? bill.subTotal : bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity),0);
+              bill.totalSGST = typeof bill.totalSGST === 'number' ? bill.totalSGST : bill.items.reduce((acc, item) => acc + (item.sgstAmount || 0),0);
+              bill.totalCGST = typeof bill.totalCGST === 'number' ? bill.totalCGST : bill.items.reduce((acc, item) => acc + (item.cgstAmount || 0),0);
+              bill.totalAmount = typeof bill.totalAmount === 'number' ? bill.totalAmount : (bill.subTotal + bill.totalSGST + bill.totalCGST);
+              bill.isEstimate = typeof bill.isEstimate === 'boolean' ? bill.isEstimate : false;
+
+
               bill.timestamp = typeof bill.timestamp === 'number' ? bill.timestamp : (bill.date ? new Date(bill.date).getTime() : Date.now());
               bill.date = bill.date || new Date(bill.timestamp).toISOString();
               bill.storeId = bill.storeId || undefined;
@@ -1088,8 +1145,8 @@ export const useInventoryStore = create<InventoryState>()(
           state.staffs = state.staffs.map(s_any => {
              if (!s_any || typeof s_any !== 'object') return null;
              const s = { ...s_any } as User;
-             s.companyId = s.companyId || "comp_default_001"; // Default company
-             s.role = s.role || 'employee'; // Default role
+             s.companyId = s.companyId || "comp_default_001"; 
+             s.role = s.role || 'employee'; 
              return s;
           }).filter(s => s !== null) as User[];
 
@@ -1097,7 +1154,7 @@ export const useInventoryStore = create<InventoryState>()(
           state.stores = state.stores.map(s_any => {
             if (!s_any || typeof s_any !== 'object') return null;
             const s = { ...s_any } as Store;
-            s.companyId = s.companyId || "comp_default_001"; // Default company
+            s.companyId = s.companyId || "comp_default_001"; 
             s.allowedOperations = Array.isArray(s.allowedOperations) && s.allowedOperations.length > 0 ? s.allowedOperations : ['sell', 'buy', 'return'];
             return s;
           }).filter(s => s !== null) as Store[];

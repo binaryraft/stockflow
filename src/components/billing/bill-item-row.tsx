@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 interface BillItemRowProps {
   item: BillItem;
   mode: BillMode;
+  isEstimateMode?: boolean; // Added for sales tax handling
   onQuantityChange: (itemId: string, newQuantity: number) => void;
   onPriceChange?: (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => void;
   onRemoveItem: (itemId: string) => void;
@@ -24,6 +25,7 @@ interface BillItemRowProps {
 export function BillItemRow({
   item,
   mode,
+  isEstimateMode = false,
   onQuantityChange,
   onPriceChange,
   onRemoveItem,
@@ -38,12 +40,17 @@ export function BillItemRow({
     }
   };
 
-  const subtotal = mode === 'buy' ? item.quantity * item.costPrice : item.quantity * item.sellPrice;
+  // Sell price is pre-tax. Subtotal is pre-tax subtotal.
+  const itemSubtotalPreTax = mode === 'buy' ? item.quantity * item.costPrice : item.quantity * item.sellPrice;
+  const itemTotalWithTax = itemSubtotalPreTax + (item.sgstAmount || 0) + (item.cgstAmount || 0);
+
+  const showTaxColumns = mode === 'sell' && !isEstimateMode && !item.productId.startsWith('SERVICE_ITEM_');
 
   return (
     <div className={cn(
       "grid items-center gap-2 py-2 border-b border-dashed",
-      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]"
+      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : 
+      (showTaxColumns ? "grid-cols-[1fr_60px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]")
     )}>
       <div>
         <span className="truncate text-sm font-medium">{item.productName}</span>
@@ -79,12 +86,12 @@ export function BillItemRow({
             min="0"
           />
           <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">
-            ₹{subtotal.toFixed(2)}
+            ₹{itemSubtotalPreTax.toFixed(2)}
           </span>
           <Input
             ref={inputRefs?.sellPrice}
             type="number"
-            value={item.sellPrice}
+            value={item.sellPrice} // This is the sell price to be set for the batch
             onChange={(e) => onPriceChange?.(item.id, parseFloat(e.target.value) || 0, 'sell')}
             onKeyDown={(e) => handleKeyDown(e, 'sellPrice')}
             className="h-8 text-sm w-full"
@@ -92,13 +99,23 @@ export function BillItemRow({
             min="0"
           />
         </>
-      ) : ( // Sell or Return mode
+      ) : ( 
         <>
           <span className="text-sm text-muted-foreground text-right flex items-center justify-end h-8 pr-2">
             ₹{item.sellPrice.toFixed(2)}
           </span>
+          {showTaxColumns && (
+            <>
+              <span className="text-xs text-muted-foreground text-right flex items-center justify-end h-8 pr-1">
+                ₹{(item.sgstAmount || 0).toFixed(2)}
+              </span>
+              <span className="text-xs text-muted-foreground text-right flex items-center justify-end h-8 pr-1">
+                ₹{(item.cgstAmount || 0).toFixed(2)}
+              </span>
+            </>
+          )}
           <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">
-            ₹{subtotal.toFixed(2)}
+            ₹{(showTaxColumns ? itemTotalWithTax : itemSubtotalPreTax).toFixed(2)}
           </span>
         </>
       )}
@@ -110,11 +127,13 @@ export function BillItemRow({
   );
 }
 
-export function BillItemHeader({ mode }: { mode: BillMode }) {
+export function BillItemHeader({ mode, isEstimateMode }: { mode: BillMode, isEstimateMode?: boolean }) {
+  const showTaxColumns = mode === 'sell' && !isEstimateMode;
   return (
     <div className={cn(
       "grid items-center gap-2 pb-2 border-b",
-      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]"
+       mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : 
+      (showTaxColumns ? "grid-cols-[1fr_60px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]")
     )}>
       <span className="text-xs font-semibold text-muted-foreground">Product</span>
       <span className="text-xs font-semibold text-muted-foreground text-right">Qty</span>
@@ -127,10 +146,16 @@ export function BillItemHeader({ mode }: { mode: BillMode }) {
       ) : (
         <>
           <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Price/Unit</span>
-          <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Subtotal</span>
+          {showTaxColumns && (
+            <>
+              <span className="text-xs font-semibold text-muted-foreground text-right pr-1">SGST</span>
+              <span className="text-xs font-semibold text-muted-foreground text-right pr-1">CGST</span>
+            </>
+          )}
+          <span className="text-xs font-semibold text-muted-foreground text-right pr-2">Total</span>
         </>
       )}
-      <span className="text-xs font-semibold text-muted-foreground"></span> {/* For remove button */}
+      <span className="text-xs font-semibold text-muted-foreground"></span> {}
     </div>
   );
 }
