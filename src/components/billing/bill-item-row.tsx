@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 interface BillItemRowProps {
   item: BillItem;
   mode: BillMode;
-  isEstimateMode?: boolean; // Added for sales tax handling
+  isEstimateMode?: boolean; 
   onQuantityChange: (itemId: string, newQuantity: number) => void;
   onPriceChange?: (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => void;
   onRemoveItem: (itemId: string) => void;
@@ -40,17 +40,18 @@ export function BillItemRow({
     }
   };
 
-  // Sell price is pre-tax. Subtotal is pre-tax subtotal.
   const itemSubtotalPreTax = mode === 'buy' ? item.quantity * item.costPrice : item.quantity * item.sellPrice;
   const itemTotalWithTax = itemSubtotalPreTax + (item.sgstAmount || 0) + (item.cgstAmount || 0);
 
-  const showTaxColumns = mode === 'sell' && !isEstimateMode && !item.productId.startsWith('SERVICE_ITEM_');
+  const showTaxColumns = mode === 'sell' && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_');
+  const isChargeOrService = item.isAdditionalCharge || item.productId.startsWith('SERVICE_ITEM_');
+
 
   return (
     <div className={cn(
       "grid items-center gap-2 py-2 border-b border-dashed",
-      mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : 
-      (showTaxColumns ? "grid-cols-[1fr_60px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]")
+      mode === 'buy' ? "grid-cols-[1fr_100px_100px_100px_100px_40px]" : 
+      (showTaxColumns ? "grid-cols-[1fr_80px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_100px_100px_100px_40px]")
     )}>
       <div>
         <span className="truncate text-sm font-medium">{item.productName}</span>
@@ -61,16 +62,19 @@ export function BillItemRow({
               .join(', ')}
           </div>
         )}
+         {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
       </div>
 
       <Input
         ref={inputRefs?.quantity}
         type="number"
         value={item.quantity}
-        onChange={(e) => onQuantityChange(item.id, parseInt(e.target.value) || 0)}
+        onChange={(e) => onQuantityChange(item.id, parseFloat(e.target.value) || 0)}
         onKeyDown={(e) => handleKeyDown(e, 'quantity')}
         className="h-8 text-sm w-full"
-        min="1"
+        step="any" // Allow float
+        min="0.01" // Allow small float
+        disabled={item.isAdditionalCharge} // Quantity for charges is fixed at 1
       />
 
       {mode === 'buy' ? (
@@ -84,6 +88,7 @@ export function BillItemRow({
             className="h-8 text-sm w-full"
             step="0.01"
             min="0"
+            disabled={isChargeOrService}
           />
           <span className="text-sm text-foreground font-semibold text-right flex items-center justify-end h-8 pr-2">
             ₹{itemSubtotalPreTax.toFixed(2)}
@@ -91,12 +96,13 @@ export function BillItemRow({
           <Input
             ref={inputRefs?.sellPrice}
             type="number"
-            value={item.sellPrice} // This is the sell price to be set for the batch
+            value={item.sellPrice} 
             onChange={(e) => onPriceChange?.(item.id, parseFloat(e.target.value) || 0, 'sell')}
             onKeyDown={(e) => handleKeyDown(e, 'sellPrice')}
             className="h-8 text-sm w-full"
             step="0.01"
             min="0"
+             disabled={isChargeOrService}
           />
         </>
       ) : ( 
@@ -132,10 +138,10 @@ export function BillItemHeader({ mode, isEstimateMode }: { mode: BillMode, isEst
   return (
     <div className={cn(
       "grid items-center gap-2 pb-2 border-b",
-       mode === 'buy' ? "grid-cols-[1fr_80px_100px_100px_100px_40px]" : 
-      (showTaxColumns ? "grid-cols-[1fr_60px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_80px_100px_100px_40px]")
+       mode === 'buy' ? "grid-cols-[1fr_100px_100px_100px_100px_40px]" : 
+      (showTaxColumns ? "grid-cols-[1fr_80px_80px_70px_70px_90px_40px]" : "grid-cols-[1fr_100px_100px_100px_40px]")
     )}>
-      <span className="text-xs font-semibold text-muted-foreground">Product</span>
+      <span className="text-xs font-semibold text-muted-foreground">Product/Charge</span>
       <span className="text-xs font-semibold text-muted-foreground text-right">Qty</span>
       {mode === 'buy' ? (
         <>

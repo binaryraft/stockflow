@@ -21,14 +21,24 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2, Percent } from 'lucide-react';
+import { PlusCircle, Trash2, Percent, DollarSign } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { v4 as uuidv4 } from 'uuid';
 
+
+const additionalChargeDefinitionDialogSchema = z.object({
+  id: z.string().default(() => uuidv4()),
+  name: z.string().min(1, "Charge name cannot be empty"),
+  price: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Charge price must be a number" }).min(0, "Charge price must be non-negative")
+  ),
+});
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -55,7 +65,7 @@ const newProductDialogSchema = z.object({
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
   initialStock: z.preprocess( 
-    (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))), // Allow float
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
   sgstRate: z.preprocess(
@@ -67,6 +77,7 @@ const newProductDialogSchema = z.object({
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
+  additionalChargeDefinitions: z.array(additionalChargeDefinitionDialogSchema).optional(),
 });
 
 type NewProductDialogFormData = z.infer<typeof newProductDialogSchema>;
@@ -182,6 +193,107 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   );
 };
 
+interface AdditionalChargesDialogSectionProps {
+  control: any;
+  register: any;
+  errors: any;
+  setFocus: any;
+}
+
+const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionProps> = ({ control, register, errors, setFocus }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "additionalChargeDefinitions",
+  });
+  
+  const handleChargeNameEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setFocus(`additionalChargeDefinitions.${index}.price`);
+    }
+  };
+
+  const handleChargePriceEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+     if (e.key === 'Enter') {
+      e.preventDefault();
+      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && watch(`additionalChargeDefinitions.${index}.price`) !== undefined) {
+        append({ name: "", price: undefined });
+        setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex justify-between items-center">
+        <Label className="text-sm font-medium text-primary">Additional Charges</Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="text-xs"
+          onClick={() => {
+            append({ name: "", price: undefined });
+            setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
+          }}
+        >
+          <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Charge
+        </Button>
+      </div>
+      {fields.map((field, index) => (
+        <div key={field.id} className="flex items-end gap-2 p-2 border rounded-md bg-muted/30">
+          <div className="grid grid-cols-2 gap-2 flex-grow">
+            <div className="space-y-1">
+              <Label htmlFor={`additionalChargeDefinitions.${index}.name`} className="text-xs">Charge Name</Label>
+              <Input
+                {...register(`additionalChargeDefinitions.${index}.name`)}
+                id={`additionalChargeDefinitions.${index}.name`}
+                placeholder="e.g., Making Charge"
+                className="h-8 text-xs"
+                onKeyDown={(e) => handleChargeNameEnter(e, index)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor={`additionalChargeDefinitions.${index}.price`} className="text-xs">Price (₹)</Label>
+              <Input
+                {...register(`additionalChargeDefinitions.${index}.price`)}
+                id={`additionalChargeDefinitions.${index}.price`}
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                className="h-8 text-xs"
+                onKeyDown={(e) => handleChargePriceEnter(e, index)}
+              />
+            </div>
+          </div>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="h-8 w-8" aria-label="Remove Charge">
+                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent><p>Remove this charge</p></TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      ))}
+      {errors.additionalChargeDefinitions?.root && (
+        <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions.root.message}</p>
+      )}
+      {Array.isArray(errors.additionalChargeDefinitions) && errors.additionalChargeDefinitions.map((err: any, i: number) => (
+        (err?.name?.message || err?.price?.message) && (
+          <div key={i} className="text-xs text-destructive mt-0.5">
+            {err.name?.message && <p>Charge {i+1} Name: {err.name.message}</p>}
+            {err.price?.message && <p>Charge {i+1} Price: {err.price.message}</p>}
+          </div>
+        )
+      ))}
+    </div>
+  );
+};
+
+
 interface NewProductDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
@@ -212,10 +324,11 @@ export function NewProductDialog({
       trackQuantity: initialValues?.quantity ? true : true,
       costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
       sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
-      initialStock: initialValues?.quantity ? parseInt(initialValues.quantity) : undefined,
+      initialStock: initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
       sgstRate: undefined,
       cgstRate: undefined,
       variants: [],
+      additionalChargeDefinitions: [],
     },
   });
 
@@ -240,10 +353,11 @@ export function NewProductDialog({
         trackQuantity: defaultTrackQuantity,
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
-        initialStock: defaultTrackQuantity && initialValues?.quantity ? parseInt(initialValues.quantity) : undefined,
+        initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
         sgstRate: undefined,
         cgstRate: undefined,
         variants: [],
+        additionalChargeDefinitions: [],
       });
       setTimeout(() => setFocus('name'), 100);
     }
@@ -271,6 +385,7 @@ export function NewProductDialog({
       variants: productVariantsPayload,
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
+      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({...ac, id: ac.id || uuidv4() })),
       companyId: currentCompanyId,
     };
     
@@ -278,12 +393,7 @@ export function NewProductDialog({
         productToSaveBase.costPriceForNonTracked = data.costPrice;
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
-    if (data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0) && data.initialStock !== undefined) {
-        // The store's addProduct handles initial stock for tracked non-variant via Expense Bills, not directly here.
-        // This initialStock was mainly for form pre-fill, not direct stock setting for tracked items here.
-    }
-
-
+    
     const newProduct = addProduct(productToSaveBase);
     toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
     onProductAdded(newProduct);
@@ -363,7 +473,7 @@ export function NewProductDialog({
                   {trackQuantityValue && initialValues?.quantity !== undefined && (
                      <div className="space-y-1.5">
                         <Label htmlFor="dialog-initialStock">Initial Stock (from billing)</Label>
-                        <Input id="dialog-initialStock" type="number" {...register("initialStock")} disabled />
+                        <Input id="dialog-initialStock" type="number" step="any" {...register("initialStock")} disabled />
                         <p className="text-xs text-muted-foreground">Stock will be added via the Expense Bill.</p>
                      </div>
                   )}
@@ -387,6 +497,8 @@ export function NewProductDialog({
                  <p className="text-xs text-muted-foreground">For products with variants, stock and pricing are managed per specific combination (SKU) via Expense Bills.</p>
               )}
 
+              <Separator className="my-4"/>
+              <AdditionalChargesDialogSection control={control} register={register} errors={errors} setFocus={setFocus}/>
 
               <Separator className="my-4"/>
               <div className="space-y-3">
@@ -428,3 +540,4 @@ export function NewProductDialog({
 }
     
     
+

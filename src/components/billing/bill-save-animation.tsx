@@ -3,16 +3,17 @@
 
 import React, { useEffect } from 'react';
 import type { BillMode } from '@/types';
-import { CheckCircle2, PackageCheck, PackageX, ShoppingBag, Send, RotateCcw } from 'lucide-react';
+import { CheckCircle2, PackageCheck, PackageX, ShoppingBag, Send, RotateCcw, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface BillSaveAnimationProps {
   show: boolean;
   billMode: BillMode | null;
+  isEstimate?: boolean;
   onClose: () => void;
 }
 
-export function BillSaveAnimation({ show, billMode, onClose }: BillSaveAnimationProps) {
+export function BillSaveAnimation({ show, billMode, isEstimate, onClose }: BillSaveAnimationProps) {
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (show) {
@@ -28,21 +29,27 @@ export function BillSaveAnimation({ show, billMode, onClose }: BillSaveAnimation
   }
 
   let IconComponent = CheckCircle2;
-  let text = "Bill Saved!";
-  let iconColor = "text-green-500"; // Default to green
+  let text = "Saved!";
+  let iconColor = "text-green-500"; 
 
   if (billMode === 'sell') {
-    IconComponent = Send;
-    text = "Sales Bill Saved!";
-    iconColor = "text-primary"; // Use primary color (royal green)
+    if (isEstimate) {
+      IconComponent = FileText;
+      text = "Estimate Saved!";
+      iconColor = "text-blue-500"; // Blue for estimate
+    } else {
+      IconComponent = Send;
+      text = "Sales Bill Saved!";
+      iconColor = "text-primary"; 
+    }
   } else if (billMode === 'buy') {
     IconComponent = ShoppingBag;
     text = "Expense Bill Saved!";
-    iconColor = "text-destructive"; // Red for expense
+    iconColor = "text-destructive"; 
   } else if (billMode === 'return') {
     IconComponent = RotateCcw;
     text = "Return Entry Saved!";
-    iconColor = "text-amber-500"; // Amber for return
+    iconColor = "text-amber-500"; 
   }
 
   return (
@@ -52,12 +59,12 @@ export function BillSaveAnimation({ show, billMode, onClose }: BillSaveAnimation
         show ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
     >
-      <div className="transform scale-100 transition-transform duration-300 ease-out"> {/* Basic scale animation */}
+      <div className="transform scale-100 transition-transform duration-300 ease-out">
         <IconComponent
           className={cn("h-32 w-32 mb-6", iconColor)}
           strokeWidth={1.5}
         />
-        <p className={cn("text-3xl font-semibold", iconColor === "text-primary" ? "text-primary" : iconColor === "text-destructive" ? "text-destructive" : "text-amber-500")}>
+        <p className={cn("text-3xl font-semibold", iconColor)}>
           {text}
         </p>
       </div>

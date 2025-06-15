@@ -11,10 +11,10 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput, type ProductSearchSuggestion } from './product-search-input';
 import { BillItemRow, BillItemHeader } from './bill-item-row';
-import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType } from '@/types';
+import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -25,6 +25,9 @@ import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/comp
 import { EmployeePasskeyDialog } from './employee-passkey-dialog';
 import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+
 
 type PendingBillPayload = {
   billType: BillMode;
@@ -57,14 +60,22 @@ export function BillingForm({
   const pathname = usePathname();
   const { toast } = useToast();
 
-  const addBill = useInventoryStore(state => state.addBill);
-  const searchProducts = useInventoryStore(state => state.searchProducts);
-  const getProductById = useInventoryStore(state => state.getProductById);
-  const getAllStores = useInventoryStore(state => state.getAllStores);
-  const findOrCreateProductSKU = useInventoryStore(state => state.findOrCreateProductSKU);
-  const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
-  const getSkuIdentifier = useInventoryStore(state => state.getSkuIdentifier);
-  const getActiveSubscriptionPlan = useInventoryStore(state => state.getActiveSubscriptionPlan);
+  const {
+    addBill, searchProducts, getProductById, getAllStores, 
+    findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
+    getActiveSubscriptionPlan, userProfile, products: allProductsStore
+  } = useInventoryStore(state => ({
+    addBill: state.addBill,
+    searchProducts: state.searchProducts,
+    getProductById: state.getProductById,
+    getAllStores: state.getAllStores,
+    findOrCreateProductSKU: state.findOrCreateProductSKU,
+    getSkuDetails: state.getSkuDetails,
+    getSkuIdentifier: state.getSkuIdentifier,
+    getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
+    userProfile: state.userProfile,
+    products: state.products,
+  }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
 
   const [allStores, setAllStores] = useState<Store[]>([]);
@@ -99,6 +110,7 @@ export function BillingForm({
   const [productNotFoundHint, setProductNotFoundHint] = useState('');
   const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
   const [lastSavedBillMode, setLastSavedBillMode] = useState<BillMode | null>(null);
+  const [lastSavedBillIsEstimate, setLastSavedBillIsEstimate] = useState<boolean>(false);
   const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false);
   const [pendingBillPayload, setPendingBillPayload] = useState<PendingBillPayload | null>(null);
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
@@ -106,6 +118,10 @@ export function BillingForm({
 
   const [serviceDescription, setServiceDescription] = useState('');
   const [serviceAmount, setServiceAmount] = useState<number | string>('');
+
+  const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
+  const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
+
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -182,11 +198,12 @@ export function BillingForm({
     setCustomerPhone('');
     setNotes('');
     setIsPaid(true);
-    setIsEstimateMode(false); // Reset estimate mode as well
+    setIsEstimateMode(false); 
     setServiceDescription('');
     setServiceAmount('');
     resetFormFields(true);
     setPendingBillPayload(null);
+    setBillToPotentiallyPrint(null);
   }, [resetFormFields]);
 
 
@@ -339,7 +356,7 @@ export function BillingForm({
 
 
   const handleAddNewItem = () => {
-    const currentQuantity = typeof quantity === 'string' ? parseInt(quantity) || 1 : quantity || 1;
+    const currentQuantity = typeof quantity === 'string' ? parseFloat(quantity) || 1 : quantity || 1;
     if (!currentProductForSelection) {
       toast({ variant: "destructive", title: "Product Not Selected", description: "Please select a product/SKU from suggestions or add a new one." });
       productNameInputRef.current?.focus();
@@ -387,13 +404,13 @@ export function BillingForm({
                            : (skuDetails.totalStock ?? 0);
 
         if (stockToCheck < currentQuantity) {
-          toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck} of ${itemProductNameForBill} available at this store.` });
+          toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store.` });
           return;
         }
     }
 
     let itemCostPrice: number;
-    let itemSellPriceForBill: number; // This is always pre-tax
+    let itemSellPriceForBill: number; 
     let itemSgstAmount: number | undefined = 0;
     let itemCgstAmount: number | undefined = 0;
 
@@ -428,16 +445,14 @@ export function BillingForm({
         itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
       }
 
-    } else { // Return mode
+    } else { 
       itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0;
       itemCostPrice = skuDetails.averageCostPrice ?? 0; 
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0."});
         return;
       }
-       // For returns, tax is typically reversed based on the original bill or current rates.
-       // Here, we'll calculate it as if it's a negative sale for simplicity in tax totals.
-      if (!product.id?.startsWith('SERVICE_ITEM_')) { // Don't apply product tax to adhoc services
+      if (!product.id?.startsWith('SERVICE_ITEM_')) { 
         const itemSubTotal = itemSellPriceForBill * currentQuantity;
         itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
         itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
@@ -451,9 +466,28 @@ export function BillingForm({
       selectedVariantOptions: (product.variants && product.variants.length > 0) ? { ...selectedVariantOptions } : undefined,
       sgstAmount: itemSgstAmount,
       cgstAmount: itemCgstAmount,
+      isAdditionalCharge: false,
     };
+    const itemsToAdd = [newItem];
 
-    setCurrentBillItems(prevItems => [...prevItems, newItem]);
+    if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0) {
+        product.additionalChargeDefinitions.forEach(charge => {
+            itemsToAdd.push({
+                id: uuidv4(),
+                productId: `CHARGE_ITEM_${charge.id}`,
+                productName: charge.name,
+                quantity: 1, // Fixed quantity for charges
+                costPrice: 0, // Charges have no cost for this context
+                sellPrice: charge.price,
+                isAdditionalCharge: true,
+                sgstAmount: 0, // Charges are not taxed by product rates here
+                cgstAmount: 0,
+            });
+        });
+    }
+
+
+    setCurrentBillItems(prevItems => [...prevItems, ...itemsToAdd]);
     resetFormFields(true);
   };
 
@@ -533,7 +567,7 @@ export function BillingForm({
       prevItems.map(item => {
         if (item.id === itemId) {
           let updatedItem = { ...item, quantity: Math.max(0, newQuantity) };
-          if (mode === 'sell' && !isEstimateMode && !item.productId.startsWith('SERVICE_ITEM_')) {
+          if (mode === 'sell' && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
             const product = getProductById(item.productId);
             if (product) {
               const itemSubTotal = updatedItem.sellPrice * updatedItem.quantity;
@@ -544,7 +578,7 @@ export function BillingForm({
           return updatedItem;
         }
         return item;
-      }).filter(item => item.quantity > 0) 
+      }).filter(item => item.quantity > 0 || item.isAdditionalCharge) // Keep additional charges even if quantity is 0 (though it's fixed to 1)
     );
   };
 
@@ -569,10 +603,10 @@ export function BillingForm({
     currentBillItems.forEach(item => {
       const itemSubTotal = item.sellPrice * item.quantity;
       subTotal += itemSubTotal;
-      if (mode === 'sell' && !isEstimateMode && !item.productId.startsWith('SERVICE_ITEM_')) {
+      if (mode === 'sell' && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
         totalSGST += item.sgstAmount || 0;
         totalCGST += item.cgstAmount || 0;
-      } else if (mode === 'return' && !item.productId.startsWith('SERVICE_ITEM_')){ // For returns, sum up item taxes
+      } else if (mode === 'return' && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')){
         totalSGST += item.sgstAmount || 0;
         totalCGST += item.cgstAmount || 0;
       }
@@ -581,42 +615,58 @@ export function BillingForm({
     let grandTotal = subTotal;
     if (mode === 'sell' && !isEstimateMode) {
       grandTotal += totalSGST + totalCGST;
-    } else if (mode === 'buy') { // For buy mode, total is based on costPrice, no tax for now in this prototype's buy bills.
+    } else if (mode === 'buy') { 
         subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
         grandTotal = subTotal;
         totalSGST = 0;
         totalCGST = 0;
-    } else if (mode === 'return') { // For return, total is sum of item sell prices (which could be negative if handled that way) + their taxes
+    } else if (mode === 'return') { 
         grandTotal = subTotal + totalSGST + totalCGST;
     }
-
-
     return { subTotal, totalSGST, totalCGST, grandTotal };
   };
   
   const billTotals = useMemo(calculateBillTotals, [currentBillItems, mode, isEstimateMode]);
 
-
-  const proceedWithSave = (staffId: string, billPayloadToSave: PendingBillPayload) => {
+  const startSaveProcess = (staffId: string, billPayloadToSave: PendingBillPayload) => {
     if (!billPayloadToSave) {
       toast({ variant: "destructive", title: "Internal Error", description: "No bill data to save." });
-      setIsSavingAnimationVisible(false); 
       return;
     }
-    const { billType, items: itemsToSave, storeIdForBill: storeIdForThisBill, isEstimate: isEstimateForBill, ...otherBillData } = billPayloadToSave;
-
-    const billResult = addBill(
-      { type: billType, billedByStaffId: staffId, storeId: storeIdForThisBill, companyId: companyId, isEstimate: isEstimateForBill, ...otherBillData },
-      itemsToSave 
+    const savedBill = addBill(
+      { 
+        type: billPayloadToSave.billType, 
+        billedByStaffId: staffId, 
+        storeId: billPayloadToSave.storeIdForBill, 
+        companyId: companyId, 
+        isEstimate: billPayloadToSave.isEstimate, 
+        ... (({ billType, items, storeIdForBill, isEstimate, ...otherData }) => otherData)(billPayloadToSave)
+      },
+      billPayloadToSave.items
     );
 
-    if (billResult === null) { 
-      setIsSavingAnimationVisible(false); 
-      return;
+    if (savedBill) {
+      setBillToPotentiallyPrint(savedBill);
+      setIsPrintConfirmDialogOpen(true); 
+    } else {
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save the bill. Please check stock or product details." });
     }
+  };
 
-    setLastSavedBillMode(billType);
-    setIsSavingAnimationVisible(true); 
+  const handleConfirmPrint = (print: boolean) => {
+    setIsPrintConfirmDialogOpen(false);
+    if (print && billToPotentiallyPrint) {
+        const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStore);
+        triggerPrint(printContent);
+    }
+    // Proceed to success animation regardless of print choice
+    if (billToPotentiallyPrint) {
+        setLastSavedBillMode(billToPotentiallyPrint.type);
+        setLastSavedBillIsEstimate(billToPotentiallyPrint.isEstimate || false);
+        setIsSavingAnimationVisible(true);
+    }
+    setBillToPotentiallyPrint(null);
+    // ResetFullForm is now called by handleAnimationClose
   };
 
   const handleSaveBill = () => {
@@ -653,6 +703,7 @@ export function BillingForm({
       productId: item.productId, quantity: item.quantity,
       costPrice: item.costPrice || 0, sellPrice: item.sellPrice || 0, 
       isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
+      isAdditionalCharge: item.isAdditionalCharge,
     }));
 
     const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
@@ -673,14 +724,14 @@ export function BillingForm({
             toast({ variant: "destructive", title: "Store Required", description: "A store context is required to save this bill for your plan."});
             return;
         }
-        proceedWithSave('admin_self_billed', currentBillPayload); 
+        startSaveProcess('admin_self_billed', currentBillPayload); 
     }
   };
 
   const handleEmployeeVerifiedForBill = (staff: Staff) => {
     setIsVerifyEmployeeDialogOpen(false);
     if (pendingBillPayload) {
-      proceedWithSave(staff.id, pendingBillPayload);
+      startSaveProcess(staff.id, pendingBillPayload);
     } else {
         toast({ variant: "destructive", title: "Error", description: "Billing data was unexpectedly cleared. Please try saving again." });
     }
@@ -690,6 +741,7 @@ export function BillingForm({
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
+    setLastSavedBillIsEstimate(false);
     resetFullForm();
 
     if (isAdminContext) {
@@ -752,9 +804,6 @@ export function BillingForm({
     let sgstAmount: number | undefined = 0;
     let cgstAmount: number | undefined = 0;
 
-    // For service items, GST isn't tied to product rates. A general service tax could be applied if needed.
-    // For this implementation, services added via this ad-hoc method will NOT have SGST/CGST from product rates.
-    // If a global service tax rate was available, it could be applied here if mode === 'sell' && !isEstimateMode.
 
     const serviceItem: BillItem = {
       id: uuidv4(), 
@@ -767,6 +816,7 @@ export function BillingForm({
       selectedVariantOptions: undefined,
       sgstAmount,
       cgstAmount,
+      isAdditionalCharge: false, // Explicitly false for ad-hoc services
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
@@ -796,8 +846,25 @@ export function BillingForm({
       <BillSaveAnimation
         show={isSavingAnimationVisible}
         billMode={lastSavedBillMode}
+        isEstimate={lastSavedBillIsEstimate}
         onClose={handleAnimationClose}
       />
+       <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bill Saved Successfully!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Would you like to print this bill now?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => handleConfirmPrint(false)}>No</AlertDialogCancel>
+            <AlertDialogAction onClick={() => handleConfirmPrint(true)}>
+              <Printer className="mr-2 h-4 w-4" /> Yes, Print Bill
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {isNewProductDialogOpen && newProductDialogInitialValues && (
         <NewProductDialog
           isOpen={isNewProductDialogOpen}
@@ -938,7 +1005,7 @@ export function BillingForm({
                     <span>Selected: {getSkuDetails(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())), finalStoreIdForSkuDetails)?.skuIdentifier || currentProductForSelection.name}</span>
                     {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
                       <span className="block">
-                        {isDisplayingLayerStock && mode === 'sell' ? `Layer Stock: ${currentSkuStock}` : `Total Stock: ${currentSkuStock}`}
+                        {isDisplayingLayerStock && mode === 'sell' ? `Layer Stock: ${currentSkuStock.toFixed(2)}` : `Total Stock: ${currentSkuStock.toFixed(2)}`}
                       </span>
                     )}
                     {currentSkuSellPrice !== null && (
@@ -969,10 +1036,11 @@ export function BillingForm({
                   ref={quantityInputRef}
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseInt(e.target.value) || '')}
+                  onChange={(e) => setQuantity(parseFloat(e.target.value) || '')}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
                   onFocus={(e) => e.target.select()}
-                  min="1"
+                  step="any"
+                  min="0.01"
                   placeholder="1"
                 />
               </div>

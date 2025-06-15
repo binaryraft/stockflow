@@ -12,9 +12,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Textarea } from '@/components/ui/textarea';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType } from '@/types';
+import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -32,7 +32,17 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { v4 as uuidv4 } from 'uuid';
 
+
+const additionalChargeDefinitionSchema = z.object({
+  id: z.string().default(() => uuidv4()),
+  name: z.string().min(1, "Charge name cannot be empty"),
+  price: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Charge price must be a number" }).min(0, "Charge price must be non-negative")
+  ),
+});
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -61,7 +71,7 @@ const productFormSchema = z.object({
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
   initialStock: z.preprocess( 
-    (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))), // Allow float
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
   sgstRate: z.preprocess(
@@ -73,6 +83,7 @@ const productFormSchema = z.object({
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
+  additionalChargeDefinitions: z.array(additionalChargeDefinitionSchema).optional(),
 });
 
 type ProductFormData = z.infer<typeof productFormSchema>;
@@ -188,6 +199,106 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   );
 };
 
+
+interface AdditionalChargesFormSectionProps {
+  control: any; // Control from useForm
+  register: any; // Register from useForm
+  errors: any; // Errors from formState
+  setFocus: any;
+}
+
+const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> = ({ control, register, errors, setFocus }) => {
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "additionalChargeDefinitions",
+  });
+
+  const handleChargeNameEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setFocus(`additionalChargeDefinitions.${index}.price`);
+    }
+  };
+
+  const handleChargePriceEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+     if (e.key === 'Enter') {
+      e.preventDefault();
+      // Optionally, add a new charge or move to next section
+      if (index === fields.length -1) {
+        append({ name: "", price: undefined });
+        setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
+      }
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <Label className="text-lg font-semibold text-primary flex items-center gap-2">
+          <DollarSign size={20}/> Additional Charges (Optional)
+        </Label>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => append({ name: "", price: undefined })}
+        >
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Charge
+        </Button>
+      </div>
+      <p className="text-xs text-muted-foreground -mt-2 mb-2">
+        Define any fixed additional charges associated with this product (e.g., Making Charges, Service Fee). These will be added as separate line items in sales bills.
+      </p>
+      {fields.map((field, index) => (
+        <Card key={field.id} className="p-3 bg-tertiary/50 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+            <div className="space-y-1.5">
+              <Label htmlFor={`additionalChargeDefinitions.${index}.name`}>Charge Name*</Label>
+              <Input
+                {...register(`additionalChargeDefinitions.${index}.name`)}
+                id={`additionalChargeDefinitions.${index}.name`}
+                placeholder="e.g., Making Charge"
+                onKeyDown={(e) => handleChargeNameEnter(e, index)}
+              />
+              {errors.additionalChargeDefinitions?.[index]?.name && (
+                <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].name.message}</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor={`additionalChargeDefinitions.${index}.price`}>Price (₹)*</Label>
+              <Input
+                {...register(`additionalChargeDefinitions.${index}.price`)}
+                id={`additionalChargeDefinitions.${index}.price`}
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                onKeyDown={(e) => handleChargePriceEnter(e, index)}
+              />
+              {errors.additionalChargeDefinitions?.[index]?.price && (
+                <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].price.message}</p>
+              )}
+            </div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="self-center" aria-label="Remove Additional Charge">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent><p>Remove this charge</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </Card>
+      ))}
+      {errors.additionalChargeDefinitions?.root && (
+        <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions.root.message}</p>
+      )}
+    </div>
+  );
+};
+
+
 interface ProductFormProps {
   initialData?: Product | null;
   searchParams?: { [key: string]: string | string[] | undefined };
@@ -222,7 +333,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   const addCategoryToStore = useInventoryStore(state => state.addCategory);
   const getBillsForProduct = useInventoryStore(state => state.getBillsForProduct);
   const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
-  const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001"); // Get companyId
+  const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001"); 
 
   const { toast } = useToast();
   const router = useRouter();
@@ -239,6 +350,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+      additionalChargeDefinitions: [],
     },
   });
 
@@ -253,6 +365,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+      additionalChargeDefinitions: [],
     };
 
     if (isEditing && initialData) {
@@ -277,6 +390,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
           id: v.id, name: v.name,
           options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
+        additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({...ac})) || [],
       };
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
       const initialTrackQuantityFromParams = routeSearchParamsProp.quantity ? true : true;
@@ -287,8 +401,9 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
         description: '', category: '', trackQuantity: initialTrackQuantityFromParams, sku: '',
         costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
-        initialStock: (routeSearchParamsProp.quantity && !hasVariantsForParamsPreFill) ? parseInt(routeSearchParamsProp.quantity as string) : undefined,
+        initialStock: (routeSearchParamsProp.quantity && !hasVariantsForParamsPreFill) ? parseFloat(routeSearchParamsProp.quantity as string) : undefined,
         expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+        additionalChargeDefinitions: [],
       };
     }
     return defaults;
@@ -338,7 +453,8 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       sgstRate: data.sgstRate, cgstRate: data.cgstRate,
       variants: productVariantsPayload,
-      companyId: companyId, // Add companyId
+      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({...ac, id: ac.id || uuidv4() })),
+      companyId: companyId, 
     };
     
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
@@ -519,6 +635,10 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
               {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
             </div>
 
+            <Separator className="my-6"/>
+            <AdditionalChargesFormSection control={control} register={register} errors={errors} setFocus={setFocus}/>
+
+
             {isEditing && initialData && (
               <>
                 <Separator className="my-6"/>
@@ -567,9 +687,9 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
                                               <TableRow key={layer.id}>
                                                 <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
                                                 <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
-                                                <TableCell className="text-right">{layer.initialQuantity}</TableCell>
-                                                <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{layer.initialQuantity - layer.quantity}</TableCell>
-                                                <TableCell className="text-right font-semibold">{layer.quantity}</TableCell>
+                                                <TableCell className="text-right">{layer.initialQuantity.toFixed(2)}</TableCell>
+                                                <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{(layer.initialQuantity - layer.quantity).toFixed(2)}</TableCell>
+                                                <TableCell className="text-right font-semibold">{layer.quantity.toFixed(2)}</TableCell>
                                                 <TableCell className="text-right">
                                                   ₹{typeof layer.costPrice === 'number' ? layer.costPrice.toFixed(2) : '0.00'}
                                                 </TableCell>
@@ -625,7 +745,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
                                                 <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right font-semibold">
-                                                {transactionInfo.quantity} unit(s)
+                                                {transactionInfo.quantity.toFixed(2)} unit(s)
                                                 </TableCell>
                                             </TableRow>
                                         );

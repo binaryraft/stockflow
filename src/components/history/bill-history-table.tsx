@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval } from 'date-fns';
-import type { Bill, ProductSKU, BillMode, BillItem, StockLayer } from '@/types';
+import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription as AlertDialogDesc, AlertDialogFooter as AlertDialogFoot, AlertDialogHeader as AlertDialogHead, AlertDialogTitle as AlertDialogTit, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -25,12 +25,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
-import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
+import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
@@ -76,6 +76,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     getProductById,
     getSkuDetails,
     updateBillNonCriticalDetails,
+    products: allProductsStore // Fetch all products for printing
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -84,6 +85,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       deleteBill: state.deleteBill,
       getSkuDetails: state.getSkuDetails,
       updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
+      products: state.products, // Add this line
     })
   );
   const { toast } = useToast();
@@ -95,7 +97,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
   
-  type BillTypeFilter = 'all' | BillMode | 'estimate'; // Added 'estimate'
+  type BillTypeFilter = 'all' | BillMode | 'estimate'; 
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
@@ -105,7 +107,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     }
     const product = getProductById(productId);
     if (!product) return undefined;
-    if (productId.startsWith('SERVICE_ITEM_')) return undefined; 
+    if (productId.startsWith('SERVICE_ITEM_') || productId.startsWith('CHARGE_ITEM_')) return undefined; 
 
     const targetOptionValues = selectedOptions || {};
     return product.productSKUs.find(sku => 
@@ -261,205 +263,10 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   };
 
 
-  const handlePrintBill = (billToPrint: Bill | null) => {
-    if (!billToPrint || !userProfile) return;
-
-    const printWindow = window.open('', '_blank', 'height=800,width=600');
-    if (printWindow) {
-      printWindow.document.write('<html><head><title>Print Bill</title>');
-      const styles =
-        "<style>\n" +
-        "  body { font-family: Arial, Helvetica, sans-serif; margin: 20px; line-height: 1.6; color: #333; font-size: 10pt; }\n" +
-        "  @page { size: auto; margin: 0.5in; }\n" +
-        "  .print-container { max-width: 750px; margin: auto; }\n" +
-        "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 15px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 6px; page-break-inside: avoid; background-color: #fff; }\n" +
-        "  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 25px; background-color: transparent; border-radius: 0; border-left: 0; border-right: 0; }\n" +
-        "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: bold; color: #000; }\n" +
-        "  .header p { margin: 2px 0; font-size: 9pt; color: #444; }\n" +
-        "  h3, h4 { margin-top: 0; margin-bottom: 8px; font-size: 12pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 4px; color: #111; }\n" +
-        "  h4 { font-size: 10pt; }\n" +
-        "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
-        "  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
-        "  th { background-color: #f7f7f7; font-weight: bold; color: #222; }\n" +
-        "  .text-right { text-align: right; }\n" +
-        "  .font-medium { font-weight: bold; }\n" +
-        "  .text-muted-foreground { color: #555; font-size: 0.9em; }\n" +
-        "  .badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: bold; line-height: 1; text-align: center; white-space: nowrap; vertical-align: baseline; border-radius: 0.375rem; border: 1px solid transparent; }\n" +
-        "  .badge-destructive { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; }\n" +
-        "  .badge-success { color: #155724; background-color: #d4edda; border-color: #c3e6cb; }\n" +
-        "  .badge-paid { color: #155724; background-color: #d4edda; border-color: #c3e6cb; } \n" +
-        "  .badge-unpaid { color: #721c24; background-color: #f8d7da; border-color: #f5c6cb; } \n" +
-        "  .total-row td { font-weight: bold; background-color: #f7f7f7; font-size: 10pt; }\n" +
-        "  .items-section .variant-options { font-size: 0.8em; color: #555; margin-left: 10px; margin-top: 3px; display: block; font-style: italic; }\n" +
-        "  .items-section .item-sub-detail { font-size: 0.85em; color: #444; margin-top: 2px; display: block; } \n" +
-        "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 10px; border-radius: 4px; border: 1px solid #eee; }\n" +
-        "  .no-print { display: none !important; } \n" +
-        "</style>\n";
-      printWindow.document.write(styles);
-      
-      printWindow.document.write('</head><body>');
-      printWindow.document.write('<div class="print-container">');
-
-      printWindow.document.write('<div class="header">');
-      printWindow.document.write(`<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`);
-      printWindow.document.write(`<p>${COMPANY_ADDRESS}</p>`);
-      printWindow.document.write(`<p>${COMPANY_CONTACT}</p>`);
-      printWindow.document.write(`<h2>${billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE' : (billToPrint.type === 'sell' ? 'TAX INVOICE' : getBillTypeName(billToPrint).toUpperCase())}</h2>`);
-      printWindow.document.write('</div>');
-
-      printWindow.document.write('<table style="width:100%; margin-bottom: 20px; border:0;"><tr><td style="width:50%; vertical-align:top; border:0;">');
-      if (billToPrint.vendorOrCustomerName || billToPrint.customerPhone) {
-        printWindow.document.write('<div class="bill-to">');
-        printWindow.document.write(`<h4>${getPartyDetailsTitle(billToPrint.type)}</h4>`);
-        if (billToPrint.vendorOrCustomerName) printWindow.document.write(`<p><strong>${getPartyNameLabel(billToPrint.type)}:</strong> ${billToPrint.vendorOrCustomerName}</p>`);
-        if (billToPrint.customerPhone) printWindow.document.write(`<p><strong>Phone:</strong> ${billToPrint.customerPhone}</p>`);
-        printWindow.document.write('</div>');
-      }
-      printWindow.document.write('</td><td style="width:50%; vertical-align:top; border:0;">');
-      printWindow.document.write('<div class="bill-info text-right">');
-      printWindow.document.write(`<h4>Bill Information</h4>`);
-      printWindow.document.write(`<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`);
-      printWindow.document.write(`<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`);
-      if (!(billToPrint.type === 'sell' && billToPrint.isEstimate)) { // Don't show type if it's already in main header as estimate/invoice
-         printWindow.document.write(`<p><strong>Type:</strong> ${getBillTypeName(billToPrint)}</p>`);
-      }
-      if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy') && !billToPrint.isEstimate) {
-         printWindow.document.write(`<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`);
-      }
-      printWindow.document.write('</div>');
-      printWindow.document.write('</td></tr></table>');
-
-      if (billToPrint.billedByStaffName || billToPrint.storeName) {
-        printWindow.document.write('<div class="billed-by-section">');
-        printWindow.document.write(`<h4>Transaction Origin</h4>`);
-        if (billToPrint.storeName) printWindow.document.write(`<p><strong>Store:</strong> ${billToPrint.storeName}</p>`);
-        if (billToPrint.billedByStaffName) printWindow.document.write(`<p><strong>Billed by:</strong> ${billToPrint.billedByStaffName}</p>`);
-        printWindow.document.write('</div>');
-      }
-
-      printWindow.document.write('<div class="items-section">');
-      printWindow.document.write('<h3>Items</h3>');
-      
-      const showTaxDetailsInItems = billToPrint.type === 'sell' && !billToPrint.isEstimate;
-
-      if (billToPrint.type === 'buy') { 
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product Details</th><th>Purch. Qty</th><th>Sold Qty</th><th>Rem. Qty</th><th>Cost/Unit</th><th>Sell Price (Set)</th><th>Item Total</th></tr></thead><tbody>');
-        billToPrint.items.forEach((item, index) => {
-            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001 );
-            
-            const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
-            const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
-            const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
-            const costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
-            const sellPriceSet = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-
-
-            printWindow.document.write('<tr>');
-            printWindow.document.write(`<td>${index + 1}</td>`);
-            printWindow.document.write(`<td>${item.productName}`);
-            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-              printWindow.document.write('<span class="variant-options">');
-              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
-              printWindow.document.write('</span>');
-            }
-            printWindow.document.write('</td>');
-            printWindow.document.write(`<td class="text-right">${purchasedQty}</td>`);
-            printWindow.document.write(`<td class="text-right" style="color: green;">${soldQty}</td>`);
-            printWindow.document.write(`<td class="text-right font-medium">${remainingQty}</td>`);
-            printWindow.document.write(`<td class="text-right">₹${costPrice.toFixed(2)}</td>`);
-            printWindow.document.write(`<td class="text-right">₹${sellPriceSet.toFixed(2)}</td>`);
-            printWindow.document.write(`<td class="text-right font-medium">₹${(item.quantity * costPrice).toFixed(2)}</td>`);
-            printWindow.document.write('</tr>');
-        });
-      } else { // Sell or Return
-        const itemSubTotalColName = showTaxDetailsInItems ? "Subtotal" : "Item Total";
-        printWindow.document.write('<table><thead><tr><th>#</th><th>Product</th><th>Qty</th><th>Price/Unit</th>');
-        if (showTaxDetailsInItems) {
-          printWindow.document.write('<th>SGST</th><th>CGST</th>');
-        }
-        printWindow.document.write(`<th class="text-right">${itemSubTotalColName}</th></tr></thead><tbody>`);
-        
-        billToPrint.items.forEach((item, index) => {
-            const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-            const itemPreTaxSubtotal = item.quantity * sellPrice;
-            const itemSgst = item.sgstAmount || 0;
-            const itemCgst = item.cgstAmount || 0;
-            const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
-
-            printWindow.document.write('<tr>');
-            printWindow.document.write(`<td>${index + 1}</td>`);
-            printWindow.document.write(`<td>${item.productName}`);
-            if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-              printWindow.document.write('<span class="variant-options">');
-              printWindow.document.write(Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', '));
-              printWindow.document.write('</span>');
-            }
-            if (billToPrint.type === 'return') {
-               if (item.isDefective) {
-                printWindow.document.write(' <span class="badge badge-destructive">Defective</span>');
-              } else {
-                printWindow.document.write(' <span class="badge badge-success">Restocked</span>');
-              }
-            }
-            printWindow.document.write('</td>');
-            printWindow.document.write(`<td class="text-right">${item.quantity}</td>`);
-            printWindow.document.write(`<td class="text-right">₹${sellPrice.toFixed(2)}</td>`);
-            if (showTaxDetailsInItems) {
-              printWindow.document.write(`<td class="text-right">₹${itemSgst.toFixed(2)}</td>`);
-              printWindow.document.write(`<td class="text-right">₹${itemCgst.toFixed(2)}</td>`);
-            }
-            printWindow.document.write(`<td class="text-right font-medium">₹${(showTaxDetailsInItems ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</td>`);
-            printWindow.document.write('</tr>');
-        });
-      }
-      printWindow.document.write('</tbody></table>');
-      printWindow.document.write('</div>');
-
-
-      if (billToPrint.notes) {
-        printWindow.document.write('<div class="notes-section">');
-        printWindow.document.write('<h4>Notes</h4>');
-        printWindow.document.write(`<p class="notes-content">${billToPrint.notes}</p>`);
-        printWindow.document.write('</div>');
-      }
-
-      printWindow.document.write('<div class="summary-section">');
-      printWindow.document.write('<h4>Summary</h4>');
-      printWindow.document.write(`<table style="width: auto; margin-left: auto; border: none;">`); 
-      
-      if (billToPrint.type === 'buy') {
-        const expectedRevenue = billToPrint.items.reduce((acc, item) => {
-            const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-            const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-            const sellPriceForCalc = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-            return acc + (sellPriceForCalc * item.quantity);
-        }, 0);
-        const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-        const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; 
-        printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`);
-        printWindow.document.write(`<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`);
-      } else if (billToPrint.type === 'sell' || billToPrint.type === 'return') {
-         if (showTaxDetailsInItems) { // Bill is a Sales Invoice (not estimate)
-            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Subtotal:</td><td class="text-right" style="border: none;">₹${(billToPrint.subTotal || 0).toFixed(2)}</td></tr>`);
-            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Total SGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`);
-            printWindow.document.write(`<tr><td style="text-align:right; border: none;">Total CGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`);
-         }
-         const totalRowColor = billToPrint.type === 'sell' ? (billToPrint.isEstimate ? '#1d4ed8' : '#166534') : '#b45309';
-         const totalLabel = billToPrint.type === 'sell' && billToPrint.isEstimate ? 'Estimate Total:' : 'Grand Total:';
-         printWindow.document.write(`<tr class="total-row"><td style="text-align:right; border: none; color: ${totalRowColor};"><strong>${totalLabel}</strong></td><td class="text-right" style="border: none; color: ${totalRowColor};"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`);
-      }
-      printWindow.document.write('</table>');
-      printWindow.document.write('</div>');
-
-
-      printWindow.document.write('</div>'); 
-      printWindow.document.write('</body></html>');
-      printWindow.document.close();
-      printWindow.focus();
-      printWindow.print();
-    }
+  const handlePrintSelectedBill = (bill: Bill | null) => {
+    if (!bill || !userProfile) return;
+    const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
+    triggerPrint(printContent);
   };
 
   return (
@@ -488,9 +295,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
               <div className="space-y-6 py-2 px-2">
                 <div className="p-4 border rounded-md bg-card shadow-sm">
-                    <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName || DEFAULT_COMPANY_NAME}</h3>
-                    <p className="text-sm text-muted-foreground">{COMPANY_ADDRESS}</p>
-                    <p className="text-sm text-muted-foreground">{COMPANY_CONTACT}</p>
+                    <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName}</h3>
+                    <p className="text-sm text-muted-foreground">{/* Company Address if available */}</p>
+                    <p className="text-sm text-muted-foreground">{/* Company Contact if available */}</p>
                 </div>
                 <Separator />
 
@@ -637,15 +444,16 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                                   .join('; ')}
                                               </div>
                                           )}
-                                          {sku && skuDetails && typeof skuDetails.totalStock === 'number' && (
+                                          {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
+                                          {sku && skuDetails && typeof skuDetails.totalStock === 'number' && !item.isAdditionalCharge && (
                                               <div className="text-xs text-muted-foreground mt-0.5">
-                                                  Current Total SKU Stock: {skuDetails.totalStock}
+                                                  Current Total SKU Stock: {skuDetails.totalStock.toFixed(2)}
                                               </div>
                                           )}
                                         </TableCell>
-                                        <TableCell className="text-right py-2 align-top">{purchasedQty}</TableCell>
-                                        <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty}</TableCell>
-                                        <TableCell className="text-right py-2 align-top font-semibold">{remainingQty}</TableCell>
+                                        <TableCell className="text-right py-2 align-top">{purchasedQty.toFixed(2)}</TableCell>
+                                        <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty.toFixed(2)}</TableCell>
+                                        <TableCell className="text-right py-2 align-top font-semibold">{remainingQty.toFixed(2)}</TableCell>
                                         <TableCell className="text-right py-2 align-top">₹{costPrice.toFixed(2)}</TableCell>
                                         <TableCell className="text-right py-2 align-top">₹{sellPriceSet.toFixed(2)}</TableCell>
                                         <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * costPrice).toFixed(2)}</TableCell>
@@ -654,14 +462,14 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 })}
                               </TableBody>
                             </>
-                          ) : ( // Sell or Return Bill
+                          ) : ( 
                             <>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="w-[40%]">Product</TableHead>
+                                  <TableHead className="w-[40%]">Product/Charge</TableHead>
                                   <TableHead className="text-right">Qty</TableHead>
                                   <TableHead className="text-right">Price/Unit</TableHead>
-                                  {selectedBill.type==='sell' && !selectedBill.isEstimate && (
+                                  {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge) && (
                                     <>
                                       <TableHead className="text-right">SGST</TableHead>
                                       <TableHead className="text-right">CGST</TableHead>
@@ -677,6 +485,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                   const itemSgst = item.sgstAmount || 0;
                                   const itemCgst = item.cgstAmount || 0;
                                   const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
+                                  const showItemTaxCols = selectedBill.type==='sell' && !selectedBill.isEstimate && !item.isAdditionalCharge;
                                   return (
                                   <TableRow key={item.id || item.productId}>
                                     <TableCell className="py-2 align-top w-[40%]">
@@ -688,22 +497,23 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                             .join('; ')}
                                         </div>
                                       )}
-                                       {selectedBill.type === 'return' && item.isDefective && (
+                                       {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
+                                       {selectedBill.type === 'return' && item.isDefective && !item.isAdditionalCharge && (
                                         <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
                                       )}
-                                      {selectedBill.type === 'return' && !item.isDefective && (
+                                      {selectedBill.type === 'return' && !item.isDefective && !item.isAdditionalCharge && (
                                         <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                                       )}
                                     </TableCell>
-                                    <TableCell className="text-right py-2 align-top">{item.quantity}</TableCell>
+                                    <TableCell className="text-right py-2 align-top">{item.quantity.toFixed(2)}</TableCell>
                                     <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                                     {selectedBill.type==='sell' && !selectedBill.isEstimate && (
+                                     {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge) && (
                                         <>
-                                          <TableCell className="text-right py-2 align-top">₹{itemSgst.toFixed(2)}</TableCell>
-                                          <TableCell className="text-right py-2 align-top">₹{itemCgst.toFixed(2)}</TableCell>
+                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemSgst.toFixed(2)}` : '-'}</TableCell>
+                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemCgst.toFixed(2)}` : '-'}</TableCell>
                                         </>
                                     )}
-                                    <TableCell className="text-right font-medium py-2 align-top">₹{(selectedBill.type === 'sell' && !selectedBill.isEstimate ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
                                   </TableRow>
                                 )})}
                               </TableBody>
@@ -744,7 +554,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                           </div>
                       )}
-                       {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && (selectedBill.totalSGST ?? 0) > 0 && (selectedBill.totalCGST ?? 0) > 0 && (
+                       {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && ((selectedBill.totalSGST ?? 0) > 0 || (selectedBill.totalCGST ?? 0) > 0 || selectedBill.items.some(i => !i.isAdditionalCharge)) && (
                           <>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal (Before Tax):</span>
@@ -790,7 +600,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               <div className="flex gap-2">
                   {!isEditingBillDetails && (
                     <>
-                        <Button variant="outline" onClick={() => handlePrintBill(selectedBill)}>
+                        <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}>
                             <Printer className="mr-2 h-4 w-4" /> Print
                         </Button>
                         <AlertDialog>
@@ -966,7 +776,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                         <DropdownMenuItem onClick={() => handleViewBill(bill)}>
                           <Eye className="mr-2 h-4 w-4" /> View / Edit Details
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePrintBill(bill)}>
+                        <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
                           <Printer className="mr-2 h-4 w-4" /> Print Bill
                         </DropdownMenuItem>
                         <AlertDialog>
