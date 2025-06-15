@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; // Added SheetHeader, SheetTitle
 import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon } from 'lucide-react';
 import { NAV_LINKS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
@@ -53,7 +53,7 @@ export function HeaderMain() {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    window.addEventListener('focus', handleStorageChange);
+    window.addEventListener('focus', handleStorageChange); // Re-check on window focus
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
@@ -69,7 +69,7 @@ export function HeaderMain() {
     localStorage.removeItem('userRole');
     localStorage.removeItem('companyId');
     localStorage.removeItem('assignedStoreIds');
-    sessionStorage.removeItem('lastAuthenticatedStoreId'); // Added
+    sessionStorage.removeItem('lastAuthenticatedStoreId');
 
     setIsUserLoggedIn(false);
     setUserName(null);
@@ -85,6 +85,7 @@ export function HeaderMain() {
 
 
   if (!hasMounted) {
+    // Simplified skeleton for header during initial mount
     return (
       <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
         <div className="flex w-full items-center justify-end gap-2 md:ml-auto">
@@ -110,15 +111,19 @@ export function HeaderMain() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="flex flex-col p-0">
+              <SheetHeader className="p-4 border-b">
+                <SheetTitle asChild>
+                  <Link
+                    href={userRole === 'admin' ? "/admin" : "/"}
+                    className="flex items-center gap-2 text-lg font-semibold"
+                  >
+                    <Package2 className="h-6 w-6 text-primary" />
+                    <span className="">{APP_NAME}</span>
+                  </Link>
+                </SheetTitle>
+              </SheetHeader>
               <nav className="grid gap-2 text-lg font-medium p-4">
-                <Link
-                  href={userRole === 'admin' ? "/admin" : "/"}
-                  className="flex items-center gap-2 text-lg font-semibold mb-4"
-                >
-                  <Package2 className="h-6 w-6 text-primary" />
-                  <span className="">{APP_NAME}</span>
-                </Link>
-                {userRole === 'admin' && NAV_LINKS.map(link => ( 
+                {userRole === 'admin' && NAV_LINKS.map(link => (
                     <Link
                         key={link.href}
                         href={link.href}
