@@ -23,7 +23,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType } from '@/types';
 import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2 } from 'lucide-react';
+import { PlusCircle, Trash2, Percent } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -46,7 +46,6 @@ const newProductDialogSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
-  // For non-variant, non-tracked items, or pre-fill from expense bill
   costPrice: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
@@ -55,9 +54,17 @@ const newProductDialogSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
-  initialStock: z.preprocess( // Only relevant if trackQuantity and pre-filled from billing
+  initialStock: z.preprocess( 
     (val) => (val === "" || val === undefined || val === null ? undefined : parseInt(String(val), 10)),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
+  ),
+  sgstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "SGST rate must be a number" }).min(0, "SGST rate cannot be negative").optional()
+  ),
+  cgstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
 });
@@ -181,7 +188,7 @@ interface NewProductDialogProps {
   onProductAdded: (newProduct: Product) => void;
   initialValues?: {
     name?: string;
-    quantity?: string; // Used for initialStock if tracked
+    quantity?: string; 
     costPrice?: string;
     sellPrice?: string;
   } | null;
@@ -193,7 +200,7 @@ export function NewProductDialog({
   onProductAdded,
   initialValues,
 }: NewProductDialogProps) {
-  const { addProduct, categories, addCategory: addCategoryToStore } = useInventoryStore();
+  const { addProduct, categories, addCategory: addCategoryToStore, companyId: currentCompanyId } = useInventoryStore();
   const { toast } = useToast();
 
   const form = useForm<NewProductDialogFormData>({
@@ -202,10 +209,12 @@ export function NewProductDialog({
       name: initialValues?.name || '',
       description: '',
       category: '',
-      trackQuantity: initialValues?.quantity ? true : true, // Default to true, or true if quantity is prefilled
+      trackQuantity: initialValues?.quantity ? true : true,
       costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
       sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
       initialStock: initialValues?.quantity ? parseInt(initialValues.quantity) : undefined,
+      sgstRate: undefined,
+      cgstRate: undefined,
       variants: [],
     },
   });
@@ -232,6 +241,8 @@ export function NewProductDialog({
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseInt(initialValues.quantity) : undefined,
+        sgstRate: undefined,
+        cgstRate: undefined,
         variants: [],
       });
       setTimeout(() => setFocus('name'), 100);
@@ -252,12 +263,15 @@ export function NewProductDialog({
       addCategoryToStore(data.category!);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStockForTrackedNonVariant?: number } = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string } = {
       name: data.name,
       description: data.description,
       category: data.category,
       trackQuantity: data.trackQuantity,
       variants: productVariantsPayload,
+      sgstRate: data.sgstRate,
+      cgstRate: data.cgstRate,
+      companyId: currentCompanyId,
     };
     
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
@@ -265,14 +279,15 @@ export function NewProductDialog({
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
     if (data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0) && data.initialStock !== undefined) {
-        productToSaveBase.initialStockForTrackedNonVariant = data.initialStock;
+        // The store's addProduct handles initial stock for tracked non-variant via Expense Bills, not directly here.
+        // This initialStock was mainly for form pre-fill, not direct stock setting for tracked items here.
     }
 
 
     const newProduct = addProduct(productToSaveBase);
     toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
     onProductAdded(newProduct);
-    onOpenChange(false); // Close dialog
+    onOpenChange(false); 
   };
 
   return (
@@ -327,6 +342,22 @@ export function NewProductDialog({
                 <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2}/>
               </div>
 
+              <div className="space-y-3 pt-2">
+                <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dialog-sgstRate">SGST Rate (%)</Label>
+                    <Input id="dialog-sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
+                    {errors.sgstRate && <p className="text-xs text-destructive mt-1">{errors.sgstRate.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dialog-cgstRate">CGST Rate (%)</Label>
+                    <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                    {errors.cgstRate && <p className="text-xs text-destructive mt-1">{errors.cgstRate.message}</p>}
+                  </div>
+                </div>
+              </div>
+
               {!hasVariants && (
                 <>
                   {trackQuantityValue && initialValues?.quantity !== undefined && (
@@ -339,13 +370,13 @@ export function NewProductDialog({
                   {(!trackQuantityValue || initialValues?.costPrice !== undefined || initialValues?.sellPrice !== undefined) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1.5">
-                            <Label htmlFor="dialog-costPrice">Cost Price {trackQuantityValue ? "(Optional for first batch)" : ""}</Label>
-                            <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                            <Label htmlFor="dialog-costPrice">Cost Price {trackQuantityValue ? "(Ignored if tracking quantity)" : ""}</Label>
+                            <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" disabled={trackQuantityValue && !hasVariants} />
                             {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
                         </div>
                         <div className="space-y-1.5">
-                            <Label htmlFor="dialog-sellPrice">Sell Price {trackQuantityValue ? "(Optional for first batch)" : ""}</Label>
-                            <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                            <Label htmlFor="dialog-sellPrice">Sell Price {trackQuantityValue ? "(Ignored if tracking quantity)" : ""}</Label>
+                            <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" disabled={trackQuantityValue && !hasVariants} />
                             {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
                         </div>
                     </div>
