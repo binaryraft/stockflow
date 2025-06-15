@@ -31,7 +31,8 @@ export interface ProductSKU {
 export interface AdditionalChargeDefinition {
   id: string;
   name: string;
-  price: number;
+  type: 'fixed' | 'percentage';
+  value: number; // Price if fixed, percentage value if percentage
 }
 
 export interface Product {
@@ -55,7 +56,7 @@ export type BillMode = 'buy' | 'sell' | 'return';
 
 export interface BillItem {
   id: string;
-  productId: string; // Can be real product ID or special ID for charges like 'CHARGE_ITEM_...'
+  productId: string; 
   productName: string;
   quantity: number; // Can be float
   costPrice: number; 
@@ -64,7 +65,8 @@ export interface BillItem {
   selectedVariantOptions?: Record<string, string>;
   sgstAmount?: number; 
   cgstAmount?: number; 
-  isAdditionalCharge?: boolean; // Flag to identify auto-added charges
+  isAdditionalCharge?: boolean; 
+  sourceChargeDefinitionId?: string; // To link back to the original charge definition if needed
 }
 
 export interface Bill {
@@ -136,6 +138,11 @@ export interface SubscriptionPlan {
 
 export interface UserProfile {
   companyName: string;
+  companyLogoUrl?: string;
+  companySlogan?: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  companyGstNo?: string;
   activeSubscriptionId: string;
   dataMode: 'local' | 'global';
 }

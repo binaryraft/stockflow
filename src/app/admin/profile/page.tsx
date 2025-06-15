@@ -10,16 +10,94 @@ import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
-import type { SubscriptionPlan } from '@/types';
-import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail } from 'lucide-react';
+import type { SubscriptionPlan, UserProfile } from '@/types';
+import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
-export default function ProfilePage() {
-  const { userProfile, updateCompanyName, updateSubscription, getActiveSubscriptionPlan } = useInventoryStore();
+interface EditableProfileFieldProps {
+  fieldId: keyof UserProfile;
+  label: string;
+  currentValue: string | undefined;
+  onSave: (newValue: string) => void;
+  inputType?: 'text' | 'textarea' | 'tel' | 'url';
+  placeholder?: string;
+  icon?: React.ElementType;
+  disabled?: boolean;
+}
+
+const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
+  fieldId,
+  label,
+  currentValue,
+  onSave,
+  inputType = 'text',
+  placeholder,
+  icon: Icon,
+  disabled = false,
+}) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [inputValue, setInputValue] = useState(currentValue || '');
   const { toast } = useToast();
 
-  const [companyNameInput, setCompanyNameInput] = useState('');
-  const [isEditingCompanyName, setIsEditingCompanyName] = useState(false);
+  useEffect(() => {
+    setInputValue(currentValue || '');
+  }, [currentValue]);
+
+  const handleSave = () => {
+    if (inputValue.trim() === '' && fieldId === 'companyName') { // Company Name is mandatory
+      toast({ variant: 'destructive', title: 'Error', description: `${label} cannot be empty.` });
+      return;
+    }
+    onSave(inputValue.trim());
+    setIsEditing(false);
+  };
+
+  const InputComponent = inputType === 'textarea' ? Textarea : Input;
+
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={fieldId} className="flex items-center gap-1.5">
+        {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
+        {label}
+      </Label>
+      <div className="flex items-center gap-2">
+        {isEditing ? (
+          <InputComponent
+            id={fieldId}
+            // @ts-ignore
+            type={inputType === 'textarea' ? undefined : inputType}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            placeholder={placeholder || `Enter ${label.toLowerCase()}`}
+            className={cn("flex-grow", inputType === 'textarea' && 'min-h-[60px]')}
+            rows={inputType === 'textarea' ? 3 : undefined}
+            disabled={disabled}
+          />
+        ) : (
+          <div className="flex-grow p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30 text-sm">
+            {currentValue || <span className="text-muted-foreground italic">Not set</span>}
+          </div>
+        )}
+        {isEditing ? (
+          <Button onClick={handleSave} size="sm" disabled={disabled}>
+            <Save className="mr-2 h-4 w-4" /> Save
+          </Button>
+        ) : (
+          <Button variant="outline" size="sm" onClick={() => { setInputValue(currentValue || ''); setIsEditing(true); }} disabled={disabled}>
+            <Edit3 className="mr-2 h-4 w-4" /> Edit
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+};
+
+
+export default function ProfilePage() {
+  const { userProfile, updateUserProfileFields, getActiveSubscriptionPlan } = useInventoryStore();
+  const { toast } = useToast();
+
   const [activePlan, setActivePlan] = useState<SubscriptionPlan | undefined>(undefined);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -29,34 +107,25 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (hasMounted) {
-      setCompanyNameInput(userProfile.companyName);
-      const currentPlan = getActiveSubscriptionPlan();
-      setActivePlan(currentPlan);
+      setActivePlan(getActiveSubscriptionPlan());
     }
   }, [hasMounted, userProfile, getActiveSubscriptionPlan]);
 
-  const handleCompanyNameSave = () => {
-    if (companyNameInput.trim() === '') {
-      toast({ variant: 'destructive', title: 'Error', description: 'Company name cannot be empty.' });
-      return;
-    }
-    updateCompanyName(companyNameInput.trim());
-    setIsEditingCompanyName(false);
-    toast({ title: 'Success', description: 'Company name updated.' });
+  const handleFieldSave = (fieldId: keyof UserProfile, newValue: string) => {
+    updateUserProfileFields({ [fieldId]: newValue } as Partial<UserProfile>);
+    toast({ title: 'Success', description: `${fieldId.replace('company', 'Company ')} updated.` });
   };
-
+  
   const handleSubscriptionSelect = (planId: string) => {
     if (planId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) {
-      // In a real app, this would open a contact form or redirect
       toast({ title: 'Enterprise Plan', description: 'Please contact sales for Enterprise pricing and setup.' });
       return;
     }
-    updateSubscription(planId);
-    // activePlan will be updated by the useEffect watching getActiveSubscriptionPlan
+    updateUserProfileFields({activeSubscriptionId: planId});
     const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
     toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
   };
-  
+
   if (!hasMounted || !activePlan) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-4">
@@ -72,36 +141,70 @@ export default function ProfilePage() {
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
-          <CardTitle>Company Information</CardTitle>
-          <CardDescription>Manage your company details.</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <Building className="h-5 w-5 text-primary"/>Company Information
+          </CardTitle>
+          <CardDescription>Manage your company details. These may be used in invoices and other documents.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="companyName">Company Name</Label>
-            <div className="flex items-center gap-2">
-              {isEditingCompanyName ? (
-                <Input
-                  id="companyName"
-                  value={companyNameInput}
-                  onChange={(e) => setCompanyNameInput(e.target.value)}
-                  className="flex-grow"
-                />
-              ) : (
-                <p className="flex-grow p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">{userProfile.companyName}</p>
-              )}
-              {isEditingCompanyName ? (
-                <Button onClick={handleCompanyNameSave} size="sm">
-                  <Save className="mr-2 h-4 w-4" /> Save
-                </Button>
-              ) : (
-                <Button variant="outline" size="sm" onClick={() => setIsEditingCompanyName(true)}>
-                  <Edit3 className="mr-2 h-4 w-4" /> Edit
-                </Button>
-              )}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <EditableProfileField
+              fieldId="companyName"
+              label="Company Name*"
+              currentValue={userProfile.companyName}
+              onSave={(value) => handleFieldSave('companyName', value)}
+              icon={Building}
+            />
+            <EditableProfileField
+              fieldId="companySlogan"
+              label="Company Slogan"
+              currentValue={userProfile.companySlogan}
+              onSave={(value) => handleFieldSave('companySlogan', value)}
+              icon={PenLine}
+              placeholder="e.g., Quality products, best service!"
+            />
           </div>
+          <EditableProfileField
+            fieldId="companyAddress"
+            label="Company Address"
+            currentValue={userProfile.companyAddress}
+            onSave={(value) => handleFieldSave('companyAddress', value)}
+            inputType="textarea"
+            icon={Info}
+            placeholder="Enter full company address"
+          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <EditableProfileField
+              fieldId="companyPhone"
+              label="Company Phone"
+              currentValue={userProfile.companyPhone}
+              onSave={(value) => handleFieldSave('companyPhone', value)}
+              inputType="tel"
+              icon={Phone}
+              placeholder="e.g., +91 98765 43210"
+            />
+            <EditableProfileField
+              fieldId="companyGstNo"
+              label="Company GST No."
+              currentValue={userProfile.companyGstNo}
+              onSave={(value) => handleFieldSave('companyGstNo', value)}
+              icon={FileText}
+              placeholder="e.g., 29ABCDE1234F1Z5"
+            />
+          </div>
+           <EditableProfileField
+            fieldId="companyLogoUrl"
+            label="Company Logo URL"
+            currentValue={userProfile.companyLogoUrl}
+            onSave={(value) => handleFieldSave('companyLogoUrl', value)}
+            inputType="url"
+            icon={ImageIcon}
+            placeholder="https://example.com/logo.png"
+          />
            <div className="space-y-1.5">
-            <Label>Your Name (Placeholder)</Label>
+            <Label className="flex items-center gap-1.5">
+                <User className="h-4 w-4 text-muted-foreground" /> Your Name (Placeholder)
+            </Label>
             <p className="text-sm text-muted-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">
               Current User (Full user auth not implemented)
             </p>
@@ -114,7 +217,7 @@ export default function ProfilePage() {
           <CardTitle>Subscription Plan</CardTitle>
           <CardDescription>Choose the plan that best fits your business needs. Your current plan is highlighted.</CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4"> {/* Adjusted grid for 4 plans */}
+        <CardContent className="grid gap-6 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
           {SUBSCRIPTION_PLANS.map((plan) => (
             <Card 
               key={plan.id} 
@@ -157,7 +260,7 @@ export default function ProfilePage() {
               <CardFooter>
                 {plan.price === -1 ? (
                     <Button asChild className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                        <a href="mailto:sales@stockflow.app"> {/* Example mailto link */}
+                        <a href="mailto:sales@stockflow.app"> 
                             <Mail className="mr-2 h-4 w-4" /> Contact Sales
                         </a>
                     </Button>

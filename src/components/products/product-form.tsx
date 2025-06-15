@@ -14,7 +14,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign, BadgePercent, HandCoins } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -33,15 +33,25 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { v4 as uuidv4 } from 'uuid';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const additionalChargeDefinitionSchema = z.object({
   id: z.string().default(() => uuidv4()),
   name: z.string().min(1, "Charge name cannot be empty"),
-  price: z.preprocess(
+  type: z.enum(['fixed', 'percentage']).default('fixed'),
+  value: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
-    z.number({ invalid_type_error: "Charge price must be a number" }).min(0, "Charge price must be non-negative")
+    z.number({ invalid_type_error: "Charge value must be a number" }).min(0, "Value must be non-negative")
   ),
+}).refine(data => {
+  if (data.type === 'percentage' && (data.value < 0 || data.value > 100)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Percentage value must be between 0 and 100.",
+  path: ["value"], 
 });
 
 const productOptionSchema = z.object({
@@ -71,7 +81,7 @@ const productFormSchema = z.object({
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
   initialStock: z.preprocess( 
-    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))), // Allow float
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
   sgstRate: z.preprocess(
@@ -201,13 +211,15 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 
 interface AdditionalChargesFormSectionProps {
-  control: any; // Control from useForm
-  register: any; // Register from useForm
-  errors: any; // Errors from formState
+  control: any; 
+  register: any; 
+  errors: any; 
+  watch: any;
+  setValue: any;
   setFocus: any;
 }
 
-const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> = ({ control, register, errors, setFocus }) => {
+const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> = ({ control, register, errors, watch, setValue, setFocus }) => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "additionalChargeDefinitions",
@@ -216,16 +228,17 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
   const handleChargeNameEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      setFocus(`additionalChargeDefinitions.${index}.price`);
+      setFocus(`additionalChargeDefinitions.${index}.value`);
     }
   };
 
-  const handleChargePriceEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+  const handleChargeValueEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
      if (e.key === 'Enter') {
       e.preventDefault();
-      // Optionally, add a new charge or move to next section
-      if (index === fields.length -1) {
-        append({ name: "", price: undefined });
+      const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
+      const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
+      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
+        append({ name: "", type: 'fixed', value: undefined }); // Default new charge to 'fixed'
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
     }
@@ -241,17 +254,19 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
           type="button"
           variant="outline"
           size="sm"
-          onClick={() => append({ name: "", price: undefined })}
+          onClick={() => append({ name: "", type: "fixed", value: undefined })}
         >
-          <PlusCircle className="mr-2 h-4 w-4" /> Add Charge
+          <PlusCircle className="mr-2 h-4 w-4" /> Add Charge Definition
         </Button>
       </div>
       <p className="text-xs text-muted-foreground -mt-2 mb-2">
-        Define any fixed additional charges associated with this product (e.g., Making Charges, Service Fee). These will be added as separate line items in sales bills.
+        Define fixed or percentage-based charges associated with this product (e.g., Making Charges, Service Fee). These will be added as separate line items in sales bills. Percentage is based on the product's line item price.
       </p>
-      {fields.map((field, index) => (
-        <Card key={field.id} className="p-3 bg-tertiary/50 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+      {fields.map((field, index) => {
+        const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
+        return (
+        <Card key={field.id} className="p-4 bg-tertiary/50 shadow-sm">
+          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-4 items-start">
             <div className="space-y-1.5">
               <Label htmlFor={`additionalChargeDefinitions.${index}.name`}>Charge Name*</Label>
               <Input
@@ -264,33 +279,79 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
                 <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].name.message}</p>
               )}
             </div>
+
             <div className="space-y-1.5">
-              <Label htmlFor={`additionalChargeDefinitions.${index}.price`}>Price (₹)*</Label>
-              <Input
-                {...register(`additionalChargeDefinitions.${index}.price`)}
-                id={`additionalChargeDefinitions.${index}.price`}
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                onKeyDown={(e) => handleChargePriceEnter(e, index)}
-              />
-              {errors.additionalChargeDefinitions?.[index]?.price && (
-                <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].price.message}</p>
-              )}
+              <Label>Charge Type*</Label>
+                <Controller
+                    control={control}
+                    name={`additionalChargeDefinitions.${index}.type`}
+                    render={({ field: { onChange, value } }) => (
+                        <RadioGroup
+                            defaultValue="fixed"
+                            value={value}
+                            onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
+                            className="flex items-center gap-3 h-10"
+                        >
+                            <div className="flex items-center space-x-1.5">
+                                <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}-form`} />
+                                <Label htmlFor={`ac-type-fixed-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'fixed' && "text-primary font-semibold")}>
+                                  <HandCoins className={cn("mr-1.5 h-4 w-4", value === 'fixed' ? "text-primary" : "text-muted-foreground")} /> Fixed
+                                </Label>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                                <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}-form`} />
+                                <Label htmlFor={`ac-type-percentage-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'percentage' && "text-primary font-semibold")}>
+                                   <BadgePercent className={cn("mr-1.5 h-4 w-4", value === 'percentage' ? "text-primary" : "text-muted-foreground")} /> Percentage
+                                </Label>
+                            </div>
+                        </RadioGroup>
+                    )}
+                />
             </div>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="self-center" aria-label="Remove Additional Charge">
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Remove this charge</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            
+            <div className="flex items-end gap-2 md:col-span-2">
+                 <div className="space-y-1.5 flex-grow">
+                    <Label htmlFor={`additionalChargeDefinitions.${index}.value`}>
+                    {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
+                    </Label>
+                    <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            {chargeType === 'fixed' ? 
+                                <HandCoins className={cn("h-4 w-4", chargeType === 'fixed' ? "text-primary/70" : "text-muted-foreground")} /> :
+                                <BadgePercent className={cn("h-4 w-4", chargeType === 'percentage' ? "text-primary/70" : "text-muted-foreground")} />
+                            }
+                        </div>
+                        <Input
+                            {...register(`additionalChargeDefinitions.${index}.value`)}
+                            id={`additionalChargeDefinitions.${index}.value`}
+                            type="number"
+                            step={chargeType === 'fixed' ? "0.01" : "0.1"}
+                            placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
+                            className="pl-10"
+                            onKeyDown={(e) => handleChargeValueEnter(e, index)}
+                        />
+                    </div>
+                    {errors.additionalChargeDefinitions?.[index]?.value && (
+                        <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].value.message}</p>
+                    )}
+                    {errors.additionalChargeDefinitions?.[index]?.type && (
+                        <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].type.message}</p>
+                    )}
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="self-center mb-1" aria-label="Remove Additional Charge">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Remove this charge definition</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+            </div>
           </div>
         </Card>
-      ))}
+      )})}
       {errors.additionalChargeDefinitions?.root && (
         <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions.root.message}</p>
       )}
@@ -390,7 +451,12 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
           id: v.id, name: v.name,
           options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
-        additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({...ac})) || [],
+        additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({
+            id: ac.id || uuidv4(),
+            name: ac.name,
+            type: ac.type || 'fixed',
+            value: ac.value,
+        })) || [],
       };
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
       const initialTrackQuantityFromParams = routeSearchParamsProp.quantity ? true : true;
@@ -453,7 +519,12 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       sgstRate: data.sgstRate, cgstRate: data.cgstRate,
       variants: productVariantsPayload,
-      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({...ac, id: ac.id || uuidv4() })),
+      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
+          id: ac.id || uuidv4(), 
+          name: ac.name, 
+          type: ac.type || 'fixed', 
+          value: ac.value
+        })),
       companyId: companyId, 
     };
     
@@ -636,7 +707,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
             </div>
 
             <Separator className="my-6"/>
-            <AdditionalChargesFormSection control={control} register={register} errors={errors} setFocus={setFocus}/>
+            <AdditionalChargesFormSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
 
 
             {isEditing && initialData && (

@@ -23,22 +23,33 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2, Percent, DollarSign } from 'lucide-react';
+import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { v4 as uuidv4 } from 'uuid';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 
 const additionalChargeDefinitionDialogSchema = z.object({
   id: z.string().default(() => uuidv4()),
   name: z.string().min(1, "Charge name cannot be empty"),
-  price: z.preprocess(
+  type: z.enum(['fixed', 'percentage']).default('fixed'),
+  value: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
-    z.number({ invalid_type_error: "Charge price must be a number" }).min(0, "Charge price must be non-negative")
+    z.number({ invalid_type_error: "Charge value must be a number" }).min(0, "Value must be non-negative")
   ),
+}).refine(data => {
+  if (data.type === 'percentage' && (data.value < 0 || data.value > 100)) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Percentage value must be between 0 and 100.",
+  path: ["value"],
 });
+
 
 const productOptionSchema = z.object({
   id: z.string().optional(),
@@ -65,7 +76,7 @@ const newProductDialogSchema = z.object({
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
   initialStock: z.preprocess( 
-    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))), // Allow float
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
   sgstRate: z.preprocess(
@@ -197,10 +208,12 @@ interface AdditionalChargesDialogSectionProps {
   control: any;
   register: any;
   errors: any;
+  watch: any;
+  setValue: any;
   setFocus: any;
 }
 
-const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionProps> = ({ control, register, errors, setFocus }) => {
+const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionProps> = ({ control, register, errors, watch, setValue, setFocus }) => {
   const { fields, append, remove } = useFieldArray({
     control,
     name: "additionalChargeDefinitions",
@@ -209,15 +222,17 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
   const handleChargeNameEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
-      setFocus(`additionalChargeDefinitions.${index}.price`);
+      setFocus(`additionalChargeDefinitions.${index}.value`);
     }
   };
 
-  const handleChargePriceEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+  const handleChargeValueEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
      if (e.key === 'Enter') {
       e.preventDefault();
-      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && watch(`additionalChargeDefinitions.${index}.price`) !== undefined) {
-        append({ name: "", price: undefined });
+      const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
+      const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
+      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
+        append({ name: "", type: 'fixed', value: undefined });
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
     }
@@ -233,59 +248,105 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
           size="sm"
           className="text-xs"
           onClick={() => {
-            append({ name: "", price: undefined });
+            append({ name: "", type: "fixed", value: undefined });
             setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
           }}
         >
           <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Charge
         </Button>
       </div>
-      {fields.map((field, index) => (
-        <div key={field.id} className="flex items-end gap-2 p-2 border rounded-md bg-muted/30">
-          <div className="grid grid-cols-2 gap-2 flex-grow">
-            <div className="space-y-1">
-              <Label htmlFor={`additionalChargeDefinitions.${index}.name`} className="text-xs">Charge Name</Label>
-              <Input
+      {fields.map((field, index) => {
+        const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
+        return (
+            <div key={field.id} className="p-3 border rounded-md bg-muted/30 space-y-2">
+            <div className="flex items-center justify-between">
+                <Label htmlFor={`additionalChargeDefinitions.${index}.name`} className="text-xs font-medium">Charge Name*</Label>
+                <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="h-7 w-7" aria-label="Remove Charge">
+                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Remove this charge</p></TooltipContent>
+                </Tooltip>
+                </TooltipProvider>
+            </div>
+            <Input
                 {...register(`additionalChargeDefinitions.${index}.name`)}
                 id={`additionalChargeDefinitions.${index}.name`}
                 placeholder="e.g., Making Charge"
-                className="h-8 text-xs"
+                className="h-9 text-sm"
                 onKeyDown={(e) => handleChargeNameEnter(e, index)}
-              />
+            />
+            {errors.additionalChargeDefinitions?.[index]?.name && (
+                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].name.message}</p>
+            )}
+
+            <div className="flex items-center gap-3 pt-1">
+                <Label className="text-xs">Type:</Label>
+                <Controller
+                    control={control}
+                    name={`additionalChargeDefinitions.${index}.type`}
+                    render={({ field: { onChange, value } }) => (
+                        <RadioGroup
+                            defaultValue="fixed"
+                            value={value}
+                            onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
+                            className="flex items-center gap-2"
+                        >
+                            <div className="flex items-center space-x-1.5">
+                                <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}`} />
+                                <Label htmlFor={`ac-type-fixed-${index}`} className={cn("text-xs cursor-pointer", value === 'fixed' && "text-primary font-semibold")}>Fixed (₹)</Label>
+                            </div>
+                            <div className="flex items-center space-x-1.5">
+                                <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}`} />
+                                <Label htmlFor={`ac-type-percentage-${index}`} className={cn("text-xs cursor-pointer", value === 'percentage' && "text-primary font-semibold")}>Percentage (%)</Label>
+                            </div>
+                        </RadioGroup>
+                    )}
+                />
             </div>
-            <div className="space-y-1">
-              <Label htmlFor={`additionalChargeDefinitions.${index}.price`} className="text-xs">Price (₹)</Label>
-              <Input
-                {...register(`additionalChargeDefinitions.${index}.price`)}
-                id={`additionalChargeDefinitions.${index}.price`}
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                className="h-8 text-xs"
-                onKeyDown={(e) => handleChargePriceEnter(e, index)}
-              />
+
+            <div className="relative">
+                <Label htmlFor={`additionalChargeDefinitions.${index}.value`} className="text-xs">
+                {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
+                </Label>
+                <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        {chargeType === 'fixed' ? 
+                            <HandCoins className={cn("h-4 w-4 text-muted-foreground", chargeType === 'fixed' && "text-primary/80")} /> :
+                            <BadgePercent className={cn("h-4 w-4 text-muted-foreground", chargeType === 'percentage' && "text-primary/80")} />
+                        }
+                    </div>
+                    <Input
+                        {...register(`additionalChargeDefinitions.${index}.value`)}
+                        id={`additionalChargeDefinitions.${index}.value`}
+                        type="number"
+                        step={chargeType === 'fixed' ? "0.01" : "0.1"}
+                        placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
+                        className="h-9 text-sm pl-10" // Added pl-10 for icon spacing
+                        onKeyDown={(e) => handleChargeValueEnter(e, index)}
+                    />
+                </div>
             </div>
-          </div>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="h-8 w-8" aria-label="Remove Charge">
-                  <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent><p>Remove this charge</p></TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
-      ))}
+            {errors.additionalChargeDefinitions?.[index]?.value && (
+                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].value.message}</p>
+            )}
+             {errors.additionalChargeDefinitions?.[index]?.type && (
+                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].type.message}</p>
+            )}
+            </div>
+        )})}
       {errors.additionalChargeDefinitions?.root && (
         <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions.root.message}</p>
       )}
       {Array.isArray(errors.additionalChargeDefinitions) && errors.additionalChargeDefinitions.map((err: any, i: number) => (
-        (err?.name?.message || err?.price?.message) && (
+        (err?.name?.message || err?.value?.message || err?.type?.message) && (
           <div key={i} className="text-xs text-destructive mt-0.5">
             {err.name?.message && <p>Charge {i+1} Name: {err.name.message}</p>}
-            {err.price?.message && <p>Charge {i+1} Price: {err.price.message}</p>}
+            {err.type?.message && <p>Charge {i+1} Type: {err.type.message}</p>}
+            {err.value?.message && <p>Charge {i+1} Value: {err.value.message}</p>}
           </div>
         )
       ))}
@@ -385,7 +446,11 @@ export function NewProductDialog({
       variants: productVariantsPayload,
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
-      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({...ac, id: ac.id || uuidv4() })),
+      additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
+        ...ac, 
+        id: ac.id || uuidv4(),
+        type: ac.type || 'fixed', // Ensure type is set
+      })) || [],
       companyId: currentCompanyId,
     };
     
@@ -498,7 +563,7 @@ export function NewProductDialog({
               )}
 
               <Separator className="my-4"/>
-              <AdditionalChargesDialogSection control={control} register={register} errors={errors} setFocus={setFocus}/>
+              <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
 
               <Separator className="my-4"/>
               <div className="space-y-3">
@@ -540,4 +605,3 @@ export function NewProductDialog({
 }
     
     
-
