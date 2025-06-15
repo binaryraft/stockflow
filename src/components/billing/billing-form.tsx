@@ -235,7 +235,7 @@ export function BillingForm({
         setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
         setSelectedVariantOptions(sku.optionValues || {});
 
-        if (currentMode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
+        if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
             setCurrentSkuStock(layer.quantity);
             setIsDisplayingLayerStock(true); 
             setCurrentSkuSellPrice(layer.sellPrice);
