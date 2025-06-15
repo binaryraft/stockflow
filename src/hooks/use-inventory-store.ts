@@ -120,6 +120,9 @@ const defaultUserProfile: UserProfile = {
   companyGstNo: '',
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
   dataMode: 'local',
+  defaultBillNotes: '',
+  defaultSalesPaymentStatus: 'paid',
+  defaultPurchasePaymentStatus: 'paid',
 };
 
 export const useInventoryStore = create<InventoryState>()(
@@ -429,7 +432,7 @@ export const useInventoryStore = create<InventoryState>()(
 
           const itemSubTotalPreTax = billItemSellPrice * itemData.quantity;
           
-          if (billData.type === 'sell' && !isSalesEstimate) {
+          if (billData.type === 'sell' && !isSalesEstimate && !itemData.productId.startsWith('SERVICE_ITEM_')) {
               const sgstRate = currentProductRef.sgstRate || 0;
               const cgstRate = currentProductRef.cgstRate || 0;
               itemSgstAmount = (itemSubTotalPreTax * sgstRate) / 100;
@@ -1092,6 +1095,9 @@ export const useInventoryStore = create<InventoryState>()(
               storeUpdated = true;
             }
              state.userProfile.dataMode = state.userProfile.dataMode || 'local';
+             state.userProfile.defaultBillNotes = state.userProfile.defaultBillNotes || '';
+             state.userProfile.defaultSalesPaymentStatus = state.userProfile.defaultSalesPaymentStatus || 'paid';
+             state.userProfile.defaultPurchasePaymentStatus = state.userProfile.defaultPurchasePaymentStatus || 'paid';
           }
 
           if (!Array.isArray(state.categories)) { state.categories = []; storeUpdated = true; }
@@ -1270,3 +1276,4 @@ if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
       (useInventoryStore.getState() as any).__hydrated = true;
   }
 }
+

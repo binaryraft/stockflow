@@ -196,20 +196,37 @@ export function BillingForm({
     setCurrentBillItems([]);
     setCustomerVendorName('');
     setCustomerPhone('');
-    setNotes('');
-    setIsPaid(true);
+    
+    setNotes(userProfile.defaultBillNotes || '');
+    if (mode === 'sell') {
+      setIsPaid(userProfile.defaultSalesPaymentStatus === 'paid');
+    } else if (mode === 'buy') {
+      setIsPaid(userProfile.defaultPurchasePaymentStatus === 'paid');
+    } else {
+      setIsPaid(true); // Default for other modes
+    }
+    
     setIsEstimateMode(false); 
     setServiceDescription('');
     setServiceAmount('');
     resetFormFields(true);
     setPendingBillPayload(null);
     setBillToPotentiallyPrint(null);
-  }, [resetFormFields]);
+  }, [resetFormFields, userProfile, mode]);
 
 
   useEffect(() => {
     setTimeout(() => productNameInputRef.current?.focus(), 50);
-  }, [mode]);
+    // Apply default notes and payment status when mode changes
+    setNotes(userProfile.defaultBillNotes || '');
+    if (mode === 'sell') {
+      setIsPaid(userProfile.defaultSalesPaymentStatus === 'paid');
+    } else if (mode === 'buy') {
+      setIsPaid(userProfile.defaultPurchasePaymentStatus === 'paid');
+    } else {
+      setIsPaid(true);
+    }
+  }, [mode, userProfile]);
 
   const finalStoreIdForSkuDetails = useMemo(() => {
     return isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
@@ -472,14 +489,22 @@ export function BillingForm({
 
     if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0) {
         product.additionalChargeDefinitions.forEach(charge => {
+            let chargeValue = 0;
+            if (charge.type === 'fixed') {
+                chargeValue = charge.value;
+            } else if (charge.type === 'percentage') {
+                chargeValue = ((itemSellPriceForBill * currentQuantity) * charge.value) / 100;
+            }
+
             itemsToAdd.push({
                 id: uuidv4(),
                 productId: `CHARGE_ITEM_${charge.id}`,
                 productName: charge.name,
                 quantity: 1, // Fixed quantity for charges
                 costPrice: 0, // Charges have no cost for this context
-                sellPrice: charge.price,
+                sellPrice: chargeValue,
                 isAdditionalCharge: true,
+                sourceChargeDefinitionId: charge.id,
                 sgstAmount: 0, // Charges are not taxed by product rates here
                 cgstAmount: 0,
             });
@@ -704,6 +729,7 @@ export function BillingForm({
       costPrice: item.costPrice || 0, sellPrice: item.sellPrice || 0, 
       isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
       isAdditionalCharge: item.isAdditionalCharge,
+      sourceChargeDefinitionId: item.sourceChargeDefinitionId,
     }));
 
     const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
@@ -1014,7 +1040,7 @@ export function BillingForm({
                         {currentProductForSelection.trackQuantity && (isDisplayingLayerStock && mode === 'sell' ? "" : " (from oldest batch)")}
                       </span>
                     )}
-                     {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && (
+                     {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && !currentProductForSelection.id?.startsWith('SERVICE_ITEM_') && (
                         <span className="block text-primary/80">
                             Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%
                         </span>
@@ -1324,3 +1350,4 @@ export function BillingForm({
     </div>
   );
 }
+

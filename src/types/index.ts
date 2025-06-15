@@ -145,6 +145,9 @@ export interface UserProfile {
   companyGstNo?: string;
   activeSubscriptionId: string;
   dataMode: 'local' | 'global';
+  defaultBillNotes?: string;
+  defaultSalesPaymentStatus?: 'paid' | 'unpaid';
+  defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
 }
 
 export interface ChatMessage {
@@ -179,3 +182,4 @@ export interface ProductLedgerEntry {
   totalDefectiveReturns: number;
   currentStock: number | 'N/A';
 }
+

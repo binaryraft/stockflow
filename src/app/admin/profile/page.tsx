@@ -11,9 +11,10 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import type { SubscriptionPlan, UserProfile } from '@/types';
-import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info } from 'lucide-react';
+import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import NextImage from 'next/image'; // Renamed to avoid conflict with Lucide's Image
 
 interface EditableProfileFieldProps {
   fieldId: keyof UserProfile;
@@ -99,10 +100,16 @@ export default function ProfilePage() {
   const { toast } = useToast();
 
   const [activePlan, setActivePlan] = useState<SubscriptionPlan | undefined>(undefined);
+  const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [logoPreviewError, setLogoPreviewError] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
+    if (typeof window !== 'undefined') {
+      setLoggedInUserName(localStorage.getItem('userName'));
+    }
   }, []);
 
   useEffect(() => {
@@ -110,10 +117,15 @@ export default function ProfilePage() {
       setActivePlan(getActiveSubscriptionPlan());
     }
   }, [hasMounted, userProfile, getActiveSubscriptionPlan]);
+  
+  useEffect(() => {
+    setLogoPreviewError(false); // Reset error on URL change
+  }, [userProfile.companyLogoUrl]);
+
 
   const handleFieldSave = (fieldId: keyof UserProfile, newValue: string) => {
-    updateUserProfileFields({ [fieldId]: newValue } as Partial<UserProfile>);
-    toast({ title: 'Success', description: `${fieldId.replace('company', 'Company ')} updated.` });
+    updateUserProfileFields({ [fieldId]: newValue } as Partial<UserProfile>); // Type assertion
+    toast({ title: 'Success', description: `${fieldId.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} updated.` });
   };
   
   const handleSubscriptionSelect = (planId: string) => {
@@ -201,12 +213,34 @@ export default function ProfilePage() {
             icon={ImageIcon}
             placeholder="https://example.com/logo.png"
           />
+          {userProfile.companyLogoUrl && (
+            <div className="mt-2 space-y-1.5">
+                <Label className="flex items-center gap-1.5">
+                    <ImageIcon className="h-4 w-4 text-muted-foreground" /> Logo Preview
+                </Label>
+                <div className="p-2 border border-input rounded-md bg-muted/30 flex items-center justify-center min-h-[100px]">
+                {logoPreviewError ? (
+                    <p className="text-xs text-destructive">Could not load image. Check URL.</p>
+                ) : (
+                    <NextImage
+                        src={userProfile.companyLogoUrl}
+                        alt={`${userProfile.companyName || 'Company'} Logo`}
+                        width={128}
+                        height={128}
+                        className="object-contain max-h-[100px] max-w-full rounded"
+                        onError={() => setLogoPreviewError(true)}
+                        unoptimized={true} // Useful if external URLs are varied
+                    />
+                )}
+                </div>
+            </div>
+           )}
            <div className="space-y-1.5">
             <Label className="flex items-center gap-1.5">
-                <User className="h-4 w-4 text-muted-foreground" /> Your Name (Placeholder)
+                <User className="h-4 w-4 text-muted-foreground" /> Logged-in Admin
             </Label>
-            <p className="text-sm text-muted-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">
-              Current User (Full user auth not implemented)
+            <p className="text-sm text-foreground p-2 border border-input rounded-md min-h-[40px] flex items-center bg-muted/30">
+              {loggedInUserName || 'Admin User'}
             </p>
           </div>
         </CardContent>
@@ -260,8 +294,8 @@ export default function ProfilePage() {
               <CardFooter>
                 {plan.price === -1 ? (
                     <Button asChild className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                        <a href="mailto:sales@stockflow.app"> 
-                            <Mail className="mr-2 h-4 w-4" /> Contact Sales
+                        <a href="mailto:sales@stockflow.app" target="_blank" rel="noopener noreferrer"> 
+                            <Mail className="mr-2 h-4 w-4" /> Contact Sales <ExternalLink className="ml-1 h-3 w-3 opacity-70"/>
                         </a>
                     </Button>
                 ) : (
