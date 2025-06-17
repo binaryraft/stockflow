@@ -12,19 +12,19 @@ export interface ProductVariant {
 
 export interface StockLayer {
   id: string;
-  purchaseBillId: string;
-  purchaseDate: string;
+  purchaseBillId: string; // ID of the bill that created this layer
+  purchaseDate: string; // ISO Date string
   initialQuantity: number;
-  quantity: number; // Can be float
-  costPrice: number;
-  sellPrice: number;
-  storeId?: string;
+  quantity: number; // Current remaining quantity in this layer
+  costPrice: number; // Cost per unit for this layer
+  sellPrice: number; // Original intended sell price for this layer (set at purchase time)
+  storeId?: string; // To track stock per store if applicable
 }
 
 export interface ProductSKU {
   id: string;
-  optionValues: Record<string, string>;
-  skuIdentifier?: string;
+  optionValues: Record<string, string>; // e.g., { "Color": "Red", "Size": "M" }
+  skuIdentifier?: string; // e.g., "T-Shirt Red M"
   stockLayers: StockLayer[];
 }
 
@@ -32,7 +32,7 @@ export interface AdditionalChargeDefinition {
   id: string;
   name: string;
   type: 'fixed' | 'percentage';
-  value: number; // Price if fixed, percentage value if percentage
+  value: number;
 }
 
 export interface Product {
@@ -40,54 +40,54 @@ export interface Product {
   name: string;
   category?: string;
   trackQuantity: boolean;
-  sku?: string; 
-  expiryDate?: string;
+  sku?: string; // Base SKU/product code if any
+  expiryDate?: string; // ISO Date string
   imageUrl?: string;
   description?: string;
   variants?: ProductVariant[];
   productSKUs: ProductSKU[];
   companyId: string;
-  sgstRate?: number; 
-  cgstRate?: number; 
+  sgstRate?: number; // Percentage, e.g., 9 for 9%
+  cgstRate?: number; // Percentage
   additionalChargeDefinitions?: AdditionalChargeDefinition[];
 }
 
 export type BillMode = 'buy' | 'sell' | 'return';
 
 export interface BillItem {
-  id: string;
-  productId: string; 
-  productName: string;
-  quantity: number; // Can be float
-  costPrice: number; 
-  sellPrice: number; 
-  isDefective?: boolean;
+  id: string; // Unique ID for this item within the bill
+  productId: string; // Reference to the Product
+  productName: string; // Denormalized for display
+  quantity: number;
+  costPrice: number; // COGS for this item in this bill (for sales/returns), or purchase cost (for buys)
+  sellPrice: number; // Actual sell price for this item in this bill
+  isDefective?: boolean; // For return bills
   selectedVariantOptions?: Record<string, string>;
-  sgstAmount?: number; 
-  cgstAmount?: number; 
-  isAdditionalCharge?: boolean; 
-  sourceChargeDefinitionId?: string; // To link back to the original charge definition if needed
+  sgstAmount?: number; // Calculated SGST for this line item
+  cgstAmount?: number; // Calculated CGST for this line item
+  isAdditionalCharge?: boolean;
+  sourceChargeDefinitionId?: string;
 }
 
 export interface Bill {
-  id:string;
+  id: string; // Unique bill ID
   type: BillMode;
-  date: string; 
-  timestamp: number; 
+  date: string; // ISO Date string of bill creation
+  timestamp: number; // For sorting
   vendorOrCustomerName?: string;
   customerPhone?: string;
   items: BillItem[];
-  totalAmount: number; 
-  subTotal?: number; 
-  totalSGST?: number; 
-  totalCGST?: number; 
-  isEstimate?: boolean; 
+  subTotal?: number; // Sum of (item.sellPrice * item.quantity) PRE-TAX
+  totalSGST?: number;
+  totalCGST?: number;
+  totalAmount: number; // Grand total (subTotal + totalSGST + totalCGST for sales, or just sum of costs for buys)
+  isEstimate?: boolean; // If true, it's a sales estimate, not an actual invoice
   notes?: string;
-  paymentStatus?: 'paid' | 'unpaid';
-  billedByStaffId?: string; 
-  billedByStaffName?: string; 
+  paymentStatus?: 'paid' | 'unpaid'; // For sell and buy bills
+  billedByStaffId?: string;
+  billedByStaffName?: string; // Denormalized
   storeId?: string;
-  storeName?: string;
+  storeName?: string; // Denormalized
   companyId: string;
 }
 
@@ -99,19 +99,19 @@ export interface Category {
 export interface Company {
   id: string;
   name: string;
-  token: string; 
-  activeSubscriptionId: string; // Added for server-side subscription tracking
+  token: string; // Placeholder for API key / secret for company-level API access
+  activeSubscriptionId: string;
 }
 
 export interface User {
   id: string;
   companyId: string;
   name: string;
-  email?: string; 
-  employeeId?: string; 
-  password?: string; 
+  email?: string; // Required for admins, optional for employees
+  employeeId?: string; // For employees
+  password?: string; // Hashed password
   role: 'admin' | 'employee';
-  assignedStoreIds?: string[]; 
+  assignedStoreIds?: string[]; // For employees, stores they can access
 }
 
 export interface Store {
@@ -121,8 +121,8 @@ export interface Store {
   location: string;
   phone: string;
   email: string;
-  passkey: string; 
-  allowedStaffIds: string[]; 
+  passkey: string; // For store terminal login
+  allowedStaffIds: string[]; // Staff specifically allowed in this store. Empty means any assigned staff.
   allowedOperations: BillMode[];
 }
 
@@ -137,15 +137,15 @@ export interface SubscriptionPlan {
   isPopular?: boolean;
 }
 
-export interface UserProfile {
-  companyName: string;
+export interface UserProfile { // Primarily client-side preferences for the logged-in admin
+  companyName: string; // Denormalized from Company for display
   companyLogoUrl?: string;
   companySlogan?: string;
   companyPhone?: string;
   companyAddress?: string;
   companyGstNo?: string;
-  activeSubscriptionId: string; // This will be kept in sync with Company.activeSubscriptionId
-  dataMode: 'local' | 'global'; // May become 'server'
+  activeSubscriptionId: string; // Client-side cache of company's plan
+  dataMode: 'local' | 'global'; // Placeholder for future data source switching
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
@@ -154,23 +154,24 @@ export interface UserProfile {
 export interface ChatMessage {
   id: string;
   storeId: string;
-  senderId: 'admin' | string; 
+  senderId: 'admin' | string; // 'admin' or employee User.id
   senderName: string;
   text: string;
   timestamp: number;
 }
 
+// --- Reporting & Summary Types ---
 export interface FinancialSummary {
   totalRevenue: number;
   totalCOGS: number;
   grossProfit: number;
-  totalExpenses: number;
+  totalExpenses: number; // From 'buy' bills
   netProfit: number;
 }
 
 export interface TodaysFinancialSummary extends FinancialSummary {
-  transactionsToday: number;
-  defectivesToday: number;
+  transactionsToday: number; // Count of all bill types today
+  defectivesToday: number; // Count of items marked defective in returns today
 }
 
 export interface ProductLedgerEntry {
@@ -179,8 +180,7 @@ export interface ProductLedgerEntry {
   category?: string;
   totalPurchased: number;
   totalSold: number;
-  totalRestockedReturns: number;
+  totalRestockedReturns: number; // Non-defective returns
   totalDefectiveReturns: number;
-  currentStock: number | 'N/A';
+  currentStock: number | 'N/A'; // N/A if not tracked
 }
-

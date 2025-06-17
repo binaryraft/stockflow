@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
-import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -59,24 +59,27 @@ const getPartyNameLabel = (billType?: BillMode): string => {
 };
 
 
+export type TimePeriodFilterOption = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom';
+
 interface BillHistoryTableProps {
   filterByStoreId?: string;
   timePeriodFilter: TimePeriodFilterOption;
   customStartDate?: Date;
   customEndDate?: Date;
 }
-export type TimePeriodFilterOption = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'thisYear' | 'custom';
 
 
 export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate }: BillHistoryTableProps) {
   const {
-    bills,
+    bills: allBillsFromStore,
     userProfile,
-    deleteBill,
+    deleteBill: deleteBillFromStore,
     getProductById,
     getSkuDetails,
-    updateBillNonCriticalDetails,
-    products: allProductsStore // Fetch all products for printing
+    updateBillNonCriticalDetails: updateBillDetailsInStore,
+    products: allProductsStore,
+    fetchBills,
+    companyId: currentCompanyId,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -85,7 +88,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       deleteBill: state.deleteBill,
       getSkuDetails: state.getSkuDetails,
       updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
-      products: state.products, // Add this line
+      products: state.products,
+      fetchBills: state.fetchBills,
+      companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null,
     })
   );
   const { toast } = useToast();
@@ -99,6 +104,17 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   
   type BillTypeFilter = 'all' | BillMode | 'estimate'; 
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (currentCompanyId) {
+      setIsLoading(true);
+      fetchBills(currentCompanyId).finally(() => setIsLoading(false));
+    } else {
+      setIsLoading(false); // No companyId, nothing to fetch
+    }
+  }, [currentCompanyId, fetchBills]);
+
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     if (!getProductById) { 
@@ -117,20 +133,31 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   }, [getProductById]);
 
   const filteredAndSortedBills = useMemo(() => {
-    let processBills = [...bills];
+    let processBills = [...allBillsFromStore]; // Use bills from the store
 
     if (filterByStoreId) {
       processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
     }
     
+    // Apply time period filter
     if (timePeriodFilter === 'today') {
       processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
     } else if (timePeriodFilter === 'thisWeek') {
       processBills = processBills.filter(bill => isThisWeek(new Date(bill.timestamp), { weekStartsOn: 1 }));
     } else if (timePeriodFilter === 'thisMonth') {
       processBills = processBills.filter(bill => isThisMonth(new Date(bill.timestamp)));
+    } else if (timePeriodFilter === 'lastMonth') {
+        const today = new Date();
+        const firstDayLastMonth = startOfMonth(subMonths(today, 1));
+        const lastDayLastMonth = endOfMonth(subMonths(today, 1));
+        processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastMonth, end: lastDayLastMonth }));
     } else if (timePeriodFilter === 'thisYear') {
       processBills = processBills.filter(bill => isThisYear(new Date(bill.timestamp)));
+    } else if (timePeriodFilter === 'lastYear') {
+        const today = new Date();
+        const firstDayLastYear = startOfYear(subYears(today, 1));
+        const lastDayLastYear = endOfYear(subYears(today, 1));
+        processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastYear, end: lastDayLastYear }));
     } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
       const start = startOfDay(customStartDate);
       const end = endOfDay(customEndDate);
@@ -203,11 +230,12 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
+        // Default sort by timestamp descending (newest first) if no specific sort is applied
         processBills.sort((a,b) => b.timestamp - a.timestamp); 
     }
 
     return processBills;
-  }, [bills, searchTerm, sortConfig, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]); 
+  }, [allBillsFromStore, searchTerm, sortConfig, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]); 
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -229,9 +257,17 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     setIsViewDialogOpen(true);
   };
 
-  const handleDeleteBillClick = (billId: string, billDisplayId: string) => {
-    deleteBill(billId);
-    toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
+  const handleDeleteBillClick = async (billId: string, billDisplayId: string) => {
+    if (!currentCompanyId) {
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing."});
+        return;
+    }
+    const success = await deleteBillFromStore(billId, currentCompanyId);
+    if (success) {
+        toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
+    } else {
+        toast({ variant: "destructive", title: "Deletion Failed", description: `Could not delete bill ${billDisplayId}.` });
+    }
   };
   
   const handleEnterEditMode = () => {
@@ -246,19 +282,20 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     setIsEditingBillDetails(false);
   };
 
-  const handleSaveBillDetails = () => {
-    if (selectedBill) {
-      updateBillNonCriticalDetails(selectedBill.id, {
+  const handleSaveBillDetails = async () => {
+    if (selectedBill && currentCompanyId) {
+      const updatedBill = await updateBillDetailsInStore(selectedBill.id, {
         paymentStatus: editablePaymentStatus,
         notes: editableNotes,
-      });
-      setSelectedBill(prev => prev ? {
-        ...prev,
-        paymentStatus: editablePaymentStatus,
-        notes: editableNotes
-      } : null);
-      toast({ title: "Bill Updated", description: "Payment status and/or notes have been updated." });
-      setIsEditingBillDetails(false);
+      }, currentCompanyId);
+
+      if (updatedBill) {
+        setSelectedBill(updatedBill); // Update selectedBill with the response from API
+        toast({ title: "Bill Updated", description: "Payment status and/or notes have been updated." });
+        setIsEditingBillDetails(false);
+      } else {
+         toast({ variant: "destructive", title: "Update Failed", description: "Could not update bill details." });
+      }
     }
   };
 
@@ -268,6 +305,13 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
     triggerPrint(printContent);
   };
+  
+  if (isLoading) {
+    return <div className="flex-1 flex items-center justify-center p-6">Loading bill history...</div>;
+  }
+  if (!currentCompanyId && !isLoading) {
+     return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load bills.</div>;
+  }
 
   return (
     <>
@@ -296,8 +340,14 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               <div className="space-y-6 py-2 px-2">
                 <div className="p-4 border rounded-md bg-card shadow-sm">
                     <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName}</h3>
-                    <p className="text-sm text-muted-foreground">{/* Company Address if available */}</p>
-                    <p className="text-sm text-muted-foreground">{/* Company Contact if available */}</p>
+                    {userProfile?.companyAddress && <p className="text-sm text-muted-foreground">{userProfile.companyAddress}</p>}
+                    {(userProfile?.companyPhone || userProfile?.companyGstNo) && (
+                        <p className="text-sm text-muted-foreground">
+                        {userProfile.companyPhone && `Phone: ${userProfile.companyPhone}`}
+                        {userProfile.companyPhone && userProfile.companyGstNo && " | "}
+                        {userProfile.companyGstNo && `GSTIN: ${userProfile.companyGstNo}`}
+                        </p>
+                    )}
                 </div>
                 <Separator />
 
@@ -469,7 +519,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                   <TableHead className="w-[40%]">Product/Charge</TableHead>
                                   <TableHead className="text-right">Qty</TableHead>
                                   <TableHead className="text-right">Price/Unit</TableHead>
-                                  {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge) && (
+                                  {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_')) && (
                                     <>
                                       <TableHead className="text-right">SGST</TableHead>
                                       <TableHead className="text-right">CGST</TableHead>
@@ -485,7 +535,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                   const itemSgst = item.sgstAmount || 0;
                                   const itemCgst = item.cgstAmount || 0;
                                   const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
-                                  const showItemTaxCols = selectedBill.type==='sell' && !selectedBill.isEstimate && !item.isAdditionalCharge;
+                                  const showItemTaxCols = selectedBill.type==='sell' && !selectedBill.isEstimate && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_');
                                   return (
                                   <TableRow key={item.id || item.productId}>
                                     <TableCell className="py-2 align-top w-[40%]">
@@ -507,7 +557,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                     </TableCell>
                                     <TableCell className="text-right py-2 align-top">{item.quantity.toFixed(2)}</TableCell>
                                     <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                                     {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge) && (
+                                     {selectedBill.type==='sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_')) && (
                                         <>
                                           <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemSgst.toFixed(2)}` : '-'}</TableCell>
                                           <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemCgst.toFixed(2)}` : '-'}</TableCell>
@@ -554,7 +604,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                           </div>
                       )}
-                       {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && ((selectedBill.totalSGST ?? 0) > 0 || (selectedBill.totalCGST ?? 0) > 0 || selectedBill.items.some(i => !i.isAdditionalCharge)) && (
+                       {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && ((selectedBill.totalSGST ?? 0) > 0 || (selectedBill.totalCGST ?? 0) > 0 || selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
                           <>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal (Before Tax):</span>
@@ -614,7 +664,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
                                 This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
-                                Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
+                                Stock levels will NOT be automatically readjusted.
                                 </AlertDialogDesc>
                             </AlertDialogHead>
                             <AlertDialogFoot>
@@ -649,9 +699,6 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto bg-background"
         />
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-3 w-full md:w-auto">
-            {/* Date Filter Placeholder - Implemented in AdminBillingPage */}
-        </div>
         <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
             <SelectTrigger className="w-full md:w-[180px] select-trigger-class bg-background">
                 <SelectValue placeholder="Filter by type" />
@@ -790,7 +837,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
                                     This action cannot be undone. This will permanently delete bill ID: {bill.id}.
-                                    Stock levels will NOT be automatically readjusted based on this deletion with current FIFO model.
+                                    Stock levels will NOT be automatically readjusted.
                                 </AlertDialogDesc>
                                 </AlertDialogHead>
                                 <AlertDialogFoot>
@@ -809,7 +856,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             ) : (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center py-3 px-4">
-                  No bills found.
+                  {isLoading ? "Loading bills..." : "No bills found for the selected filters."}
                 </TableCell>
               </TableRow>
             )}

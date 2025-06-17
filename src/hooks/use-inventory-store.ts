@@ -40,13 +40,14 @@ interface InventoryState {
   getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
   getSkuIdentifier: (productName: string, optionValues: Record<string, string>) => string;
 
+  fetchBills: (companyId: string) => Promise<void>;
   addBill: (
     billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName' | 'companyId' | 'subTotal' | 'totalSGST' | 'totalCGST'> & { billedByStaffId?: string; storeId?: string; companyId: string; isEstimate?: boolean },
-    items: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'|'sourceChargeDefinitionId'>[]
-  ) => Bill | null;
-  deleteBill: (billId: string) => void;
+    items: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'|'sourceChargeDefinitionId'| 'costPrice'>[] & {costPrice?:number}[]
+  ) => Promise<Bill | null>;
+  deleteBill: (billId: string, companyId: string) => Promise<boolean>;
   getBillById: (billId: string) => Bill | undefined;
-  updateBillNonCriticalDetails: (billId: string, details: { paymentStatus?: Bill['paymentStatus'], notes?: string }) => void;
+  updateBillNonCriticalDetails: (billId: string, details: { paymentStatus?: Bill['paymentStatus'], notes?: string }, companyId: string) => Promise<Bill | null>;
   getRecentBills: (limit: number) => Bill[];
   getBillsForProduct: (productId: string) => Bill[];
 
@@ -69,7 +70,7 @@ interface InventoryState {
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
 
-  updateUserProfileFields: (data: Partial<UserProfile>) => Promise<void>; // Now async
+  updateUserProfileFields: (data: Partial<UserProfile>) => Promise<void>; 
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
@@ -137,13 +138,8 @@ export const useInventoryStore = create<InventoryState>()(
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
 
-      // --- Product Methods (API driven) ---
       fetchProducts: async (companyId: string) => {
-        if (!companyId) {
-          console.warn("fetchProducts: companyId is required");
-          set({ products: [] });
-          return;
-        }
+        if (!companyId) { console.warn("fetchProducts: companyId is required"); set({ products: [] }); return; }
         try {
           const response = await fetch(`/api/products?companyId=${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
@@ -194,8 +190,6 @@ export const useInventoryStore = create<InventoryState>()(
           } else { console.error("Failed to delete product via API:", result.message); return false; }
         } catch (error) { console.error("Error deleting product via API:", error); return false; }
       },
-
-      // --- Store Methods (API driven) ---
       fetchStores: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStores: companyId is required"); set({ stores: [] }); return; }
         try {
@@ -242,8 +236,6 @@ export const useInventoryStore = create<InventoryState>()(
           } else { console.error("Failed to delete store via API:", result.message); return false; }
         } catch (error) { console.error("Error deleting store via API:", error); return false; }
       },
-
-      // --- Staff Methods (API driven) ---
       fetchStaff: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStaff: companyId is required"); set({ staffs: [] }); return; }
         try {
@@ -291,8 +283,90 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error deleting staff via API:", error); return false; }
       },
 
-      // --- Client-side only methods (or methods operating on client-side cache) ---
-      getSkuIdentifier: (productName, optionValues) => { /* ... (same as before) ... */ 
+      // Bill Management - Now API driven
+      fetchBills: async (companyId: string) => {
+        if (!companyId) { console.warn("fetchBills: companyId is required"); set({ bills: [] }); return; }
+        try {
+          const response = await fetch(`/api/bills?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch bills: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            set({ bills: result.data.sort((a: Bill, b: Bill) => b.timestamp - a.timestamp) });
+          } else {
+            console.error("Failed to fetch bills or data format incorrect:", result.message);
+            set({ bills: [] });
+          }
+        } catch (error) {
+          console.error("Error fetching bills:", error);
+          set({ bills: [] });
+        }
+      },
+      addBill: async (billData, itemsData) => {
+        try {
+          const response = await fetch('/api/bills', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ billData, itemsData }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({ bills: [result.data, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
+            // After a bill, product stock has changed on the server. Re-fetch products.
+            if (billData.companyId) {
+                get().fetchProducts(billData.companyId);
+            }
+            return result.data;
+          } else {
+            console.error("Failed to add bill via API:", result.message);
+            throw new Error(result.message || "Failed to save bill."); // Throw error to be caught by calling component
+          }
+        } catch (error) {
+          console.error("Error adding bill via API:", error);
+          throw error; // Re-throw to be caught by calling component
+        }
+      },
+      deleteBill: async (billId: string, companyId: string) => {
+        try {
+          const response = await fetch(`/api/bills/${billId}?companyId=${companyId}`, { method: 'DELETE' });
+          const result = await response.json();
+          if (result.success) {
+            set((state) => ({ bills: state.bills.filter((b) => b.id !== billId) }));
+            // Potentially re-fetch products if deletion could affect stock (though current API DELETE doesn't do reversal)
+            // get().fetchProducts(companyId);
+            return true;
+          } else {
+            console.error("Failed to delete bill via API:", result.message);
+            return false;
+          }
+        } catch (error) {
+          console.error("Error deleting bill via API:", error);
+          return false;
+        }
+      },
+      updateBillNonCriticalDetails: async (billId, details, companyId) => {
+        try {
+          const response = await fetch(`/api/bills/${billId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...details, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({
+              bills: state.bills.map((b) => (b.id === billId ? result.data : b)),
+            }));
+            return result.data;
+          } else {
+            console.error("Failed to update bill details via API:", result.message);
+            return null;
+          }
+        } catch (error) {
+          console.error("Error updating bill details via API:", error);
+          return null;
+        }
+      },
+
+      getSkuIdentifier: (productName, optionValues) => { 
         if (!productName) return "Unknown Product";
         if (!optionValues || Object.keys(optionValues).length === 0) return productName;
         const sortedOptionsString = Object.entries(optionValues)
@@ -302,7 +376,7 @@ export const useInventoryStore = create<InventoryState>()(
           .join(' - ');
         return sortedOptionsString ? `${productName} (${sortedOptionsString})` : productName;
       },
-      findOrCreateProductSKU: (productId, optionValues) => { /* ... (same as before, operates on client cache) ... */ 
+      findOrCreateProductSKU: (productId, optionValues) => { 
         const products = get().products;
         const productIndex = products.findIndex(p => p.id === productId);
         if (productIndex === -1) return undefined;
@@ -322,6 +396,9 @@ export const useInventoryStore = create<InventoryState>()(
             skuIdentifier: skuIdentifier,
             stockLayers: [],
           };
+          // This client-side update to productSKUs during findOrCreate is problematic if products are primarily server-managed.
+          // The server should ideally handle SKU creation if it doesn't exist when a bill is processed.
+          // For now, keep it, but be aware this might become out of sync if server doesn't return updated product.
           const updatedProductSKUs = [...product.productSKUs, sku];
           const updatedProducts = [...products];
           updatedProducts[productIndex] = { ...product, productSKUs: updatedProductSKUs };
@@ -329,7 +406,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
         return sku;
       },
-      getSkuDetails: (sku, targetStoreId) => { /* ... (same as before) ... */ 
+      getSkuDetails: (sku, targetStoreId) => { 
         const products = get().products;
         const product = products.find(p => p.productSKUs.some(s => s.id === sku?.id));
         const skuIdentifier = sku?.skuIdentifier || (sku && product ? get().getSkuIdentifier(product.name, sku.optionValues) : undefined);
@@ -344,7 +421,7 @@ export const useInventoryStore = create<InventoryState>()(
 
 
         if (product.trackQuantity === false) {
-          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0];
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; // Fallback to any layer if store-specific not found
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -364,7 +441,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (oldestLayerWithStock && typeof oldestLayerWithStock.sellPrice === 'number') {
             currentSellPrice = oldestLayerWithStock.sellPrice;
           }
-        } else if (relevantStockLayers.length > 0) {
+        } else if (relevantStockLayers.length > 0) { // If no stock, use sell price from the newest layer
             const newestLayer = [...relevantStockLayers].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
             if (newestLayer && typeof newestLayer.sellPrice === 'number') {
                 currentSellPrice = newestLayer.sellPrice;
@@ -376,243 +453,24 @@ export const useInventoryStore = create<InventoryState>()(
         if (totalStock > 0) {
             const totalCostValue = relevantStockLayers.reduce((sum, layer) => sum + ((typeof layer.costPrice === 'number' ? layer.costPrice : 0) * (typeof layer.quantity === 'number' ? layer.quantity : 0)), 0);
             averageCostPrice = totalCostValue / totalStock;
-        } else if (relevantStockLayers.length > 0) {
+        } else if (relevantStockLayers.length > 0) { // If no stock, calculate avg cost based on initial quantities of all layers for this SKU
             const totalInitialCost = relevantStockLayers.reduce((sum, layer) => sum + ((typeof layer.costPrice === 'number' ? layer.costPrice : 0) * (typeof layer.initialQuantity === 'number' ? layer.initialQuantity : 0)), 0);
             const totalInitialQty = relevantStockLayers.reduce((sum, layer) => sum + (typeof layer.initialQuantity === 'number' ? layer.initialQuantity : 0), 0);
             if (totalInitialQty > 0) averageCostPrice = totalInitialCost / totalInitialQty;
         }
         return { totalStock, currentSellPrice, averageCostPrice, skuIdentifier };
       },
-      addBill: (billData, billItemsData) => { /* ... (same as before, still operates on client-side products for stock updates) ... */ 
-        const currentDate = new Date();
-        const billTimestamp = currentDate.getTime();
-        const newBillId = format(currentDate, 'ddMMyyHHmmss');
-        let newBillItems: BillItem[] = [];
-        let tempProducts = JSON.parse(JSON.stringify(get().products)) as Product[];
-        let productsUpdated = false;
-        const storeIdForBill = billData.storeId;
-        const companyIdForBill = billData.companyId;
-        const isSalesEstimate = billData.type === 'sell' && billData.isEstimate === true;
-
-        let billSubTotal = 0;
-        let billTotalSGST = 0;
-        let billTotalCGST = 0;
-        
-        const mainProductItemsData = billItemsData.filter(item => !item.productId.startsWith('CHARGE_ITEM_') && !item.productId.startsWith('SERVICE_ITEM_'));
-        const chargeItemsData = billItemsData.filter(item => item.productId.startsWith('CHARGE_ITEM_') || item.productId.startsWith('SERVICE_ITEM_'));
-
-
-        for (const itemData of mainProductItemsData) {
-          const productIndex = tempProducts.findIndex(p => p.id === itemData.productId && p.companyId === companyIdForBill);
-          let product = productIndex !== -1 ? tempProducts[productIndex] : null;
-          
-          if (!product) {
-            console.error(`Product not found for ID: ${itemData.productId} in company ${companyIdForBill}. Skipping item.`);
-            continue;
-          }
-
-          if (billData.type === 'buy' && product && product.trackQuantity === false) {
-             console.error(`Attempt to add non-tracked product ${product.name} to expense bill.`);
-             return null;
-          }
-
-          let sku: ProductSKU | undefined = undefined;
-          let billItemCostPrice = typeof itemData.costPrice === 'number' ? itemData.costPrice : 0;
-          let billItemSellPrice = typeof itemData.sellPrice === 'number' ? itemData.sellPrice : 0; 
-          let itemProductNameForBill = product?.name || 'Unknown Product';
-          let itemSgstAmount = 0;
-          let itemCgstAmount = 0;
-
-          const selectedOpts = itemData.selectedVariantOptions || {};
-          const currentProductRef = tempProducts[productIndex];
-          if (!currentProductRef) { console.error("Product ref disappeared in tempProducts"); continue; }
-
-          const stringifiedTargetOptions = JSON.stringify(Object.fromEntries(Object.entries(selectedOpts).sort()));
-          sku = currentProductRef.productSKUs.find(s =>
-            JSON.stringify(Object.fromEntries(Object.entries(s.optionValues).sort())) === stringifiedTargetOptions
-          );
-
-          if (!sku) {
-            const skuIdentifier = get().getSkuIdentifier(currentProductRef.name, selectedOpts);
-            sku = {
-              id: generateId(), optionValues: { ...selectedOpts }, skuIdentifier: skuIdentifier,
-              stockLayers: [],
-            };
-            currentProductRef.productSKUs.push(sku);
-            productsUpdated = true;
-          }
-          itemProductNameForBill = sku.skuIdentifier || get().getSkuIdentifier(currentProductRef.name, selectedOpts);
-
-          const itemSubTotalPreTax = billItemSellPrice * itemData.quantity;
-          
-          if (billData.type === 'sell' && !isSalesEstimate && !itemData.productId.startsWith('SERVICE_ITEM_')) {
-              const sgstRate = currentProductRef.sgstRate || 0;
-              const cgstRate = currentProductRef.cgstRate || 0;
-              itemSgstAmount = (itemSubTotalPreTax * sgstRate) / 100;
-              itemCgstAmount = (itemSubTotalPreTax * cgstRate) / 100;
-          }
-
-          if (billData.type === 'buy') {
-            if (!currentProductRef.trackQuantity) {
-              console.error(`Attempt to add non-tracked product ${currentProductRef.name} to expense bill.`);
-              return null;
-            }
-            const newLayer: StockLayer = {
-              id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
-              initialQuantity: itemData.quantity, quantity: itemData.quantity,
-              costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
-              storeId: storeIdForBill,
-            };
-            sku.stockLayers.push(newLayer);
-            productsUpdated = true;
-          } else if (billData.type === 'sell') {
-            if (currentProductRef.trackQuantity) {
-              let quantityToSell = itemData.quantity;
-              let costOfGoodsSoldThisItem = 0;
-              const relevantLayers = sku.stockLayers.filter(l => l.storeId === storeIdForBill && l.quantity > 0)
-                                         .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
-
-              for (let i = 0; i < relevantLayers.length && quantityToSell > 0; i++) {
-                const layer = relevantLayers[i];
-                const sellFromThisLayer = Math.min(quantityToSell, layer.quantity);
-                costOfGoodsSoldThisItem += sellFromThisLayer * layer.costPrice;
-
-                const originalSku = tempProducts[productIndex].productSKUs.find(s => s.id === sku!.id);
-                const originalLayer = originalSku?.stockLayers.find(l => l.id === layer.id);
-                if (originalLayer) {
-                  originalLayer.quantity -= sellFromThisLayer;
-                }
-                quantityToSell -= sellFromThisLayer;
-                productsUpdated = true;
-              }
-              if (quantityToSell > 0) {
-                console.error(`Stock ran out for ${itemProductNameForBill} at store ${storeIdForBill}. Remaining: ${quantityToSell}`);
-                return null; 
-              }
-              billItemCostPrice = itemData.quantity > 0 ? costOfGoodsSoldThisItem / itemData.quantity : 0;
-            } else { 
-              const skuDetails = get().getSkuDetails(sku, storeIdForBill);
-              billItemCostPrice = skuDetails.averageCostPrice ?? 0;
-            }
-          } else if (billData.type === 'return') {
-            const skuDetails = get().getSkuDetails(sku, storeIdForBill);
-            billItemCostPrice = skuDetails.averageCostPrice ?? 0;
-            if (currentProductRef.trackQuantity && !itemData.isDefective) {
-              const returnLayer: StockLayer = {
-                id: generateId(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
-                initialQuantity: itemData.quantity, quantity: itemData.quantity,
-                costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
-                storeId: storeIdForBill,
-              };
-              sku.stockLayers.push(returnLayer);
-              productsUpdated = true;
-            }
-          }
-          
-          newBillItems.push({
-            id: generateId(), productName: itemProductNameForBill,
-            productId: itemData.productId, quantity: itemData.quantity,
-            costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
-            isDefective: itemData.isDefective, selectedVariantOptions: itemData.selectedVariantOptions,
-            sgstAmount: itemSgstAmount, cgstAmount: itemCgstAmount,
-            isAdditionalCharge: false,
-          });
-
-          billSubTotal += itemSubTotalPreTax;
-          billTotalSGST += itemSgstAmount;
-          billTotalCGST += itemCgstAmount;
-
-          if (billData.type === 'sell' && currentProductRef.additionalChargeDefinitions && currentProductRef.additionalChargeDefinitions.length > 0) {
-            currentProductRef.additionalChargeDefinitions.forEach(chargeDef => {
-              let chargeValue = 0;
-              if (chargeDef.type === 'fixed') {
-                chargeValue = chargeDef.value;
-              } else if (chargeDef.type === 'percentage') {
-                chargeValue = (itemSubTotalPreTax * chargeDef.value) / 100;
-              }
-              
-              newBillItems.push({
-                id: generateId(), productId: `CHARGE_ITEM_${chargeDef.id}`, productName: chargeDef.name,
-                quantity: 1, costPrice: 0, sellPrice: chargeValue,
-                sgstAmount: 0, cgstAmount: 0, isAdditionalCharge: true, sourceChargeDefinitionId: chargeDef.id,
-              });
-              billSubTotal += chargeValue; // Add charge to subtotal for sales invoices
-            });
-          }
-        }
-        
-        for (const itemData of chargeItemsData) {
-          const billItemCostPrice = billData.type === 'buy' ? (itemData.costPrice ?? 0) : 0;
-          const billItemSellPrice = itemData.sellPrice ?? 0;
-          newBillItems.push({
-            id: generateId(), productId: itemData.productId, productName: itemData.productName || 'Service/Charge',
-            quantity: itemData.quantity, costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
-            isDefective: undefined, selectedVariantOptions: undefined, sgstAmount: 0, cgstAmount: 0, isAdditionalCharge: false,
-          });
-          billSubTotal += billItemSellPrice * itemData.quantity; // Add ad-hoc service/charge to subtotal
-        }
-
-
-        if (productsUpdated) {
-          set({ products: tempProducts }); // This still updates the client-side cache directly for stock.
-        }
-
-        let grandTotalAmount = 0;
-        if (billData.type === 'buy') { 
-          grandTotalAmount = newBillItems.reduce((acc, buyItem) => acc + (buyItem.quantity * (buyItem.costPrice || 0)), 0);
-          billSubTotal = grandTotalAmount; billTotalSGST = 0; billTotalCGST = 0;
-        } else if (billData.type === 'sell') {
-            if (isSalesEstimate) { grandTotalAmount = billSubTotal; billTotalSGST = 0; billTotalCGST = 0; } 
-            else { grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST; }
-        } else { // Return bill
-            grandTotalAmount = billSubTotal; 
-            // For returns, tax reversal logic might be complex and is not fully implemented here.
-            // This assumes subTotal is the amount returned, taxes might need to be calculated based on original sale.
-            // For simplicity now, keeping SGST/CGST as 0 for return total calc unless explicitly set on items.
-             billTotalSGST = newBillItems.reduce((sum, item) => sum + (item.sgstAmount || 0), 0);
-             billTotalCGST = newBillItems.reduce((sum, item) => sum + (item.cgstAmount || 0), 0);
-             grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
-        }
-
-
-        const staffUser = billData.billedByStaffId ? get().getStaffById(billData.billedByStaffId) : undefined;
-        const storeLocation = billData.storeId ? get().getStoreById(billData.storeId) : undefined;
-
-        const newBill: Bill = {
-          id: newBillId, type: billData.type, date: currentDate.toISOString(), timestamp: billTimestamp,
-          vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
-          items: newBillItems, subTotal: billSubTotal, totalSGST: billTotalSGST, totalCGST: billTotalCGST,
-          totalAmount: grandTotalAmount, isEstimate: billData.isEstimate,
-          notes: billData.notes, paymentStatus: billData.paymentStatus,
-          billedByStaffId: staffUser?.id, billedByStaffName: staffUser?.name,
-          storeId: storeLocation?.id, storeName: storeLocation?.name,
-          companyId: companyIdForBill,
-        };
-
-        set((state) => ({ bills: [newBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
-        return newBill;
-      },
-      deleteBill: (billId: string) => { set((state) => ({ bills: state.bills.filter((b) => b.id !== billId) })); },
       getBillById: (billId) => get().bills.find((b) => b.id === billId),
-      updateBillNonCriticalDetails: (billId, details) => { 
-        set((state) => ({
-          bills: state.bills.map((bill) =>
-            bill.id === billId
-              ? { ...bill, paymentStatus: details.paymentStatus !== undefined ? details.paymentStatus : bill.paymentStatus, notes: details.notes !== undefined ? details.notes : bill.notes, }
-              : bill
-          ),
-        }));
-      },
-      getRecentBills: (limit: number) => [...get().bills].slice(0, limit),
+      getRecentBills: (limit: number) => [...get().bills].sort((a,b)=> b.timestamp - a.timestamp).slice(0, limit),
       getBillsForProduct: (productId: string) => get().bills.filter(bill => bill.items.some(item => item.productId === productId)).sort((a, b) => b.timestamp - a.timestamp),
-      addCategory: (categoryName) => { /* ... (same as before) ... */ 
+      addCategory: (categoryName) => { 
         const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
         if (existingCategory) return existingCategory;
         const newCategory: Category = { id: generateId(), name: categoryName };
         set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
       },
-      searchCategories: (searchTerm: string) => { /* ... (same as before) ... */ 
+      searchCategories: (searchTerm: string) => { 
         if (!searchTerm) return get().categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().categories
@@ -645,12 +503,11 @@ export const useInventoryStore = create<InventoryState>()(
                     if (!response.ok) {
                         const errorResult = await response.json();
                         console.error("Failed to update company subscription on server:", errorResult.message);
-                        // Optionally revert client-side change or notify user
-                        set({ userProfile: oldProfile }); // Revert optimistic update
+                        set({ userProfile: oldProfile }); 
                     }
                 } catch (error) {
                     console.error("Error updating company subscription on server:", error);
-                    set({ userProfile: oldProfile }); // Revert optimistic update
+                    set({ userProfile: oldProfile }); 
                 }
             } else {
                 console.warn("Company ID not found in localStorage, cannot sync subscription to server.");
@@ -666,18 +523,16 @@ export const useInventoryStore = create<InventoryState>()(
       canAddStore: () => { 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan) return false;
-        // This relies on `stores` being up-to-date for the current company via `fetchStores`
         return get().stores.length < plan.maxStores;
       },
       canAddStaff: () => { 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan) return false;
-        // This relies on `staffs` being up-to-date for the current company via `fetchStaff`
         return get().staffs.length < plan.maxEmployees;
       },
       getProductById: (productId: string) => get().products.find((p) => p.id === productId),
       getProductByName: (name: string) => get().products.find((p) => p.name.toLowerCase() === name.toLowerCase()),
-      searchProducts: (searchTerm: string) => { /* ... (same as before) ... */ 
+      searchProducts: (searchTerm: string) => { 
         if (!searchTerm) return []; 
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().products.filter(
@@ -688,7 +543,7 @@ export const useInventoryStore = create<InventoryState>()(
             p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm))
         );
       },
-      getLowStockProductCount: (threshold: number) => { /* ... (same as before) ... */ 
+      getLowStockProductCount: (threshold: number) => { 
         return get().products.reduce((count, product) => {
           if (product.trackQuantity) {
             const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, undefined).totalStock ?? 0), 0);
@@ -699,7 +554,7 @@ export const useInventoryStore = create<InventoryState>()(
           return count;
         }, 0);
       },
-      getDailySalesAndExpenses: (days, companyId) => { /* ... (same as before) ... */ 
+      getDailySalesAndExpenses: (days, companyId) => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -724,7 +579,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
         return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse();
       },
-      getTopSellingProductsByRevenue: (limit: number, companyId) => { /* ... (same as before) ... */ 
+      getTopSellingProductsByRevenue: (limit: number, companyId) => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -748,7 +603,7 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, limit);
       },
-      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId) => { /* ... (same as before) ... */ 
+      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId) => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -771,7 +626,7 @@ export const useInventoryStore = create<InventoryState>()(
           return { ...bill, totalCost, potentialRevenue, coverageStatus };
         });
       },
-      getExpenseSummaryStats: (companyId): ExpenseSummary => { /* ... (same as before) ... */ 
+      getExpenseSummaryStats: (companyId): ExpenseSummary => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -812,7 +667,7 @@ export const useInventoryStore = create<InventoryState>()(
           coveredBillCount, uncoveredBillCount,
         };
       },
-      getOverallFinancialSummary: (companyId): FinancialSummary => { /* ... (same as before) ... */ 
+      getOverallFinancialSummary: (companyId): FinancialSummary => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -835,7 +690,7 @@ export const useInventoryStore = create<InventoryState>()(
         const netProfit = grossProfit - totalExpenses;
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
-      getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { /* ... (same as before) ... */ 
+      getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { 
          let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -867,7 +722,7 @@ export const useInventoryStore = create<InventoryState>()(
         const netProfit = grossProfit - totalExpenses;
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, transactionsToday, defectivesToday };
       },
-      getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => { /* ... (same as before) ... */ 
+      getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -900,14 +755,14 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit);
       },
-      getProductLedgerSummary: (params): ProductLedgerEntry[] => { /* ... (same as before) ... */ 
+      getProductLedgerSummary: (params): ProductLedgerEntry[] => { 
         const { companyId, startDate, endDate } = params || {};
         let productsToConsider = get().products;
-        let billsToConsider = get().bills;
+        let billsToConsider = get().bills; // Operate on fetched bills
 
         if (companyId) {
           productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
-          billsToConsider = billsToConsider.filter(b => b.companyId === companyId);
+          // Bills are already company-scoped if fetchBills was called with companyId
         }
         
         if (startDate && endDate) {
@@ -918,7 +773,6 @@ export const useInventoryStore = create<InventoryState>()(
                 return billTimestamp >= start && billTimestamp <= end;
             });
         }
-
 
         const ledgerMap: Record<string, Omit<ProductLedgerEntry, 'productId' | 'productName' | 'currentStock' | 'category'>> = {};
 
@@ -954,6 +808,7 @@ export const useInventoryStore = create<InventoryState>()(
           const summary = ledgerMap[product.id] || {
             totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
           };
+          // Current stock comes from the server-fetched product data
           let currentStock: number | 'N/A' = 'N/A';
           if (product.trackQuantity) {
             currentStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0);
@@ -968,7 +823,7 @@ export const useInventoryStore = create<InventoryState>()(
           };
         }).sort((a, b) => a.productName.localeCompare(b.productName));
       },
-      addChatMessage: (storeId, senderId, senderName, text) => { /* ... (same as before) ... */ 
+      addChatMessage: (storeId, senderId, senderName, text) => { 
         const newMessage: ChatMessage = {
           id: generateId(), storeId, senderId, senderName, text, timestamp: Date.now(),
         };
@@ -979,18 +834,18 @@ export const useInventoryStore = create<InventoryState>()(
           };
         });
       },
-      getMessagesForStore: (storeId: string) => { /* ... (same as before) ... */ 
+      getMessagesForStore: (storeId: string) => { 
         const messages = get().messagesByStore[storeId] || [];
         return [...messages].sort((a, b) => a.timestamp - b.timestamp);
       },
-      clearChatForStore: (storeId: string) => { /* ... (same as before) ... */ 
+      clearChatForStore: (storeId: string) => { 
         set((state) => {
           const newMessagesByStore = { ...state.messagesByStore };
           delete newMessagesByStore[storeId];
           return { messagesByStore: newMessagesByStore };
         });
       },
-      _hydrate: () => { /* ... (same as before, with new UserProfile fields handled) ... */ 
+      _hydrate: () => { 
         try {
           const state = get();
           let storeUpdated = false;
@@ -1212,4 +1067,3 @@ if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
       (useInventoryStore.getState() as any).__hydrated = true;
   }
 }
-
