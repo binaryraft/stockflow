@@ -72,15 +72,14 @@ const productFormSchema = z.object({
   trackQuantity: z.boolean().default(true),
   sku: z.string().optional(), 
   expiryDate: z.string().optional(),
-  costPrice: z.preprocess( // For non-tracked, non-variant items
+  costPrice: z.preprocess( 
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
   ),
-  sellPrice: z.preprocess( // For non-tracked, non-variant items
+  sellPrice: z.preprocess( 
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
-  // initialStock is removed as stock is managed via Expense Bills (API will handle this)
   sgstRate: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "SGST rate must be a number" }).min(0, "SGST rate cannot be negative").optional()
@@ -358,7 +357,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
 
 
 interface ProductFormProps {
-  initialData?: Product | null; // Product from API might not have all client-side computed fields
+  initialData?: Product | null;
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
@@ -388,9 +387,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const { 
     addProduct: addProductToStore, 
     updateProduct: updateProductInStore, 
-    categories, addCategory: addCategoryToStore, 
+    fetchCategories, // Added
+    categories, // Added
+    addCategory: addCategoryToStore, 
     getBillsForProduct, getSkuDetails,
-    // companyId: currentCompanyIdFromStore // This is not how companyId is typically retrieved
   } = useInventoryStore();
 
   const { toast } = useToast();
@@ -399,7 +399,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   
   const [hasMounted, setHasMounted] = useState(false);
   const [productBills, setProductBills] = useState<Bill[]>([]);
-  const [isLoading, setIsLoading] = useState(false); // For API calls
+  const [isLoading, setIsLoading] = useState(false); 
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
 
@@ -410,7 +410,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
-      costPrice: undefined, sellPrice: undefined, // initialStock removed
+      costPrice: undefined, sellPrice: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     },
@@ -431,20 +431,20 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     const storedCompanyId = localStorage.getItem('companyId');
     if (storedCompanyId) {
       setCurrentCompanyId(storedCompanyId);
+      fetchCategories(storedCompanyId); // Fetch categories for the company
     } else {
       console.error("ProductForm: Company ID not found in localStorage.");
       toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage products."});
-      // router.push('/admin'); // Or some other error handling
     }
-  }, [toast, router]);
+  }, [toast, fetchCategories]);
 
-  // Effect to set form default values once initialData (from prop or fetch) and companyId are available
+
   useEffect(() => {
     if (!hasMounted || !currentCompanyId) return;
 
     let defaults: ProductFormData = {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
-      costPrice: undefined, sellPrice: undefined, // initialStock removed
+      costPrice: undefined, sellPrice: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     };
@@ -477,9 +477,8 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
             value: ac.value,
         })) || [],
       };
-      setProductBills(getBillsForProduct(initialData.id)); // Still uses client-side bills
+      setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
-      // Pre-fill from URL params (e.g., from NewProductDialog via BillingForm)
       defaults = {
         name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
         description: '', category: '', trackQuantity: true, sku: '',
@@ -501,6 +500,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
       return;
     }
     setIsLoading(true);
+
+    if (data.category && !categories.find(c => c.name.toLowerCase() === data.category!.toLowerCase() && c.companyId === currentCompanyId)) {
+      await addCategoryToStore(data.category!, currentCompanyId); // Ensure category exists for the company
+    }
 
     const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name, description: data.description, category: data.category,
@@ -557,9 +560,13 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     }
   };
 
-  if (!hasMounted && isEditing) { // Show loader if editing and initial data not yet processed
+  if (!hasMounted && isEditing) {
      return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
   }
+  if (!currentCompanyId && hasMounted) {
+    return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID is missing. Cannot load product form.</div>;
+  }
+
 
   return (
     <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
@@ -847,3 +854,5 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     </Card>
   );
 }
+
+    

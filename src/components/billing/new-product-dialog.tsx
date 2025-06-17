@@ -325,7 +325,7 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
                         type="number"
                         step={chargeType === 'fixed' ? "0.01" : "0.1"}
                         placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
-                        className="h-9 text-sm pl-10" // Added pl-10 for icon spacing
+                        className="h-9 text-sm pl-10"
                         onKeyDown={(e) => handleChargeValueEnter(e, index)}
                     />
                 </div>
@@ -373,8 +373,9 @@ export function NewProductDialog({
   onProductAdded,
   initialValues,
 }: NewProductDialogProps) {
-  const { addProduct, categories, addCategory: addCategoryToStore, companyId: currentCompanyId } = useInventoryStore();
+  const { addProduct, categories, addCategory: addCategoryToStore, fetchCategories } = useInventoryStore();
   const { toast } = useToast();
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
   const form = useForm<NewProductDialogFormData>({
     resolver: zodResolver(newProductDialogSchema),
@@ -403,6 +404,17 @@ export function NewProductDialog({
     control,
     name: "variants",
   });
+  
+  useEffect(() => {
+    const companyIdFromStorage = localStorage.getItem('companyId');
+    if (companyIdFromStorage) {
+      setCurrentCompanyId(companyIdFromStorage);
+      if (isOpen) { // Fetch categories only when dialog opens and companyId is known
+        fetchCategories(companyIdFromStorage);
+      }
+    }
+  }, [isOpen, fetchCategories]);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -424,7 +436,12 @@ export function NewProductDialog({
     }
   }, [isOpen, initialValues, reset, setFocus]);
 
-  const onSubmit = (data: NewProductDialogFormData) => {
+  const onSubmit = async (data: NewProductDialogFormData) => {
+    if (!currentCompanyId) {
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+        return;
+    }
+
     const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
         id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
@@ -434,11 +451,11 @@ export function NewProductDialog({
         }))
     }));
 
-    if (data.category && !categories.some(c => c.name.toLowerCase() === data.category!.toLowerCase())) {
-      addCategoryToStore(data.category!);
+    if (data.category && !categories.find(c => c.name.toLowerCase() === data.category!.toLowerCase() && c.companyId === currentCompanyId)) {
+      await addCategoryToStore(data.category!, currentCompanyId);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string } = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -449,9 +466,8 @@ export function NewProductDialog({
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
         ...ac, 
         id: ac.id || uuidv4(),
-        type: ac.type || 'fixed', // Ensure type is set
+        type: ac.type || 'fixed', 
       })) || [],
-      companyId: currentCompanyId,
     };
     
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
@@ -459,10 +475,14 @@ export function NewProductDialog({
         productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
     
-    const newProduct = addProduct(productToSaveBase);
-    toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
-    onProductAdded(newProduct);
-    onOpenChange(false); 
+    const newProduct = await addProduct(productToSaveBase, currentCompanyId);
+    if (newProduct) {
+      toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
+      onProductAdded(newProduct);
+      onOpenChange(false); 
+    } else {
+       toast({ variant: "destructive", title: "Add Failed", description: "Could not add product via API." });
+    }
   };
 
   return (
@@ -594,7 +614,7 @@ export function NewProductDialog({
                 <DialogClose asChild>
                   <Button type="button" variant="outline">Cancel</Button>
                 </DialogClose>
-                <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Adding...' : 'Add Product'}</Button>
+                <Button type="submit" disabled={isSubmitting || !currentCompanyId}>{isSubmitting ? 'Adding...' : 'Add Product'}</Button>
               </DialogFooter>
             </form>
           </FormProvider>
@@ -603,5 +623,5 @@ export function NewProductDialog({
     </Dialog>
   );
 }
-    
+
     

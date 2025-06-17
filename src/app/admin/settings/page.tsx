@@ -10,37 +10,69 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { UserProfile } from '@/types';
+import type { UserProfile, Company } from '@/types';
 import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info } from 'lucide-react';
 import { useTheme } from "next-themes";
-import { ThemeToggle } from '@/components/layout/theme-toggle'; // Import ThemeToggle
+import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 export default function SettingsPage() {
-  const { userProfile, updateUserProfileFields } = useInventoryStore();
+  const { 
+    userProfile, 
+    updateUserProfileFields, 
+    fetchCompanyProfile 
+  } = useInventoryStore();
   const { toast } = useToast();
-  const { theme } = useTheme(); // Get current theme
+  const { theme } = useTheme();
 
   const [defaultBillNotes, setDefaultBillNotes] = useState('');
   const [defaultSalesPaymentStatus, setDefaultSalesPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [defaultPurchasePaymentStatus, setDefaultPurchasePaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   
   const [hasMounted, setHasMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
-    if (userProfile) {
+    const companyIdFromStorage = localStorage.getItem('companyId');
+    if (companyIdFromStorage) {
+      setCurrentCompanyId(companyIdFromStorage);
+      setIsLoading(true);
+      fetchCompanyProfile(companyIdFromStorage)
+        .then(() => setIsLoading(false))
+        .catch(() => {
+          toast({ variant: "destructive", title: "Error", description: "Could not load company settings." });
+          setIsLoading(false);
+        });
+    } else {
+      toast({ variant: "destructive", title: "Error", description: "Company context not found."});
+      setIsLoading(false);
+    }
+  }, [fetchCompanyProfile, toast]);
+
+  useEffect(() => {
+    if (hasMounted && !isLoading && userProfile) {
       setDefaultBillNotes(userProfile.defaultBillNotes || '');
       setDefaultSalesPaymentStatus(userProfile.defaultSalesPaymentStatus || 'paid');
       setDefaultPurchasePaymentStatus(userProfile.defaultPurchasePaymentStatus || 'paid');
     }
-  }, [userProfile]);
+  }, [hasMounted, isLoading, userProfile]);
 
-  const handleSaveSetting = (field: keyof UserProfile, value: any, successMessage: string) => {
-    updateUserProfileFields({ [field]: value });
-    toast({ title: 'Setting Saved', description: successMessage });
+  const handleSaveSetting = async (field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus'>, value: any, successMessage: string) => {
+    if (!currentCompanyId) {
+      toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot save settings."});
+      return;
+    }
+    try {
+      // updateUserProfileFields now syncs to the Company record on the server
+      await updateUserProfileFields({ [field]: value } as Partial<UserProfile>);
+      toast({ title: 'Setting Saved', description: successMessage });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Save Failed", description: "Could not save setting." });
+    }
   };
 
-  if (!hasMounted || !userProfile) {
+  if (!hasMounted || isLoading || !userProfile || !currentCompanyId) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-4">
         <SettingsIcon className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
@@ -156,7 +188,8 @@ export default function SettingsPage() {
           </ul>
         </CardContent>
       </Card>
-
     </div>
   );
 }
+
+    

@@ -10,17 +10,17 @@ import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
-import type { SubscriptionPlan, UserProfile } from '@/types';
+import type { SubscriptionPlan, UserProfile, Company } from '@/types';
 import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import NextImage from 'next/image'; 
 
 interface EditableProfileFieldProps {
-  fieldId: keyof UserProfile;
+  fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>; // Use Company fields
   label: string;
   currentValue: string | undefined;
-  onSave: (newValue: string) => Promise<void> | void; // Can be async for API calls
+  onSave: (newValue: string) => Promise<void> | void;
   inputType?: 'text' | 'textarea' | 'tel' | 'url';
   placeholder?: string;
   icon?: React.ElementType;
@@ -39,7 +39,7 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(currentValue || '');
-  const [isSaving, setIsSaving] = useState(false); // For async save
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,7 +47,7 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
   }, [currentValue]);
 
   const handleSave = async () => {
-    if (inputValue.trim() === '' && fieldId === 'companyName') {
+    if (inputValue.trim() === '' && fieldId === 'name') { // company name is 'name' in Company type
       toast({ variant: 'destructive', title: 'Error', description: `${label} cannot be empty.` });
       return;
     }
@@ -55,6 +55,7 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
     try {
       await onSave(inputValue.trim());
       setIsEditing(false);
+      toast({ title: 'Success', description: `${label} updated.` });
     } catch (error) {
       console.error("Error saving profile field:", error);
       toast({ variant: 'destructive', title: 'Save Failed', description: `Could not update ${label}.` });
@@ -105,39 +106,57 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
 
 
 export default function ProfilePage() {
-  const { userProfile, updateUserProfileFields, getActiveSubscriptionPlan } = useInventoryStore();
+  const { 
+    userProfile, 
+    updateUserProfileFields, 
+    getActiveSubscriptionPlan,
+    fetchCompanyProfile, // Added
+  } = useInventoryStore();
   const { toast } = useToast();
 
   const [activePlanDetails, setActivePlanDetails] = useState<SubscriptionPlan | undefined>(undefined);
   const [loggedInUserName, setLoggedInUserName] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [logoPreviewError, setLogoPreviewError] = useState(false);
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
 
 
   useEffect(() => {
     setHasMounted(true);
-    if (typeof window !== 'undefined') {
-      setLoggedInUserName(localStorage.getItem('userName'));
-      setCompanyId(localStorage.getItem('companyId'));
+    const companyIdFromStorage = localStorage.getItem('companyId');
+    const userNameFromStorage = localStorage.getItem('userName');
+    
+    if (companyIdFromStorage) {
+      setCurrentCompanyId(companyIdFromStorage);
+      setLoggedInUserName(userNameFromStorage);
+      setIsLoadingProfile(true);
+      fetchCompanyProfile(companyIdFromStorage).finally(() => setIsLoadingProfile(false));
+    } else {
+      toast({ variant: "destructive", title: "Error", description: "Company context not found."});
+      setIsLoadingProfile(false);
     }
-  }, []);
+  }, [fetchCompanyProfile, toast]);
 
   useEffect(() => {
-    if (hasMounted) {
+    if (hasMounted && !isLoadingProfile) { // Ensure profile is loaded before setting plan details
       setActivePlanDetails(getActiveSubscriptionPlan());
     }
-  }, [hasMounted, userProfile, getActiveSubscriptionPlan]);
+  }, [hasMounted, userProfile, getActiveSubscriptionPlan, isLoadingProfile]);
   
   useEffect(() => {
     setLogoPreviewError(false); 
   }, [userProfile.companyLogoUrl]);
 
 
-  const handleFieldSave = async (fieldId: keyof UserProfile, newValue: string) => {
-    // updateUserProfileFields is now async due to potential API call for subscription
+  const handleFieldSave = async (fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>, newValue: string) => {
+    if (!currentCompanyId) {
+       toast({ variant: 'destructive', title: 'Error', description: 'Company context not found.' });
+       return;
+    }
+    // updateUserProfileFields will call the API to update the main Company record
     await updateUserProfileFields({ [fieldId]: newValue } as Partial<UserProfile>); 
-    toast({ title: 'Success', description: `${fieldId.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} updated.` });
+    // Toast is now handled within EditableProfileField on successful save
   };
   
   const handleSubscriptionSelect = async (planId: string) => {
@@ -146,24 +165,24 @@ export default function ProfilePage() {
       return;
     }
     
-    const currentCompanyId = localStorage.getItem('companyId');
     if (!currentCompanyId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Company context not found. Cannot update subscription.' });
         return;
     }
 
     try {
-        await updateUserProfileFields({activeSubscriptionId: planId}); // This will also call the API
+        // This will trigger API call via updateUserProfileFields in store
+        await updateUserProfileFields({activeSubscriptionId: planId}); 
         const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
         toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
-        setActivePlanDetails(getActiveSubscriptionPlan()); // Re-fetch active plan details after update
+        // setActivePlanDetails will update via useEffect reacting to userProfile change
     } catch (error) {
         console.error("Error updating subscription:", error);
         toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update subscription plan.' });
     }
   };
 
-  if (!hasMounted || !activePlanDetails) {
+  if (!hasMounted || isLoadingProfile || !userProfile || !currentCompanyId) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center p-4">
         <User className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
@@ -171,10 +190,13 @@ export default function ProfilePage() {
       </div>
     );
   }
+  
+  const currentActivePlan = getActiveSubscriptionPlan(); // Get latest after potential updates
+
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle title="Profile & Subscription" icon={User} />
+      <PageTitle title="Company Profile & Subscription" icon={User} />
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
@@ -186,54 +208,54 @@ export default function ProfilePage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <EditableProfileField
-              fieldId="companyName"
+              fieldId="name" // Corresponds to Company.name
               label="Company Name*"
               currentValue={userProfile.companyName}
-              onSave={(value) => handleFieldSave('companyName', value)}
+              onSave={(value) => handleFieldSave('name', value)}
               icon={Building}
             />
             <EditableProfileField
-              fieldId="companySlogan"
+              fieldId="slogan"
               label="Company Slogan"
               currentValue={userProfile.companySlogan}
-              onSave={(value) => handleFieldSave('companySlogan', value)}
+              onSave={(value) => handleFieldSave('slogan', value)}
               icon={PenLine}
               placeholder="e.g., Quality products, best service!"
             />
           </div>
           <EditableProfileField
-            fieldId="companyAddress"
+            fieldId="address"
             label="Company Address"
             currentValue={userProfile.companyAddress}
-            onSave={(value) => handleFieldSave('companyAddress', value)}
+            onSave={(value) => handleFieldSave('address', value)}
             inputType="textarea"
             icon={Info}
             placeholder="Enter full company address"
           />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <EditableProfileField
-              fieldId="companyPhone"
+              fieldId="phone"
               label="Company Phone"
               currentValue={userProfile.companyPhone}
-              onSave={(value) => handleFieldSave('companyPhone', value)}
+              onSave={(value) => handleFieldSave('phone', value)}
               inputType="tel"
               icon={Phone}
               placeholder="e.g., +91 98765 43210"
             />
             <EditableProfileField
-              fieldId="companyGstNo"
+              fieldId="gstNo"
               label="Company GST No."
               currentValue={userProfile.companyGstNo}
-              onSave={(value) => handleFieldSave('companyGstNo', value)}
+              onSave={(value) => handleFieldSave('gstNo', value)}
               icon={FileText}
               placeholder="e.g., 29ABCDE1234F1Z5"
             />
           </div>
            <EditableProfileField
-            fieldId="companyLogoUrl"
+            fieldId="logoUrl"
             label="Company Logo URL"
             currentValue={userProfile.companyLogoUrl}
-            onSave={(value) => handleFieldSave('companyLogoUrl', value)}
+            onSave={(value) => handleFieldSave('logoUrl', value)}
             inputType="url"
             icon={ImageIcon}
             placeholder="https://example.com/logo.png"
@@ -282,21 +304,21 @@ export default function ProfilePage() {
               key={plan.id} 
               className={cn(
                 "flex flex-col transition-all hover:shadow-xl",
-                activePlanDetails.id === plan.id ? 'border-primary ring-2 ring-primary shadow-xl relative' : 'border-border hover:border-primary/50'
+                currentActivePlan?.id === plan.id ? 'border-primary ring-2 ring-primary shadow-xl relative' : 'border-border hover:border-primary/50'
               )}
             >
-              {activePlanDetails.id === plan.id && (
+              {currentActivePlan?.id === plan.id && (
                 <div className="absolute -top-3 -right-3 bg-primary text-primary-foreground p-1.5 rounded-full shadow-md">
                   <BadgeCheck className="h-5 w-5" />
                 </div>
               )}
-               {plan.isPopular && activePlanDetails.id !== plan.id && (
+               {plan.isPopular && currentActivePlan?.id !== plan.id && (
                 <div className="absolute top-2 right-2 bg-accent text-accent-foreground px-2 py-0.5 text-xs rounded-full font-semibold shadow">
                   Popular
                 </div>
               )}
               <CardHeader className="pb-4">
-                <CardTitle className={cn("text-xl mb-1", activePlanDetails.id === plan.id && "text-primary")}>{plan.name}</CardTitle>
+                <CardTitle className={cn("text-xl mb-1", currentActivePlan?.id === plan.id && "text-primary")}>{plan.name}</CardTitle>
                 {plan.price === -1 ? (
                     <span className="text-3xl font-bold">Contact Us</span>
                 ) : (
@@ -325,11 +347,11 @@ export default function ProfilePage() {
                     </Button>
                 ) : (
                     <Button
-                    className={cn("w-full", activePlanDetails.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
+                    className={cn("w-full", currentActivePlan?.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
                     onClick={() => handleSubscriptionSelect(plan.id)}
-                    disabled={activePlanDetails.id === plan.id}
+                    disabled={currentActivePlan?.id === plan.id}
                     >
-                    {activePlanDetails.id === plan.id ? 'Current Plan' : 'Choose Plan'}
+                    {currentActivePlan?.id === plan.id ? 'Current Plan' : 'Choose Plan'}
                     </Button>
                 )}
               </CardFooter>
@@ -340,3 +362,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    

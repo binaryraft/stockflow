@@ -4,13 +4,12 @@
 import { useParams } from 'next/navigation';
 import { PageTitle } from '@/components/common/page-title';
 import { ChatInterface } from '@/components/chat/ChatInterface';
-import { MessageSquare, Trash2, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Trash2, AlertTriangle, ChevronLeft } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useEffect, useState } from 'react';
 import type { Store } from '@/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,35 +26,76 @@ import { useToast } from '@/hooks/use-toast';
 export default function AdminStoreChatPage() {
   const params = useParams();
   const storeId = params.storeId as string;
-  const { getStoreById, clearChatForStore } = useInventoryStore((state) => ({
+  const { 
+    getStoreById, 
+    fetchMessagesForStore, 
+    clearChatForStore, 
+    messagesByStore, 
+    companyId: currentCompanyIdFromStoreHook // Not used directly for fetch, companyId from localStorage is used
+  } = useInventoryStore((state) => ({
     getStoreById: state.getStoreById,
+    fetchMessagesForStore: state.fetchMessagesForStore,
     clearChatForStore: state.clearChatForStore,
+    messagesByStore: state.messagesByStore, // To trigger re-renders when messages update
+    companyId: state.userProfile.companyName // This is not companyId, placeholder for actual id
   }));
   const { toast } = useToast();
 
   const [store, setStore] = useState<Store | null | undefined>(undefined); // undefined for loading
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (storeId) {
-      setStore(getStoreById(storeId));
+    const companyIdFromStorage = localStorage.getItem('companyId');
+    if (companyIdFromStorage) {
+      setCurrentCompanyId(companyIdFromStorage);
+    } else {
+      console.error("AdminStoreChatPage: Company ID not found in localStorage.");
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+      setIsLoading(false);
     }
-  }, [storeId, getStoreById]);
+  }, [toast]);
 
-  const handleClearChat = () => {
-    if (storeId) {
-      clearChatForStore(storeId);
-      toast({
-        title: "Chat Cleared",
-        description: `All messages for ${store?.name || 'this store'} have been deleted.`,
-      });
+  useEffect(() => {
+    if (storeId && currentCompanyId) {
+      setIsLoading(true);
+      setStore(getStoreById(storeId)); // Get store details from client cache
+      fetchMessagesForStore(storeId, currentCompanyId).finally(() => setIsLoading(false));
+    } else if (storeId && !currentCompanyId) {
+      // Waiting for companyId
+      setIsLoading(true);
+    } else {
+        setIsLoading(false);
+    }
+  }, [storeId, currentCompanyId, getStoreById, fetchMessagesForStore]);
+
+  const handleClearChat = async () => {
+    if (storeId && currentCompanyId && store) {
+      const success = await clearChatForStore(storeId, currentCompanyId);
+      if (success) {
+        toast({
+          title: "Chat Cleared",
+          description: `All messages for ${store.name} have been deleted.`,
+        });
+      } else {
+         toast({
+          variant: "destructive",
+          title: "Clear Failed",
+          description: `Could not clear chat for ${store.name}.`,
+        });
+      }
     }
   };
 
-  if (store === undefined) {
-    return <div className="flex-1 flex items-center justify-center">Loading store information...</div>;
+  if (isLoading) {
+    return <div className="flex-1 flex items-center justify-center">Loading store and chat information...</div>;
   }
 
-  if (store === null) {
+  if (!currentCompanyId && !isLoading) {
+    return <div className="flex-1 flex items-center justify-center text-destructive">Error: Company ID missing. Cannot load chat.</div>;
+  }
+
+  if (!store && !isLoading) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-4 p-4">
         <p className="text-lg text-destructive">Store not found.</p>
@@ -67,9 +107,15 @@ export default function AdminStoreChatPage() {
       </div>
     );
   }
+  
+  // Fallback if store is somehow null after loading
+  if (!store) {
+      return <div className="flex-1 flex items-center justify-center">Store details unavailable.</div>;
+  }
+
 
   return (
-    <div className="flex flex-col h-[calc(100vh_-_var(--header-height)_-_theme(spacing.12))]"> {/* Adjust for header and page padding */}
+    <div className="flex flex-col h-[calc(100vh_-_var(--header-height)_-_theme(spacing.12))]">
       <PageTitle 
         title={`Chat with ${store.name}`} 
         icon={MessageSquare} 
@@ -107,9 +153,17 @@ export default function AdminStoreChatPage() {
         }
       />
       <div className="flex-1 overflow-hidden">
-        <ChatInterface storeId={store.id} currentUserId="admin" currentUserName="Admin" />
+        {currentCompanyId && (
+          <ChatInterface 
+            storeId={store.id} 
+            currentUserId="admin" 
+            currentUserName="Admin" 
+            // companyId={currentCompanyId} // No longer needed as prop, ChatInterface will get it
+          />
+        )}
       </div>
     </div>
   );
 }
+
     
