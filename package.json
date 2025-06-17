@@ -1,4 +1,3 @@
-
 {
   "name": "nextn",
   "version": "0.1.0",
@@ -34,6 +33,8 @@
     "@radix-ui/react-tooltip": "^1.1.8",
     "@tanstack-query-firebase/react": "^1.0.5",
     "@tanstack/react-query": "^5.66.0",
+    "@zxing/browser": "^0.1.5",
+    "@zxing/library": "^0.21.0",
     "bcryptjs": "^2.4.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

@@ -14,7 +14,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, ScanLine } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -27,6 +27,7 @@ import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { BarcodeScannerModal } from '@/components/common/barcode-scanner-modal';
 
 
 type PendingBillPayload = {
@@ -63,7 +64,8 @@ export function BillingForm({
   const {
     addBill, searchProducts, getProductById, getAllStores, 
     findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
-    getActiveSubscriptionPlan, userProfile, products: allProductsStore
+    getActiveSubscriptionPlan, userProfile, products: allProductsStore,
+    fetchProducts // Added to refresh product list if needed
   } = useInventoryStore(state => ({
     addBill: state.addBill,
     searchProducts: state.searchProducts,
@@ -75,6 +77,7 @@ export function BillingForm({
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     userProfile: state.userProfile,
     products: state.products,
+    fetchProducts: state.fetchProducts,
   }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
 
@@ -121,6 +124,7 @@ export function BillingForm({
 
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
+  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
 
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
@@ -217,7 +221,6 @@ export function BillingForm({
 
   useEffect(() => {
     setTimeout(() => productNameInputRef.current?.focus(), 50);
-    // Apply default notes and payment status when mode changes
     setNotes(userProfile.defaultBillNotes || '');
     if (mode === 'sell') {
       setIsPaid(userProfile.defaultSalesPaymentStatus === 'paid');
@@ -603,7 +606,7 @@ export function BillingForm({
           return updatedItem;
         }
         return item;
-      }).filter(item => item.quantity > 0 || item.isAdditionalCharge) // Keep additional charges even if quantity is 0 (though it's fixed to 1)
+      }).filter(item => item.quantity > 0 || item.isAdditionalCharge) 
     );
   };
 
@@ -653,28 +656,33 @@ export function BillingForm({
   
   const billTotals = useMemo(calculateBillTotals, [currentBillItems, mode, isEstimateMode]);
 
-  const startSaveProcess = (staffId: string, billPayloadToSave: PendingBillPayload) => {
+  const startSaveProcess = async (staffId: string, billPayloadToSave: PendingBillPayload) => {
     if (!billPayloadToSave) {
       toast({ variant: "destructive", title: "Internal Error", description: "No bill data to save." });
       return;
     }
-    const savedBill = addBill(
-      { 
-        type: billPayloadToSave.billType, 
-        billedByStaffId: staffId, 
-        storeId: billPayloadToSave.storeIdForBill, 
-        companyId: companyId, 
-        isEstimate: billPayloadToSave.isEstimate, 
-        ... (({ billType, items, storeIdForBill, isEstimate, ...otherData }) => otherData)(billPayloadToSave)
-      },
-      billPayloadToSave.items
-    );
+    try {
+      const savedBill = await addBill(
+        { 
+          type: billPayloadToSave.billType, 
+          billedByStaffId: staffId, 
+          storeId: billPayloadToSave.storeIdForBill, 
+          companyId: companyId, 
+          isEstimate: billPayloadToSave.isEstimate, 
+          ... (({ billType, items, storeIdForBill, isEstimate, ...otherData }) => otherData)(billPayloadToSave)
+        },
+        billPayloadToSave.items
+      );
 
-    if (savedBill) {
-      setBillToPotentiallyPrint(savedBill);
-      setIsPrintConfirmDialogOpen(true); 
-    } else {
-      toast({ variant: "destructive", title: "Save Failed", description: "Could not save the bill. Please check stock or product details." });
+      if (savedBill) {
+        setBillToPotentiallyPrint(savedBill);
+        setIsPrintConfirmDialogOpen(true); 
+      } else {
+        // addBill should throw on failure if API returns error, caught by catch block below
+      }
+    } catch (error) {
+      console.error("Error during bill save process:", error);
+      toast({ variant: "destructive", title: "Save Failed", description: error instanceof Error ? error.message : "Could not save the bill. Please check stock or product details." });
     }
   };
 
@@ -684,14 +692,12 @@ export function BillingForm({
         const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStore);
         triggerPrint(printContent);
     }
-    // Proceed to success animation regardless of print choice
     if (billToPotentiallyPrint) {
         setLastSavedBillMode(billToPotentiallyPrint.type);
         setLastSavedBillIsEstimate(billToPotentiallyPrint.isEstimate || false);
         setIsSavingAnimationVisible(true);
     }
     setBillToPotentiallyPrint(null);
-    // ResetFullForm is now called by handleAnimationClose
   };
 
   const handleSaveBill = () => {
@@ -842,13 +848,77 @@ export function BillingForm({
       selectedVariantOptions: undefined,
       sgstAmount,
       cgstAmount,
-      isAdditionalCharge: false, // Explicitly false for ad-hoc services
+      isAdditionalCharge: false, 
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
     setServiceDescription('');
     setServiceAmount('');
     setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0); 
+  };
+
+  const handleBarcodeScanSuccess = async (decodedText: string) => {
+    setIsBarcodeScannerOpen(false); // Close scanner first
+    
+    // Attempt to find product by SKU (or base product code)
+    // This is a simplified lookup; a real system might need a dedicated barcode field
+    let foundProduct: Product | undefined = undefined;
+    let foundSku: ProductSKU | undefined = undefined;
+
+    for (const p of allProductsStore) {
+        if (p.sku === decodedText) {
+            foundProduct = p;
+            foundSku = p.productSKUs.find(s => Object.keys(s.optionValues).length === 0); // Default SKU for base product code match
+            break;
+        }
+        for (const s of p.productSKUs) {
+            if (s.skuIdentifier === decodedText) {
+                foundProduct = p;
+                foundSku = s;
+                break;
+            }
+        }
+        if (foundProduct) break;
+    }
+
+    if (foundProduct) {
+        const skuToUse = foundSku || (foundProduct.productSKUs.length > 0 ? foundProduct.productSKUs[0] : { id: foundProduct.id + '_default_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
+        
+        const suggestion: ProductSearchSuggestion = {
+            product: foundProduct,
+            sku: skuToUse,
+            displayInfo: {
+                name: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).skuIdentifier || foundProduct.name,
+                stock: foundProduct.trackQuantity ? (getSkuDetails(skuToUse, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
+                price: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
+            }
+        };
+        handleProductSelectFromSearch(suggestion);
+        toast({ title: "Barcode Scanned", description: `Product: ${suggestion.displayInfo.name}` });
+        
+        // Optional: auto-add item if quantity is 1 and no variants to select
+        if ( (!foundProduct.variants || foundProduct.variants.length === 0) && (parseFloat(quantity.toString()) === 1 || quantity === '') ) {
+            // Need to set fields as handleAddNewItem reads them
+            setQuantity(1); // Ensure quantity is 1
+            const sellPriceToUse = getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice;
+            setSellPrice(sellPriceToUse !== null ? sellPriceToUse.toString() : '');
+            // This timeout allows state to update before calling handleAddNewItem
+            setTimeout(() => {
+                 handleAddNewItem();
+            }, 100);
+        }
+
+
+    } else {
+        toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${decodedText}` });
+        setProductNameQuery(decodedText); // Put scanned code in search for manual creation/search
+        productNameInputRef.current?.focus();
+    }
+  };
+
+  const handleBarcodeScanError = (error: Error) => {
+    toast({ variant: "destructive", title: "Barcode Scan Error", description: error.message || "Could not scan barcode." });
+    setIsBarcodeScannerOpen(false);
   };
 
 
@@ -912,6 +982,12 @@ export function BillingForm({
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
+       <BarcodeScannerModal
+        isOpen={isBarcodeScannerOpen}
+        onOpenChange={setIsBarcodeScannerOpen}
+        onScanSuccess={handleBarcodeScanSuccess}
+        onScanError={handleBarcodeScanError}
+      />
 
       <div className="flex justify-center">
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
@@ -988,7 +1064,7 @@ export function BillingForm({
             <div className={cn(
               "grid gap-4 items-baseline", 
               "grid-cols-1", 
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto]" 
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]" // Adjusted for barcode button
             )}>
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name / SKU</Label>
@@ -1013,6 +1089,16 @@ export function BillingForm({
                     className="flex-grow"
                     currentMode={mode}
                   />
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={() => setIsBarcodeScannerOpen(true)} className="shrink-0" aria-label="Scan Barcode">
+                            <ScanLine className="h-5 w-5 text-primary" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Scan Product Barcode</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (
                     <TooltipProvider>
                       <Tooltip>
@@ -1062,7 +1148,7 @@ export function BillingForm({
                   ref={quantityInputRef}
                   type="number"
                   value={quantity}
-                  onChange={(e) => setQuantity(parseFloat(e.target.value) || '')}
+                  onChange={(e) => setQuantity(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
                   onFocus={(e) => e.target.select()}
                   step="any"
@@ -1080,7 +1166,7 @@ export function BillingForm({
                       ref={costPriceInputRef}
                       type="number"
                       value={costPrice}
-                      onChange={(e) => setCostPrice(parseFloat(e.target.value) || '')}
+                      onChange={(e) => setCostPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
                       onFocus={(e) => e.target.select()}
                       step="0.01" min="0" placeholder="0.00"
@@ -1093,7 +1179,7 @@ export function BillingForm({
                       ref={sellPriceBatchInputRef}
                       type="number"
                       value={sellPrice} 
-                      onChange={(e) => setSellPrice(parseFloat(e.target.value) || '')}
+                      onChange={(e) => setSellPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                       onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
                       onFocus={(e) => e.target.select()}
                       step="0.01" min="0" placeholder="0.00"
@@ -1239,7 +1325,7 @@ export function BillingForm({
                     ref={serviceAmountInputRef}
                     type="number"
                     value={serviceAmount}
-                    onChange={(e) => setServiceAmount(parseFloat(e.target.value) || '')}
+                    onChange={(e) => setServiceAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                     placeholder="0.00"
                     step="0.01"
                     min="0"
