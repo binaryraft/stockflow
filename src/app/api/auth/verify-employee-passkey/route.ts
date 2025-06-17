@@ -1,25 +1,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { readDB } from '@/lib/db-access';
 import type { User, Store } from '@/types';
-
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-
-interface Database {
-  users: User[];
-  stores: Store[];
-}
-
-async function readDB(): Promise<Database> {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data) as Database;
-  } catch (error) {
-    console.error("Error reading DB for employee verification:", error);
-    return { users: [], stores: [] };
-  }
-}
+import bcrypt from 'bcryptjs';
 
 export async function POST(req: NextRequest) {
   try {
@@ -31,38 +14,51 @@ export async function POST(req: NextRequest) {
 
     const db = await readDB();
 
-    // Find the employee by password and companyId
-    // In a real app, employeeId would be better than password for lookup, or use a session token.
-    // Here, 'password' for employee is their passkey for operations.
-    const employee = db.users.find(u => 
+    // Find the employee by companyId and verify password (assuming employeePassword is their main login password)
+    // This implies employees use their main account password for this operational verification.
+    // If a simpler, separate "operational passkey" was intended, this logic would differ.
+    
+    // First, find employees of the company
+    const companyEmployees = db.users.filter(u => 
       u.role === 'employee' && 
-      u.password === employeePassword && // Using main password as their operational passkey
       u.companyId === companyId
     );
 
-    if (!employee) {
+    let authenticatedEmployee: User | undefined = undefined;
+    for (const emp of companyEmployees) {
+        if (emp.password && bcrypt.compareSync(employeePassword, emp.password)) {
+            authenticatedEmployee = emp;
+            break;
+        }
+    }
+
+
+    if (!authenticatedEmployee) {
       return NextResponse.json({ success: false, message: 'Invalid employee credentials or employee does not belong to this company.' }, { status: 401 });
     }
 
-    // Check if the employee is assigned to the store or if store allows all company employees
     const store = db.stores.find(s => s.id === storeId && s.companyId === companyId);
     if (!store) {
       return NextResponse.json({ success: false, message: 'Store not found or does not belong to this company.' }, { status: 404 });
     }
 
-    const isExplicitlyAllowed = store.allowedStaffIds.includes(employee.id);
-    const isGenerallyAllowed = store.allowedStaffIds.length === 0; // If no specific staff, any company employee assigned to ANY store might be allowed (depends on business rule).
-                                                                 // For this prototype, if employee is assigned to *this* store, or if allowedStaffIds is empty AND employee is assigned to *any* store in the company
-    const isAssignedToThisStore = employee.assignedStoreIds?.includes(storeId);
+    const isExplicitlyAllowed = store.allowedStaffIds?.includes(authenticatedEmployee.id);
+    
+    // An employee is considered generally allowed if:
+    // 1. The store's allowedStaffIds list is empty (meaning no specific restrictions)
+    // 2. AND the employee is assigned to *this specific store* in their User profile.
+    const isGenerallyAllowedIfAssigned = 
+        (!store.allowedStaffIds || store.allowedStaffIds.length === 0) && 
+        (authenticatedEmployee.assignedStoreIds?.includes(storeId) ?? false);
 
-    if (isExplicitlyAllowed || (isGenerallyAllowed && isAssignedToThisStore)) {
-      // Return minimal necessary employee info (excluding sensitive data like password)
+    if (isExplicitlyAllowed || isGenerallyAllowedIfAssigned) {
+      const { password, ...employeeWithoutPassword } = authenticatedEmployee;
       return NextResponse.json({
         success: true,
-        employee: {
-          id: employee.id,
-          name: employee.name,
-          employeeId: employee.employeeId,
+        employee: { // Return minimal necessary employee info
+          id: employeeWithoutPassword.id,
+          name: employeeWithoutPassword.name,
+          employeeId: employeeWithoutPassword.employeeId,
         }
       });
     } else {

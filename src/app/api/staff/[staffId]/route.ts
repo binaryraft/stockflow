@@ -1,22 +1,29 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
-import type { User } from '@/types'; // User type represents staff
+import type { User } from '@/types'; 
+import bcrypt from 'bcryptjs';
 
-// GET a single staff member by ID (might not be strictly needed)
+const SALT_ROUNDS = 10;
+
 export async function GET(req: NextRequest, { params }: { params: { staffId: string } }) {
   try {
     const { staffId } = params;
-    // const { searchParams } = new URL(req.url); // Potentially get companyId
-    // const companyId = searchParams.get('companyId');
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('companyId');
+
+    if (!companyId) {
+        return NextResponse.json({ success: false, message: 'Company ID is required for authorization' }, { status: 400 });
+    }
 
     const db = await readDB();
-    const staffMember = db.users.find(u => u.id === staffId && u.role === 'employee'); // Add && u.companyId === companyId
+    const staffMember = db.users.find(u => u.id === staffId && u.role === 'employee' && u.companyId === companyId);
 
     if (!staffMember) {
-      return NextResponse.json({ success: false, message: 'Staff member not found' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Staff member not found or not part of this company' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, data: staffMember });
+    const { password, ...staffWithoutPassword } = staffMember;
+    return NextResponse.json({ success: true, data: staffWithoutPassword });
   } catch (error) {
     console.error(`API GET /api/staff/${params.staffId} error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred';
@@ -24,12 +31,11 @@ export async function GET(req: NextRequest, { params }: { params: { staffId: str
   }
 }
 
-// PUT (update) a staff member by ID
 export async function PUT(req: NextRequest, { params }: { params: { staffId: string } }) {
   try {
     const { staffId } = params;
     const body = await req.json();
-    const { staffData, companyId } = body; // Expect staffData and companyId to verify ownership
+    const { staffData, companyId } = body; 
 
     if (!companyId || !staffData) {
       return NextResponse.json({ success: false, message: 'Company ID and staff data are required' }, { status: 400 });
@@ -46,32 +52,37 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
       return NextResponse.json({ success: false, message: 'Unauthorized to update this staff member' }, { status: 403 });
     }
     
-    const existingUserWithNewEmail = db.users.find(u => u.email === staffData.email && u.id !== staffId && (u.companyId === companyId || u.role === 'admin'));
-    if (existingUserWithNewEmail) {
-        return NextResponse.json({ success: false, message: 'This email is already registered by another user.' }, { status: 409 });
+    if (staffData.email) {
+        const existingUserWithNewEmail = db.users.find(u => u.email === staffData.email && u.id !== staffId && (u.companyId === companyId || u.role === 'admin'));
+        if (existingUserWithNewEmail) {
+            return NextResponse.json({ success: false, message: 'This email is already registered by another user.' }, { status: 409 });
+        }
     }
     
-    const passwordToUpdate = staffData.password?.trim();
     const updatedStaffData = { ...staffData };
-     if (!passwordToUpdate) { // If password is empty or undefined in payload, keep existing
-      delete updatedStaffData.password;
+    if (staffData.password && staffData.password.trim() !== "") {
+        if (staffData.password.length < 6) {
+           return NextResponse.json({ success: false, message: 'Password must be at least 6 characters long.' }, { status: 400 });
+        }
+      updatedStaffData.password = bcrypt.hashSync(staffData.password, SALT_ROUNDS);
     } else {
-      updatedStaffData.password = passwordToUpdate;
+      delete updatedStaffData.password; // Don't update password if not provided or empty
     }
 
 
     const updatedStaff: User = {
       ...db.users[staffIndex],
       ...updatedStaffData,
-      id: staffId, // Ensure ID is not changed
-      companyId: db.users[staffIndex].companyId, // Ensure companyId is not changed
-      role: 'employee', // Ensure role remains employee
+      id: staffId, 
+      companyId: db.users[staffIndex].companyId, 
+      role: 'employee', 
     };
 
     db.users[staffIndex] = updatedStaff;
     await writeDB(db);
 
-    return NextResponse.json({ success: true, data: updatedStaff });
+    const { password, ...staffWithoutPassword } = updatedStaff;
+    return NextResponse.json({ success: true, data: staffWithoutPassword });
   } catch (error) {
     console.error(`API PUT /api/staff/${params.staffId} error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred';
@@ -79,11 +90,10 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
   }
 }
 
-// DELETE a staff member by ID
 export async function DELETE(req: NextRequest, { params }: { params: { staffId: string } }) {
   try {
     const { staffId } = params;
-    const { searchParams } = new URL(req.url); // Get companyId from query for ownership check
+    const { searchParams } = new URL(req.url); 
     const companyId = searchParams.get('companyId');
 
     if (!companyId) {
@@ -101,9 +111,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { staffId: 
       return NextResponse.json({ success: false, message: 'Unauthorized to delete this staff member' }, { status: 403 });
     }
     
-    // Also remove this staffId from any store's allowedStaffIds
     db.stores = db.stores.map(store => {
-        if (store.allowedStaffIds?.includes(staffId)) {
+        if (store.companyId === companyId && store.allowedStaffIds?.includes(staffId)) {
             return {
                 ...store,
                 allowedStaffIds: store.allowedStaffIds.filter(id => id !== staffId)
@@ -117,7 +126,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { staffId: 
     await writeDB(db);
 
     return NextResponse.json({ success: true, message: 'Staff member deleted successfully' });
-  } catch (error) {
+  } catch (error)
+{
     console.error(`API DELETE /api/staff/${params.staffId} error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred';
     return NextResponse.json({ success: false, message }, { status: 500 });

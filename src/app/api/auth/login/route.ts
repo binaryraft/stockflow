@@ -1,27 +1,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { readDB } from '@/lib/db-access';
 import type { User, Company, Store } from '@/types';
+import bcrypt from 'bcryptjs';
 
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-const SHARED_AUTH_TOKEN = "DEMO_SHARED_AUTH_TOKEN_ADMIN_EMPLOYEE"; // Shared token for authenticated users
-
-interface Database {
-  companies: Company[];
-  users: User[];
-  stores: Store[];
-}
-
-async function readDB(): Promise<Database> {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data) as Database;
-  } catch (error) {
-    console.error("Error reading DB:", error);
-    return { companies: [], users: [], stores: [] };
-  }
-}
+const SHARED_AUTH_TOKEN = "DEMO_SHARED_AUTH_TOKEN_ADMIN_EMPLOYEE"; 
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,16 +23,23 @@ export async function POST(req: NextRequest) {
       if (!email || !password) {
         return NextResponse.json({ success: false, message: 'Email and password are required for admin login' }, { status: 400 });
       }
-      authenticatedUser = db.users.find(u => u.role === 'admin' && u.email === email && u.password === password);
+      const userToVerify = db.users.find(u => u.role === 'admin' && u.email === email);
+      if (userToVerify && userToVerify.password && bcrypt.compareSync(password, userToVerify.password)) {
+        authenticatedUser = userToVerify;
+      }
     } else if (loginType === 'employee') {
       if (!employeeId || !password) {
         return NextResponse.json({ success: false, message: 'Employee ID and password are required for employee login' }, { status: 400 });
       }
-      authenticatedUser = db.users.find(u => u.role === 'employee' && u.employeeId === employeeId && u.password === password);
+      const userToVerify = db.users.find(u => u.role === 'employee' && u.employeeId === employeeId);
+      if (userToVerify && userToVerify.password && bcrypt.compareSync(password, userToVerify.password)) {
+        authenticatedUser = userToVerify;
+      }
     } else if (loginType === 'store') {
       if (!companyId || !storeId || !storePasskey) {
         return NextResponse.json({ success: false, message: 'Company ID, Store ID, and Store Passkey are required for store terminal login' }, { status: 400 });
       }
+      // Store passkey is not hashed in this prototype. If it were, bcrypt comparison would be needed here too.
       authenticatedStore = db.stores.find(s => s.companyId === companyId && s.id === storeId && s.passkey === storePasskey);
       if (authenticatedStore) {
         return NextResponse.json({
@@ -67,9 +57,12 @@ export async function POST(req: NextRequest) {
     }
 
     if (authenticatedUser) {
+      const { password: _, ...userWithoutPassword } = authenticatedUser; // Exclude password from response
       return NextResponse.json({
         success: true,
-        token: SHARED_AUTH_TOKEN, // User gets this token for client-side session
+        token: SHARED_AUTH_TOKEN, 
+        user: userWithoutPassword, // Send user object without password
+        // Deprecated direct fields, prefer user object:
         userId: authenticatedUser.id,
         userName: authenticatedUser.name,
         role: authenticatedUser.role,
@@ -77,12 +70,11 @@ export async function POST(req: NextRequest) {
         assignedStoreIds: authenticatedUser.role === 'employee' ? authenticatedUser.assignedStoreIds : undefined,
       });
     } else {
-      return NextResponse.json({ success: false, message: 'Invalid credentials' }, { status: 401 });
+      return NextResponse.json({ success: false, message: 'Invalid credentials or user not found' }, { status: 401 });
     }
 
   } catch (error) {
     console.error('Login API error:', error);
-    // Check if error is an instance of Error and has a message property
     const message = error instanceof Error ? error.message : 'An internal server error occurred';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

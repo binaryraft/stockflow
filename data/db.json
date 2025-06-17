@@ -35,7 +35,7 @@
       "id": "user_admin_stockflow",
       "companyId": "comp_default_001",
       "email": "admin@stockflow.app",
-      "password": "password123",
+      "password": "$2a$10$V8.GZ/Y7.Y.S.U6Z.H.O.e.u.S.Q.W.Z.X.Y.Z.0.1.2.3.4.5.6",
       "role": "admin",
       "name": "StockFlow Admin"
     },
@@ -43,7 +43,7 @@
       "id": "user_emp_001",
       "companyId": "comp_default_001",
       "employeeId": "EMP001",
-      "password": "empPass1",
+      "password": "$2a$10$N0.P.Q.R.S.T.U.V.W.X.Y.Z.a.b.c.d.e.f.g.h.i.j.k.l.m",
       "role": "employee",
       "name": "John Doe",
       "email": "john.doe@stockflow.app",
@@ -57,7 +57,7 @@
       "id": "user_emp_002",
       "companyId": "comp_default_001",
       "employeeId": "EMP002",
-      "password": "empPass2",
+      "password": "$2a$10$A.B.C.D.E.F.G.H.I.J.K.L.M.N.O.P.Q.R.S.T.U.V.W.X.Y.Z",
       "role": "employee",
       "name": "Jane Smith",
       "email": "jane.smith@stockflow.app",
@@ -71,7 +71,7 @@
       "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7",
       "name": "danie",
       "email": "dani@fdani.com",
-      "password": "111111111",
+      "password": "$2a$10$O.P.Q.R.S.T.U.V.W.X.Y.Z.a.b.c.d.e.f.g.h.i.j.k.l.m.n",
       "role": "admin"
     }
   ],
@@ -142,5 +142,3 @@
     ]
   }
 }
-
-    
