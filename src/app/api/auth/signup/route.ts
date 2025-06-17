@@ -1,38 +1,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { readDB, writeDB, DB_PATH } from '@/lib/db-access';
+import type { User, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import type { User, Company, Store } from '@/types';
+import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants'; // For default subscription
 
-const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
-const SHARED_AUTH_TOKEN = "DEMO_SHARED_AUTH_TOKEN_ADMIN_EMPLOYEE"; // Shared token for authenticated users
-
-interface Database {
-  companies: Company[];
-  users: User[];
-  stores: Store[];
-}
-
-async function readDB(): Promise<Database> {
-  try {
-    const data = await fs.readFile(DB_PATH, 'utf-8');
-    return JSON.parse(data) as Database;
-  } catch (error) {
-    console.error("Error reading DB:", error);
-    // If the file doesn't exist or is invalid, return a default structure
-    return { companies: [], users: [], stores: [] };
-  }
-}
-
-async function writeDB(data: Database): Promise<void> {
-  try {
-    await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-  } catch (error) {
-    console.error("Error writing DB:", error);
-    throw new Error("Could not save data to the database.");
-  }
-}
+const SHARED_AUTH_TOKEN = "DEMO_SHARED_AUTH_TOKEN_ADMIN_EMPLOYEE";
 
 export async function POST(req: NextRequest) {
   try {
@@ -45,34 +18,32 @@ export async function POST(req: NextRequest) {
 
     const db = await readDB();
 
-    // Check if admin email already exists
     const existingAdmin = db.users.find(u => u.email === email && u.role === 'admin');
     if (existingAdmin) {
-      return NextResponse.json({ success: false, message: 'An admin account with this email already exists.' }, { status: 409 }); // 409 Conflict
+      return NextResponse.json({ success: false, message: 'An admin account with this email already exists.' }, { status: 409 });
     }
 
-    // Create new company
+    const newCompanyId = `comp_${uuidv4()}`;
     const newCompany: Company = {
-      id: `comp_${uuidv4()}`,
+      id: newCompanyId,
       name: companyName,
-      token: `TOKEN_${uuidv4().toUpperCase()}` // Simple token generation for prototype
+      token: `TOKEN_${uuidv4().toUpperCase()}`,
+      activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER, // Default to starter plan
     };
     db.companies.push(newCompany);
 
-    // Create new admin user
     const newAdminUser: User = {
       id: `user_admin_${uuidv4()}`,
-      companyId: newCompany.id,
+      companyId: newCompanyId,
       name: adminName,
       email: email,
-      password: password, // Storing password in plaintext for prototype. HASH IN PRODUCTION!
+      password: password,
       role: 'admin',
     };
     db.users.push(newAdminUser);
 
     await writeDB(db);
 
-    // Return success response, including token and user info for auto-login
     return NextResponse.json({
       success: true,
       message: `Company "${newCompany.name}" and admin user "${newAdminUser.name}" created successfully.`,
@@ -89,4 +60,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-    

@@ -100,6 +100,7 @@ export interface Company {
   id: string;
   name: string;
   token: string; 
+  activeSubscriptionId: string; // Added for server-side subscription tracking
 }
 
 export interface User {
@@ -143,8 +144,8 @@ export interface UserProfile {
   companyPhone?: string;
   companyAddress?: string;
   companyGstNo?: string;
-  activeSubscriptionId: string;
-  dataMode: 'local' | 'global';
+  activeSubscriptionId: string; // This will be kept in sync with Company.activeSubscriptionId
+  dataMode: 'local' | 'global'; // May become 'server'
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
