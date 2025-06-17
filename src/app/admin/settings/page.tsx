@@ -17,8 +17,8 @@ import { ThemeToggle } from '@/components/layout/theme-toggle';
 
 export default function SettingsPage() {
   const { 
-    userProfile, 
-    updateUserProfileFields, 
+    userProfile, // Client-side cache of Company data
+    updateUserProfileFields, // Updates Company on server
     fetchCompanyProfile 
   } = useInventoryStore();
   const { toast } = useToast();
@@ -38,7 +38,7 @@ export default function SettingsPage() {
     if (companyIdFromStorage) {
       setCurrentCompanyId(companyIdFromStorage);
       setIsLoading(true);
-      fetchCompanyProfile(companyIdFromStorage)
+      fetchCompanyProfile(companyIdFromStorage) // Fetch full company data
         .then(() => setIsLoading(false))
         .catch(() => {
           toast({ variant: "destructive", title: "Error", description: "Could not load company settings." });
@@ -51,6 +51,7 @@ export default function SettingsPage() {
   }, [fetchCompanyProfile, toast]);
 
   useEffect(() => {
+    // Populate local state from userProfile (which is updated by fetchCompanyProfile)
     if (hasMounted && !isLoading && userProfile) {
       setDefaultBillNotes(userProfile.defaultBillNotes || '');
       setDefaultSalesPaymentStatus(userProfile.defaultSalesPaymentStatus || 'paid');
@@ -58,15 +59,20 @@ export default function SettingsPage() {
     }
   }, [hasMounted, isLoading, userProfile]);
 
-  const handleSaveSetting = async (field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus'>, value: any, successMessage: string) => {
+  const handleSaveSetting = async (
+    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus'>, 
+    value: any, 
+    successMessage: string
+  ) => {
     if (!currentCompanyId) {
       toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot save settings."});
       return;
     }
     try {
       // updateUserProfileFields now syncs to the Company record on the server
-      await updateUserProfileFields({ [field]: value } as Partial<UserProfile>);
+      await updateUserProfileFields({ [field]: value } as Partial<Omit<Company, 'id'|'token'>>, currentCompanyId);
       toast({ title: 'Setting Saved', description: successMessage });
+      // No need to manually update local state if userProfile in store is source of truth and re-renders
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save setting." });
     }
@@ -115,7 +121,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultSalesPaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultSalesPaymentStatus(value);
+                  setDefaultSalesPaymentStatus(value); // Optimistic UI update
                   handleSaveSetting('defaultSalesPaymentStatus', value, 'Default sales payment status updated.');
                 }}
               >
@@ -134,7 +140,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultPurchasePaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultPurchasePaymentStatus(value);
+                  setDefaultPurchasePaymentStatus(value); // Optimistic UI update
                   handleSaveSetting('defaultPurchasePaymentStatus', value, 'Default purchase payment status updated.');
                 }}
               >
@@ -191,5 +197,4 @@ export default function SettingsPage() {
     </div>
   );
 }
-
     

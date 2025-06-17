@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const newCategory: Category = {
       id: `cat_${uuidv4()}`,
       name,
-      companyId,
+      companyId, // Associate with company
     };
 
     db.categories.push(newCategory);
@@ -59,5 +59,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-
     

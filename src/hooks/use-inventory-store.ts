@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
@@ -24,7 +24,7 @@ interface InventoryState {
   categories: Category[];
   staffs: User[]; 
   stores: Store[];
-  userProfile: UserProfile;
+  userProfile: UserProfile; // Client-side cache of the current company's data
   messagesByStore: Record<string, ChatMessage[]>;
 
   fetchProducts: (companyId: string) => Promise<void>;
@@ -51,12 +51,12 @@ interface InventoryState {
   getRecentBills: (limit: number) => Bill[];
   getBillsForProduct: (productId: string) => Bill[];
 
-
-  addCategory: (categoryName: string) => Category;
+  fetchCategories: (companyId: string) => Promise<void>;
+  addCategory: (categoryName: string, companyId: string) => Promise<Category | null>;
   searchCategories: (searchTerm: string) => string[];
 
   fetchStaff: (companyId: string) => Promise<void>;
-  addStaff: (staffData: Omit<User, 'id' | 'role' | 'companyId'>, companyId: string) => Promise<User | null>;
+  addStaff: (staffData: Omit<User, 'id' | 'role' | 'companyId'|'password'> & {password:string}, companyId: string) => Promise<User | null>;
   updateStaff: (staffId: string, staffData: Partial<Omit<User, 'id' | 'role' | 'companyId'>>, companyId: string) => Promise<User | null>;
   deleteStaff: (staffId: string, companyId: string) => Promise<boolean>;
   getStaffById: (staffId: string) => User | undefined; 
@@ -70,7 +70,8 @@ interface InventoryState {
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
 
-  updateUserProfileFields: (data: Partial<UserProfile>) => Promise<void>; 
+  fetchCompanyProfile: (companyId: string) => Promise<void>;
+  updateUserProfileFields: (data: Partial<Omit<Company, 'id'|'token'>>, companyId: string) => Promise<Company | null>; 
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
@@ -84,9 +85,10 @@ interface InventoryState {
   getTopProfitableProducts: (limit: number, companyId?: string) => ProductProfitabilityData[];
   getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
 
-  addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string) => void;
+  fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
+  addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
   getMessagesForStore: (storeId: string) => ChatMessage[];
-  clearChatForStore: (storeId: string) => void;
+  clearChatForStore: (storeId: string, companyId: string) => Promise<boolean>;
 
   _hydrate: () => void;
 }
@@ -115,8 +117,7 @@ const defaultUserProfile: UserProfile = {
   companyAddress: '',
   companyGstNo: '',
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
-  dataMode: 'local', 
-  defaultBillNotes: '',
+  defaultBillNotes: 'Thank you for your business!',
   defaultSalesPaymentStatus: 'paid',
   defaultPurchasePaymentStatus: 'paid',
 };
@@ -132,12 +133,13 @@ export const useInventoryStore = create<InventoryState>()(
     (set, get) => ({
       products: [],
       bills: [],
-      categories: DEFAULT_CATEGORIES.map(name => ({ id: generateId(), name })).sort((a, b) => a.name.localeCompare(b.name)),
+      categories: [], // Categories will now be fetched per company
       staffs: [],
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
 
+      // Product Management (API Driven)
       fetchProducts: async (companyId: string) => {
         if (!companyId) { console.warn("fetchProducts: companyId is required"); set({ products: [] }); return; }
         try {
@@ -157,9 +159,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ products: [...state.products, result.data] }));
-            if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
-              get().addCategory(productData.category!);
-            }
+            if (productData.category) get().fetchCategories(companyId); // Re-fetch categories if a new one might have been added implicitly
             return result.data;
           } else { console.error("Failed to add product via API:", result.message); return null; }
         } catch (error) { console.error("Error adding product via API:", error); return null; }
@@ -173,9 +173,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ products: state.products.map((p) => (p.id === productId ? result.data : p)) }));
-            if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
-              get().addCategory(productData.category!);
-            }
+            if (productData.category) get().fetchCategories(companyId); // Re-fetch categories if one might have changed
             return result.data;
           } else { console.error("Failed to update product via API:", result.message); return null; }
         } catch (error) { console.error("Error updating product via API:", error); return null; }
@@ -190,6 +188,8 @@ export const useInventoryStore = create<InventoryState>()(
           } else { console.error("Failed to delete product via API:", result.message); return false; }
         } catch (error) { console.error("Error deleting product via API:", error); return false; }
       },
+
+      // Store Management (API Driven)
       fetchStores: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStores: companyId is required"); set({ stores: [] }); return; }
         try {
@@ -236,6 +236,8 @@ export const useInventoryStore = create<InventoryState>()(
           } else { console.error("Failed to delete store via API:", result.message); return false; }
         } catch (error) { console.error("Error deleting store via API:", error); return false; }
       },
+      
+      // Staff Management (API Driven)
       fetchStaff: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStaff: companyId is required"); set({ staffs: [] }); return; }
         try {
@@ -283,7 +285,89 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error deleting staff via API:", error); return false; }
       },
 
-      // Bill Management - Now API driven
+      // Category Management (API Driven)
+      fetchCategories: async (companyId: string) => {
+        if (!companyId) { console.warn("fetchCategories: companyId is required"); set({ categories: [] }); return; }
+        try {
+          const response = await fetch(`/api/categories?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch categories: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) set({ categories: result.data });
+          else { console.error("Failed to fetch categories or data format incorrect:", result.message); set({ categories: [] }); }
+        } catch (error) { console.error("Error fetching categories:", error); set({ categories: [] }); }
+      },
+      addCategory: async (categoryName, companyId) => {
+        if (!companyId) { console.error("addCategory: companyId is required"); return null; }
+        try {
+          const response = await fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: categoryName, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({ categories: [...state.categories, result.data].sort((a, b) => a.name.localeCompare(b.name)) }));
+            return result.data;
+          } else { console.error("Failed to add category via API:", result.message); return null; }
+        } catch (error) { console.error("Error adding category via API:", error); return null; }
+      },
+
+      // Chat Management (API Driven)
+      fetchMessagesForStore: async (storeId, companyId) => {
+        if (!storeId || !companyId) { console.warn("fetchMessages: storeId and companyId are required"); return; }
+        try {
+          const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch messages: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            set((state) => ({
+              messagesByStore: { ...state.messagesByStore, [storeId]: result.data },
+            }));
+          } else {
+            console.error("Failed to fetch messages or data format incorrect:", result.message);
+            set((state) => ({ messagesByStore: { ...state.messagesByStore, [storeId]: [] } }));
+          }
+        } catch (error) {
+          console.error("Error fetching messages:", error);
+          set((state) => ({ messagesByStore: { ...state.messagesByStore, [storeId]: [] } }));
+        }
+      },
+      addChatMessage: async (storeId, senderId, senderName, text, companyId) => {
+        if (!storeId || !senderId || !text || !companyId) { console.error("addChatMessage: Missing required params"); return; }
+        try {
+          const response = await fetch(`/api/chat/${storeId}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId, senderName, text, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => {
+              const existingMessages = state.messagesByStore[storeId] || [];
+              return {
+                messagesByStore: { ...state.messagesByStore, [storeId]: [...existingMessages, result.data] },
+              };
+            });
+          } else { console.error("Failed to add chat message via API:", result.message); }
+        } catch (error) { console.error("Error adding chat message via API:", error); }
+      },
+      clearChatForStore: async (storeId, companyId) => {
+        if (!storeId || !companyId) { console.error("clearChatForStore: Missing required params"); return false; }
+        try {
+          const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
+          const result = await response.json();
+          if (result.success) {
+            set((state) => {
+              const newMessagesByStore = { ...state.messagesByStore };
+              delete newMessagesByStore[storeId];
+              return { messagesByStore: newMessagesByStore };
+            });
+            return true;
+          } else { console.error("Failed to clear chat via API:", result.message); return false; }
+        } catch (error) { console.error("Error clearing chat via API:", error); return false; }
+      },
+
+      // Bill Management (API Driven)
       fetchBills: async (companyId: string) => {
         if (!companyId) { console.warn("fetchBills: companyId is required"); set({ bills: [] }); return; }
         try {
@@ -311,18 +395,17 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ bills: [result.data, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
-            // After a bill, product stock has changed on the server. Re-fetch products.
             if (billData.companyId) {
                 get().fetchProducts(billData.companyId);
             }
             return result.data;
           } else {
             console.error("Failed to add bill via API:", result.message);
-            throw new Error(result.message || "Failed to save bill."); // Throw error to be caught by calling component
+            throw new Error(result.message || "Failed to save bill.");
           }
         } catch (error) {
           console.error("Error adding bill via API:", error);
-          throw error; // Re-throw to be caught by calling component
+          throw error;
         }
       },
       deleteBill: async (billId: string, companyId: string) => {
@@ -331,8 +414,6 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success) {
             set((state) => ({ bills: state.bills.filter((b) => b.id !== billId) }));
-            // Potentially re-fetch products if deletion could affect stock (though current API DELETE doesn't do reversal)
-            // get().fetchProducts(companyId);
             return true;
           } else {
             console.error("Failed to delete bill via API:", result.message);
@@ -366,6 +447,78 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
 
+      // Company Profile (API Driven)
+      fetchCompanyProfile: async (companyId: string) => {
+        if (!companyId) { console.warn("fetchCompanyProfile: companyId is required"); set({userProfile: defaultUserProfile}); return; }
+        try {
+          const response = await fetch(`/api/companies/${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch company profile: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && result.data) {
+            const companyData = result.data as Company;
+            // Map Company data to UserProfile for client-side use
+            set({ userProfile: {
+                companyName: companyData.name,
+                companyLogoUrl: companyData.logoUrl,
+                companySlogan: companyData.slogan,
+                companyPhone: companyData.phone,
+                companyAddress: companyData.address,
+                companyGstNo: companyData.gstNo,
+                activeSubscriptionId: companyData.activeSubscriptionId,
+                defaultBillNotes: companyData.defaultBillNotes,
+                defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus,
+                defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
+            }});
+          } else { 
+            console.error("Failed to fetch company profile or data format incorrect:", result.message); 
+            set({userProfile: defaultUserProfile}); 
+          }
+        } catch (error) { 
+          console.error("Error fetching company profile:", error); 
+          set({userProfile: defaultUserProfile}); 
+        }
+      },
+      updateUserProfileFields: async (dataToUpdate, companyId) => {
+        if (!companyId) { console.error("updateUserProfileFields: companyId is required"); return null; }
+        try {
+          // The dataToUpdate is Partial<Omit<Company, 'id'|'token'>>
+          // It can include name, logoUrl, activeSubscriptionId, defaultBillNotes, etc.
+          const response = await fetch(`/api/companies/${companyId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dataToUpdate),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            const updatedCompany = result.data as Company;
+            // Update client-side userProfile cache
+            set((state) => ({
+              userProfile: {
+                ...state.userProfile, // Keep existing userProfile fields not directly from Company if any
+                companyName: updatedCompany.name,
+                companyLogoUrl: updatedCompany.logoUrl,
+                companySlogan: updatedCompany.slogan,
+                companyPhone: updatedCompany.phone,
+                companyAddress: updatedCompany.address,
+                companyGstNo: updatedCompany.gstNo,
+                activeSubscriptionId: updatedCompany.activeSubscriptionId,
+                defaultBillNotes: updatedCompany.defaultBillNotes,
+                defaultSalesPaymentStatus: updatedCompany.defaultSalesPaymentStatus,
+                defaultPurchasePaymentStatus: updatedCompany.defaultPurchasePaymentStatus,
+              }
+            }));
+            return updatedCompany;
+          } else {
+            console.error("Failed to update company profile on server:", result.message);
+            return null;
+          }
+        } catch (error) {
+          console.error("Error updating company profile on server:", error);
+          return null;
+        }
+      },
+
+      // Client-Side Getters & Utilities
       getSkuIdentifier: (productName, optionValues) => { 
         if (!productName) return "Unknown Product";
         if (!optionValues || Object.keys(optionValues).length === 0) return productName;
@@ -387,22 +540,14 @@ export const useInventoryStore = create<InventoryState>()(
         let sku = product.productSKUs.find(s =>
           JSON.stringify(Object.fromEntries(Object.entries(s.optionValues).sort())) === stringifiedTargetOptions
         );
-
+        // SKU creation is primarily handled server-side now during bill processing if needed.
+        // This client-side part is more for immediate UI feedback or local operations before server sync.
         if (!sku) {
-          const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
-          sku = {
-            id: generateId(),
-            optionValues: { ...optionValues },
-            skuIdentifier: skuIdentifier,
-            stockLayers: [],
-          };
-          // This client-side update to productSKUs during findOrCreate is problematic if products are primarily server-managed.
-          // The server should ideally handle SKU creation if it doesn't exist when a bill is processed.
-          // For now, keep it, but be aware this might become out of sync if server doesn't return updated product.
-          const updatedProductSKUs = [...product.productSKUs, sku];
-          const updatedProducts = [...products];
-          updatedProducts[productIndex] = { ...product, productSKUs: updatedProductSKUs };
-          set({ products: updatedProducts }); 
+          console.warn(`Client-side SKU creation attempt for ${product.name} with options ${JSON.stringify(optionValues)}. Server should handle this.`);
+           const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
+           sku = { id: generateId(), optionValues: { ...optionValues }, skuIdentifier: skuIdentifier, stockLayers: [] };
+           // Avoid directly mutating products array here if server is source of truth.
+           // This implies products array might need a refresh if a new SKU was truly created server-side.
         }
         return sku;
       },
@@ -421,7 +566,7 @@ export const useInventoryStore = create<InventoryState>()(
 
 
         if (product.trackQuantity === false) {
-          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; // Fallback to any layer if store-specific not found
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0];
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -441,7 +586,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (oldestLayerWithStock && typeof oldestLayerWithStock.sellPrice === 'number') {
             currentSellPrice = oldestLayerWithStock.sellPrice;
           }
-        } else if (relevantStockLayers.length > 0) { // If no stock, use sell price from the newest layer
+        } else if (relevantStockLayers.length > 0) { 
             const newestLayer = [...relevantStockLayers].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
             if (newestLayer && typeof newestLayer.sellPrice === 'number') {
                 currentSellPrice = newestLayer.sellPrice;
@@ -453,7 +598,7 @@ export const useInventoryStore = create<InventoryState>()(
         if (totalStock > 0) {
             const totalCostValue = relevantStockLayers.reduce((sum, layer) => sum + ((typeof layer.costPrice === 'number' ? layer.costPrice : 0) * (typeof layer.quantity === 'number' ? layer.quantity : 0)), 0);
             averageCostPrice = totalCostValue / totalStock;
-        } else if (relevantStockLayers.length > 0) { // If no stock, calculate avg cost based on initial quantities of all layers for this SKU
+        } else if (relevantStockLayers.length > 0) { 
             const totalInitialCost = relevantStockLayers.reduce((sum, layer) => sum + ((typeof layer.costPrice === 'number' ? layer.costPrice : 0) * (typeof layer.initialQuantity === 'number' ? layer.initialQuantity : 0)), 0);
             const totalInitialQty = relevantStockLayers.reduce((sum, layer) => sum + (typeof layer.initialQuantity === 'number' ? layer.initialQuantity : 0), 0);
             if (totalInitialQty > 0) averageCostPrice = totalInitialCost / totalInitialQty;
@@ -463,17 +608,11 @@ export const useInventoryStore = create<InventoryState>()(
       getBillById: (billId) => get().bills.find((b) => b.id === billId),
       getRecentBills: (limit: number) => [...get().bills].sort((a,b)=> b.timestamp - a.timestamp).slice(0, limit),
       getBillsForProduct: (productId: string) => get().bills.filter(bill => bill.items.some(item => item.productId === productId)).sort((a, b) => b.timestamp - a.timestamp),
-      addCategory: (categoryName) => { 
-        const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
-        if (existingCategory) return existingCategory;
-        const newCategory: Category = { id: generateId(), name: categoryName };
-        set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
-        return newCategory;
-      },
       searchCategories: (searchTerm: string) => { 
-        if (!searchTerm) return get().categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
+        const categories = get().categories;
+        if (!searchTerm) return categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
         const lowerSearchTerm = searchTerm.toLowerCase();
-        return get().categories
+        return categories
           .filter(c => c.name.toLowerCase().includes(lowerSearchTerm))
           .map(c => c.name)
           .sort((a,b) => a.localeCompare(b));
@@ -486,39 +625,13 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getStoreById: (storeId) => get().stores.find((s) => s.id === storeId),
       getAllStores: () => get().stores,
-      updateUserProfileFields: async (data: Partial<UserProfile>) => {
-        const oldProfile = get().userProfile;
-        const newProfile = { ...oldProfile, ...data };
-        set({ userProfile: newProfile });
-
-        if (data.activeSubscriptionId !== undefined && data.activeSubscriptionId !== oldProfile.activeSubscriptionId) {
-            const companyId = localStorage.getItem('companyId');
-            if (companyId) {
-                try {
-                    const response = await fetch(`/api/companies/${companyId}/subscription`, {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ activeSubscriptionId: data.activeSubscriptionId }),
-                    });
-                    if (!response.ok) {
-                        const errorResult = await response.json();
-                        console.error("Failed to update company subscription on server:", errorResult.message);
-                        set({ userProfile: oldProfile }); 
-                    }
-                } catch (error) {
-                    console.error("Error updating company subscription on server:", error);
-                    set({ userProfile: oldProfile }); 
-                }
-            } else {
-                console.warn("Company ID not found in localStorage, cannot sync subscription to server.");
-            }
-        }
-      },
       getActiveSubscriptionPlan: () => { 
         const { userProfile } = get();
-        if (!userProfile) return SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
-        const { activeSubscriptionId } = userProfile;
-        return SUBSCRIPTION_PLANS.find(plan => plan.id === activeSubscriptionId) || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
+        if (!userProfile || !userProfile.activeSubscriptionId) {
+           console.warn("User profile or activeSubscriptionId not found, defaulting to STARTER plan.");
+           return SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
+        }
+        return SUBSCRIPTION_PLANS.find(plan => plan.id === userProfile.activeSubscriptionId) || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
       },
       canAddStore: () => { 
         const plan = get().getActiveSubscriptionPlan();
@@ -758,11 +871,11 @@ export const useInventoryStore = create<InventoryState>()(
       getProductLedgerSummary: (params): ProductLedgerEntry[] => { 
         const { companyId, startDate, endDate } = params || {};
         let productsToConsider = get().products;
-        let billsToConsider = get().bills; // Operate on fetched bills
+        let billsToConsider = get().bills; 
 
         if (companyId) {
           productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
-          // Bills are already company-scoped if fetchBills was called with companyId
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         
         if (startDate && endDate) {
@@ -808,7 +921,6 @@ export const useInventoryStore = create<InventoryState>()(
           const summary = ledgerMap[product.id] || {
             totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
           };
-          // Current stock comes from the server-fetched product data
           let currentStock: number | 'N/A' = 'N/A';
           if (product.trackQuantity) {
             currentStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0);
@@ -823,217 +935,45 @@ export const useInventoryStore = create<InventoryState>()(
           };
         }).sort((a, b) => a.productName.localeCompare(b.productName));
       },
-      addChatMessage: (storeId, senderId, senderName, text) => { 
-        const newMessage: ChatMessage = {
-          id: generateId(), storeId, senderId, senderName, text, timestamp: Date.now(),
-        };
-        set((state) => {
-          const existingMessages = state.messagesByStore[storeId] || [];
-          return {
-            messagesByStore: { ...state.messagesByStore, [storeId]: [...existingMessages, newMessage] },
-          };
-        });
-      },
+      
       getMessagesForStore: (storeId: string) => { 
         const messages = get().messagesByStore[storeId] || [];
         return [...messages].sort((a, b) => a.timestamp - b.timestamp);
       },
-      clearChatForStore: (storeId: string) => { 
-        set((state) => {
-          const newMessagesByStore = { ...state.messagesByStore };
-          delete newMessagesByStore[storeId];
-          return { messagesByStore: newMessagesByStore };
-        });
-      },
+      
       _hydrate: () => { 
         try {
           const state = get();
           let storeUpdated = false;
 
-          const defaultStateShape: Partial<InventoryState> = {
-            products: [], bills: [], categories: [], staffs: [], stores: [],
-            userProfile: { ...defaultUserProfile }, messagesByStore: {}
-          };
-
-          for (const key in defaultStateShape) {
-            if (Object.prototype.hasOwnProperty.call(defaultStateShape, key)) {
-              const k = key as keyof InventoryState;
-              if (state[k] === undefined || state[k] === null ||
-                  (Array.isArray((defaultStateShape as any)[k]) && !Array.isArray(state[k])) ||
-                  (typeof (defaultStateShape as any)[k] === 'object' && !Array.isArray((defaultStateShape as any)[k]) && typeof state[k] !== 'object')
-              ) {
-                (state as any)[k] = JSON.parse(JSON.stringify((defaultStateShape as any)[k]));
-                storeUpdated = true;
-              }
+          // Reset client-side caches that are now primarily server-driven
+          const serverDrivenArrays: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories'];
+          serverDrivenArrays.forEach(key => {
+            if (!Array.isArray((state as any)[key]) || (state as any)[key].length > 0) {
+              (state as any)[key] = [];
+              storeUpdated = true;
             }
-          }
-
+          });
+          
           if (!state.userProfile || typeof state.userProfile !== 'object' || state.userProfile === null) {
             state.userProfile = JSON.parse(JSON.stringify(defaultUserProfile));
             storeUpdated = true;
           } else {
-            state.userProfile.companyName = state.userProfile.companyName || DEFAULT_COMPANY_NAME;
-            state.userProfile.companyLogoUrl = state.userProfile.companyLogoUrl || '';
-            state.userProfile.companySlogan = state.userProfile.companySlogan || '';
-            state.userProfile.companyPhone = state.userProfile.companyPhone || '';
-            state.userProfile.companyAddress = state.userProfile.companyAddress || '';
-            state.userProfile.companyGstNo = state.userProfile.companyGstNo || '';
-
-            const currentSubId = state.userProfile.activeSubscriptionId;
-            const isValidSubId = SUBSCRIPTION_PLANS.some(plan => plan.id === currentSubId);
-            if (!currentSubId || !isValidSubId) {
-              state.userProfile.activeSubscriptionId = SUBSCRIPTION_PLAN_IDS.STARTER;
-              storeUpdated = true;
-            }
-             state.userProfile.dataMode = state.userProfile.dataMode || 'local';
-             state.userProfile.defaultBillNotes = state.userProfile.defaultBillNotes || '';
-             state.userProfile.defaultSalesPaymentStatus = state.userProfile.defaultSalesPaymentStatus || 'paid';
-             state.userProfile.defaultPurchasePaymentStatus = state.userProfile.defaultPurchasePaymentStatus || 'paid';
-          }
-
-          if (!Array.isArray(state.categories)) { state.categories = []; storeUpdated = true; }
-          DEFAULT_CATEGORIES.forEach(catName => {
-            if (!state.categories.find(c => c.name.toLowerCase() === catName.toLowerCase())) {
-              state.categories.push({ id: generateId(), name: catName });
-              storeUpdated = true;
-            }
-          });
-          if(storeUpdated || state.categories.some((c, i) => state.categories.findIndex(sc => sc.name === c.name) !== i)) {
-             state.categories.sort((a, b) => a.name.localeCompare(b.name));
-             storeUpdated = true;
-          }
-
-          if (Array.isArray(state.products)) {
-            state.products = state.products.map(p_any => {
-              if (!p_any || typeof p_any !== 'object' || !p_any.id || !p_any.name) return null;
-              let p = { ...p_any } as Product;
-              p.companyId = p.companyId || "comp_default_001"; 
-              p.trackQuantity = typeof p.trackQuantity === 'boolean' ? p.trackQuantity : true;
-              p.sgstRate = typeof p.sgstRate === 'number' ? p.sgstRate : undefined;
-              p.cgstRate = typeof p.cgstRate === 'number' ? p.cgstRate : undefined;
-              p.additionalChargeDefinitions = Array.isArray(p.additionalChargeDefinitions) ? p.additionalChargeDefinitions.map(ac => ({...ac, type: ac.type || 'fixed'})) : [];
-
-
-              p.variants = Array.isArray(p.variants) ? p.variants.map(v_any => {
-                if(!v_any || typeof v_any !== 'object') return null;
-                const v = v_any as ProductVariantType;
-                v.options = Array.isArray(v.options) ? v.options.map(opt_any => {
-                    if(!opt_any || typeof opt_any !== 'object') return null;
-                    return opt_any as ProductOption;
-                }).filter(o => o !== null) : [];
-                return v;
-              }).filter(v => v !== null) : [];
-
-              p.productSKUs = Array.isArray(p.productSKUs) ? p.productSKUs.map(sku_any => {
-                if(!sku_any || typeof sku_any !== 'object') return null;
-                let sku = { ...sku_any } as ProductSKU;
-                sku.stockLayers = Array.isArray(sku.stockLayers) ? sku.stockLayers.map(layer_any => {
-                    if(!layer_any || typeof layer_any !== 'object') return null;
-                    const layer = { ...layer_any } as StockLayer;
-                    layer.costPrice = typeof layer.costPrice === 'number' ? layer.costPrice : 0;
-                    layer.sellPrice = typeof layer.sellPrice === 'number' ? layer.sellPrice : 0;
-                    layer.initialQuantity = typeof layer.initialQuantity === 'number' ? layer.initialQuantity : (typeof layer.quantity === 'number' ? layer.quantity : 0);
-                    layer.quantity = typeof layer.quantity === 'number' ? layer.quantity : 0;
-                    layer.purchaseDate = layer.purchaseDate || new Date(0).toISOString();
-                    layer.purchaseBillId = layer.purchaseBillId || 'unknown_hydrated';
-                    layer.id = layer.id || generateId();
-                    layer.storeId = layer.storeId || undefined;
-                    return layer;
-                }).filter(l => l !== null) : [];
-
-                sku.optionValues = sku.optionValues || {};
-                sku.skuIdentifier = sku.skuIdentifier || get().getSkuIdentifier(p.name, sku.optionValues);
-                return sku;
-              }).filter(sku => sku !== null) : [];
-
-              if (p.productSKUs.length === 0 && (!p.variants || p.variants.length === 0)) {
-                  const defaultSkuIdentifier = get().getSkuIdentifier(p.name, {});
-                  const defaultSku: ProductSKU = {
-                    id: generateId(), optionValues: {}, skuIdentifier: defaultSkuIdentifier, stockLayers: [],
-                  };
-                  if (p.trackQuantity === false && (p as any).costPriceForNonTracked !== undefined) {
-                     defaultSku.stockLayers.push({
-                        id: generateId(), purchaseBillId: 'hydrated_nontracked_price', purchaseDate: new Date(0).toISOString(),
-                        initialQuantity: 0, quantity: 0,
-                        costPrice: (p as any).costPriceForNonTracked ?? 0,
-                        sellPrice: (p as any).sellPriceForNonTracked ?? 0,
-                        storeId: undefined,
-                    });
+            // Ensure all UserProfile fields exist, defaulting if necessary.
+            // These will be overwritten by fetchCompanyProfile on login.
+            const defaultProfileKeys = Object.keys(defaultUserProfile) as Array<keyof UserProfile>;
+            defaultProfileKeys.forEach(key => {
+                if (state.userProfile[key] === undefined) {
+                    state.userProfile[key] = defaultUserProfile[key] as any;
                     storeUpdated = true;
-                  }
-                  p.productSKUs.push(defaultSku);
-              }
-              delete (p as any).costPriceForNonTracked; delete (p as any).sellPriceForNonTracked;
-              return p;
-            }).filter(p => p !== null) as Product[];
-          } else {
-            state.products = []; storeUpdated = true;
+                }
+            });
           }
-
-          if (Array.isArray(state.bills)) {
-            state.bills = state.bills.map(bill_any => {
-              if (!bill_any || typeof bill_any !== 'object') return null;
-              const bill = { ...bill_any } as Bill;
-              bill.companyId = bill.companyId || "comp_default_001"; 
-              bill.items = Array.isArray(bill.items) ? bill.items.map(item_any => {
-                if (!item_any || typeof item_any !== 'object') return null;
-                const item = { ...item_any } as BillItem;
-                item.costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
-                item.sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-                item.quantity = typeof item.quantity === 'number' && item.quantity > 0 ? item.quantity : 1;
-                item.productName = item.productName || 'Unknown Item';
-                item.sgstAmount = typeof item.sgstAmount === 'number' ? item.sgstAmount : 0;
-                item.cgstAmount = typeof item.cgstAmount === 'number' ? item.cgstAmount : 0;
-                item.isAdditionalCharge = typeof item.isAdditionalCharge === 'boolean' ? item.isAdditionalCharge : false;
-                item.sourceChargeDefinitionId = item.sourceChargeDefinitionId || undefined;
-                return item;
-              }).filter(item => item !== null) : [];
-              bill.subTotal = typeof bill.subTotal === 'number' ? bill.subTotal : bill.items.reduce((acc, item) => acc + (item.sellPrice * item.quantity),0);
-              bill.totalSGST = typeof bill.totalSGST === 'number' ? bill.totalSGST : bill.items.reduce((acc, item) => acc + (item.sgstAmount || 0),0);
-              bill.totalCGST = typeof bill.totalCGST === 'number' ? bill.totalCGST : bill.items.reduce((acc, item) => acc + (item.cgstAmount || 0),0);
-              bill.totalAmount = typeof bill.totalAmount === 'number' ? bill.totalAmount : (bill.subTotal + bill.totalSGST + bill.totalCGST);
-              bill.isEstimate = typeof bill.isEstimate === 'boolean' ? bill.isEstimate : false;
-
-
-              bill.timestamp = typeof bill.timestamp === 'number' ? bill.timestamp : (bill.date ? new Date(bill.date).getTime() : Date.now());
-              bill.date = bill.date || new Date(bill.timestamp).toISOString();
-              bill.storeId = bill.storeId || undefined;
-              bill.storeName = bill.storeName || undefined;
-              bill.billedByStaffId = bill.billedByStaffId || undefined;
-              bill.billedByStaffName = bill.billedByStaffName || undefined;
-              return bill;
-            }).filter(bill => bill !== null) as Bill[];
-          } else {
-            state.bills = []; storeUpdated = true;
+          
+          if(!state.messagesByStore || typeof state.messagesByStore !== 'object') {
+            state.messagesByStore = {}; 
+            storeUpdated = true;
           }
-
-          if(!Array.isArray(state.staffs)) { state.staffs = []; storeUpdated = true;}
-          state.staffs = state.staffs.map(s_any => {
-             if (!s_any || typeof s_any !== 'object') return null;
-             const s = { ...s_any } as User;
-             s.companyId = s.companyId || "comp_default_001"; 
-             s.role = s.role || 'employee'; 
-             return s;
-          }).filter(s => s !== null) as User[];
-
-          if(!Array.isArray(state.stores)) { state.stores = []; storeUpdated = true;}
-          state.stores = state.stores.map(s_any => {
-            if (!s_any || typeof s_any !== 'object') return null;
-            const s = { ...s_any } as Store;
-            s.companyId = s.companyId || "comp_default_001"; 
-            s.allowedOperations = Array.isArray(s.allowedOperations) && s.allowedOperations.length > 0 ? s.allowedOperations : ['sell', 'buy', 'return'];
-            return s;
-          }).filter(s => s !== null) as Store[];
-
-          if(!state.messagesByStore || typeof state.messagesByStore !== 'object') {state.messagesByStore = {}; storeUpdated = true;}
-          Object.keys(state.messagesByStore).forEach(storeId => {
-            if (!Array.isArray(state.messagesByStore[storeId])) {
-                state.messagesByStore[storeId] = [];
-                storeUpdated = true;
-            } else {
-                state.messagesByStore[storeId] = state.messagesByStore[storeId].filter(msg => msg && typeof msg === 'object');
-            }
-          });
 
 
           if (storeUpdated) {
@@ -1042,9 +982,8 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) {
           console.error("Critical error during inventory store hydration, resetting to defaults:", error);
           set({
-            products: [], bills: [],
-            categories: DEFAULT_CATEGORIES.map(name => ({ id: generateId(), name })).sort((a, b) => a.name.localeCompare(b.name)),
-            staffs: [], stores: [], userProfile: { ...defaultUserProfile }, messagesByStore: {}
+            products: [], bills: [], categories: [], staffs: [], stores: [], 
+            userProfile: { ...defaultUserProfile }, messagesByStore: {}
           });
         }
       }
@@ -1067,3 +1006,4 @@ if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
       (useInventoryStore.getState() as any).__hydrated = true;
   }
 }
+    

@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Company } from '@/types';
+import { SUBSCRIPTION_PLANS } from '@/lib/constants';
 
 // GET a single company by ID
 export async function GET(req: NextRequest, { params }: { params: { companyId: string } }) {
@@ -35,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
     }
-    if (!companyData) {
+    if (!companyData || Object.keys(companyData).length === 0) {
       return NextResponse.json({ success: false, message: 'Company data is required for update' }, { status: 400 });
     }
 
@@ -48,6 +49,15 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
 
     // Selectively update fields, don't allow changing id or token this way
     const { id, token, ...updateableData } = companyData;
+
+    // Validate activeSubscriptionId if it's being updated
+    if (updateableData.activeSubscriptionId) {
+      const validPlan = SUBSCRIPTION_PLANS.find(p => p.id === updateableData.activeSubscriptionId);
+      if (!validPlan) {
+          return NextResponse.json({ success: false, message: 'Invalid subscription plan ID provided' }, { status: 400 });
+      }
+    }
+
 
     db.companies[companyIndex] = {
       ...db.companies[companyIndex],
@@ -63,5 +73,4 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-
     

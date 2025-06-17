@@ -17,9 +17,9 @@ import { Textarea } from '@/components/ui/textarea';
 import NextImage from 'next/image'; 
 
 interface EditableProfileFieldProps {
-  fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>; // Use Company fields
+  fieldId: keyof Omit<Company, 'id' | 'token'>; // Fields from Company type, excluding id and token
   label: string;
-  currentValue: string | undefined;
+  currentValue: string | undefined | null; // Allow null for currentValue
   onSave: (newValue: string) => Promise<void> | void;
   inputType?: 'text' | 'textarea' | 'tel' | 'url';
   placeholder?: string;
@@ -47,7 +47,7 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
   }, [currentValue]);
 
   const handleSave = async () => {
-    if (inputValue.trim() === '' && fieldId === 'name') { // company name is 'name' in Company type
+    if (inputValue.trim() === '' && fieldId === 'name') { 
       toast({ variant: 'destructive', title: 'Error', description: `${label} cannot be empty.` });
       return;
     }
@@ -68,14 +68,14 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
 
   return (
     <div className="space-y-1.5">
-      <Label htmlFor={fieldId} className="flex items-center gap-1.5">
+      <Label htmlFor={fieldId as string} className="flex items-center gap-1.5">
         {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
         {label}
       </Label>
       <div className="flex items-center gap-2">
         {isEditing ? (
           <InputComponent
-            id={fieldId}
+            id={fieldId as string}
             // @ts-ignore
             type={inputType === 'textarea' ? undefined : inputType}
             value={inputValue}
@@ -107,10 +107,9 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
 
 export default function ProfilePage() {
   const { 
-    userProfile, 
-    updateUserProfileFields, 
-    getActiveSubscriptionPlan,
-    fetchCompanyProfile, // Added
+    userProfile, // This is now a client-side cache of the Company data
+    updateUserProfileFields, // This now updates the Company record on the server
+    fetchCompanyProfile, 
   } = useInventoryStore();
   const { toast } = useToast();
 
@@ -139,24 +138,27 @@ export default function ProfilePage() {
   }, [fetchCompanyProfile, toast]);
 
   useEffect(() => {
-    if (hasMounted && !isLoadingProfile) { // Ensure profile is loaded before setting plan details
-      setActivePlanDetails(getActiveSubscriptionPlan());
+    // This effect will run when userProfile (client cache) changes,
+    // which happens after fetchCompanyProfile or updateUserProfileFields successfully updates it.
+    if (hasMounted && !isLoadingProfile && userProfile) {
+       const plan = SUBSCRIPTION_PLANS.find(p => p.id === userProfile.activeSubscriptionId);
+       setActivePlanDetails(plan || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER));
     }
-  }, [hasMounted, userProfile, getActiveSubscriptionPlan, isLoadingProfile]);
+  }, [hasMounted, userProfile, isLoadingProfile]);
   
   useEffect(() => {
     setLogoPreviewError(false); 
   }, [userProfile.companyLogoUrl]);
 
 
-  const handleFieldSave = async (fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>, newValue: string) => {
+  const handleFieldSave = async (fieldId: keyof Omit<Company, 'id' | 'token'>, newValue: string) => {
     if (!currentCompanyId) {
        toast({ variant: 'destructive', title: 'Error', description: 'Company context not found.' });
        return;
     }
     // updateUserProfileFields will call the API to update the main Company record
-    await updateUserProfileFields({ [fieldId]: newValue } as Partial<UserProfile>); 
-    // Toast is now handled within EditableProfileField on successful save
+    await updateUserProfileFields({ [fieldId]: newValue } as Partial<Omit<Company, 'id'|'token'>>, currentCompanyId);
+    // Toast is handled within EditableProfileField on successful save
   };
   
   const handleSubscriptionSelect = async (planId: string) => {
@@ -171,11 +173,9 @@ export default function ProfilePage() {
     }
 
     try {
-        // This will trigger API call via updateUserProfileFields in store
-        await updateUserProfileFields({activeSubscriptionId: planId}); 
+        await updateUserProfileFields({ activeSubscriptionId: planId }, currentCompanyId); 
         const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
         toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
-        // setActivePlanDetails will update via useEffect reacting to userProfile change
     } catch (error) {
         console.error("Error updating subscription:", error);
         toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update subscription plan.' });
@@ -191,7 +191,7 @@ export default function ProfilePage() {
     );
   }
   
-  const currentActivePlan = getActiveSubscriptionPlan(); // Get latest after potential updates
+  const currentActivePlan = activePlanDetails; // Already derived from userProfile
 
 
   return (
@@ -362,5 +362,4 @@ export default function ProfilePage() {
     </div>
   );
 }
-
     

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest, { params }: { params: { storeId: str
   try {
     const { storeId } = params;
     const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get('companyId'); // Sent by admin client
+    const companyId = searchParams.get('companyId'); 
 
     if (!storeId) {
       return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { storeId: str
     if (!store) {
       return NextResponse.json({ success: false, message: 'Store not found' }, { status: 404 });
     }
-    if (store.companyId !== companyId) {
+    if (store.companyId !== companyId) { // Ensure the store belongs to the requesting company
       return NextResponse.json({ success: false, message: 'Unauthorized to access this store\'s chat' }, { status: 403 });
     }
 
@@ -55,15 +55,10 @@ export async function POST(req: NextRequest, { params }: { params: { storeId: st
     if (!store) {
       return NextResponse.json({ success: false, message: 'Store not found' }, { status: 404 });
     }
-    // Verify company context: if sender is 'admin', companyId from body must match store's company.
-    // If sender is store itself, companyId from store is used.
-    if (senderId === 'admin' && store.companyId !== companyId) {
-         return NextResponse.json({ success: false, message: 'Admin unauthorized for this store\'s company chat' }, { status: 403 });
+    // Verify company context
+    if (store.companyId !== companyId) {
+         return NextResponse.json({ success: false, message: 'Message company context does not match store\'s company.' }, { status: 403 });
     }
-     if (senderId !== 'admin' && senderId !== storeId) { // If sender is an employee, this check is too simple. Future: validate employee's company
-         // For now, only admin or the store itself can send. This needs refinement for employee chat.
-         // Let's assume for now if senderId is storeId, it's the store terminal.
-     }
 
 
     const newMessage: ChatMessage = {
@@ -99,7 +94,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
   try {
     const { storeId } = params;
     const { searchParams } = new URL(req.url);
-    const companyId = searchParams.get('companyId'); // Admin's companyId for authorization
+    const companyId = searchParams.get('companyId'); 
 
     if (!storeId) {
       return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
@@ -114,12 +109,16 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
     if (!store) {
       return NextResponse.json({ success: false, message: 'Store not found' }, { status: 404 });
     }
-    if (store.companyId !== companyId) {
+    if (store.companyId !== companyId) { // Ensure the admin belongs to the company that owns the store
       return NextResponse.json({ success: false, message: 'Unauthorized to clear chat for this store' }, { status: 403 });
     }
 
     if (db.messagesByStore && db.messagesByStore[storeId]) {
-      delete db.messagesByStore[storeId];
+      // Filter messages to only delete those belonging to the company, though practically, all messages for a store should be from its company
+      db.messagesByStore[storeId] = (db.messagesByStore[storeId] || []).filter(msg => msg.companyId !== companyId);
+      if (db.messagesByStore[storeId].length === 0) { // If all messages were for this company
+          delete db.messagesByStore[storeId];
+      }
       await writeDB(db);
       return NextResponse.json({ success: true, message: 'Chat history cleared successfully' });
     } else {
@@ -132,5 +131,4 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
-
     
