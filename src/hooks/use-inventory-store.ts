@@ -2,7 +2,7 @@
 "use client";
 
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
+import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday } from 'date-fns';
@@ -19,7 +19,7 @@ interface ProductProfitabilityData {
 
 
 interface InventoryState {
-  products: Product[];
+  products: Product[]; // This will now be a client-side cache
   bills: Bill[];
   categories: Category[];
   staffs: User[]; 
@@ -27,19 +27,21 @@ interface InventoryState {
   userProfile: UserProfile;
   messagesByStore: Record<string, ChatMessage[]>;
 
-  // Product methods
-  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string }) => Product;
-  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }) => void;
-  deleteProduct: (productId: string) => void;
-  getProductById: (productId: string) => Product | undefined;
-  getProductByName: (name: string) => Product | undefined;
-  searchProducts: (searchTerm: string) => Product[];
-  getLowStockProductCount: (threshold: number) => number;
-  findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>) => ProductSKU | undefined;
+  // Product methods (will be refactored to use API)
+  fetchProducts: (companyId: string) => Promise<void>;
+  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
+  deleteProduct: (productId: string, companyId: string) => Promise<boolean>;
+  getProductById: (productId: string) => Product | undefined; // Remains client-side for now for quick access if cached
+  getProductByName: (name: string) => Product | undefined; // Client-side search on cached data
+  searchProducts: (searchTerm: string) => Product[]; // Client-side search on cached data
+  getLowStockProductCount: (threshold: number) => number; // Client-side calculation on cached data
+
+  findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>) => ProductSKU | undefined; // May need API interaction if product not fully loaded or for consistency
   getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
   getSkuIdentifier: (productName: string, optionValues: Record<string, string>) => string;
 
-  // Bill methods
+  // Bill methods (still client-side for now)
   addBill: (
     billData: Omit<Bill, 'id' | 'date' | 'timestamp' | 'totalAmount' | 'items' | 'billedByStaffName' | 'storeName' | 'companyId' | 'subTotal' | 'totalSGST' | 'totalCGST'> & { billedByStaffId?: string; storeId?: string; companyId: string; isEstimate?: boolean },
     items: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'|'sourceChargeDefinitionId'>[]
@@ -51,11 +53,11 @@ interface InventoryState {
   getBillsForProduct: (productId: string) => Bill[];
 
 
-  // Category methods
+  // Category methods (still client-side for now)
   addCategory: (categoryName: string) => Category;
   searchCategories: (searchTerm: string) => string[];
 
-  // Staff (User) methods
+  // Staff (User) methods (still client-side for now, auth API handles some parts)
   addStaff: (staffData: Omit<User, 'id' | 'role'> & {companyId: string}) => User | null; 
   updateStaff: (staffId: string, staffData: Partial<Omit<User, 'id' | 'role' | 'companyId'>>) => void;
   deleteStaff: (staffId: string) => void;
@@ -63,7 +65,7 @@ interface InventoryState {
   getAllStaff: () => User[]; 
   getStaffDetailsByIds: (staffIds: string[]) => User[]; 
 
-  // Store methods
+  // Store methods (still client-side for now)
   addStore: (storeData: Omit<Store, 'id' | 'companyId'> & {companyId: string}) => Store | null;
   updateStore: (storeId: string, storeData: Partial<Omit<Store, 'id' | 'companyId'>>) => void;
   deleteStore: (storeId: string) => void;
@@ -76,7 +78,7 @@ interface InventoryState {
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
 
-  // Dashboard selectors
+  // Dashboard selectors (will need refactoring if data moves server-side)
   getDailySalesAndExpenses: (days: number, companyId?: string) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number, companyId?: string) => Array<{ name: string; revenue: number }>;
   getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId?: string) => ExpenseBillWithCoverage[];
@@ -87,7 +89,7 @@ interface InventoryState {
   getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
 
 
-  // Chat methods
+  // Chat methods (still client-side for now)
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string) => void;
   getMessagesForStore: (storeId: string) => ChatMessage[];
   clearChatForStore: (storeId: string) => void;
@@ -119,14 +121,20 @@ const defaultUserProfile: UserProfile = {
   companyAddress: '',
   companyGstNo: '',
   activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
-  dataMode: 'local',
+  dataMode: 'local', // This might change to 'server' once fully migrated
   defaultBillNotes: '',
   defaultSalesPaymentStatus: 'paid',
   defaultPurchasePaymentStatus: 'paid',
 };
 
+type InventoryPersist = (
+  config: (set: any, get: any, api: any) => InventoryState,
+  options: PersistOptions<InventoryState>
+) => (set: any, get: any, api: any) => InventoryState;
+
+
 export const useInventoryStore = create<InventoryState>()(
-  persist(
+  (persist as InventoryPersist)(
     (set, get) => ({
       products: [],
       bills: [],
@@ -135,6 +143,102 @@ export const useInventoryStore = create<InventoryState>()(
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
+
+      fetchProducts: async (companyId: string) => {
+        if (!companyId) {
+          console.warn("fetchProducts: companyId is required");
+          set({ products: [] }); // Clear products if no companyId
+          return;
+        }
+        try {
+          const response = await fetch(`/api/products?companyId=${companyId}`);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch products: ${response.statusText}`);
+          }
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            set({ products: result.data });
+          } else {
+            console.error("Failed to fetch products or data format incorrect:", result.message);
+            set({ products: [] });
+          }
+        } catch (error) {
+          console.error("Error fetching products:", error);
+          set({ products: [] }); // Set to empty on error
+        }
+      },
+
+      addProduct: async (productData, companyId) => {
+        try {
+          const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productData, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({ products: [...state.products, result.data] }));
+            if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
+              get().addCategory(productData.category!);
+            }
+            return result.data;
+          } else {
+            console.error("Failed to add product:", result.message);
+            // Potentially throw an error or display a toast from here
+            return null;
+          }
+        } catch (error) {
+          console.error("Error adding product:", error);
+          return null;
+        }
+      },
+
+      updateProduct: async (productId, productData, companyId) => {
+        try {
+          const response = await fetch(`/api/products/${productId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productData, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({
+              products: state.products.map((p) => (p.id === productId ? result.data : p)),
+            }));
+            if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
+              get().addCategory(productData.category!);
+            }
+            return result.data;
+          } else {
+            console.error("Failed to update product:", result.message);
+            return null;
+          }
+        } catch (error) {
+          console.error("Error updating product:", error);
+          return null;
+        }
+      },
+
+      deleteProduct: async (productId: string, companyId: string) => {
+        try {
+          const response = await fetch(`/api/products/${productId}?companyId=${companyId}`, {
+            method: 'DELETE',
+          });
+          const result = await response.json();
+          if (result.success) {
+            set((state) => ({
+              products: state.products.filter((p) => p.id !== productId),
+            }));
+            return true;
+          } else {
+            console.error("Failed to delete product:", result.message);
+            return false;
+          }
+        } catch (error) {
+          console.error("Error deleting product:", error);
+          return false;
+        }
+      },
 
       getSkuIdentifier: (productName, optionValues) => {
         if (!productName) return "Unknown Product";
@@ -146,148 +250,9 @@ export const useInventoryStore = create<InventoryState>()(
           .join(' - ');
         return sortedOptionsString ? `${productName} (${sortedOptionsString})` : productName;
       },
-
-      addProduct: (productData) => {
-        const productVariants: ProductVariantType[] = (productData.variants || []).map((variantData, variantIdx) => ({
-          id: (variantData as any).id || `variant-${generateId()}-${variantIdx}`,
-          name: variantData.name,
-          options: variantData.options.map((optData, optIdx) => ({
-            id: (optData as any).id || `option-${generateId()}-${variantIdx}-${optIdx}`,
-            value: optData.value,
-          })),
-        }));
-
-        const newProductBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs'> = {
-          name: productData.name, category: productData.category,
-          trackQuantity: productData.trackQuantity, sku: productData.sku,
-          expiryDate: productData.expiryDate, description: productData.description,
-          variants: productVariants,
-          companyId: productData.companyId,
-          sgstRate: productData.sgstRate,
-          cgstRate: productData.cgstRate,
-          additionalChargeDefinitions: productData.additionalChargeDefinitions?.map(ac => ({
-            ...ac, 
-            id: ac.id || uuidv4(),
-            type: ac.type || 'fixed'
-          })) || [],
-        };
-
-        const newProduct: Product = {
-          ...newProductBase,
-          id: generateId(),
-          imageUrl: `https://placehold.co/100x100.png?text=${encodeURIComponent(productData.name.substring(0,10))}&font=roboto`,
-          productSKUs: [],
-        };
-
-        if ((!productVariants || productVariants.length === 0)) {
-            const skuIdentifier = get().getSkuIdentifier(newProduct.name, {});
-            const defaultSku: ProductSKU = {
-                id: generateId(), optionValues: {}, skuIdentifier: skuIdentifier,
-                stockLayers: [],
-            };
-            if (newProduct.trackQuantity === false) {
-                defaultSku.stockLayers.push({
-                    id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED', purchaseDate: new Date().toISOString(),
-                    initialQuantity: 0, quantity: 0,
-                    costPrice: productData.costPriceForNonTracked ?? 0,
-                    sellPrice: productData.sellPriceForNonTracked ?? 0,
-                });
-            }
-            newProduct.productSKUs.push(defaultSku);
-        }
-
-
-        set((state) => ({ products: [...state.products, newProduct] }));
-        if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
-          get().addCategory(productData.category!);
-        }
-        return newProduct;
-      },
-
-      updateProduct: (productId, productData) => {
-        set((state) => ({
-          products: state.products.map((p) => {
-            if (p.id === productId) {
-              const updatedProduct: Product = { ...p, ...productData, companyId: p.companyId } as Product; 
-
-              if (productData.variants !== undefined) {
-                updatedProduct.variants = productData.variants.map((variantData, variantIdx) => {
-                  const existingVariant = p.variants?.find(v => v.id === (variantData as any).id || v.name === variantData.name);
-                  return {
-                    id: existingVariant?.id || `variant-${generateId()}-${variantIdx}`,
-                    name: variantData.name,
-                    options: variantData.options.map((optData, optIdx) => {
-                      const existingOption = existingVariant?.options.find(o => o.id === (optData as any).id || o.value === optData.value);
-                      return {
-                        id: existingOption?.id || `option-${generateId()}-${variantIdx}-${optIdx}`,
-                        value: optData.value,
-                      };
-                    }),
-                  };
-                });
-              }
-              
-              if (productData.additionalChargeDefinitions !== undefined) {
-                updatedProduct.additionalChargeDefinitions = productData.additionalChargeDefinitions.map(ac => ({
-                    ...ac,
-                    id: ac.id || uuidv4(),
-                    type: ac.type || 'fixed',
-                }));
-              }
-
-
-              updatedProduct.productSKUs = updatedProduct.productSKUs.map(sku => ({
-                ...sku,
-                skuIdentifier: get().getSkuIdentifier(updatedProduct.name, sku.optionValues)
-              }));
-
-              if (updatedProduct.trackQuantity === false && (!updatedProduct.variants || updatedProduct.variants.length === 0)) {
-                let defaultSku = updatedProduct.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
-                const costPrice = productData.costPriceForNonTracked ?? 0;
-                const sellPrice = productData.sellPriceForNonTracked ?? 0;
-
-                if (defaultSku) {
-                  if (defaultSku.stockLayers.length > 0) {
-                    defaultSku.stockLayers[0].costPrice = costPrice;
-                    defaultSku.stockLayers[0].sellPrice = sellPrice;
-                    defaultSku.stockLayers[0].quantity = 0; 
-                    defaultSku.stockLayers[0].initialQuantity = 0;
-                  } else {
-                    defaultSku.stockLayers.push({
-                        id: generateId(), purchaseBillId: 'UPDATED_NON_TRACKED', purchaseDate: new Date().toISOString(),
-                        initialQuantity: 0, quantity: 0, costPrice, sellPrice,
-                    });
-                  }
-                   defaultSku.skuIdentifier = get().getSkuIdentifier(updatedProduct.name, defaultSku.optionValues);
-                } else {
-                  defaultSku = {
-                    id: generateId(), optionValues: {}, skuIdentifier: get().getSkuIdentifier(updatedProduct.name, {}),
-                    stockLayers: [{
-                      id: generateId(), purchaseBillId: 'CREATED_NON_TRACKED', purchaseDate: new Date().toISOString(),
-                      initialQuantity: 0, quantity: 0, costPrice, sellPrice,
-                    }],
-                  };
-                  updatedProduct.productSKUs = [defaultSku, ...updatedProduct.productSKUs.filter(sku => Object.keys(sku.optionValues).length > 0)];
-                }
-              }
-              return updatedProduct;
-            }
-            return p;
-          }),
-        }));
-        if (productData.category && !get().categories.find(c => c.name.toLowerCase() === productData.category!.toLowerCase())) {
-          get().addCategory(productData.category!);
-        }
-      },
-
-      deleteProduct: (productId: string) => {
-        set((state) => {
-          const updatedProducts = state.products.filter((p) => p.id !== productId);
-          return { products: updatedProducts };
-        });
-      },
-
+      
       findOrCreateProductSKU: (productId, optionValues) => {
+        // This logic might need to become async if SKUs are managed server-side eventually
         const products = get().products;
         const productIndex = products.findIndex(p => p.id === productId);
         if (productIndex === -1) return undefined;
@@ -300,6 +265,9 @@ export const useInventoryStore = create<InventoryState>()(
         );
 
         if (!sku) {
+          // In a server-centric model, creating an SKU might involve an API call.
+          // For now, we'll keep client-side creation for immediate UI feedback,
+          // assuming the parent product save (add/update) handles persisting these.
           const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
           sku = {
             id: generateId(),
@@ -310,7 +278,8 @@ export const useInventoryStore = create<InventoryState>()(
           const updatedProductSKUs = [...product.productSKUs, sku];
           const updatedProducts = [...products];
           updatedProducts[productIndex] = { ...product, productSKUs: updatedProductSKUs };
-          set({ products: updatedProducts });
+          set({ products: updatedProducts }); 
+          // If this were an API, you'd likely call an updateProduct API here too
         }
         return sku;
       },
@@ -371,6 +340,10 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       addBill: (billData, billItemsData) => {
+        // ... (Existing addBill logic, which uses getProductById and modifies products in tempProducts)
+        // This will need careful refactoring if products are purely server-side.
+        // For now, it continues to operate on the client-side cache of products for stock updates.
+        // This is a major point of eventual refactoring for full server-side data.
         const currentDate = new Date();
         const billTimestamp = currentDate.getTime();
         const newBillId = format(currentDate, 'ddMMyyHHmmss');
@@ -509,50 +482,32 @@ export const useInventoryStore = create<InventoryState>()(
           billTotalSGST += itemSgstAmount;
           billTotalCGST += itemCgstAmount;
 
-          // Add related additional charges
           if (billData.type === 'sell' && currentProductRef.additionalChargeDefinitions && currentProductRef.additionalChargeDefinitions.length > 0) {
             currentProductRef.additionalChargeDefinitions.forEach(chargeDef => {
               let chargeValue = 0;
               if (chargeDef.type === 'fixed') {
                 chargeValue = chargeDef.value;
               } else if (chargeDef.type === 'percentage') {
-                // Percentage calculated on the main item's pre-tax subtotal (qty * sellPrice)
                 chargeValue = (itemSubTotalPreTax * chargeDef.value) / 100;
               }
               
               newBillItems.push({
-                id: generateId(),
-                productId: `CHARGE_ITEM_${chargeDef.id}`, // Distinguish from actual products
-                productName: chargeDef.name,
-                quantity: 1, // Charges are usually per main item instance, so qty 1
-                costPrice: 0, // Charges have no COGS in this context
-                sellPrice: chargeValue,
-                sgstAmount: 0, // For simplicity, not applying GST to these additional charges
-                cgstAmount: 0,
-                isAdditionalCharge: true,
-                sourceChargeDefinitionId: chargeDef.id,
+                id: generateId(), productId: `CHARGE_ITEM_${chargeDef.id}`, productName: chargeDef.name,
+                quantity: 1, costPrice: 0, sellPrice: chargeValue,
+                sgstAmount: 0, cgstAmount: 0, isAdditionalCharge: true, sourceChargeDefinitionId: chargeDef.id,
               });
-              billSubTotal += chargeValue; // Add charge to subtotal
+              billSubTotal += chargeValue;
             });
           }
         }
         
-        // Add ad-hoc service/charge items
         for (const itemData of chargeItemsData) {
           const billItemCostPrice = billData.type === 'buy' ? (itemData.costPrice ?? 0) : 0;
           const billItemSellPrice = itemData.sellPrice ?? 0;
           newBillItems.push({
-            id: generateId(),
-            productId: itemData.productId, // Will be like SERVICE_ITEM_uuid
-            productName: itemData.productName || 'Service/Charge',
-            quantity: itemData.quantity,
-            costPrice: billItemCostPrice,
-            sellPrice: billItemSellPrice,
-            isDefective: undefined,
-            selectedVariantOptions: undefined,
-            sgstAmount: 0, // Ad-hoc services don't use product's GST rates
-            cgstAmount: 0,
-            isAdditionalCharge: false, // It's an ad-hoc item, not an auto-added charge
+            id: generateId(), productId: itemData.productId, productName: itemData.productName || 'Service/Charge',
+            quantity: itemData.quantity, costPrice: billItemCostPrice, sellPrice: billItemSellPrice,
+            isDefective: undefined, selectedVariantOptions: undefined, sgstAmount: 0, cgstAmount: 0, isAdditionalCharge: false,
           });
           billSubTotal += billItemSellPrice * itemData.quantity;
         }
@@ -565,22 +520,11 @@ export const useInventoryStore = create<InventoryState>()(
         let grandTotalAmount = 0;
         if (billData.type === 'buy') { 
           grandTotalAmount = newBillItems.reduce((acc, buyItem) => acc + (buyItem.quantity * (buyItem.costPrice || 0)), 0);
-          billSubTotal = grandTotalAmount;
-          billTotalSGST = 0;
-          billTotalCGST = 0;
+          billSubTotal = grandTotalAmount; billTotalSGST = 0; billTotalCGST = 0;
         } else if (billData.type === 'sell') {
-            if (isSalesEstimate) {
-                grandTotalAmount = billSubTotal;
-                billTotalSGST = 0;
-                billTotalCGST = 0;
-            } else {
-                grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
-            }
-        } else { 
-            grandTotalAmount = billSubTotal; // Return value
-            billTotalSGST = 0; 
-            billTotalCGST = 0;
-        }
+            if (isSalesEstimate) { grandTotalAmount = billSubTotal; billTotalSGST = 0; billTotalCGST = 0; } 
+            else { grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST; }
+        } else { grandTotalAmount = billSubTotal; billTotalSGST = 0; billTotalCGST = 0; }
 
 
         const staffUser = billData.billedByStaffId ? get().getStaffById(billData.billedByStaffId) : undefined;
@@ -589,12 +533,8 @@ export const useInventoryStore = create<InventoryState>()(
         const newBill: Bill = {
           id: newBillId, type: billData.type, date: currentDate.toISOString(), timestamp: billTimestamp,
           vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
-          items: newBillItems, 
-          subTotal: billSubTotal,
-          totalSGST: billTotalSGST,
-          totalCGST: billTotalCGST,
-          totalAmount: grandTotalAmount, 
-          isEstimate: billData.isEstimate,
+          items: newBillItems, subTotal: billSubTotal, totalSGST: billTotalSGST, totalCGST: billTotalCGST,
+          totalAmount: grandTotalAmount, isEstimate: billData.isEstimate,
           notes: billData.notes, paymentStatus: billData.paymentStatus,
           billedByStaffId: staffUser?.id, billedByStaffName: staffUser?.name,
           storeId: storeLocation?.id, storeName: storeLocation?.name,
@@ -604,13 +544,13 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({ bills: [newBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
         return newBill;
       },
-      deleteBill: (billId: string) => {
+      deleteBill: (billId: string) => { /* ... existing logic ... */ 
         set((state) => ({
           bills: state.bills.filter((b) => b.id !== billId),
         }));
       },
       getBillById: (billId) => get().bills.find((b) => b.id === billId),
-      updateBillNonCriticalDetails: (billId, details) => {
+      updateBillNonCriticalDetails: (billId, details) => { /* ... existing logic ... */ 
         set((state) => ({
           bills: state.bills.map((bill) =>
             bill.id === billId
@@ -623,24 +563,24 @@ export const useInventoryStore = create<InventoryState>()(
           ),
         }));
       },
-      getRecentBills: (limit: number) => {
+      getRecentBills: (limit: number) => { /* ... existing logic ... */ 
         return [...get().bills]
           .slice(0, limit);
       },
-      getBillsForProduct: (productId: string) => {
+      getBillsForProduct: (productId: string) => { /* ... existing logic ... */ 
         return get().bills
           .filter(bill => bill.items.some(item => item.productId === productId))
           .sort((a, b) => b.timestamp - a.timestamp);
       },
 
-      addCategory: (categoryName) => {
+      addCategory: (categoryName) => { /* ... existing logic ... */ 
         const existingCategory = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
         if (existingCategory) return existingCategory;
         const newCategory: Category = { id: generateId(), name: categoryName };
         set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
         return newCategory;
       },
-      searchCategories: (searchTerm: string) => {
+      searchCategories: (searchTerm: string) => { /* ... existing logic ... */ 
         if (!searchTerm) return get().categories.map(c => c.name).sort((a,b) => a.localeCompare(b));
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().categories
@@ -649,19 +589,19 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a,b) => a.localeCompare(b));
       },
 
-      addStaff: (staffData) => {
+      addStaff: (staffData) => { /* ... existing logic ... */ 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan || get().staffs.length >= plan.maxEmployees) return null;
         const newStaff: User = { id: generateId(), role: 'employee', ...staffData };
         set((state) => ({ staffs: [...state.staffs, newStaff] }));
         return newStaff;
       },
-      updateStaff: (staffId, staffData) => {
+      updateStaff: (staffId, staffData) => { /* ... existing logic ... */ 
         set((state) => ({
           staffs: state.staffs.map((s) => (s.id === staffId ? { ...s, ...staffData, role: 'employee', companyId: s.companyId } : s)),
         }));
       },
-      deleteStaff: (staffId: string) => {
+      deleteStaff: (staffId: string) => { /* ... existing logic ... */ 
          set((state) => ({
           staffs: state.staffs.filter((s) => s.id !== staffId),
           stores: state.stores.map(store => ({
@@ -672,13 +612,13 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getStaffById: (staffId) => get().staffs.find((s) => s.id === staffId),
       getAllStaff: () => get().staffs,
-      getStaffDetailsByIds: (staffIds: string[]) => {
+      getStaffDetailsByIds: (staffIds: string[]) => { /* ... existing logic ... */ 
         const allStaff = get().staffs;
         return staffIds.map(id => allStaff.find(s => s.id === id)).filter(s => !!s) as User[];
       },
 
 
-      addStore: (storeData) => {
+      addStore: (storeData) => { /* ... existing logic ... */ 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan || get().stores.length >= plan.maxStores) return null;
         const newStore: Store = {
@@ -689,12 +629,12 @@ export const useInventoryStore = create<InventoryState>()(
         set((state) => ({ stores: [...state.stores, newStore] }));
         return newStore;
       },
-      updateStore: (storeId, storeData) => {
+      updateStore: (storeId, storeData) => { /* ... existing logic ... */ 
         set((state) => ({
           stores: state.stores.map((s) => (s.id === storeId ? { ...s, ...storeData, companyId: s.companyId } : s)),
         }));
       },
-      deleteStore: (storeId: string) => {
+      deleteStore: (storeId: string) => { /* ... existing logic ... */ 
          set((state) => ({
           stores: state.stores.filter((s) => s.id !== storeId),
           staffs: state.staffs.map(staff => ({
@@ -706,23 +646,23 @@ export const useInventoryStore = create<InventoryState>()(
       getStoreById: (storeId) => get().stores.find((s) => s.id === storeId),
       getAllStores: () => get().stores,
 
-      updateUserProfileFields: (data: Partial<UserProfile>) => {
+      updateUserProfileFields: (data: Partial<UserProfile>) => { /* ... existing logic ... */ 
         set((state) => ({
           userProfile: { ...state.userProfile, ...data },
         }));
       },
-      getActiveSubscriptionPlan: () => {
+      getActiveSubscriptionPlan: () => { /* ... existing logic ... */ 
         const { userProfile } = get();
         if (!userProfile) return SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
         const { activeSubscriptionId } = userProfile;
         return SUBSCRIPTION_PLANS.find(plan => plan.id === activeSubscriptionId) || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
       },
-      canAddStore: () => {
+      canAddStore: () => { /* ... existing logic ... */ 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan) return false;
         return get().stores.length < plan.maxStores;
       },
-      canAddStaff: () => {
+      canAddStaff: () => { /* ... existing logic ... */ 
         const plan = get().getActiveSubscriptionPlan();
         if (!plan) return false;
         return get().staffs.length < plan.maxEmployees;
@@ -735,7 +675,7 @@ export const useInventoryStore = create<InventoryState>()(
         return get().products.find((p) => p.name.toLowerCase() === name.toLowerCase());
       },
       searchProducts: (searchTerm: string) => {
-        if (!searchTerm) return [];
+        if (!searchTerm) return []; // Or return all products if searchTerm is empty based on desired UX
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().products.filter(
           (p) =>
@@ -757,7 +697,7 @@ export const useInventoryStore = create<InventoryState>()(
         }, 0);
       },
 
-      getDailySalesAndExpenses: (days, companyId) => {
+      getDailySalesAndExpenses: (days, companyId) => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -782,7 +722,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
         return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse();
       },
-      getTopSellingProductsByRevenue: (limit: number, companyId) => {
+      getTopSellingProductsByRevenue: (limit: number, companyId) => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -806,7 +746,7 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, limit);
       },
-      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId) => {
+      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId) => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -829,7 +769,7 @@ export const useInventoryStore = create<InventoryState>()(
           return { ...bill, totalCost, potentialRevenue, coverageStatus };
         });
       },
-      getExpenseSummaryStats: (companyId): ExpenseSummary => {
+      getExpenseSummaryStats: (companyId): ExpenseSummary => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -870,7 +810,7 @@ export const useInventoryStore = create<InventoryState>()(
           coveredBillCount, uncoveredBillCount,
         };
       },
-      getOverallFinancialSummary: (companyId): FinancialSummary => {
+      getOverallFinancialSummary: (companyId): FinancialSummary => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -894,7 +834,7 @@ export const useInventoryStore = create<InventoryState>()(
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
 
-      getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => {
+      getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { /* ... existing logic ... */ 
          let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -927,7 +867,7 @@ export const useInventoryStore = create<InventoryState>()(
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, transactionsToday, defectivesToday };
       },
 
-      getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => {
+      getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => { /* ... existing logic ... */ 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -961,7 +901,7 @@ export const useInventoryStore = create<InventoryState>()(
           .slice(0, limit);
       },
 
-      getProductLedgerSummary: (params): ProductLedgerEntry[] => {
+      getProductLedgerSummary: (params): ProductLedgerEntry[] => { /* ... existing logic ... */ 
         const { companyId, startDate, endDate } = params || {};
         let productsToConsider = get().products;
         let billsToConsider = get().bills;
@@ -1031,7 +971,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
 
-      addChatMessage: (storeId, senderId, senderName, text) => {
+      addChatMessage: (storeId, senderId, senderName, text) => { /* ... existing logic ... */ 
         const newMessage: ChatMessage = {
           id: generateId(), storeId, senderId, senderName, text, timestamp: Date.now(),
         };
@@ -1042,11 +982,11 @@ export const useInventoryStore = create<InventoryState>()(
           };
         });
       },
-      getMessagesForStore: (storeId: string) => {
+      getMessagesForStore: (storeId: string) => { /* ... existing logic ... */ 
         const messages = get().messagesByStore[storeId] || [];
         return [...messages].sort((a, b) => a.timestamp - b.timestamp);
       },
-      clearChatForStore: (storeId: string) => {
+      clearChatForStore: (storeId: string) => { /* ... existing logic ... */ 
         set((state) => {
           const newMessagesByStore = { ...state.messagesByStore };
           delete newMessagesByStore[storeId];
@@ -1054,7 +994,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
       },
 
-      _hydrate: () => {
+      _hydrate: () => { /* ... existing hydration logic, ensure it handles new fields gracefully ... */ 
         try {
           const state = get();
           let storeUpdated = false;

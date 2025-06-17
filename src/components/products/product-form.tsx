@@ -72,18 +72,15 @@ const productFormSchema = z.object({
   trackQuantity: z.boolean().default(true),
   sku: z.string().optional(), 
   expiryDate: z.string().optional(),
-  costPrice: z.preprocess(
+  costPrice: z.preprocess( // For non-tracked, non-variant items
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
   ),
-  sellPrice: z.preprocess(
+  sellPrice: z.preprocess( // For non-tracked, non-variant items
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
-  initialStock: z.preprocess( 
-    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
-    z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
-  ),
+  // initialStock is removed as stock is managed via Expense Bills (API will handle this)
   sgstRate: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "SGST rate must be a number" }).min(0, "SGST rate cannot be negative").optional()
@@ -238,7 +235,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
       const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
       const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
       if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
-        append({ name: "", type: 'fixed', value: undefined }); // Default new charge to 'fixed'
+        append({ name: "", type: 'fixed', value: undefined }); 
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
     }
@@ -361,7 +358,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
 
 
 interface ProductFormProps {
-  initialData?: Product | null;
+  initialData?: Product | null; // Product from API might not have all client-side computed fields
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
@@ -387,14 +384,14 @@ function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { qu
 }
 
 
-export function ProductForm({ initialData, searchParams: routeSearchParamsProp }: ProductFormProps) {
-  const addProduct = useInventoryStore(state => state.addProduct);
-  const updateProduct = useInventoryStore(state => state.updateProduct);
-  const categories = useInventoryStore(state => state.categories);
-  const addCategoryToStore = useInventoryStore(state => state.addCategory);
-  const getBillsForProduct = useInventoryStore(state => state.getBillsForProduct);
-  const getSkuDetails = useInventoryStore(state => state.getSkuDetails);
-  const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001"); 
+export function ProductForm({ initialData: initialProductProp, searchParams: routeSearchParamsProp }: ProductFormProps) {
+  const { 
+    addProduct: addProductToStore, 
+    updateProduct: updateProductInStore, 
+    categories, addCategory: addCategoryToStore, 
+    getBillsForProduct, getSkuDetails,
+    // companyId: currentCompanyIdFromStore // This is not how companyId is typically retrieved
+  } = useInventoryStore();
 
   const { toast } = useToast();
   const router = useRouter();
@@ -402,6 +399,10 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   
   const [hasMounted, setHasMounted] = useState(false);
   const [productBills, setProductBills] = useState<Bill[]>([]);
+  const [isLoading, setIsLoading] = useState(false); // For API calls
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+  const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
+
 
   const isEditing = !!initialData;
 
@@ -409,7 +410,7 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
     resolver: zodResolver(productFormSchema),
     defaultValues: {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
-      costPrice: undefined, sellPrice: undefined, initialStock: undefined,
+      costPrice: undefined, sellPrice: undefined, // initialStock removed
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     },
@@ -421,10 +422,29 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
   const currentVariants = watch('variants');
   const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
 
-  const memoizedDefaultValues = useMemo(() => {
+  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
+    control, name: "variants",
+  });
+
+  useEffect(() => {
+    setHasMounted(true);
+    const storedCompanyId = localStorage.getItem('companyId');
+    if (storedCompanyId) {
+      setCurrentCompanyId(storedCompanyId);
+    } else {
+      console.error("ProductForm: Company ID not found in localStorage.");
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage products."});
+      // router.push('/admin'); // Or some other error handling
+    }
+  }, [toast, router]);
+
+  // Effect to set form default values once initialData (from prop or fetch) and companyId are available
+  useEffect(() => {
+    if (!hasMounted || !currentCompanyId) return;
+
     let defaults: ProductFormData = {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
-      costPrice: undefined, sellPrice: undefined, initialStock: undefined,
+      costPrice: undefined, sellPrice: undefined, // initialStock removed
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     };
@@ -443,7 +463,6 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
         sku: initialData.sku || '',
         costPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.averageCostPrice === 'number') ? defaultSkuForNonVariant.averageCostPrice : undefined,
         sellPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.currentSellPrice === 'number') ? defaultSkuForNonVariant.currentSellPrice : undefined,
-        initialStock: undefined, 
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         sgstRate: initialData.sgstRate,
         cgstRate: initialData.cgstRate,
@@ -458,105 +477,87 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
             value: ac.value,
         })) || [],
       };
+      setProductBills(getBillsForProduct(initialData.id)); // Still uses client-side bills
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
-      const initialTrackQuantityFromParams = routeSearchParamsProp.quantity ? true : true;
-      const hasVariantsForParamsPreFill = false; 
-
+      // Pre-fill from URL params (e.g., from NewProductDialog via BillingForm)
       defaults = {
         name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
-        description: '', category: '', trackQuantity: initialTrackQuantityFromParams, sku: '',
+        description: '', category: '', trackQuantity: true, sku: '',
         costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
-        initialStock: (routeSearchParamsProp.quantity && !hasVariantsForParamsPreFill) ? parseFloat(routeSearchParamsProp.quantity as string) : undefined,
         expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
         additionalChargeDefinitions: [],
       };
     }
-    return defaults;
-  }, [isEditing, initialData, routeSearchParamsProp, getSkuDetails]);
-
-
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hasMounted) return;
-
-    formReset(memoizedDefaultValues); 
-
-    if (isEditing && initialData?.id) {
-        setProductBills(getBillsForProduct(initialData.id));
-    } else {
-        setProductBills([]); 
-    }
-    
+    formReset(defaults); 
     setTimeout(() => setFocus('name'), 50);
 
-  }, [hasMounted, memoizedDefaultValues, formReset, setFocus, getBillsForProduct, isEditing, initialData?.id]);
+  }, [hasMounted, currentCompanyId, initialData, isEditing, routeSearchParamsProp, formReset, setFocus, getBillsForProduct, getSkuDetails]);
 
 
-  const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
-    control, name: "variants",
-  });
-
-  const onSubmit = (data: ProductFormData) => {
-    const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
-        id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        name: v_form.name,
-        options: v_form.options.map(opt_form => ({
-          id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          value: opt_form.value
-        }))
-    }));
-
-    if (data.category && !categories.some(c => c.name.toLowerCase() === data.category!.toLowerCase())) {
-      addCategoryToStore(data.category!);
+  const onSubmit = async (data: ProductFormData) => {
+    if (!currentCompanyId) {
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot save product."});
+      return;
     }
+    setIsLoading(true);
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, companyId: string } = {
+    const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name, description: data.description, category: data.category,
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       sgstRate: data.sgstRate, cgstRate: data.cgstRate,
-      variants: productVariantsPayload,
+      variants: (data.variants || []).map(v_form => ({
+          id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          name: v_form.name,
+          options: v_form.options.map(opt_form => ({
+            id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+            value: opt_form.value
+          }))
+      })),
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
-          id: ac.id || uuidv4(), 
-          name: ac.name, 
-          type: ac.type || 'fixed', 
-          value: ac.value
+          id: ac.id || uuidv4(), name: ac.name, type: ac.type || 'fixed', value: ac.value
         })),
-      companyId: companyId, 
     };
     
-    if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
-        productToSaveBase.costPriceForNonTracked = data.costPrice;
-        productToSaveBase.sellPriceForNonTracked = data.sellPrice;
+    if (!data.trackQuantity && (!productPayload.variants || productPayload.variants.length === 0)) {
+        productPayload.costPriceForNonTracked = data.costPrice;
+        productPayload.sellPriceForNonTracked = data.sellPrice;
     }
+    
+    let savedProduct: Product | null = null;
 
-    let savedProductId = '';
     if (isEditing && initialData) {
-      updateProduct(initialData.id, productToSaveBase);
-      savedProductId = initialData.id;
-      toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
+      savedProduct = await updateProductInStore(initialData.id, productPayload, currentCompanyId);
+      if (savedProduct) {
+        toast({ title: "Product Updated", description: `${data.name} has been updated successfully.` });
+      } else {
+        toast({ variant: "destructive", title: "Update Failed", description: "Could not update product." });
+      }
     } else {
-      const newProduct = addProduct(productToSaveBase);
-      savedProductId = newProduct.id;
-      toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
+      savedProduct = await addProductToStore(productPayload, currentCompanyId);
+      if (savedProduct) {
+        toast({ title: "Product Added", description: `${data.name} has been added to your inventory.` });
+      } else {
+        toast({ variant: "destructive", title: "Add Failed", description: "Could not add product." });
+      }
     }
+    setIsLoading(false);
 
-    const returnToParam = nextSearchParams.get('returnTo');
-    if (returnToParam) {
-      const isNewProductFlow = !isEditing;
-      const finalReturnUrl = isNewProductFlow 
-        ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProductId}`
-        : decodeURIComponent(returnToParam);
-      router.push(finalReturnUrl);
-    } else {
-      router.push('/admin/products');
+    if (savedProduct) {
+        const returnToParam = nextSearchParams.get('returnTo');
+        if (returnToParam) {
+          const isNewProductFlow = !isEditing;
+          const finalReturnUrl = isNewProductFlow 
+            ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProduct.id}`
+            : decodeURIComponent(returnToParam);
+          router.push(finalReturnUrl);
+        } else {
+          router.push('/admin/products');
+        }
     }
   };
 
-  if (!hasMounted && (isEditing || routeSearchParamsProp)) {
+  if (!hasMounted && isEditing) { // Show loader if editing and initial data not yet processed
      return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
   }
 
@@ -833,11 +834,11 @@ export function ProductForm({ initialData, searchParams: routeSearchParamsProp }
             )}
 
             <CardFooter className="flex justify-end gap-3 pt-8 border-t">
-              <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting}>
+              <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+              <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
+                {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
               </Button>
             </CardFooter>
           </form>

@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown, PackageSearch } from 'lucide-react';
+import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -28,10 +28,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
 
 export function ProductsTable() {
-  const { products, deleteProduct, getSkuDetails } = useInventoryStore(
+  const { products, fetchProducts, deleteProduct: deleteProductFromStore, getSkuDetails } = useInventoryStore(
     (state) => ({
       products: state.products,
-      deleteProduct: state.deleteProduct,
+      fetchProducts: state.fetchProducts,
+      deleteProduct: state.deleteProduct, // Renamed to avoid conflict with local function
       getSkuDetails: state.getSkuDetails,
     })
   );
@@ -39,14 +40,37 @@ export function ProductsTable() {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableColumns; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
+  const [isLoading, setIsLoading] = useState(true);
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+    const storedCompanyId = localStorage.getItem('companyId');
+    if (storedCompanyId) {
+      setCompanyId(storedCompanyId);
+    } else {
+      console.error("Company ID not found for fetching products.");
+      setIsLoading(false);
+      // Potentially show an error message to the user or redirect
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hasMounted && companyId) {
+      setIsLoading(true);
+      fetchProducts(companyId).finally(() => setIsLoading(false));
+    }
+  }, [hasMounted, companyId, fetchProducts]);
+
 
   const filteredAndSortedProducts = useMemo(() => {
-    let sortableProducts = [...products];
+    let sortableProducts = [...products]; // Use the products from the store (client-side cache)
     if (searchTerm) {
       sortableProducts = sortableProducts.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) || // Main product SKU code
+        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) || 
         product.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
@@ -55,12 +79,12 @@ export function ProductsTable() {
       sortableProducts.sort((a, b) => {
         let valA, valB;
         if (sortConfig.key === 'stock') {
-            valA = a.trackQuantity ? a.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0) : -1; // Treat non-tracked as less than 0 for sorting
+            valA = a.trackQuantity ? a.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0) : -1; 
             valB = b.trackQuantity ? b.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0) : -1;
         } else if (sortConfig.key === 'costPrice') {
             const costsA = a.productSKUs.map(sku => getSkuDetails(sku).averageCostPrice).filter(p => typeof p === 'number') as number[];
             const costsB = b.productSKUs.map(sku => getSkuDetails(sku).averageCostPrice).filter(p => typeof p === 'number') as number[];
-            valA = costsA.length > 0 ? Math.min(...costsA) : Infinity; // Unpriced items go to the end
+            valA = costsA.length > 0 ? Math.min(...costsA) : Infinity; 
             valB = costsB.length > 0 ? Math.min(...costsB) : Infinity;
         } else if (sortConfig.key === 'sellPrice') {
             const pricesA = a.productSKUs.map(sku => getSkuDetails(sku).currentSellPrice).filter(p => typeof p === 'number') as number[];
@@ -68,10 +92,10 @@ export function ProductsTable() {
             valA = pricesA.length > 0 ? Math.min(...pricesA) : Infinity;
             valB = pricesB.length > 0 ? Math.min(...pricesB) : Infinity;
         } else if (sortConfig.key === 'sku') {
-            valA = a.sku || ''; // Main product SKU
+            valA = a.sku || ''; 
             valB = b.sku || '';
         } else if (sortConfig.key === 'expiryDate') {
-            valA = a.expiryDate ? new Date(a.expiryDate).getTime() : 0; // No expiry date sorts first
+            valA = a.expiryDate ? new Date(a.expiryDate).getTime() : 0; 
             valB = b.expiryDate ? new Date(b.expiryDate).getTime() : 0;
         } else {
             valA = a[sortConfig.key as Exclude<SortableColumns, 'stock'|'costPrice'|'sellPrice'|'sku'|'expiryDate'>];
@@ -101,12 +125,20 @@ export function ProductsTable() {
     setSortConfig({ key, direction });
   };
 
-  const handleDeleteProductClick = (productId: string, productName: string) => {
-    deleteProduct(productId);
-    toast({ title: "Product Deleted", description: `${productName} has been removed from inventory.` });
+  const handleDeleteProduct = async (productId: string, productName: string) => {
+    if (!companyId) {
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+        return;
+    }
+    const success = await deleteProductFromStore(productId, companyId);
+    if (success) {
+        toast({ title: "Product Deleted", description: `${productName} has been removed from inventory.` });
+    } else {
+        toast({ variant: "destructive", title: "Deletion Failed", description: `Could not delete ${productName}.` });
+    }
   };
 
-  const getProductStockDisplay = (product: Product): string | number => {
+  const getProductStockDisplay = (product: Product): string | number | JSX.Element => {
     if (!product.trackQuantity) return <span className="text-xs text-muted-foreground">N/A</span>;
     const totalStock = product.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0);
     return totalStock;
@@ -120,11 +152,11 @@ export function ProductsTable() {
     if (prices.length === 0) return "N/A"; 
     
     const allPricesAreZero = prices.every(price => price === 0);
-    if (allPricesAreZero && prices.length > 0) return `₹0.00`; // If SKUs exist but all prices are 0
+    if (allPricesAreZero && prices.length > 0) return `₹0.00`;
 
-    const validPrices = prices.filter(price => price > 0); // Consider only non-zero prices for min/max if some are zero
-    if (validPrices.length === 0 && prices.length > 0) return `₹0.00`; // All existing SKU prices are 0
-    if (validPrices.length === 0) return "N/A"; // No valid prices among SKUs
+    const validPrices = prices.filter(price => price > 0); 
+    if (validPrices.length === 0 && prices.length > 0) return `₹0.00`; 
+    if (validPrices.length === 0) return "N/A"; 
 
     const minPrice = Math.min(...validPrices);
     const maxPrice = Math.max(...validPrices);
@@ -134,8 +166,16 @@ export function ProductsTable() {
     return `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
   };
 
+  if (isLoading && hasMounted) {
+    return <div className="flex-1 flex items-center justify-center p-6">Loading products...</div>;
+  }
+  if (!companyId && hasMounted) {
+     return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load products.</div>;
+  }
+
+
   return (
-    <>
+    <TooltipProvider>
       <div className="flex items-center justify-between mb-4 gap-2">
         <Input
           placeholder="Search products (name, category, SKU identifier)..."
@@ -262,6 +302,11 @@ export function ProductsTable() {
                             <Edit3 className="mr-2 h-4 w-4" /> Edit / View Details
                           </Link>
                         </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                           <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? `&isVariant=true`: ""}`} target="_blank">
+                               <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
+                           </Link>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
@@ -278,7 +323,7 @@ export function ProductsTable() {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteProductClick(product.id, product.name)} className="bg-destructive hover:bg-destructive/90">
+                                <AlertDialogAction onClick={() => handleDeleteProduct(product.id, product.name)} className="bg-destructive hover:bg-destructive/90">
                                     Delete Product
                                 </AlertDialogAction>
                                 </AlertDialogFooter>
@@ -292,15 +337,13 @@ export function ProductsTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={10} className="h-24 text-center py-3 px-4">
-                  No products found.
+                  {isLoading ? "Loading products..." : (companyId ? "No products found for this company." : "Company ID not available.")}
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
-    </>
+    </TooltipProvider>
   );
 }
-
-    
