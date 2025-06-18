@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react'; // Added useState
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -31,7 +31,7 @@ const storeFormSchema = z.object({
   location: z.string().min(3, { message: "Location must be at least 3 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
-  passkey: z.string().min(4, { message: "Passkey must be at least 4 characters." }).or(z.literal('')).optional(), // Allow empty for not changing
+  passkey: z.string().min(4, { message: "Passkey must be at least 4 characters for new stores, or leave blank to keep current on edit." }).or(z.literal('')).optional(),
   allowedStaffIds: z.array(z.string()).optional().default([]),
   allowedOperations: z.array(billModeSchema).min(1, "At least one operation must be allowed.").default(['sell', 'buy', 'return']),
 });
@@ -52,17 +52,18 @@ const operationOptions: { id: BillMode; label: string }[] = [
   { id: 'return', label: 'Returns Processing' },
 ];
 
-export function StoreFormDialog({ 
-  isOpen, 
-  onOpenChange, 
+export function StoreFormDialog({
+  isOpen,
+  onOpenChange,
   onFormSubmit,
   editingStore,
   allStaff
 }: StoreFormDialogProps) {
   const { addStore, updateStore } = useInventoryStore();
   const { toast } = useToast();
-  
-  const { control, register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<StoreFormData>({
+  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
+
+  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StoreFormData>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: {
       name: '',
@@ -80,6 +81,16 @@ export function StoreFormDialog({
 
   useEffect(() => {
     if (isOpen) {
+      const companyIdFromStorage = localStorage.getItem('companyId');
+      if (companyIdFromStorage) {
+        setCurrentCompanyId(companyIdFromStorage);
+      } else {
+        console.error("StoreFormDialog: Company ID not found in localStorage.");
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage stores."});
+        onOpenChange(false); // Close dialog if no company context
+        return;
+      }
+
       if (editingStore) {
         reset({
           name: editingStore.name,
@@ -96,45 +107,72 @@ export function StoreFormDialog({
           location: '',
           email: '',
           phone: '',
-          passkey: '',
+          passkey: '', // Ensure passkey is empty for new store default in form
           allowedStaffIds: [],
           allowedOperations: ['sell', 'buy', 'return'],
         });
       }
     }
-  }, [isOpen, editingStore, reset]);
+  }, [isOpen, editingStore, reset, toast, onOpenChange]);
 
-  const onSubmit = (data: StoreFormData) => {
-    const passkeyToSubmit = data.passkey?.trim() || (editingStore ? undefined : '');
-    
-    if (!editingStore && !passkeyToSubmit) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new stores." });
+  const onSubmit = async (data: StoreFormData) => {
+    if (!currentCompanyId) {
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot save store." });
+      return;
+    }
+
+    const passkeyToSubmit = data.passkey?.trim();
+
+    if (!editingStore && (!passkeyToSubmit || passkeyToSubmit.length < 4)) {
+        toast({ variant: "destructive", title: "Validation Error", description: "A passkey of at least 4 characters is required for new stores." });
         return;
     }
 
-    const storePayload: Partial<Store> & {name: string, location: string, email: string, phone: string, passkey?:string } = {
+    const storePayload: Omit<Store, 'id' | 'companyId'> & { passkey?: string } = {
         name: data.name,
         location: data.location,
         email: data.email,
         phone: data.phone,
-        allowedStaffIds: data.allowedStaffIds,
+        allowedStaffIds: data.allowedStaffIds || [],
         allowedOperations: data.allowedOperations,
     };
 
-    if (passkeyToSubmit) {
+    if (passkeyToSubmit && passkeyToSubmit.length >= 4) {
         storePayload.passkey = passkeyToSubmit;
+    } else if (!editingStore) {
+        // This case should be caught above, but as a safeguard:
+        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new stores." });
+        return;
     }
+    // If editing and passkeyToSubmit is empty, storePayload will not have passkey, so API won't update it.
 
-
+    let success = false;
     if (editingStore) {
-      updateStore(editingStore.id, storePayload as Partial<Omit<Store, 'id'>>);
-      toast({ title: "Store Updated", description: `${data.name}'s details have been updated.` });
+      const updatedStore = await updateStore(editingStore.id, storePayload, currentCompanyId);
+      if (updatedStore) {
+        toast({ title: "Store Updated", description: `${data.name}'s details have been updated.` });
+        success = true;
+      } else {
+        toast({ variant: "destructive", title: "Update Failed", description: "Could not update store." });
+      }
     } else {
-      addStore(storePayload as Omit<Store, 'id'>);
-      toast({ title: "Store Added", description: `${data.name} has been added.` });
+      if (!storePayload.passkey) { // Final explicit check before API call
+        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is missing for new store." });
+        return;
+      }
+      const newStore = await addStore(storePayload as Omit<Store, 'id' | 'companyId'>, currentCompanyId);
+      if (newStore) {
+        toast({ title: "Store Added", description: `${data.name} has been added.` });
+        success = true;
+      } else {
+        // Error is already logged by addStore in store hook if API fails
+      }
     }
-    onFormSubmit();
-    onOpenChange(false);
+
+    if (success) {
+      onFormSubmit();
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -149,7 +187,7 @@ export function StoreFormDialog({
             Fill in the store details. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1 my-1 -mx-6 px-6"> {/* Adjusted my-1 for tighter spacing */}
+        <ScrollArea className="flex-1 my-1 -mx-6 px-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
             <div>
               <Label htmlFor="name">Store Name*</Label>
@@ -216,7 +254,7 @@ export function StoreFormDialog({
                 <div className="space-y-2 pt-1">
                   <Label>Allowed Staff (Optional)</Label>
                   <p className="text-xs text-muted-foreground">
-                    Select staff members allowed to operate this store. If none selected, any staff member with access to this store can use their passkey.
+                    Select staff members allowed to operate this store. If none selected, any staff member assigned to this store (or all stores if no specific assignment) can use their passkey.
                   </p>
                   <ScrollArea className="h-32 border rounded-md p-2 bg-tertiary">
                     <div className="space-y-1">
@@ -247,11 +285,13 @@ export function StoreFormDialog({
             )}
           </form>
         </ScrollArea>
-        <DialogFooter className="border-t pt-4"> {/* Added border-t for visual separation */}
+        <DialogFooter className="border-t pt-4">
           <DialogClose asChild>
             <Button type="button" variant="outline">Cancel</Button>
           </DialogClose>
-          <Button type="button" onClick={handleSubmit(onSubmit)} variant="default">{editingStore ? 'Save Changes' : 'Add Store'}</Button>
+          <Button type="button" onClick={handleSubmit(onSubmit)} disabled={!currentCompanyId || isSubmitting}>
+            {isSubmitting ? (editingStore ? 'Saving...' : 'Adding...') : (editingStore ? 'Save Changes' : 'Add Store')}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
