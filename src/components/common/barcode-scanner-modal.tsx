@@ -28,13 +28,29 @@ export function BarcodeScannerModal({
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const { toast } = useToast();
 
+  const stopScanner = React.useCallback(() => {
+    if (codeReaderRef.current) {
+      codeReaderRef.current.reset();
+      // According to zxing-js/library docs, reset should be enough.
+      // No explicit 'stop' method on BrowserMultiFormatReader itself.
+      // Streams are stopped below.
+      codeReaderRef.current = null;
+    }
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!isOpen) {
       stopScanner();
       return;
     }
 
-    setErrorMessage(null); // Reset error on open
+    setErrorMessage(null); 
+    setHasCameraPermission(null); // Reset permission status on open
     const reader = new BrowserMultiFormatReader();
     codeReaderRef.current = reader;
 
@@ -44,43 +60,75 @@ export function BarcodeScannerModal({
         setHasCameraPermission(true);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
-          // Wait for video metadata to load to get correct dimensions
+          
           videoRef.current.onloadedmetadata = () => {
-            if (videoRef.current && codeReaderRef.current && isOpen) { // Check isOpen again
-              codeReaderRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
-                if (result) {
-                  onScanSuccess(result.getText());
-                  stopScanner(); // Stop after successful scan
-                  onOpenChange(false); // Close modal
-                }
-                if (error) {
-                  if (!(error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException)) {
-                    console.error('Barcode scan error:', error);
-                    if (onScanError) {
-                      onScanError(error);
-                    } else {
-                      // Only show toast for unexpected errors, not for normal scan failures
-                      // toast({ variant: 'destructive', title: 'Scan Error', description: 'Could not decode barcode.' });
+            // Ensure the modal is still open and references are valid
+            if (videoRef.current && codeReaderRef.current && isOpen) {
+              if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+                console.warn("BarcodeScannerModal: Video metadata loaded but dimensions are zero.");
+                setErrorMessage("Video stream has invalid dimensions (0x0). Cannot start scanner.");
+                if(onScanError) onScanError(new Error("Video stream has invalid dimensions (0x0)."));
+                stopScanner(); 
+                return;
+              }
+              
+              // Explicitly play the video after metadata is loaded
+              videoRef.current.play().then(() => {
+                if (codeReaderRef.current && videoRef.current && isOpen) { // Re-check isOpen before decoding
+                  codeReaderRef.current.decodeFromVideoDevice(undefined, videoRef.current, (result, error) => {
+                    if (!isOpen || !codeReaderRef.current) return; // Check if modal closed during async op
+
+                    if (result) {
+                      onScanSuccess(result.getText());
+                      stopScanner(); 
+                      onOpenChange(false); 
                     }
-                  }
+                    if (error) {
+                      if (!(error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException)) {
+                        console.error('Barcode scan error:', error);
+                        if (onScanError) {
+                          onScanError(error);
+                        }
+                      }
+                    }
+                  }).catch(decodeErr => {
+                    console.error("Error during decodeFromVideoDevice: ", decodeErr);
+                    if (isOpen) { // Only set error if modal is still relevant
+                        setErrorMessage("Could not start barcode reader. Ensure camera is not obstructed and page has focus.");
+                        if (onScanError) onScanError(decodeErr as Error);
+                    }
+                  });
                 }
-              }).catch(err => {
-                console.error("Error starting decodeFromVideoDevice: ", err);
-                setErrorMessage("Could not start barcode scanner. Please ensure camera is not in use by another app.");
-                if (onScanError) onScanError(err as Error);
+              }).catch(playError => {
+                console.error("Error playing video for scanner:", playError);
+                if (isOpen) {
+                    setErrorMessage("Could not play video stream for scanning.");
+                    if (onScanError) onScanError(playError as Error);
+                }
               });
             }
           };
+           videoRef.current.onerror = (e) => {
+             console.error("Video error:", e);
+             if (isOpen) {
+                setErrorMessage("Video element encountered an error.");
+                if (onScanError) onScanError(new Error("Video element error"));
+             }
+           };
         }
       } catch (err) {
         console.error('Error accessing camera:', err);
-        setHasCameraPermission(false);
-        if (err instanceof Error && err.name === "NotAllowedError") {
-            setErrorMessage('Camera permission denied. Please enable camera access in your browser settings.');
-        } else {
-            setErrorMessage('Could not access camera. Please ensure it is connected and not in use.');
+        if (isOpen) {
+            setHasCameraPermission(false);
+            if (err instanceof Error && (err.name === "NotAllowedError" || err.name === "PermissionDeniedError")) {
+                setErrorMessage('Camera permission denied. Please enable camera access in your browser settings.');
+            } else if (err instanceof Error && err.name === "NotFoundError"){
+                 setErrorMessage('No camera found. Please ensure a camera is connected.');
+            } else {
+                setErrorMessage('Could not access camera. Please ensure it is connected and not in use.');
+            }
+            if (onScanError) onScanError(err as Error);
         }
-        if (onScanError) onScanError(err as Error);
       }
     };
 
@@ -90,25 +138,13 @@ export function BarcodeScannerModal({
       stopScanner();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen]); // onScanSuccess, onScanError, onOpenChange are stable
-
-  const stopScanner = () => {
-    if (codeReaderRef.current) {
-      codeReaderRef.current.reset();
-      codeReaderRef.current = null;
-    }
-    if (videoRef.current && videoRef.current.srcObject) {
-      const stream = videoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      videoRef.current.srcObject = null;
-    }
-  };
+  }, [isOpen, onOpenChange, onScanSuccess, onScanError, stopScanner]);
 
 
   return (
     <Dialog open={isOpen} onOpenChange={(openState) => {
         if (!openState) {
-            stopScanner(); // Ensure scanner stops if dialog is closed externally
+            stopScanner();
         }
         onOpenChange(openState);
     }}>
@@ -118,7 +154,7 @@ export function BarcodeScannerModal({
             <ScanLine className="h-5 w-5 text-primary" /> Scan Barcode
           </DialogTitle>
           <DialogClose asChild>
-            <Button variant="ghost" size="icon" aria-label="Close scanner">
+            <Button variant="ghost" size="icon" aria-label="Close scanner" onClick={stopScanner}>
               <XCircle className="h-5 w-5" />
             </Button>
           </DialogClose>
@@ -139,9 +175,9 @@ export function BarcodeScannerModal({
                 ref={videoRef}
                 className="w-full h-full object-cover"
                 autoPlay
-                playsInline
-                muted
-                data-ai-hint="barcode scanner camera" // Added data-ai-hint here
+                playsInline // Important for iOS
+                muted // Important for autoPlay without user interaction
+                data-ai-hint="barcode scanner camera"
               />
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="w-3/4 h-1/3 border-2 border-primary/50 rounded-lg animate-pulse" style={{animationDuration: '2s'}}></div>
@@ -164,7 +200,7 @@ export function BarcodeScannerModal({
         </div>
         <DialogFooter className="p-4 border-t">
           <DialogClose asChild>
-            <Button type="button" variant="outline">
+            <Button type="button" variant="outline" onClick={stopScanner}>
               Cancel
             </Button>
           </DialogClose>

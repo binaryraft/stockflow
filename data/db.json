@@ -1,4 +1,3 @@
-
 {
   "companies": [
     {
@@ -75,6 +74,26 @@
       "role": "admin"
     }
   ],
+  "products": [],
+  "bills": [],
+  "categories": [
+    {
+      "id": "cat_default_electronics",
+      "name": "Electronics",
+      "companyId": "comp_default_001"
+    },
+    {
+      "id": "cat_default_groceries",
+      "name": "Groceries",
+      "companyId": "comp_default_001"
+    },
+    {
+      "id": "cat_daniel_food",
+      "name": "Food Items",
+      "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7"
+    }
+  ],
+  "staffs": [],
   "stores": [
     {
       "id": "store_main_001",
@@ -109,16 +128,23 @@
         "sell",
         "return"
       ]
+    },
+    {
+      "id": "store_3c37b782-0a30-4c48-b663-3cd6a8aa51fb",
+      "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7",
+      "name": "gold",
+      "location": "apelley",
+      "email": "asdasdsushi@shs.com",
+      "phone": "8606821125",
+      "passkey": "25252525",
+      "allowedStaffIds": [],
+      "allowedOperations": [
+        "sell",
+        "buy",
+        "return"
+      ]
     }
   ],
-  "products": [],
-  "bills": [],
-  "categories": [
-    { "id": "cat_default_electronics", "name": "Electronics", "companyId": "comp_default_001" },
-    { "id": "cat_default_groceries", "name": "Groceries", "companyId": "comp_default_001" },
-    { "id": "cat_daniel_food", "name": "Food Items", "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7" }
-  ],
-  "staff": [],
   "messagesByStore": {
     "store_main_001": [
       {
