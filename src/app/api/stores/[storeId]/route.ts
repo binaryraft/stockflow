@@ -3,18 +3,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Store } from '@/types';
 
-// GET a single store by ID (might not be strictly needed if client fetches all for company)
+// GET a single store by ID
 export async function GET(req: NextRequest, { params }: { params: { storeId: string } }) {
   try {
     const { storeId } = params;
-    // const { searchParams } = new URL(req.url); // Potentially get companyId for stricter check
-    // const companyId = searchParams.get('companyId');
+    const { searchParams } = new URL(req.url); 
+    const companyId = searchParams.get('companyId');
+
+    if (!companyId) {
+      return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
+    }
+    if (!storeId) {
+      return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
+    }
 
     const db = await readDB();
-    const store = db.stores.find(s => s.id === storeId); // Add && s.companyId === companyId for strict check
+    const store = db.stores.find(s => s.id === storeId && s.companyId === companyId); 
 
     if (!store) {
-      return NextResponse.json({ success: false, message: 'Store not found' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Store not found or does not belong to this company' }, { status: 404 });
     }
     return NextResponse.json({ success: true, data: store });
   } catch (error) {
@@ -29,11 +36,18 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
   try {
     const { storeId } = params;
     const body = await req.json();
-    const { storeData, companyId } = body; // Expect storeData and companyId to verify ownership
+    const { storeData, companyId } = body; 
 
     if (!companyId || !storeData) {
       return NextResponse.json({ success: false, message: 'Company ID and store data are required' }, { status: 400 });
     }
+    if (!storeId) {
+      return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
+    }
+    if (!storeData.name || !storeData.location) {
+        return NextResponse.json({ success: false, message: 'Store name and location are required' }, { status: 400 });
+    }
+
 
     const db = await readDB();
     const storeIndex = db.stores.findIndex(s => s.id === storeId);
@@ -48,18 +62,24 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
     
     const passkeyToUpdate = storeData.passkey?.trim();
     const updatedStoreData = { ...storeData };
-    if (!passkeyToUpdate) { // If passkey is empty or undefined in payload, keep existing
-      delete updatedStoreData.passkey;
-    } else {
+
+    // Only update passkey if it's provided and valid (e.g., min length 4)
+    if (passkeyToUpdate && passkeyToUpdate.length >= 4) {
       updatedStoreData.passkey = passkeyToUpdate;
+    } else if (passkeyToUpdate && passkeyToUpdate.length > 0 && passkeyToUpdate.length < 4) {
+        // If passkey provided but too short, return error.
+        return NextResponse.json({ success: false, message: 'New passkey must be at least 4 characters long if you intend to change it.' }, { status: 400 });
+    } else {
+      // If passkey is empty or undefined in payload, keep existing passkey from db
+      updatedStoreData.passkey = db.stores[storeIndex].passkey;
     }
 
 
     const updatedStore: Store = {
       ...db.stores[storeIndex],
       ...updatedStoreData,
-      id: storeId, // Ensure ID is not changed
-      companyId: db.stores[storeIndex].companyId, // Ensure companyId is not changed
+      id: storeId, 
+      companyId: db.stores[storeIndex].companyId, 
     };
 
     db.stores[storeIndex] = updatedStore;
@@ -77,11 +97,14 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
 export async function DELETE(req: NextRequest, { params }: { params: { storeId: string } }) {
   try {
     const { storeId } = params;
-    const { searchParams } = new URL(req.url); // Get companyId from query for ownership check
+    const { searchParams } = new URL(req.url); 
     const companyId = searchParams.get('companyId');
 
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required for deletion' }, { status: 400 });
+    }
+    if (!storeId) {
+      return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
     }
 
     const db = await readDB();

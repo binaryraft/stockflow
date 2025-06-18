@@ -11,19 +11,21 @@ const generateId = () => uuidv4();
 export async function GET(req: NextRequest, { params }: { params: { productId: string } }) {
   try {
     const { productId } = params;
-    // const { searchParams } = new URL(req.url);
-    // const companyId = searchParams.get('companyId'); // For future scoping
+    const { searchParams } = new URL(req.url);
+    const companyId = searchParams.get('companyId'); 
 
-    // if (!companyId) {
-    //   return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
-    // }
+    if (!companyId) {
+      return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
+    }
+    if (!productId) {
+      return NextResponse.json({ success: false, message: 'Product ID is required' }, { status: 400 });
+    }
 
     const db = await readDB();
-    // const product = db.products.find(p => p.id === productId && p.companyId === companyId);
-    const product = db.products.find(p => p.id === productId); // Temporarily ignoring companyId for GET single
+    const product = db.products.find(p => p.id === productId && p.companyId === companyId);
 
     if (!product) {
-      return NextResponse.json({ success: false, message: 'Product not found' }, { status: 404 });
+      return NextResponse.json({ success: false, message: 'Product not found or does not belong to this company' }, { status: 404 });
     }
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
@@ -43,6 +45,13 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     if (!companyId || !productData) {
       return NextResponse.json({ success: false, message: 'Company ID and product data are required' }, { status: 400 });
     }
+    if (!productId) {
+        return NextResponse.json({ success: false, message: 'Product ID is required' }, { status: 400 });
+    }
+    if (!productData.name || typeof productData.name !== 'string' || productData.name.trim() === '') {
+        return NextResponse.json({ success: false, message: 'Product name is required' }, { status: 400 });
+    }
+
 
     const db = await readDB();
     const productIndex = db.products.findIndex(p => p.id === productId && p.companyId === companyId);
@@ -63,15 +72,16 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     };
 
     const existingProduct = db.products[productIndex];
+    // Ensure specific fields like ID, companyId, and imageUrl (if not provided in update) are preserved.
     const updatedProduct: Product = { 
         ...existingProduct, 
         ...productData,
-        id: existingProduct.id, // Ensure ID is not changed
-        companyId: existingProduct.companyId, // Ensure companyId is not changed
-        imageUrl: existingProduct.imageUrl, // Preserve existing image URL or update if provided
+        id: existingProduct.id, 
+        companyId: existingProduct.companyId, 
+        imageUrl: productData.imageUrl !== undefined ? productData.imageUrl : existingProduct.imageUrl,
     };
     
-    // Ensure variants and their options have IDs, and productSKUs are updated
+    // Ensure variants and their options have IDs, and productSKUs are updated/maintained
     if (productData.variants !== undefined) {
       updatedProduct.variants = productData.variants.map((variantData: any, variantIdx: number) => {
         const existingVariant = existingProduct.variants?.find(v => v.id === variantData.id || v.name === variantData.name);
@@ -98,10 +108,14 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     }
 
     // Update SKU identifiers if product name or variants changed
-    updatedProduct.productSKUs = updatedProduct.productSKUs.map(sku => ({
+    // This assumes productSKUs are passed in productData if they are meant to be modified.
+    // If productData.productSKUs is undefined, we keep existingProduct.productSKUs and update identifiers.
+    const skusToProcess = productData.productSKUs !== undefined ? productData.productSKUs : existingProduct.productSKUs;
+    updatedProduct.productSKUs = skusToProcess.map((sku: ProductSKU) => ({ // Ensure sku is typed
         ...sku,
         skuIdentifier: getSkuIdentifier(updatedProduct.name, sku.optionValues)
     }));
+
 
     // Handle pricing for non-tracked, non-variant products
     if (updatedProduct.trackQuantity === false && (!updatedProduct.variants || updatedProduct.variants.length === 0)) {
@@ -120,7 +134,7 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
                 });
             }
             defaultSku.skuIdentifier = getSkuIdentifier(updatedProduct.name, defaultSku.optionValues);
-        } else { // Should ideally not happen if product setup is consistent
+        } else { 
              defaultSku = {
                 id: generateId(), optionValues: {}, skuIdentifier: getSkuIdentifier(updatedProduct.name, {}),
                 stockLayers: [{
@@ -128,7 +142,8 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
                     initialQuantity: 0, quantity: 0, costPrice, sellPrice,
                 }],
             };
-            updatedProduct.productSKUs = [defaultSku, ...updatedProduct.productSKUs.filter(sku => Object.keys(sku.optionValues).length > 0)];
+            // Ensure this new default SKU is the only one if it's a non-variant product
+            updatedProduct.productSKUs = [defaultSku];
         }
     }
 
@@ -148,11 +163,14 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
 export async function DELETE(req: NextRequest, { params }: { params: { productId: string } }) {
   try {
     const { productId } = params;
-    const { searchParams } = new URL(req.url); // Get companyId from query for DELETE
+    const { searchParams } = new URL(req.url); 
     const companyId = searchParams.get('companyId');
 
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required for deletion' }, { status: 400 });
+    }
+    if (!productId) {
+      return NextResponse.json({ success: false, message: 'Product ID is required' }, { status: 400 });
     }
 
     const db = await readDB();
