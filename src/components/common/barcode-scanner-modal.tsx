@@ -30,7 +30,7 @@ export function BarcodeScannerModal({
   const [isInitializing, setIsInitializing] = useState<boolean>(false);
   const [isScanningActive, setIsScanningActive] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null); // null: initial, true: granted, false: denied/error
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
 
   const stopEverything = useCallback(() => {
     if (scannerControlsRef.current) {
@@ -42,7 +42,7 @@ export function BarcodeScannerModal({
       scannerControlsRef.current = null;
     }
     if (codeReaderRef.current) {
-      codeReaderRef.current.reset();
+      codeReaderRef.current.reset(); // Resets the instance for potential reuse
     }
     if (videoRef.current && videoRef.current.srcObject) {
       const stream = videoRef.current.srcObject as MediaStream;
@@ -55,10 +55,11 @@ export function BarcodeScannerModal({
   useEffect(() => {
     if (!isOpen) {
       stopEverything();
-      // Reset states fully when modal is closed
+      // Reset all states when modal is closed
       setHasCameraPermission(null);
       setErrorMessage(null);
       setIsInitializing(false);
+      setIsScanningActive(false); // Ensure this is reset too
       return;
     }
 
@@ -69,12 +70,12 @@ export function BarcodeScannerModal({
     setIsScanningActive(false);
 
     if (!codeReaderRef.current) {
-      codeReaderRef.current = new BrowserMultiFormatReader(undefined, 300);
+      codeReaderRef.current = new BrowserMultiFormatReader(undefined, 300); // 300ms scan interval
     }
 
     const startScannerAsync = async () => {
-      if (!videoRef.current || !isOpen) { // Check if modal closed during async ops
-        if (isOpen) setErrorMessage("Video element reference became unavailable.");
+      if (!videoRef.current || !isOpen) { // Double check ref and modal state
+        if (isOpen) setErrorMessage("Video element reference became unavailable during setup.");
         setIsInitializing(false);
         return;
       }
@@ -83,7 +84,7 @@ export function BarcodeScannerModal({
         // 1. Get Camera Permission and Stream
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
         
-        if (!videoRef.current || !isOpen) {
+        if (!videoRef.current || !isOpen) { // Check again after permission potentially taking time
           stream.getTracks().forEach(track => track.stop());
           setIsInitializing(false);
           return;
@@ -92,64 +93,60 @@ export function BarcodeScannerModal({
         
         // 2. Play Video (wait for it to actually start playing)
         setErrorMessage("Starting camera feed...");
-        try {
-          await videoRef.current.play();
-        } catch (playError: any) {
-            if (!isOpen) { // If closed during play attempt
-                stream.getTracks().forEach(track => track.stop());
-                setIsInitializing(false);
-                return;
-            }
-            console.error("Error playing video stream:", playError);
-            setErrorMessage(`Camera stream could not be played: ${playError.name || playError.message}. Try another camera or check browser settings.`);
-            setHasCameraPermission(false);
-            setIsInitializing(false);
-            stream.getTracks().forEach(track => track.stop());
-            return;
-        }
+        await videoRef.current.play(); // This promise resolves when playback begins or if it can't play
 
-        if (!videoRef.current || !isOpen) { // Check again after play()
-          stream.getTracks().forEach(track => track.stop());
-          setIsInitializing(false);
-          return;
-        }
+        // At this point, camera permission is granted AND video is playing
+        setHasCameraPermission(true); 
+        setErrorMessage(null); // Clear "Starting camera feed..." message
 
-        // At this point, camera permission is granted and video is playing
-        setHasCameraPermission(true);
-        setErrorMessage(null); // Clear "Starting camera feed..."
-
-        // 3. Ensure video dimensions are valid
-        // A short delay can sometimes help if dimensions aren't immediately available after play()
-        await new Promise(resolve => setTimeout(resolve, 100)); 
-
-        if (!videoRef.current || !isOpen) {
-          stream.getTracks().forEach(track => track.stop());
-          setIsInitializing(false);
-          return;
+        // 3. Ensure video dimensions are valid (wait for loadedmetadata)
+        // This can be tricky; sometimes `play()` resolves but dimensions aren't immediately available.
+        // We'll wait for `loadedmetadata` if dimensions are initially 0.
+        if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
+            setErrorMessage("Waiting for video metadata...");
+            await new Promise<void>((resolve, reject) => {
+                if (!videoRef.current || !isOpen) { reject(new Error("Modal closed or video ref lost while waiting for metadata.")); return; }
+                const onLoadedMetadata = () => {
+                    if (videoRef.current && (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0)) {
+                        resolve();
+                    } else if (videoRef.current) {
+                         // Still no dimensions, try a short delay then recheck
+                        setTimeout(() => {
+                            if (videoRef.current && (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0)) {
+                                resolve();
+                            } else {
+                                reject(new Error("Video stream has no valid dimensions after waiting."));
+                            }
+                        }, 300);
+                    } else {
+                         reject(new Error("Video ref lost after metadata event."));
+                    }
+                };
+                videoRef.current.onloadedmetadata = onLoadedMetadata;
+                // Timeout if metadata doesn't load
+                setTimeout(() => reject(new Error("Timeout waiting for video metadata.")), 3000);
+            });
         }
         
-        if (videoRef.current.videoWidth === 0 || videoRef.current.videoHeight === 0) {
-          if (isOpen) setErrorMessage("Video stream has no valid dimensions. Check camera connection or permissions.");
-          setHasCameraPermission(false); // Indicate problem
-          setIsInitializing(false);
+        if (!videoRef.current || !isOpen) { // Check again after metadata handling
           stream.getTracks().forEach(track => track.stop());
+          setIsInitializing(false);
           return;
         }
         
         // 4. Initialize ZXing Scanner and Start Decoding
-        if (!codeReaderRef.current) { // Should have been initialized, but as a fallback
+        if (!codeReaderRef.current) {
              codeReaderRef.current = new BrowserMultiFormatReader(undefined, 300);
         }
         
-        setIsScanningActive(true);
-        setIsInitializing(false); // Done initializing
+        setIsInitializing(false); // Done initializing, ready to scan
 
         // decodeFromVideoElement returns controls to stop the scan
-        // Important: Ensure codeReaderRef.current is valid before calling decodeFromVideoElement
-        if (codeReaderRef.current && videoRef.current && isOpen) {
+        if (codeReaderRef.current && videoRef.current && isOpen) { // Final check
+            setIsScanningActive(true); // Set scanning active right before starting decode
             scannerControlsRef.current = await codeReaderRef.current.decodeFromVideoElement(videoRef.current, (result, error, controls) => {
-                if (!isOpen || !isScanningActive) { // If modal closed or scanning stopped elsewhere
-                    if (controls) controls.stop(); // Ensure to use the passed controls here
+                if (!isOpen) { // Modal closed during scan attempt
+                    if (scannerControlsRef.current) scannerControlsRef.current.stop(); // Use the stored controls to stop
                     return;
                 }
 
@@ -157,12 +154,15 @@ export function BarcodeScannerModal({
                     onScanSuccess(result.getText());
                     onOpenChange(false); // Close modal on success
                 }
-                // Only log more critical errors, ignore common scanning "misses"
+                
                 if (error && !(error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException)) {
-                    console.warn('Minor barcode scan error during continuous decoding:', error);
-                    // No need to setErrorMessage here for these common scan "misses", as it can be distracting
+                    console.warn('Barcode scan error during continuous decoding:', error);
+                    // Optionally set a transient error message here if desired for specific errors
                 }
             });
+        } else if (isOpen) {
+             setErrorMessage("Could not start scanner due to missing references.");
+             setIsScanningActive(false);
         }
 
       } catch (error: any) {
@@ -174,12 +174,12 @@ export function BarcodeScannerModal({
           toast({ variant: "destructive", title: "Camera Access Denied", description: userMessage});
         } else if (error.name === "NotFoundError" || error.name === "DevicesNotFoundError") {
           userMessage = 'No camera found. Please ensure a camera is connected and not in use by another application.';
-        } else if (error.name === "NotReadableError") {
-          userMessage = 'Camera is already in use or unreadable. Try closing other apps using the camera.';
+        } else if (error.name === "NotReadableError" || error.name === "OverconstrainedError") {
+          userMessage = 'Camera is already in use, unreadable, or selected settings are not supported by your camera. Try closing other apps using the camera or check browser settings.';
         } else if (error.name === "AbortError") {
           userMessage = "Camera access was aborted. Please try again.";
         } else {
-          userMessage = error.message ? `${userMessage} ${error.message}` : userMessage;
+          userMessage = error.message ? `${error.message}` : userMessage;
         }
         
         setErrorMessage(userMessage);
@@ -192,8 +192,13 @@ export function BarcodeScannerModal({
 
     startScannerAsync();
 
+    // Cleanup function
     return () => {
       stopEverything();
+      // Explicitly remove event listeners if attached outside async flow (not the case here anymore)
+      if (videoRef.current) {
+        videoRef.current.onloadedmetadata = null;
+      }
     };
   }, [isOpen, onOpenChange, onScanSuccess, onScanError, stopEverything, toast]);
 
@@ -215,20 +220,21 @@ export function BarcodeScannerModal({
       </Alert>
     );
   } else if (hasCameraPermission === true && isScanningActive) {
+    // Only show viewfinder if scanning is truly active
     displayContent = (
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="w-3/4 h-1/2 border-2 border-primary/60 rounded-lg animate-pulse" style={{ animationDuration: '2s' }}></div>
       </div>
     );
   } else if (hasCameraPermission === true && !isScanningActive && !errorMessage) {
-     // Camera permission granted, but scanner not yet active (e.g., waiting for dimensions or ZXing init)
+     // Camera permission granted, video might be playing, but scanner not yet active (e.g., waiting for ZXing init or final checks)
      displayContent = (
       <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/50 text-primary-foreground p-4">
         <Loader2 className="h-8 w-8 text-primary/70 animate-spin" />
         <p className="text-xs mt-2 text-center">Preparing scanner...</p>
       </div>
     );
-  } else if (errorMessage) { // General error if not initializing and permission not explicitly false
+  } else if (errorMessage && hasCameraPermission !== false) { // General error if not initializing and permission not explicitly false (e.g. ZXing setup error)
      displayContent = (
       <Alert variant="destructive" className="m-4">
         <CameraOff className="h-4 w-4" />
@@ -237,6 +243,8 @@ export function BarcodeScannerModal({
       </Alert>
     );
   }
+  // If hasCameraPermission is null and not initializing, it's an edge case (should be covered by initializing)
+  // or the initial state before useEffect runs. Default to no overlay or a minimal loading.
 
 
   return (
