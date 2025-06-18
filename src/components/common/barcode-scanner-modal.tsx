@@ -5,8 +5,8 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ScanLine, Loader2, VideoOff, CameraOff, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { BrowserMultiFormatReader, NotFoundException, ChecksumException, FormatException, type IScannerControls, DecodeHintType } from '@zxing/library';
+import { ScanLine, Loader2, VideoOff, CameraOff, AlertTriangle, Camera, CheckCircle2 } from 'lucide-react';
+import { BrowserMultiFormatReader, NotFoundException, DecodeHintType } from '@zxing/library';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -20,16 +20,16 @@ interface BarcodeScannerModalProps {
 type ScannerStatus =
   | "idle"
   | "requesting_permission"
-  | "permission_granted"
+  | "permission_granted" // Permission obtained, camera not yet started
   | "permission_denied"
   | "no_camera_found"
-  | "initializing_video" // Stream obtained, trying to attach and play
-  | "video_ready"        // Video metadata loaded, dimensions known
-  | "scanner_initializing" // ZXing attempting to start
-  | "scanning"
-  | "scan_success_briefly"
-  | "camera_error"       // General camera issues (not permission, not found)
-  | "error";               // Generic error
+  | "camera_error" // General camera issues
+  | "preview_active" // Video preview is live and playing
+  | "capturing_image"
+  | "decoding_image"
+  | "scan_success_image"
+  | "scan_failed_image" // No barcode found in captured image
+  | "error"; // Generic error
 
 export function BarcodeScannerModal({
   isOpen,
@@ -38,15 +38,14 @@ export function BarcodeScannerModal({
   onScanError,
 }: BarcodeScannerModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // For capturing frames
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
-  const scannerControlsRef = useRef<IScannerControls | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null); // Store the stream
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   const { toast } = useToast();
 
   const [status, setStatus] = useState<ScannerStatus>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [lastScannedValue, setLastScannedValue] = useState<string | null>(null);
 
   // Refs for callbacks to ensure useEffect doesn't re-run due to their reference changes
   const onScanSuccessRef = useRef(onScanSuccess);
@@ -57,16 +56,8 @@ export function BarcodeScannerModal({
   useEffect(() => { onScanErrorRef.current = onScanError; }, [onScanError]);
   useEffect(() => { onOpenChangeRef.current = onOpenChange; }, [onOpenChange]);
 
-  const stopEverything = useCallback(() => {
-    console.log("BarcodeScanner: stopEverything called. Current status:", status);
-    if (scannerControlsRef.current) {
-      try { scannerControlsRef.current.stop(); } catch (e) { console.warn("Minor error stopping scanner controls:", e); }
-      scannerControlsRef.current = null;
-    }
-    if (codeReaderRef.current) {
-      try { codeReaderRef.current.reset(); } catch (e) { console.warn("Minor error resetting code reader:", e); }
-      // Do not nullify codeReaderRef, it holds hints and can be reused
-    }
+  const stopCameraStream = useCallback(() => {
+    console.log("BarcodeScanner (Image): stopCameraStream called.");
     if (mediaStreamRef.current) {
       mediaStreamRef.current.getTracks().forEach(track => track.stop());
       mediaStreamRef.current = null;
@@ -74,46 +65,43 @@ export function BarcodeScannerModal({
     if (videoRef.current && videoRef.current.srcObject) {
       videoRef.current.srcObject = null;
     }
-    // Only reset status if it's not a persistent error meant to be seen on close
-    const persistentErrorStates: ScannerStatus[] = ['permission_denied', 'no_camera_found', 'camera_error', 'error'];
-    if (!persistentErrorStates.includes(status)) {
-      setStatus("idle");
-    }
-    setLastScannedValue(null);
-    // Do not clear errorMessage here if it's a persistent error
-  }, [status]); // status dependency helps decide if it should be reset to idle
-
+  }, []);
 
   useEffect(() => {
-    let isActive = true; // Flag to manage async operations against component unmount/re-run
+    let isActive = true; // Flag to manage async operations
 
-    const initializeCameraAndScanner = async () => {
-      if (!isActive) return;
+    const initializeCamera = async () => {
+      if (!isOpen || !isActive) return;
+
       setStatus("requesting_permission");
       setErrorMessage("Requesting camera permission...");
-      setLastScannedValue(null);
 
-      // Give React a moment to render the modal and video element
-      await new Promise(resolve => setTimeout(resolve, 100));
-      if (!isActive || !isOpen) { stopEverything(); return; }
+      await new Promise(resolve => setTimeout(resolve, 50)); // Brief delay for modal render
 
-      if (!videoRef.current) {
-        if (!isActive) return;
-        setStatus("error");
-        const errMessage = "Video element reference is not available. Modal might not be fully rendered.";
-        setErrorMessage(errMessage);
-        if (onScanErrorRef.current) onScanErrorRef.current(new Error(errMessage));
+      if (!isActive || !videoRef.current) {
+        if (isActive) { // Only set error if still active
+          setStatus("error");
+          setErrorMessage("Video element reference is not available. Modal might not be fully rendered.");
+          console.error("BarcodeScanner (Image): Video ref not available post delay.");
+        }
         return;
       }
 
-      // 1. Request Camera Permission and Get Stream
       try {
         mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
+        if (!isActive || !isOpen || !videoRef.current) { stopCameraStream(); return; }
+
         setStatus("permission_granted");
         setErrorMessage(null);
+        videoRef.current.srcObject = mediaStreamRef.current;
+        await videoRef.current.play();
+
+        if (!isActive || !isOpen) { stopCameraStream(); return; }
+        setStatus("preview_active");
+
       } catch (err: any) {
-        if (!isActive || !isOpen) { stopEverything(); return; }
+        if (!isActive || !isOpen) { stopCameraStream(); return; }
+        console.error("BarcodeScanner (Image): Camera initialization error:", err);
         let userMessage = 'Could not access camera.';
         let newStatus: ScannerStatus = 'camera_error';
 
@@ -131,137 +119,105 @@ export function BarcodeScannerModal({
         setErrorMessage(userMessage);
         if (onScanErrorRef.current) onScanErrorRef.current(new Error(userMessage));
         toast({ variant: "destructive", title: "Camera Access Error", description: userMessage, duration: 7000 });
-        stopEverything(); // Clean up
-        return;
-      }
-
-      // 2. Attach Stream and Play Video
-      if (!isActive || !isOpen || !videoRef.current || !mediaStreamRef.current) { stopEverything(); return; }
-      videoRef.current.srcObject = mediaStreamRef.current;
-      setStatus("initializing_video");
-      setErrorMessage("Starting camera feed...");
-
-      try {
-        await videoRef.current.play();
-        if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
-        // Video play started, now wait for metadata/dimensions
-      } catch (playError: any) {
-        if (!isActive || !isOpen) { stopEverything(); return; }
-        setStatus("camera_error");
-        const detailedPlayErrorMessage = `Failed to play video stream: ${playError.message}. Ensure camera is not in use by another app.`;
-        setErrorMessage(detailedPlayErrorMessage);
-        if (onScanErrorRef.current) onScanErrorRef.current(new Error(detailedPlayErrorMessage));
-        toast({ variant: "destructive", title: "Camera Playback Error", description: detailedPlayErrorMessage, duration: 7000 });
-        stopEverything();
-        return;
-      }
-      
-      // 3. Wait for Video Dimensions
-      if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
-      let attempts = 0;
-      const maxAttempts = 30; // Wait up to 3 seconds (30 * 100ms)
-      while (attempts < maxAttempts) {
-        if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
-        if (videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0) {
-          setStatus("video_ready");
-          setErrorMessage(null);
-          break;
-        }
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
-      if (!(videoRef.current.videoWidth > 0 && videoRef.current.videoHeight > 0)) {
-        setStatus("camera_error");
-        const errMessage = "Failed to get valid video dimensions after starting stream. Camera might be faulty or stream corrupted.";
-        setErrorMessage(errMessage);
-        if (onScanErrorRef.current) onScanErrorRef.current(new Error(errMessage));
-        toast({ variant: "destructive", title: "Camera Stream Error", description: errMessage, duration: 7000 });
-        stopEverything();
-        return;
-      }
-      
-      // 4. Initialize ZXing Scanner
-      if (!isActive || !isOpen || !videoRef.current) { stopEverything(); return; }
-      
-      if (!codeReaderRef.current) {
-        const hints = new Map();
-        const formats = [
-            DecodeHintType.EAN_13, DecodeHintType.EAN_8, DecodeHintType.CODE_128,
-            DecodeHintType.QR_CODE, DecodeHintType.DATA_MATRIX, DecodeHintType.UPC_A,
-            DecodeHintType.UPC_E, DecodeHintType.CODE_39, DecodeHintType.CODE_93,
-            DecodeHintType.ITF, DecodeHintType.PDF_417, DecodeHintType.AZTEC,
-        ];
-        hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
-        hints.set(DecodeHintType.TRY_HARDER, true);
-        codeReaderRef.current = new BrowserMultiFormatReader(hints, 200); // 200ms scan interval
-      }
-      
-      setStatus("scanner_initializing");
-      setErrorMessage("Initializing barcode scanner...");
-
-      try {
-        scannerControlsRef.current = await codeReaderRef.current.decodeFromVideoElement(
-          videoRef.current,
-          (result, error, controls) => {
-            if (!isActive || !isOpen) { return; } // Modal closed or effect cleaned up
-
-            if (result) {
-              setStatus('scan_success_briefly');
-              const scannedText = result.getText();
-              setLastScannedValue(scannedText);
-              mediaStreamRef.current?.getAudioTracks().forEach(track => track.enabled = false); // Mute audio on success (if any)
-              setTimeout(() => {
-                if (isActive && isOpen) {
-                    onScanSuccessRef.current(scannedText);
-                    onOpenChangeRef.current(false); 
-                }
-              }, 300); // Brief delay to show success feedback
-            }
-            
-            if (error && !(error instanceof NotFoundException || error instanceof ChecksumException || error instanceof FormatException)) {
-              console.warn('Barcode scan error (non-critical, ZXing):', error);
-              // Optionally set a transient error message for non-critical scan issues
-            }
-          }
-        );
-        if (!isActive || !isOpen) { stopEverything(); return; }
-        setStatus('scanning');
-        setErrorMessage(null);
-      } catch (zxingError: any) {
-        if (!isActive || !isOpen) { stopEverything(); return; }
-        setStatus('error');
-        const zxingErrorMessage = `Failed to start barcode scanner: ${zxingError.message}.`;
-        setErrorMessage(zxingErrorMessage);
-        if (onScanErrorRef.current) onScanErrorRef.current(new Error(zxingErrorMessage));
-        toast({ variant: "destructive", title: "Scanner Error", description: zxingErrorMessage, duration: 7000 });
-        stopEverything();
+        stopCameraStream();
       }
     };
 
     if (isOpen) {
-      initializeCameraAndScanner();
+      initializeCamera();
+    } else {
+      stopCameraStream();
+      setStatus("idle");
+      setErrorMessage(null);
     }
 
     return () => {
       isActive = false;
-      stopEverything();
+      stopCameraStream();
     };
-  }, [isOpen, stopEverything, toast]); // Removed onOpenChange, onScanSuccess, onScanError from deps, using refs instead
+  }, [isOpen, stopCameraStream, toast]);
+
+  const handleCaptureAndDecode = async () => {
+    if (!videoRef.current || !canvasRef.current || status !== 'preview_active') {
+      setErrorMessage("Camera not ready for capture or already processing.");
+      toast({ variant: "destructive", title: "Capture Error", description: "Camera not ready." });
+      return;
+    }
+
+    setStatus("capturing_image");
+    setErrorMessage(null);
+
+    const videoNode = videoRef.current;
+    const canvasNode = canvasRef.current;
+
+    canvasNode.width = videoNode.videoWidth;
+    canvasNode.height = videoNode.videoHeight;
+
+    const ctx = canvasNode.getContext('2d');
+    if (!ctx) {
+      setStatus("error");
+      setErrorMessage("Could not get canvas context for image capture.");
+      toast({ variant: "destructive", title: "Capture Error", description: "Canvas context failed." });
+      return;
+    }
+
+    ctx.drawImage(videoNode, 0, 0, canvasNode.width, canvasNode.height);
+    setStatus("decoding_image");
+
+    if (!codeReaderRef.current) {
+      const hints = new Map();
+      const formats = [
+          DecodeHintType.EAN_13, DecodeHintType.EAN_8, DecodeHintType.CODE_128,
+          DecodeHintType.QR_CODE, DecodeHintType.DATA_MATRIX, DecodeHintType.UPC_A,
+          DecodeHintType.UPC_E, DecodeHintType.CODE_39, DecodeHintType.CODE_93,
+          DecodeHintType.ITF, DecodeHintType.PDF_417, DecodeHintType.AZTEC,
+      ];
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      codeReaderRef.current = new BrowserMultiFormatReader(hints);
+    }
+
+    try {
+      const result = await codeReaderRef.current.decodeFromCanvas(canvasNode);
+      setStatus("scan_success_image");
+      onScanSuccessRef.current(result.getText());
+      toast({ title: "Barcode Scanned!", description: `Value: ${result.getText()}` });
+      onOpenChangeRef.current(false);
+    } catch (error: any) {
+      if (error instanceof NotFoundException) {
+        setStatus("scan_failed_image");
+        setErrorMessage("No barcode found in the image. Please adjust camera and try again.");
+        toast({ variant: "default", title: "Scan Attempt", description: "No barcode detected in the captured image." });
+      } else {
+        setStatus("error");
+        setErrorMessage(`Error decoding barcode: ${error.message}`);
+        console.error("BarcodeScanner (Image): Decoding error:", error);
+        if (onScanErrorRef.current) onScanErrorRef.current(error);
+        toast({ variant: "destructive", title: "Decoding Error", description: error.message });
+      }
+      // Allow user to try again by resetting to preview_active after a short delay if scan failed
+      if (error instanceof NotFoundException) {
+        setTimeout(() => {
+            if (isOpen && (status === "scan_failed_image" || status === "decoding_image")) { // Check current status before resetting
+                setStatus("preview_active");
+                setErrorMessage(null);
+            }
+        }, 1500);
+      }
+    }
+  };
 
 
   let statusOverlayContent = null;
   switch (status) {
     case "requesting_permission":
-    case "permission_granted": // Intermediate state, usually quickly transitions
-    case "initializing_video":
-    case "video_ready": // Video is playing but scanner not yet active
-    case "scanner_initializing":
+    case "permission_granted":
+    case "capturing_image":
+    case "decoding_image":
       statusOverlayContent = (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-primary-foreground p-4 text-center z-10">
           <Loader2 className="h-10 w-10 text-primary/80 animate-spin mb-3" />
-          <p className="text-sm px-2">{errorMessage || "Initializing..."}</p>
+          <p className="text-sm px-2">{status === 'requesting_permission' ? 'Requesting camera permission...' : status === 'capturing_image' ? 'Capturing image...' : status === 'decoding_image' ? 'Analyzing image...' : 'Initializing camera...'}</p>
         </div>
       );
       break;
@@ -273,45 +229,33 @@ export function BarcodeScannerModal({
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 p-4 text-center z-10">
           <Alert variant="destructive" className="m-4 text-destructive-foreground bg-destructive/80 border-destructive-foreground/30 max-w-sm">
             {status === 'permission_denied' || status === 'no_camera_found' ? <CameraOff className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-            <AlertTitle className="font-semibold">Scanner Error</AlertTitle>
+            <AlertTitle className="font-semibold">Camera or Scanner Error</AlertTitle>
             <AlertDescription className="text-xs">{errorMessage || "An unknown error occurred."}</AlertDescription>
           </Alert>
         </div>
       );
       break;
-    case "scanning":
-      statusOverlayContent = (
-        <>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className={cn(
-                "w-3/4 h-1/2 border-2 border-primary/60 rounded-lg",
-                "animate-pulse-border" 
-            )} 
-            style={{ 
-                boxShadow: '0 0 0 9999px rgba(0,0,0,0.4)', // Creates the "cutout" effect
-            }}></div>
-          </div>
-          <p className="absolute bottom-3 left-1/2 -translate-x-1/2 text-xs text-white bg-black/60 px-2 py-1 rounded z-10">
-            Point camera at a barcode
-          </p>
-        </>
+    case "scan_failed_image":
+       statusOverlayContent = (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/75 text-white p-4 text-center z-10">
+          <AlertTriangle className="h-10 w-10 text-amber-400 mb-3" />
+          <p className="text-sm font-semibold">No Barcode Detected</p>
+          <p className="text-xs">{errorMessage}</p>
+        </div>
       );
       break;
-     case "scan_success_briefly":
-      statusOverlayContent = (
-        <>
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-            <div className="w-3/4 h-1/2 border-4 border-green-500 rounded-lg shadow-2xl" style={{boxShadow: '0 0 0 9999px rgba(0,128,0,0.2)' }}></div>
-          </div>
-           {lastScannedValue && (
-            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-green-600 text-white px-3 py-1 rounded-md text-sm font-semibold shadow-lg z-10 flex items-center gap-2">
-              <CheckCircle2 size={16} /> Scanned: {lastScannedValue}
-            </div>
-          )}
-        </>
+    case "scan_success_image": // This state is brief as modal closes
+       statusOverlayContent = (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-500/80 text-white p-4 text-center z-10">
+          <CheckCircle2 className="h-10 w-10 mb-3" />
+          <p className="text-sm font-semibold">Scan Successful!</p>
+        </div>
       );
       break;
-    default: // idle or unhandled
+    case "preview_active":
+      // No overlay, show video feed
+      break;
+    default: // idle
       statusOverlayContent = (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-primary-foreground p-4 text-center z-10">
           <VideoOff className="h-10 w-10 text-muted-foreground mb-3" />
@@ -322,18 +266,10 @@ export function BarcodeScannerModal({
 
   return (
     <>
-      <style jsx global>{`
-        @keyframes pulseBorder {
-          0%, 100% { border-color: hsla(var(--primary-hsl) / 0.6); }
-          50% { border-color: hsla(var(--primary-hsl) / 1); }
-        }
-        .animate-pulse-border {
-          animation: pulseBorder 1.5s infinite ease-in-out;
-        }
-      `}</style>
       <Dialog open={isOpen} onOpenChange={(open) => {
-        if (!open) { // If dialog is being closed by user or programmatically
-          stopEverything(); // Ensure cleanup
+        if (!open) {
+          stopCameraStream(); // Ensure camera stops if dialog is closed manually
+          setStatus("idle");
         }
         onOpenChangeRef.current(open);
       }}>
@@ -348,12 +284,27 @@ export function BarcodeScannerModal({
               <video
                 ref={videoRef}
                 className="w-full h-full object-cover"
-                playsInline 
-                muted 
+                playsInline
+                muted
                 autoPlay={false} // We explicitly call play()
               />
+              <canvas ref={canvasRef} style={{ display: 'none' }} /> {/* Hidden canvas */}
               {statusOverlayContent}
             </div>
+            {status === 'preview_active' && (
+              <Button onClick={handleCaptureAndDecode} className="w-full" variant="default">
+                <Camera className="mr-2 h-5 w-5" /> Capture & Decode Barcode
+              </Button>
+            )}
+             {(status === 'scan_failed_image') && (
+              <Button onClick={handleCaptureAndDecode} className="w-full" variant="outline">
+                <Camera className="mr-2 h-5 w-5" /> Try Capture Again
+              </Button>
+            )}
+            {errorMessage && (status === 'scan_failed_image' || status === 'error' || status === 'camera_error' || status === 'permission_denied' || status === 'no_camera_found' ) && (
+               !statusOverlayContent && /* Only show if not already part of overlay */
+                <p className="text-xs text-destructive text-center py-1">{errorMessage}</p>
+            )}
           </div>
           <DialogFooter className="p-4 border-t">
             <DialogClose asChild>
@@ -367,5 +318,3 @@ export function BarcodeScannerModal({
     </>
   );
 }
-
-    
