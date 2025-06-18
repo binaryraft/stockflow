@@ -27,6 +27,20 @@
       "defaultBillNotes": "",
       "defaultSalesPaymentStatus": "paid",
       "defaultPurchasePaymentStatus": "unpaid"
+    },
+    {
+      "id": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "name": "danielinc",
+      "token": "TOKEN_3353312A-2B14-4946-BA8D-131792A41628",
+      "activeSubscriptionId": "plan_starter",
+      "logoUrl": "",
+      "slogan": "",
+      "phone": "",
+      "address": "",
+      "gstNo": "",
+      "defaultBillNotes": "Thank you for your business!",
+      "defaultSalesPaymentStatus": "paid",
+      "defaultPurchasePaymentStatus": "paid"
     }
   ],
   "users": [
@@ -71,6 +85,14 @@
       "name": "danie",
       "email": "dani@fdani.com",
       "password": "$2a$10$O.P.Q.R.S.T.U.V.W.X.Y.Z.a.b.c.d.e.f.g.h.i.j.k.l.m.n",
+      "role": "admin"
+    },
+    {
+      "id": "user_admin_44669c5a-6d65-4f1c-98ea-f875a54c6aee",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "name": "danie",
+      "email": "aSDASDF@ASDF.COM",
+      "password": "$2a$10$PYGeEohxRx1jb1N9kQKCyOd61Co/G9teCs8jWcRr/nN1RatbQVBjy",
       "role": "admin"
     }
   ],
@@ -137,6 +159,21 @@
       "email": "asdasdsushi@shs.com",
       "phone": "8606821125",
       "passkey": "25252525",
+      "allowedStaffIds": [],
+      "allowedOperations": [
+        "sell",
+        "buy",
+        "return"
+      ]
+    },
+    {
+      "id": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "name": "gold",
+      "location": "apelley",
+      "email": "asdf@gasdf.com",
+      "phone": "8606821125",
+      "passkey": "1111",
       "allowedStaffIds": [],
       "allowedOperations": [
         "sell",
