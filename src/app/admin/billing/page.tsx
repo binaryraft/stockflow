@@ -81,10 +81,17 @@ function BillingContent() {
   const storeIdFromUrl = searchParams.get('storeId');
   const currentViewFromUrl = searchParams.get('view') as BillingView | null;
 
-  const { getAllStores, getActiveSubscriptionPlan, fetchBills, companyId: currentCompanyId } = useInventoryStore(state => ({
-    getAllStores: state.getAllStores,
+  const { 
+    getActiveSubscriptionPlan, 
+    fetchBills, 
+    fetchStores, // Added fetchStores
+    stores: storesFromZustand, // Get stores directly from Zustand for reactivity
+    companyId: currentCompanyId // Use currentCompanyId from store which gets it from localStorage
+  } = useInventoryStore(state => ({
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     fetchBills: state.fetchBills,
+    fetchStores: state.fetchStores, // Add fetchStores selector
+    stores: state.stores, // Select stores array for reactivity
     companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null
   }));
 
@@ -105,19 +112,20 @@ function BillingContent() {
 
   useEffect(() => {
     setHasMounted(true);
-    // Initial fetch of bills when component mounts and companyId is available
     if (currentCompanyId) {
       fetchBills(currentCompanyId);
+      fetchStores(currentCompanyId); // Fetch stores when companyId is available
     }
-  }, [currentCompanyId, fetchBills]);
+  }, [currentCompanyId, fetchBills, fetchStores]); // Added fetchStores to dependencies
 
   useEffect(() => {
     if (hasMounted) {
-      setAllStoresState(getAllStores());
+      setAllStoresState(storesFromZustand); // Update allStoresState based on fetched stores
       setActivePlan(getActiveSubscriptionPlan());
       setActiveBillingView(currentViewFromUrl || 'history');
     }
-  }, [hasMounted, getAllStores, getActiveSubscriptionPlan, currentViewFromUrl]);
+  }, [hasMounted, storesFromZustand, getActiveSubscriptionPlan, currentViewFromUrl]); // Depend on storesFromZustand
+
 
   useEffect(() => {
     if (hasMounted && activePlan && allStoresState.length > 0) {
