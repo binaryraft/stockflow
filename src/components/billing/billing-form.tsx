@@ -15,7 +15,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -28,6 +28,7 @@ import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { HardwareBarcodeScanModal } from '@/components/common/HardwareBarcodeScanModal';
 
 
 type PendingBillPayload = {
@@ -124,6 +125,8 @@ export function BillingForm({
 
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
+  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -311,6 +314,20 @@ export function BillingForm({
       }, 50);
     }
   }, [getSkuDetails, mode, updateSkuDisplayInfo, finalStoreIdForSkuDetails, selectedVariantOptions]);
+
+  const handleBarcodeScanResult = useCallback((product: Product, sku: ProductSKU) => {
+    const suggestion: ProductSearchSuggestion = {
+      product,
+      sku,
+      displayInfo: {
+        name: getSkuDetails(sku, finalStoreIdForSkuDetails).skuIdentifier || product.name,
+        stock: product.trackQuantity ? (getSkuDetails(sku, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
+        price: getSkuDetails(sku, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(sku, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
+      }
+    };
+    handleProductSelectFromSearch(suggestion);
+  }, [handleProductSelectFromSearch, getSkuDetails, finalStoreIdForSkuDetails]);
+
 
   useEffect(() => {
     if (!hasMounted) return;
@@ -543,7 +560,6 @@ export function BillingForm({
             }
         }
         if (foundProduct) break;
-        // Fallback: if no direct SKU match, check product name (less ideal for pure barcode scanning)
         if (p.name.toLowerCase() === barcodeValue.toLowerCase() && !foundProduct) {
             foundProduct = p;
             foundSku = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
@@ -556,17 +572,11 @@ export function BillingForm({
                           foundProduct.productSKUs[0] :
                           { id: foundProduct.id + '_default_hw_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
 
-        const suggestion: ProductSearchSuggestion = {
-            product: foundProduct,
-            sku: skuToUse,
-            displayInfo: {
-                name: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).skuIdentifier || foundProduct.name,
-                stock: foundProduct.trackQuantity ? (getSkuDetails(skuToUse, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
-                price: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
-            }
-        };
-        handleProductSelectFromSearch(suggestion);
-        toast({title: "Product Found", description: `${suggestion.displayInfo.name} selected.`});
+        handleBarcodeScanResult(foundProduct, skuToUse); // Use the new handler
+        toast({title: "Product Found by Barcode", description: `${skuToUse.skuIdentifier || foundProduct.name} selected.`});
+        resetFormFields(false); // Don't focus product name, focus quantity
+        setTimeout(() => quantityInputRef.current?.focus(), 50);
+
     } else {
         toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${barcodeValue}` });
         setProductNameQuery(barcodeValue);
@@ -950,6 +960,13 @@ export function BillingForm({
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
+      <HardwareBarcodeScanModal
+        isOpen={isBarcodeModalOpen}
+        onOpenChange={setIsBarcodeModalOpen}
+        onScanSuccess={handleBarcodeScanResult}
+        storeId={finalStoreIdForSkuDetails}
+      />
+
 
       <div className="flex justify-center">
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
@@ -1026,7 +1043,7 @@ export function BillingForm({
             <div className={cn(
               "grid gap-4 items-baseline",
               "grid-cols-1",
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]"
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto]"
             )}>
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name / SKU / Barcode</Label>
@@ -1051,6 +1068,16 @@ export function BillingForm({
                     className="flex-grow"
                     currentMode={mode}
                   />
+                  <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={() => setIsBarcodeModalOpen(true)} className="shrink-0" aria-label="Scan Hardware Barcode">
+                                <BarcodeIconLucide className="h-5 w-5 text-primary" />
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Scan with Hardware Barcode Scanner</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (
                     <TooltipProvider>
                       <Tooltip>
@@ -1389,4 +1416,3 @@ export function BillingForm({
   );
 }
 
-    
