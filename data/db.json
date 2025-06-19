@@ -96,7 +96,29 @@
       "role": "admin"
     }
   ],
-  "products": [],
+  "products": [
+    {
+      "name": "gold",
+      "category": "",
+      "trackQuantity": true,
+      "description": "",
+      "variants": [],
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "additionalChargeDefinitions": [],
+      "id": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
+      "imageUrl": "https://placehold.co/100x100.png?text=gold&font=roboto",
+      "productSKUs": [
+        {
+          "id": "992c81a1-f951-464d-b0b9-ce838836c08c",
+          "optionValues": {},
+          "skuIdentifier": "gold",
+          "stockLayers": []
+        }
+      ],
+      "sku": "",
+      "expiryDate": ""
+    }
+  ],
   "bills": [],
   "categories": [
     {
