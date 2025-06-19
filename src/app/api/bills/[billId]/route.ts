@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Bill } from '@/types';
 
-// GET a single bill by ID
 export async function GET(req: NextRequest, { params }: { params: { billId: string } }) {
   try {
     const { billId } = params;
@@ -12,6 +11,9 @@ export async function GET(req: NextRequest, { params }: { params: { billId: stri
 
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
+    }
+    if (!billId) {
+        return NextResponse.json({ success: false, message: 'Bill ID is required' }, { status: 400 });
     }
 
     const db = await readDB();
@@ -28,7 +30,6 @@ export async function GET(req: NextRequest, { params }: { params: { billId: stri
   }
 }
 
-// PUT (update) non-critical details of a bill by ID (e.g., paymentStatus, notes)
 export async function PUT(req: NextRequest, { params }: { params: { billId: string } }) {
   try {
     const { billId } = params;
@@ -38,8 +39,14 @@ export async function PUT(req: NextRequest, { params }: { params: { billId: stri
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
     }
+    if (!billId) {
+        return NextResponse.json({ success: false, message: 'Bill ID is required' }, { status: 400 });
+    }
     if (paymentStatus === undefined && notes === undefined) {
         return NextResponse.json({ success: false, message: 'At least one field (paymentStatus or notes) must be provided for update' }, { status: 400 });
+    }
+    if (paymentStatus !== undefined && !['paid', 'unpaid'].includes(paymentStatus)) {
+        return NextResponse.json({ success: false, message: 'Invalid payment status provided' }, { status: 400 });
     }
 
 
@@ -50,16 +57,18 @@ export async function PUT(req: NextRequest, { params }: { params: { billId: stri
       return NextResponse.json({ success: false, message: 'Bill not found or not associated with this company' }, { status: 404 });
     }
 
-    const billToUpdate = db.bills[billIndex];
+    const billToUpdate = { ...db.bills[billIndex] };
 
     if (paymentStatus !== undefined) {
         if (billToUpdate.type === 'sell' || billToUpdate.type === 'buy') {
             billToUpdate.paymentStatus = paymentStatus;
+        } else if (billToUpdate.isEstimate) {
+            // Estimates don't typically have payment status, ignore.
         } else {
-            // Payment status might not be applicable for returns or estimates
+             console.warn(`Payment status update attempted for bill type '${billToUpdate.type}' (ID: ${billId}) which may not support it.`);
         }
     }
-    if (notes !== undefined) {
+    if (notes !== undefined) { // Allow empty string for notes to clear it
       billToUpdate.notes = notes;
     }
     
@@ -74,7 +83,6 @@ export async function PUT(req: NextRequest, { params }: { params: { billId: stri
   }
 }
 
-// DELETE a bill by ID
 export async function DELETE(req: NextRequest, { params }: { params: { billId: string } }) {
   try {
     const { billId } = params;
@@ -84,17 +92,28 @@ export async function DELETE(req: NextRequest, { params }: { params: { billId: s
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required for deletion' }, { status: 400 });
     }
+    if (!billId) {
+        return NextResponse.json({ success: false, message: 'Bill ID is required for deletion' }, { status: 400 });
+    }
 
     const db = await readDB();
     const initialLength = db.bills.length;
+    
+    // Find the bill to potentially adjust stock (conceptual, as db.json doesn't do transactions)
+    const billToDelete = db.bills.find(b => b.id === billId && b.companyId === companyId);
+
     db.bills = db.bills.filter(b => !(b.id === billId && b.companyId === companyId));
 
     if (db.bills.length === initialLength) {
       return NextResponse.json({ success: false, message: 'Bill not found or not associated with this company' }, { status: 404 });
     }
 
-    // IMPORTANT: Inventory stock levels are NOT automatically readjusted upon bill deletion in this simplified db.json implementation.
-    // True transactional rollbacks would require a more sophisticated database system.
+    // Conceptual: If this were a real DB, we would reverse stock adjustments here transactionally.
+    // For db.json, this is a simplification. Client side might need to re-fetch products.
+    // if (billToDelete) {
+    //   // Logic to reverse stock changes in db.products (complex for FIFO/LIFO)
+    // }
+
     await writeDB(db);
     return NextResponse.json({ success: true, message: 'Bill deleted successfully. Note: Stock levels were not automatically readjusted.' });
   } catch (error) {
@@ -103,3 +122,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { billId: s
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
+    

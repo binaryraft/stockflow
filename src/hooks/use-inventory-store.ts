@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format, subDays, startOfDay, isToday } from 'date-fns';
+import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
 
 const generateId = () => uuidv4();
@@ -24,7 +24,7 @@ interface InventoryState {
   categories: Category[];
   staffs: User[]; 
   stores: Store[];
-  userProfile: UserProfile; // Client-side cache of the current company's data
+  userProfile: UserProfile;
   messagesByStore: Record<string, ChatMessage[]>;
 
   fetchProducts: (companyId: string) => Promise<void>;
@@ -70,7 +70,7 @@ interface InventoryState {
   getStoreById: (storeId: string) => Store | undefined;
   getAllStores: () => Store[];
 
-  fetchCompanyProfile: (companyId: string) => Promise<void>;
+  fetchCompanyProfile: (companyId: string) => Promise<Company | null>;
   updateUserProfileFields: (data: Partial<Omit<Company, 'id'|'token'>>, companyId: string) => Promise<Company | null>; 
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
@@ -120,6 +120,7 @@ const defaultUserProfile: UserProfile = {
   defaultBillNotes: 'Thank you for your business!',
   defaultSalesPaymentStatus: 'paid',
   defaultPurchasePaymentStatus: 'paid',
+  dataMode: 'local', // Will be overridden by server data if available
 };
 
 type InventoryPersist = (
@@ -133,13 +134,12 @@ export const useInventoryStore = create<InventoryState>()(
     (set, get) => ({
       products: [],
       bills: [],
-      categories: [], // Categories will now be fetched per company
+      categories: [], 
       staffs: [],
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
 
-      // Product Management (API Driven)
       fetchProducts: async (companyId: string) => {
         if (!companyId) { console.warn("fetchProducts: companyId is required"); set({ products: [] }); return; }
         try {
@@ -151,6 +151,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error fetching products:", error); set({ products: [] }); }
       },
       addProduct: async (productData, companyId) => {
+        if (!companyId) { console.error("addProduct: companyId is required"); return null; }
         try {
           const response = await fetch('/api/products', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -159,12 +160,13 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ products: [...state.products, result.data] }));
-            if (productData.category) get().fetchCategories(companyId); // Re-fetch categories if a new one might have been added implicitly
+            if (productData.category) get().fetchCategories(companyId);
             return result.data;
           } else { console.error("Failed to add product via API:", result.message); return null; }
         } catch (error) { console.error("Error adding product via API:", error); return null; }
       },
       updateProduct: async (productId, productData, companyId) => {
+        if (!companyId) { console.error("updateProduct: companyId is required"); return null; }
         try {
           const response = await fetch(`/api/products/${productId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -173,12 +175,13 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ products: state.products.map((p) => (p.id === productId ? result.data : p)) }));
-            if (productData.category) get().fetchCategories(companyId); // Re-fetch categories if one might have changed
+            if (productData.category) get().fetchCategories(companyId);
             return result.data;
           } else { console.error("Failed to update product via API:", result.message); return null; }
         } catch (error) { console.error("Error updating product via API:", error); return null; }
       },
       deleteProduct: async (productId: string, companyId: string) => {
+        if (!companyId) { console.error("deleteProduct: companyId is required"); return false; }
         try {
           const response = await fetch(`/api/products/${productId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -189,7 +192,6 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error deleting product via API:", error); return false; }
       },
 
-      // Store Management (API Driven)
       fetchStores: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStores: companyId is required"); set({ stores: [] }); return; }
         try {
@@ -201,6 +203,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error fetching stores:", error); set({ stores: [] }); }
       },
       addStore: async (storeData, companyId) => {
+        if (!companyId) { console.error("addStore: companyId is required"); return null; }
         try {
           const response = await fetch('/api/stores', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -214,6 +217,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error adding store via API:", error); return null; }
       },
       updateStore: async (storeId, storeData, companyId) => {
+        if (!companyId) { console.error("updateStore: companyId is required"); return null; }
         try {
           const response = await fetch(`/api/stores/${storeId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -227,6 +231,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error updating store via API:", error); return null; }
       },
       deleteStore: async (storeId, companyId) => {
+        if (!companyId) { console.error("deleteStore: companyId is required"); return false; }
         try {
           const response = await fetch(`/api/stores/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -237,7 +242,6 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error deleting store via API:", error); return false; }
       },
       
-      // Staff Management (API Driven)
       fetchStaff: async (companyId: string) => {
         if (!companyId) { console.warn("fetchStaff: companyId is required"); set({ staffs: [] }); return; }
         try {
@@ -249,6 +253,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error fetching staff:", error); set({ staffs: [] }); }
       },
       addStaff: async (staffData, companyId) => {
+        if (!companyId) { console.error("addStaff: companyId is required"); return null; }
         try {
           const response = await fetch('/api/staff', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -262,6 +267,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error adding staff via API:", error); return null; }
       },
       updateStaff: async (staffId, staffData, companyId) => {
+        if (!companyId) { console.error("updateStaff: companyId is required"); return null; }
         try {
           const response = await fetch(`/api/staff/${staffId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -275,6 +281,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error updating staff via API:", error); return null; }
       },
       deleteStaff: async (staffId, companyId) => {
+        if (!companyId) { console.error("deleteStaff: companyId is required"); return false; }
         try {
           const response = await fetch(`/api/staff/${staffId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -285,7 +292,6 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error deleting staff via API:", error); return false; }
       },
 
-      // Category Management (API Driven)
       fetchCategories: async (companyId: string) => {
         if (!companyId) { console.warn("fetchCategories: companyId is required"); set({ categories: [] }); return; }
         try {
@@ -312,7 +318,6 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error adding category via API:", error); return null; }
       },
 
-      // Chat Management (API Driven)
       fetchMessagesForStore: async (storeId, companyId) => {
         if (!storeId || !companyId) { console.warn("fetchMessages: storeId and companyId are required"); return; }
         try {
@@ -321,7 +326,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) {
             set((state) => ({
-              messagesByStore: { ...state.messagesByStore, [storeId]: result.data },
+              messagesByStore: { ...state.messagesByStore, [storeId]: result.data.sort((a,b) => a.timestamp - b.timestamp) },
             }));
           } else {
             console.error("Failed to fetch messages or data format incorrect:", result.message);
@@ -345,7 +350,7 @@ export const useInventoryStore = create<InventoryState>()(
             set((state) => {
               const existingMessages = state.messagesByStore[storeId] || [];
               return {
-                messagesByStore: { ...state.messagesByStore, [storeId]: [...existingMessages, result.data] },
+                messagesByStore: { ...state.messagesByStore, [storeId]: [...existingMessages, result.data].sort((a,b) => a.timestamp - b.timestamp) },
               };
             });
           } else { console.error("Failed to add chat message via API:", result.message); }
@@ -359,7 +364,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success) {
             set((state) => {
               const newMessagesByStore = { ...state.messagesByStore };
-              delete newMessagesByStore[storeId];
+              delete newMessagesByStore[storeId]; // Clears all messages for this store
               return { messagesByStore: newMessagesByStore };
             });
             return true;
@@ -367,7 +372,6 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) { console.error("Error clearing chat via API:", error); return false; }
       },
 
-      // Bill Management (API Driven)
       fetchBills: async (companyId: string) => {
         if (!companyId) { console.warn("fetchBills: companyId is required"); set({ bills: [] }); return; }
         try {
@@ -386,6 +390,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addBill: async (billData, itemsData) => {
+        if (!billData.companyId) { console.error("addBill: companyId is required in billData"); throw new Error("Company ID missing."); }
         try {
           const response = await fetch('/api/bills', {
             method: 'POST',
@@ -395,9 +400,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ bills: [result.data, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
-            if (billData.companyId) {
-                get().fetchProducts(billData.companyId);
-            }
+            get().fetchProducts(billData.companyId); // Re-fetch products to update stock
             return result.data;
           } else {
             console.error("Failed to add bill via API:", result.message);
@@ -409,11 +412,13 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteBill: async (billId: string, companyId: string) => {
+        if (!companyId) { console.error("deleteBill: companyId is required"); return false; }
         try {
           const response = await fetch(`/api/bills/${billId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
           if (result.success) {
             set((state) => ({ bills: state.bills.filter((b) => b.id !== billId) }));
+            get().fetchProducts(companyId); // Re-fetch products as stock might need re-evaluation by server logic (though current server doesn't rollback)
             return true;
           } else {
             console.error("Failed to delete bill via API:", result.message);
@@ -425,6 +430,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateBillNonCriticalDetails: async (billId, details, companyId) => {
+        if (!companyId) { console.error("updateBillNonCriticalDetails: companyId is required"); return null; }
         try {
           const response = await fetch(`/api/bills/${billId}`, {
             method: 'PUT',
@@ -447,16 +453,14 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
 
-      // Company Profile (API Driven)
-      fetchCompanyProfile: async (companyId: string) => {
-        if (!companyId) { console.warn("fetchCompanyProfile: companyId is required"); set({userProfile: defaultUserProfile}); return; }
+      fetchCompanyProfile: async (companyId: string): Promise<Company | null> => {
+        if (!companyId) { console.warn("fetchCompanyProfile: companyId is required"); set({userProfile: defaultUserProfile}); return null; }
         try {
           const response = await fetch(`/api/companies/${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch company profile: ${response.statusText}`);
           const result = await response.json();
           if (result.success && result.data) {
             const companyData = result.data as Company;
-            // Map Company data to UserProfile for client-side use
             set({ userProfile: {
                 companyName: companyData.name,
                 companyLogoUrl: companyData.logoUrl,
@@ -468,21 +472,23 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultBillNotes: companyData.defaultBillNotes,
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
+                dataMode: 'global',
             }});
+            return companyData;
           } else { 
             console.error("Failed to fetch company profile or data format incorrect:", result.message); 
-            set({userProfile: defaultUserProfile}); 
+            set({userProfile: {...defaultUserProfile, dataMode: 'local'} }); 
+            return null;
           }
         } catch (error) { 
           console.error("Error fetching company profile:", error); 
-          set({userProfile: defaultUserProfile}); 
+          set({userProfile: {...defaultUserProfile, dataMode: 'local'} }); 
+          return null;
         }
       },
       updateUserProfileFields: async (dataToUpdate, companyId) => {
         if (!companyId) { console.error("updateUserProfileFields: companyId is required"); return null; }
         try {
-          // The dataToUpdate is Partial<Omit<Company, 'id'|'token'>>
-          // It can include name, logoUrl, activeSubscriptionId, defaultBillNotes, etc.
           const response = await fetch(`/api/companies/${companyId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -491,10 +497,10 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             const updatedCompany = result.data as Company;
-            // Update client-side userProfile cache
+            // Update client-side userProfile cache based on the successfully updated company data
             set((state) => ({
               userProfile: {
-                ...state.userProfile, // Keep existing userProfile fields not directly from Company if any
+                ...state.userProfile, // Keep any non-company fields from existing profile
                 companyName: updatedCompany.name,
                 companyLogoUrl: updatedCompany.logoUrl,
                 companySlogan: updatedCompany.slogan,
@@ -505,6 +511,7 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultBillNotes: updatedCompany.defaultBillNotes,
                 defaultSalesPaymentStatus: updatedCompany.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: updatedCompany.defaultPurchasePaymentStatus,
+                dataMode: 'global',
               }
             }));
             return updatedCompany;
@@ -518,7 +525,6 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
 
-      // Client-Side Getters & Utilities
       getSkuIdentifier: (productName, optionValues) => { 
         if (!productName) return "Unknown Product";
         if (!optionValues || Object.keys(optionValues).length === 0) return productName;
@@ -540,14 +546,14 @@ export const useInventoryStore = create<InventoryState>()(
         let sku = product.productSKUs.find(s =>
           JSON.stringify(Object.fromEntries(Object.entries(s.optionValues).sort())) === stringifiedTargetOptions
         );
-        // SKU creation is primarily handled server-side now during bill processing if needed.
-        // This client-side part is more for immediate UI feedback or local operations before server sync.
         if (!sku) {
-          console.warn(`Client-side SKU creation attempt for ${product.name} with options ${JSON.stringify(optionValues)}. Server should handle this.`);
            const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
-           sku = { id: generateId(), optionValues: { ...optionValues }, skuIdentifier: skuIdentifier, stockLayers: [] };
-           // Avoid directly mutating products array here if server is source of truth.
-           // This implies products array might need a refresh if a new SKU was truly created server-side.
+           // For client-side operations, we might need to create a conceptual SKU if not found,
+           // but the server should handle actual persistence if this new SKU is used in a bill.
+           // For now, if not found, it means it wasn't explicitly created via API or previous bills.
+           // So, returning a conceptual one for UI purposes might be okay, but it won't have stock layers.
+           // console.warn(`Client-side SKU not found for ${product.name} with options ${JSON.stringify(optionValues)}. Server will create if billed.`);
+           return { id: generateId() + '_conceptual', optionValues: { ...optionValues }, skuIdentifier: skuIdentifier, stockLayers: [] };
         }
         return sku;
       },
@@ -564,9 +570,8 @@ export const useInventoryStore = create<InventoryState>()(
             ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId)
             : sku.stockLayers;
 
-
         if (product.trackQuantity === false) {
-          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0];
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; // Fallback to any layer if no store-specific
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -574,7 +579,6 @@ export const useInventoryStore = create<InventoryState>()(
             skuIdentifier,
           };
         }
-
 
         const totalStock = relevantStockLayers.reduce((sum, layer) => sum + (typeof layer.quantity === 'number' ? layer.quantity : 0), 0);
 
@@ -592,7 +596,6 @@ export const useInventoryStore = create<InventoryState>()(
                 currentSellPrice = newestLayer.sellPrice;
             }
         }
-
 
         let averageCostPrice: number | null = null;
         if (totalStock > 0) {
@@ -628,7 +631,6 @@ export const useInventoryStore = create<InventoryState>()(
       getActiveSubscriptionPlan: () => { 
         const { userProfile } = get();
         if (!userProfile || !userProfile.activeSubscriptionId) {
-           console.warn("User profile or activeSubscriptionId not found, defaulting to STARTER plan.");
            return SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
         }
         return SUBSCRIPTION_PLANS.find(plan => plan.id === userProfile.activeSubscriptionId) || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER);
@@ -681,7 +683,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
 
         billsToConsider.forEach(bill => {
-          const billDateStr = format(startOfDay(new Date(bill.date)), 'MMM d');
+          const billDate = new Date(bill.date);
+          if (!billDate || !isWithinInterval(billDate, {start: startOfDay(subDays(new Date(), days -1)), end: startOfDay(new Date()) } ) ) return;
+
+          const billDateStr = format(startOfDay(billDate), 'MMM d');
           if (dailyDataMap[billDateStr]) {
             if (bill.type === 'sell' && !bill.isEstimate) { 
               dailyDataMap[billDateStr].sales += bill.totalAmount; 
@@ -707,7 +712,6 @@ export const useInventoryStore = create<InventoryState>()(
               if (!productRevenue[productNameForItem]) {
                 productRevenue[productNameForItem] = { name: productNameForItem, revenue: 0 };
               }
-              
               productRevenue[productNameForItem].revenue += (item.sellPrice ?? 0) * item.quantity;
             });
           }
@@ -732,7 +736,7 @@ export const useInventoryStore = create<InventoryState>()(
                 const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
-             
+             // For tracked items in expense bills, item.sellPrice is the intended sell price set at purchase
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
@@ -761,7 +765,6 @@ export const useInventoryStore = create<InventoryState>()(
                 const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
-             
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           if (potentialRevenue >= totalCost) {
@@ -792,15 +795,18 @@ export const useInventoryStore = create<InventoryState>()(
             totalRevenue += bill.subTotal ?? bill.totalAmount; 
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
-              const costForItem = (item.costPrice || 0);
+              const costForItem = (item.costPrice || 0); // COGS is already calculated and stored in billItem for sales
               totalCOGS += costForItem * item.quantity;
             });
           } else if (bill.type === 'buy') {
+            // All items in a 'buy' bill contribute to totalExpenses (COGS for items purchased, direct expenses for services)
             totalExpenses += bill.totalAmount;
           }
         });
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses;
+        const netProfit = grossProfit - totalExpenses; // For this model, COGS from sales and direct purchases are separate from operational expenses.
+                                                      // If 'buy' bills are *only* for inventory, totalExpenses might be better named 'totalPurchasesCost' and netProfit logic would change.
+                                                      // Assuming 'buy' bills can be direct expenses too.
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
       getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { 
@@ -850,20 +856,16 @@ export const useInventoryStore = create<InventoryState>()(
                 if (!productFinancials[skuIdentifier]) {
                   productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
                 }
-                
                 const itemRevenue = (item.sellPrice || 0) * item.quantity;
-                const itemCogs = (item.costPrice || 0) * item.quantity;
+                const itemCogs = (item.costPrice || 0) * item.quantity; // COGS is recorded per sales bill item
 
                 productFinancials[skuIdentifier].revenue += itemRevenue;
                 productFinancials[skuIdentifier].cogs += itemCogs;
                 productFinancials[skuIdentifier].profit += (itemRevenue - itemCogs);
-              } else {
-                console.warn("Skipping item in profit calculation due to missing or invalid productName/skuIdentifier:", item);
               }
             });
           }
         });
-
         return Object.values(productFinancials)
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit);
@@ -891,11 +893,16 @@ export const useInventoryStore = create<InventoryState>()(
 
         billsToConsider.forEach(bill => {
           bill.items.forEach(item => {
-            const productId = item.productId;
-            if (productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+            if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+            
+            const productRef = get().getProductById(item.productId);
+            if(!productRef) return; // Only process items for known products
 
-            if (!ledgerMap[productId]) {
-              ledgerMap[productId] = {
+            // For ledger, we group by base product ID, not individual SKUs/productName from bill
+            const baseProductId = productRef.id; 
+
+            if (!ledgerMap[baseProductId]) {
+              ledgerMap[baseProductId] = {
                 totalPurchased: 0,
                 totalSold: 0,
                 totalRestockedReturns: 0,
@@ -904,14 +911,14 @@ export const useInventoryStore = create<InventoryState>()(
             }
 
             if (bill.type === 'buy') {
-              ledgerMap[productId].totalPurchased += item.quantity;
+              ledgerMap[baseProductId].totalPurchased += item.quantity;
             } else if (bill.type === 'sell' && !bill.isEstimate) { 
-              ledgerMap[productId].totalSold += item.quantity;
+              ledgerMap[baseProductId].totalSold += item.quantity;
             } else if (bill.type === 'return') {
               if (item.isDefective) {
-                ledgerMap[productId].totalDefectiveReturns += item.quantity;
+                ledgerMap[baseProductId].totalDefectiveReturns += item.quantity;
               } else {
-                ledgerMap[productId].totalRestockedReturns += item.quantity;
+                ledgerMap[baseProductId].totalRestockedReturns += item.quantity;
               }
             }
           });
@@ -923,12 +930,15 @@ export const useInventoryStore = create<InventoryState>()(
           };
           let currentStock: number | 'N/A' = 'N/A';
           if (product.trackQuantity) {
-            currentStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0);
+            currentStock = product.productSKUs.reduce((sum, sku) => {
+                // For ledger, get overall stock, not store-specific for simplicity here
+                const skuDetails = get().getSkuDetails(sku, undefined); 
+                return sum + (skuDetails.totalStock ?? 0);
+            }, 0);
           }
-
           return {
             productId: product.id,
-            productName: product.name,
+            productName: product.name, // Display base product name
             category: product.category,
             ...summary,
             currentStock,
@@ -945,22 +955,25 @@ export const useInventoryStore = create<InventoryState>()(
         try {
           const state = get();
           let storeUpdated = false;
+          const defaultCompanyId = "comp_default_001"; // Match db.json
 
-          // Reset client-side caches that are now primarily server-driven
-          const serverDrivenArrays: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories'];
-          serverDrivenArrays.forEach(key => {
+          // Ensure companyId is present in localStorage for client-side operations.
+          // This is a placeholder; real multi-company would require login context.
+          if (typeof window !== 'undefined' && !localStorage.getItem('companyId')) {
+            localStorage.setItem('companyId', defaultCompanyId);
+          }
+
+          const arraysToReset: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories'];
+          arraysToReset.forEach(key => {
             if (!Array.isArray((state as any)[key]) || (state as any)[key].length > 0) {
-              (state as any)[key] = [];
-              storeUpdated = true;
+              (state as any)[key] = []; storeUpdated = true;
             }
           });
           
-          if (!state.userProfile || typeof state.userProfile !== 'object' || state.userProfile === null) {
+          if (!state.userProfile || typeof state.userProfile !== 'object' || state.userProfile === null || state.userProfile.dataMode !== 'global') {
             state.userProfile = JSON.parse(JSON.stringify(defaultUserProfile));
             storeUpdated = true;
           } else {
-            // Ensure all UserProfile fields exist, defaulting if necessary.
-            // These will be overwritten by fetchCompanyProfile on login.
             const defaultProfileKeys = Object.keys(defaultUserProfile) as Array<keyof UserProfile>;
             defaultProfileKeys.forEach(key => {
                 if (state.userProfile[key] === undefined) {
@@ -971,10 +984,8 @@ export const useInventoryStore = create<InventoryState>()(
           }
           
           if(!state.messagesByStore || typeof state.messagesByStore !== 'object') {
-            state.messagesByStore = {}; 
-            storeUpdated = true;
+            state.messagesByStore = {}; storeUpdated = true;
           }
-
 
           if (storeUpdated) {
             set({ ...state });
@@ -989,21 +1000,50 @@ export const useInventoryStore = create<InventoryState>()(
       }
     }),
     {
-      name: 'stockflow-inventory-storage',
+      name: 'stockflow-app-storage', // Changed name to avoid conflict if old one exists
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         if (state?._hydrate) {
           state._hydrate();
         }
-      }
+      },
+      migrate: (persistedState: any, version: number) => {
+        // Example migration: if an old version of state exists without userProfile.dataMode
+        if (persistedState && persistedState.userProfile && persistedState.userProfile.dataMode === undefined) {
+          persistedState.userProfile.dataMode = 'local'; // Default old states to local
+        }
+        // If old storage was 'stockflow-inventory-storage', clear it conceptually to avoid conflicts
+        // Actual clearing of old localStorage items would need to be done explicitly if desired.
+        return persistedState;
+      },
+      version: 2, // Increment version if schema changes significantly
     }
   )
 );
 
-if (typeof window !== 'undefined' && useInventoryStore.getState()._hydrate) {
-  if (!(useInventoryStore.getState() as any).__hydrated) {
-      useInventoryStore.getState()._hydrate();
-      (useInventoryStore.getState() as any).__hydrated = true;
+// Initial hydration call if Zustand hasn't already hydrated
+if (typeof window !== 'undefined') {
+  const state = useInventoryStore.getState();
+  if (state._hydrate && !(state as any).__hydrated) {
+    state._hydrate();
+    (useInventoryStore.getState() as any).__hydrated = true;
+  }
+  // Ensure critical data is fetched on load if a company context exists
+  const companyId = localStorage.getItem('companyId');
+  if (companyId) {
+    // Use a flag to prevent multiple fetches on hot reloads during development
+    if (!(window as any).__initialDataFetched) {
+      Promise.all([
+        state.fetchCompanyProfile(companyId),
+        state.fetchProducts(companyId),
+        state.fetchBills(companyId),
+        state.fetchCategories(companyId),
+        state.fetchStaff(companyId),
+        state.fetchStores(companyId)
+      ]).catch(err => console.error("Error during initial data fetch:", err));
+      (window as any).__initialDataFetched = true;
+    }
   }
 }
+
     

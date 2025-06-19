@@ -10,11 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { APP_NAME } from '@/lib/constants';
-import { KeyRound, LogIn } from 'lucide-react';
+import { KeyRound, LogIn, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-
-// For this prototype, assuming a single default company for store portal context
-const DEFAULT_COMPANY_ID_FOR_STORE_PORTAL = "comp_default_001";
 
 export default function StoreLoginPage() {
   const router = useRouter();
@@ -27,6 +24,7 @@ export default function StoreLoginPage() {
   const [passkey, setPasskey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [storeName, setStoreName] = useState('');
+  const [companyIdForStore, setCompanyIdForStore] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
 
@@ -39,7 +37,7 @@ export default function StoreLoginPage() {
 
     if (!storeId) {
       toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
-      router.replace('/storeportal');
+      router.replace('/storeportal'); // Redirect to generic portal page
       setInitialLoading(false);
       return;
     }
@@ -47,16 +45,23 @@ export default function StoreLoginPage() {
     const store = getStoreById(storeId);
     if (store) {
       setStoreName(store.name);
+      setCompanyIdForStore(store.companyId); // Store the companyId for this store
       // Check if already authenticated for this store in this session
       if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
         router.replace(`/storeportal/${storeId}/billing`);
-        return;
+        return; // Don't set initialLoading to false here to allow redirect to complete
       }
     } else {
+      // If store not found in Zustand, it might be due to initial load or invalid ID
+      // Let's try fetching it from localStorage-based companyId, if we assume all stores might be under one.
+      // This is a fallback, ideally getStoreById from Zustand should be sufficient after initial data load.
+      console.warn(`Store with ID ${storeId} not immediately found in Zustand. This might be okay on first load.`);
+      // For now, if not found in Zustand, we consider it an issue.
+      // In a multi-company scenario, we'd need to know which company this storeId belongs to.
       toast({
         variant: "destructive",
         title: "Store Not Found",
-        description: "The requested store does not exist.",
+        description: "The requested store may not exist or is not accessible.",
       });
       router.replace('/storeportal');
       setInitialLoading(false);
@@ -67,7 +72,14 @@ export default function StoreLoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hasMounted || !storeId) return;
+    if (!hasMounted || !storeId || !companyIdForStore) {
+      toast({ variant: "destructive", title: "Error", description: "Store information or company context is missing."});
+      return;
+    }
+    if (passkey.length < 4) {
+      toast({ variant: "destructive", title: "Login Failed", description: "Passkey must be at least 4 characters." });
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -77,7 +89,7 @@ export default function StoreLoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           loginType: 'store',
-          companyId: DEFAULT_COMPANY_ID_FOR_STORE_PORTAL, // Using default company ID for prototype
+          companyId: companyIdForStore, // Use the companyId associated with the store
           storeId: storeId,
           storePasskey: passkey,
         }),
@@ -85,12 +97,14 @@ export default function StoreLoginPage() {
 
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (response.ok && data.success && data.store) {
         sessionStorage.setItem(`authenticatedStore_${storeId}`, 'true');
-        sessionStorage.setItem('lastAuthenticatedStoreId', storeId); // Added
+        sessionStorage.setItem('lastAuthenticatedStoreId', storeId);
+        sessionStorage.setItem(`store_${storeId}_companyId`, data.store.companyId); // Store companyId for the session
+
         toast({
           title: "Login Successful",
-          description: `Welcome to ${data.storeName || storeName} terminal.`,
+          description: `Welcome to ${data.store.name || storeName} terminal.`,
         });
         router.replace(`/storeportal/${storeId}/billing`);
       } else {
@@ -110,7 +124,7 @@ export default function StoreLoginPage() {
 
   if (!hasMounted || initialLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
         <Image
           src="https://placehold.co/128x128.png"
           alt={`${APP_NAME} Logo`}
@@ -125,7 +139,7 @@ export default function StoreLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4">
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
       <div className="flex flex-col items-center mb-8">
         <Image
           src="https://placehold.co/128x128.png"
@@ -147,7 +161,7 @@ export default function StoreLoginPage() {
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="passkey" className="flex items-center">
-                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Store Passkey
+                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Store Passkey* (min. 4 characters)
               </Label>
               <Input
                 id="passkey"
@@ -157,19 +171,23 @@ export default function StoreLoginPage() {
                 required
                 placeholder="Enter store passkey"
                 className="text-center text-lg py-2 h-12"
+                disabled={isSubmitting}
               />
             </div>
           </CardContent>
           <CardFooter>
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              <LogIn className="mr-2 h-5 w-5" /> {isSubmitting ? 'Verifying...' : 'Access Terminal'}
+            <Button type="submit" className="w-full" disabled={isSubmitting || !companyIdForStore}>
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
+              {isSubmitting ? 'Verifying...' : 'Access Terminal'}
             </Button>
           </CardFooter>
         </form>
       </Card>
-       <Button variant="link" onClick={() => router.push('/storeportal')} className="mt-8 text-sm">
+       <Button variant="link" onClick={() => router.push('/storeportal')} className="mt-8 text-sm" disabled={isSubmitting}>
         Back to Store Portal
       </Button>
     </div>
   );
 }
+
+    

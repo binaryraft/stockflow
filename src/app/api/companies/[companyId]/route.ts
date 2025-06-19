@@ -4,7 +4,6 @@ import { readDB, writeDB } from '@/lib/db-access';
 import type { Company } from '@/types';
 import { SUBSCRIPTION_PLANS } from '@/lib/constants';
 
-// GET a single company by ID
 export async function GET(req: NextRequest, { params }: { params: { companyId: string } }) {
   try {
     const { companyId } = params;
@@ -27,16 +26,15 @@ export async function GET(req: NextRequest, { params }: { params: { companyId: s
   }
 }
 
-// PUT (update) a company by ID
 export async function PUT(req: NextRequest, { params }: { params: { companyId: string } }) {
   try {
     const { companyId } = params;
-    const companyData = await req.json();
+    const companyDataToUpdate = await req.json();
 
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required' }, { status: 400 });
     }
-    if (!companyData || Object.keys(companyData).length === 0) {
+    if (!companyDataToUpdate || Object.keys(companyDataToUpdate).length === 0) {
       return NextResponse.json({ success: false, message: 'Company data is required for update' }, { status: 400 });
     }
 
@@ -47,22 +45,34 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
       return NextResponse.json({ success: false, message: 'Company not found' }, { status: 404 });
     }
 
-    // Selectively update fields, don't allow changing id or token this way
-    const { id, token, ...updateableData } = companyData;
+    // Exclude fields that should not be updatable via this endpoint directly
+    const { id, token, ...updateableData } = companyDataToUpdate;
 
-    // Validate activeSubscriptionId if it's being updated
+    if (updateableData.name !== undefined && (typeof updateableData.name !== 'string' || updateableData.name.trim() === '')) {
+        return NextResponse.json({ success: false, message: 'Company name cannot be empty if provided for update.' }, { status: 400 });
+    }
+
     if (updateableData.activeSubscriptionId) {
       const validPlan = SUBSCRIPTION_PLANS.find(p => p.id === updateableData.activeSubscriptionId);
       if (!validPlan) {
           return NextResponse.json({ success: false, message: 'Invalid subscription plan ID provided' }, { status: 400 });
       }
     }
+    if (updateableData.defaultSalesPaymentStatus && !['paid', 'unpaid'].includes(updateableData.defaultSalesPaymentStatus)){
+        return NextResponse.json({ success: false, message: 'Invalid default sales payment status.' }, { status: 400 });
+    }
+    if (updateableData.defaultPurchasePaymentStatus && !['paid', 'unpaid'].includes(updateableData.defaultPurchasePaymentStatus)){
+        return NextResponse.json({ success: false, message: 'Invalid default purchase payment status.' }, { status: 400 });
+    }
 
-
+    // Merge existing data with updateable data
     db.companies[companyIndex] = {
       ...db.companies[companyIndex],
       ...updateableData,
     };
+    // Ensure name is trimmed if updated
+    if (updateableData.name) db.companies[companyIndex].name = updateableData.name.trim();
+
 
     await writeDB(db);
 
@@ -73,4 +83,5 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
     

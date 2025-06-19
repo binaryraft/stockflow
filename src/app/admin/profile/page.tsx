@@ -11,15 +11,15 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import type { SubscriptionPlan, UserProfile, Company } from '@/types';
-import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info, ExternalLink } from 'lucide-react';
+import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, FileText, Image as ImageIcon, PenLine, Info, ExternalLink, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import NextImage from 'next/image'; 
 
 interface EditableProfileFieldProps {
-  fieldId: keyof Omit<Company, 'id' | 'token'>; // Fields from Company type, excluding id and token
+  fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>; // Exclude fields not directly editable here
   label: string;
-  currentValue: string | undefined | null; // Allow null for currentValue
+  currentValue: string | undefined | null;
   onSave: (newValue: string) => Promise<void> | void;
   inputType?: 'text' | 'textarea' | 'tel' | 'url';
   placeholder?: string;
@@ -47,7 +47,7 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
   }, [currentValue]);
 
   const handleSave = async () => {
-    if (inputValue.trim() === '' && fieldId === 'name') { 
+    if (fieldId === 'name' && inputValue.trim() === '') { 
       toast({ variant: 'destructive', title: 'Error', description: `${label} cannot be empty.` });
       return;
     }
@@ -92,7 +92,8 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
         )}
         {isEditing ? (
           <Button onClick={handleSave} size="sm" disabled={disabled || isSaving}>
-            <Save className="mr-2 h-4 w-4" /> {isSaving ? 'Saving...' : 'Save'}
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
         ) : (
           <Button variant="outline" size="sm" onClick={() => { setInputValue(currentValue || ''); setIsEditing(true); }} disabled={disabled}>
@@ -107,8 +108,8 @@ const EditableProfileField: React.FC<EditableProfileFieldProps> = ({
 
 export default function ProfilePage() {
   const { 
-    userProfile, // This is now a client-side cache of the Company data
-    updateUserProfileFields, // This now updates the Company record on the server
+    userProfile,
+    updateUserProfileFields,
     fetchCompanyProfile, 
   } = useInventoryStore();
   const { toast } = useToast();
@@ -119,6 +120,7 @@ export default function ProfilePage() {
   const [logoPreviewError, setLogoPreviewError] = useState(false);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isUpdatingSubscription, setIsUpdatingSubscription] = useState(false);
 
 
   useEffect(() => {
@@ -130,55 +132,65 @@ export default function ProfilePage() {
       setCurrentCompanyId(companyIdFromStorage);
       setLoggedInUserName(userNameFromStorage);
       setIsLoadingProfile(true);
-      fetchCompanyProfile(companyIdFromStorage).finally(() => setIsLoadingProfile(false));
+      // Fetch company profile if userProfile dataMode is 'local' or not set (initial load)
+      if (!userProfile.dataMode || userProfile.dataMode === 'local') {
+        fetchCompanyProfile(companyIdFromStorage).finally(() => setIsLoadingProfile(false));
+      } else {
+        setIsLoadingProfile(false); // Already have global data
+      }
     } else {
       toast({ variant: "destructive", title: "Error", description: "Company context not found."});
       setIsLoadingProfile(false);
     }
-  }, [fetchCompanyProfile, toast]);
+  }, [fetchCompanyProfile, toast, userProfile.dataMode]);
 
   useEffect(() => {
-    // This effect will run when userProfile (client cache) changes,
-    // which happens after fetchCompanyProfile or updateUserProfileFields successfully updates it.
-    if (hasMounted && !isLoadingProfile && userProfile) {
+    if (hasMounted && userProfile) {
        const plan = SUBSCRIPTION_PLANS.find(p => p.id === userProfile.activeSubscriptionId);
        setActivePlanDetails(plan || SUBSCRIPTION_PLANS.find(p => p.id === SUBSCRIPTION_PLAN_IDS.STARTER));
     }
-  }, [hasMounted, userProfile, isLoadingProfile]);
+  }, [hasMounted, userProfile]);
   
   useEffect(() => {
     setLogoPreviewError(false); 
   }, [userProfile.companyLogoUrl]);
 
 
-  const handleFieldSave = async (fieldId: keyof Omit<Company, 'id' | 'token'>, newValue: string) => {
+  const handleFieldSave = async (fieldId: keyof Omit<Company, 'id' | 'token'| 'activeSubscriptionId'>, newValue: string) => {
     if (!currentCompanyId) {
        toast({ variant: 'destructive', title: 'Error', description: 'Company context not found.' });
        return;
     }
-    // updateUserProfileFields will call the API to update the main Company record
     await updateUserProfileFields({ [fieldId]: newValue } as Partial<Omit<Company, 'id'|'token'>>, currentCompanyId);
-    // Toast is handled within EditableProfileField on successful save
   };
   
   const handleSubscriptionSelect = async (planId: string) => {
+    if (planId === userProfile.activeSubscriptionId) return;
     if (planId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) {
       toast({ title: 'Enterprise Plan', description: 'Please contact sales for Enterprise pricing and setup.' });
       return;
     }
-    
     if (!currentCompanyId) {
         toast({ variant: 'destructive', title: 'Error', description: 'Company context not found. Cannot update subscription.' });
         return;
     }
 
+    setIsUpdatingSubscription(true);
     try {
-        await updateUserProfileFields({ activeSubscriptionId: planId }, currentCompanyId); 
-        const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
-        toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
+        const updatedCompany = await updateUserProfileFields({ activeSubscriptionId: planId }, currentCompanyId); 
+        if (updatedCompany) {
+            const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
+            toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
+        } else {
+            throw new Error("Failed to update subscription on server.");
+        }
     } catch (error) {
         console.error("Error updating subscription:", error);
-        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update subscription plan.' });
+        toast({ variant: 'destructive', title: 'Update Failed', description: 'Could not update subscription plan. Previous plan restored.' });
+        // Optionally, re-fetch profile to ensure consistency if server update partially failed
+        fetchCompanyProfile(currentCompanyId);
+    } finally {
+        setIsUpdatingSubscription(false);
     }
   };
 
@@ -191,8 +203,7 @@ export default function ProfilePage() {
     );
   }
   
-  const currentActivePlan = activePlanDetails; // Already derived from userProfile
-
+  const currentActivePlan = activePlanDetails;
 
   return (
     <div className="flex flex-col gap-6">
@@ -208,7 +219,7 @@ export default function ProfilePage() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <EditableProfileField
-              fieldId="name" // Corresponds to Company.name
+              fieldId="name"
               label="Company Name*"
               currentValue={userProfile.companyName}
               onSave={(value) => handleFieldSave('name', value)}
@@ -349,9 +360,10 @@ export default function ProfilePage() {
                     <Button
                     className={cn("w-full", currentActivePlan?.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
                     onClick={() => handleSubscriptionSelect(plan.id)}
-                    disabled={currentActivePlan?.id === plan.id}
+                    disabled={currentActivePlan?.id === plan.id || isUpdatingSubscription}
                     >
-                    {currentActivePlan?.id === plan.id ? 'Current Plan' : 'Choose Plan'}
+                    {isUpdatingSubscription && currentActivePlan?.id !== plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {currentActivePlan?.id === plan.id ? 'Current Plan' : (isUpdatingSubscription ? 'Updating...' : 'Choose Plan')}
                     </Button>
                 )}
               </CardFooter>
@@ -362,4 +374,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
     

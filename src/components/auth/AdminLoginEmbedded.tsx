@@ -7,15 +7,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
-import { LogIn, XCircle, Mail, KeyRound } from 'lucide-react';
+import { LogIn, XCircle, Mail, KeyRound, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
   onCancel: () => void;
-  onSwitchToSignup: () => void; // New prop to switch to signup
+  onSwitchToSignup: () => void;
 }
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
@@ -23,6 +24,7 @@ const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup }: AdminLoginEmbeddedProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { fetchCompanyProfile } = useInventoryStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [email, setEmail] = useState('');
@@ -31,17 +33,6 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
   useEffect(() => {
     setHasMounted(true);
   }, []);
-
-  useEffect(() => {
-    if (hasMounted) {
-      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-      const userRole = localStorage.getItem('userRole');
-      if (token && userRole === 'admin') {
-        // router.replace('/admin'); // Let onLoginSuccess handle redirection to avoid race conditions with HomePage UI mode
-        onLoginSuccess();
-      }
-    }
-  }, [router, hasMounted, onLoginSuccess]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,16 +52,18 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
 
       const data = await response.json();
 
-      if (response.ok && data.success && data.token) {
+      if (response.ok && data.success && data.token && data.user) {
         localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
-        localStorage.setItem('userId', data.userId);
-        localStorage.setItem('userName', data.userName || 'Admin');
-        localStorage.setItem('userRole', data.role || 'admin');
-        localStorage.setItem('companyId', data.companyId); // Ensure companyId is stored
+        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('userName', data.user.name || 'Admin');
+        localStorage.setItem('userRole', data.user.role || 'admin');
+        localStorage.setItem('companyId', data.user.companyId);
 
-        toast({ title: "Login Successful", description: `Welcome, ${data.userName || 'Admin'}!` });
-        onLoginSuccess(); // Callback will handle UI switch and potential redirection
-        router.replace('/admin'); // Explicitly redirect after success callback
+        // Fetch company profile right after successful login to populate userProfile in store
+        await fetchCompanyProfile(data.user.companyId);
+
+        toast({ title: "Login Successful", description: `Welcome, ${data.user.name || 'Admin'}!` });
+        onLoginSuccess(); // This should trigger UI mode change and HomePage will redirect
       } else {
         toast({ variant: "destructive", title: "Login Failed", description: data.message || "Invalid credentials or server error." });
       }
@@ -84,15 +77,8 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
 
   if (!hasMounted) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40">
-        <Image
-          src="https://placehold.co/128x128.png"
-          alt={`${APP_NAME} Logo`}
-          width={64}
-          height={64}
-          className="mb-3 rounded-lg shadow-md animate-pulse"
-          data-ai-hint="logo company"
-        />
+      <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40 backdrop-blur-sm">
+        <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
         <p className="text-muted-foreground">Loading Admin Login...</p>
       </div>
     );
@@ -135,6 +121,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@example.com"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-1.5">
@@ -148,15 +135,16 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your password"
                 required
+                disabled={isSubmitting}
               />
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-3">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              <LogIn className="mr-2 h-5 w-5" />
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
               {isSubmitting ? 'Logging In...' : 'Login as Admin'}
             </Button>
-            <Button variant="link" size="sm" onClick={onSwitchToSignup} className="text-xs">
+            <Button variant="link" size="sm" onClick={onSwitchToSignup} className="text-xs" disabled={isSubmitting}>
               New user? Sign up
             </Button>
           </CardFooter>
@@ -165,4 +153,5 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
     </div>
   );
 }
+
     

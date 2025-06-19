@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
-import { UserPlus, XCircle, Mail, KeyRound, Building, User as UserIcon } from 'lucide-react';
+import { UserPlus, XCircle, Mail, KeyRound, Building, User as UserIcon, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 interface AdminSignupEmbeddedProps {
   onSignupSuccess: () => void;
@@ -23,6 +24,7 @@ const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin }: AdminSignupEmbeddedProps) {
   const router = useRouter();
   const { toast } = useToast();
+  const { fetchCompanyProfile } = useInventoryStore(); // Added
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -43,6 +45,10 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
       toast({ variant: "destructive", title: "Signup Failed", description: "Passwords do not match." });
       return;
     }
+    if (password.length < 6) {
+      toast({ variant: "destructive", title: "Signup Failed", description: "Password must be at least 6 characters." });
+      return;
+    }
     setIsSubmitting(true);
 
     try {
@@ -59,19 +65,19 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
 
       const data = await response.json();
 
-      if (response.ok && data.success) {
+      if (response.ok && data.success && data.user) {
         toast({ title: "Signup Successful!", description: data.message || "Your company and admin account have been created." });
         
-        // Automatically log in the new admin
         if (data.token) {
             localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
-            localStorage.setItem('userId', data.userId);
-            localStorage.setItem('userName', data.userName || 'Admin');
-            localStorage.setItem('userRole', data.role || 'admin');
-            localStorage.setItem('companyId', data.companyId);
+            localStorage.setItem('userId', data.user.id);
+            localStorage.setItem('userName', data.user.name || 'Admin');
+            localStorage.setItem('userRole', data.user.role || 'admin');
+            localStorage.setItem('companyId', data.user.companyId);
+            // Fetch company profile after successful signup
+            await fetchCompanyProfile(data.user.companyId);
         }
-        onSignupSuccess(); // Callback will handle UI switch
-        router.replace('/admin'); // Redirect to admin dashboard
+        onSignupSuccess(); // Callback will handle UI switch and HomePage will redirect
       } else {
         toast({ variant: "destructive", title: "Signup Failed", description: data.message || "Could not create account." });
       }
@@ -84,17 +90,9 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   };
 
   if (!hasMounted) {
-    // Minimal loader to prevent layout shift during initial render
     return (
-        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40">
-            <Image
-            src="https://placehold.co/128x128.png"
-            alt={`${APP_NAME} Logo`}
-            width={64}
-            height={64}
-            className="mb-3 rounded-lg shadow-md animate-pulse"
-            data-ai-hint="logo company"
-            />
+        <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40 backdrop-blur-sm">
+            <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
             <p className="text-muted-foreground">Loading Admin Signup...</p>
         </div>
     );
@@ -128,7 +126,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="signup-company-name">
-                <Building className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Company Name
+                <Building className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Company Name*
               </Label>
               <Input
                 id="signup-company-name"
@@ -137,11 +135,12 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                 onChange={(e) => setCompanyName(e.target.value)}
                 placeholder="Your Company LLC"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="signup-admin-name">
-                <UserIcon className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Your Name (Admin)
+                <UserIcon className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Your Name (Admin)*
               </Label>
               <Input
                 id="signup-admin-name"
@@ -150,11 +149,12 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                 onChange={(e) => setAdminName(e.target.value)}
                 placeholder="John Doe"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="signup-email">
-                <Mail className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Admin Email
+                <Mail className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Admin Email*
               </Label>
               <Input
                 id="signup-email"
@@ -163,11 +163,12 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@yourcompany.com"
                 required
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="signup-password">
-                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password
+                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password* (min. 6 characters)
               </Label>
               <Input
                 id="signup-password"
@@ -176,11 +177,13 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Choose a strong password"
                 required
+                minLength={6}
+                disabled={isSubmitting}
               />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="signup-confirm-password">
-                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Confirm Password
+                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Confirm Password*
               </Label>
               <Input
                 id="signup-confirm-password"
@@ -189,15 +192,17 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Re-enter your password"
                 required
+                minLength={6}
+                disabled={isSubmitting}
               />
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-3">
             <Button type="submit" className="w-full" disabled={isSubmitting}>
-              <UserPlus className="mr-2 h-5 w-5" />
+              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UserPlus className="mr-2 h-5 w-5" />}
               {isSubmitting ? 'Creating Account...' : 'Sign Up & Create Company'}
             </Button>
-            <Button variant="link" size="sm" onClick={onSwitchToLogin} className="text-xs">
+            <Button variant="link" size="sm" onClick={onSwitchToLogin} className="text-xs" disabled={isSubmitting}>
               Already have an account? Login
             </Button>
           </CardFooter>
@@ -206,4 +211,5 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
     </div>
   );
 }
+
     

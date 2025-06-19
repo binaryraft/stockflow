@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Store } from '@/types';
 
-// GET a single store by ID
 export async function GET(req: NextRequest, { params }: { params: { storeId: string } }) {
   try {
     const { storeId } = params;
@@ -31,7 +30,6 @@ export async function GET(req: NextRequest, { params }: { params: { storeId: str
   }
 }
 
-// PUT (update) a store by ID
 export async function PUT(req: NextRequest, { params }: { params: { storeId: string } }) {
   try {
     const { storeId } = params;
@@ -44,8 +42,11 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
     if (!storeId) {
       return NextResponse.json({ success: false, message: 'Store ID is required' }, { status: 400 });
     }
-    if (!storeData.name || !storeData.location) {
-        return NextResponse.json({ success: false, message: 'Store name and location are required' }, { status: 400 });
+    if (!storeData.name || !storeData.location || !storeData.email || !storeData.phone) {
+        return NextResponse.json({ success: false, message: 'Store name, location, email, and phone are required' }, { status: 400 });
+    }
+    if (!storeData.allowedOperations || storeData.allowedOperations.length === 0) {
+        return NextResponse.json({ success: false, message: 'At least one operation must be allowed for the store' }, { status: 400 });
     }
 
 
@@ -63,17 +64,16 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
     const passkeyToUpdate = storeData.passkey?.trim();
     const updatedStoreData = { ...storeData };
 
-    // Only update passkey if it's provided and valid (e.g., min length 4)
     if (passkeyToUpdate && passkeyToUpdate.length >= 4) {
       updatedStoreData.passkey = passkeyToUpdate;
     } else if (passkeyToUpdate && passkeyToUpdate.length > 0 && passkeyToUpdate.length < 4) {
-        // If passkey provided but too short, return error.
         return NextResponse.json({ success: false, message: 'New passkey must be at least 4 characters long if you intend to change it.' }, { status: 400 });
     } else {
-      // If passkey is empty or undefined in payload, keep existing passkey from db
+      // If passkey is empty string "" or undefined in payload, keep existing passkey from db
+      // If passkey is explicitly null, it might mean to clear it, but our schema implies passkey is required.
+      // So, we ensure it's always present by falling back to existing.
       updatedStoreData.passkey = db.stores[storeIndex].passkey;
     }
-
 
     const updatedStore: Store = {
       ...db.stores[storeIndex],
@@ -93,7 +93,6 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
   }
 }
 
-// DELETE a store by ID
 export async function DELETE(req: NextRequest, { params }: { params: { storeId: string } }) {
   try {
     const { storeId } = params;
@@ -129,7 +128,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
         return user;
     });
 
-
     db.stores.splice(storeIndex, 1);
     await writeDB(db);
 
@@ -140,3 +138,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
+    

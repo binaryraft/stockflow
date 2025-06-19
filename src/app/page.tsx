@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation'; // Added
+import { useRouter } from 'next/navigation';
 import { LandingHeader } from '@/components/landing/LandingHeader';
 import { HeroSection } from '@/components/landing/HeroSection';
 import { FeaturesSection } from '@/components/landing/FeaturesSection';
@@ -13,84 +13,83 @@ import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/call-to-action-section';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
-import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded'; // New import
+import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
+import Image from 'next/image';
+import { APP_NAME } from '@/lib/constants';
 
 type UIMode = 'landing' | 'adminLogin' | 'adminSignup' | 'storeSelect';
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Added
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
+const ADMIN_ROLE = "admin";
 
 export default function HomePage() {
-  const router = useRouter(); // Added
+  const router = useRouter();
   const [uiMode, setUiMode] = useState<UIMode>('landing');
   const [hasMounted, setHasMounted] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(true); // Start as true to show loader
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // Bypass logic for logged-in users
   useEffect(() => {
     if (hasMounted) {
       const adminToken = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
       const adminRole = localStorage.getItem('userRole');
-
-      if (adminToken && adminRole === 'admin') {
-        router.replace('/admin');
-        return; // Admin is logged in, no need to check for store
-      }
-
       const lastAuthStoreId = sessionStorage.getItem('lastAuthenticatedStoreId');
-      if (lastAuthStoreId) {
-        const isStoreStillAuthenticated = sessionStorage.getItem(`authenticatedStore_${lastAuthStoreId}`) === 'true';
-        if (isStoreStillAuthenticated) {
-          router.replace(`/storeportal/${lastAuthStoreId}/billing`);
-          return; // Store is logged in
-        } else {
-          // Clean up if store session is invalid but lastAuthStoreId still exists
-          sessionStorage.removeItem('lastAuthenticatedStoreId');
-        }
+      const isStoreStillAuthenticated = lastAuthStoreId && sessionStorage.getItem(`authenticatedStore_${lastAuthStoreId}`) === 'true';
+
+      let redirected = false;
+      if (adminToken && adminRole === ADMIN_ROLE) {
+        router.replace('/admin');
+        redirected = true;
+      } else if (isStoreStillAuthenticated && lastAuthStoreId) {
+        router.replace(`/storeportal/${lastAuthStoreId}/billing`);
+        redirected = true;
+      } else {
+        // Clean up potentially stale store session info if admin is not logged in
+        if (lastAuthStoreId) sessionStorage.removeItem('lastAuthenticatedStoreId');
+        Object.keys(sessionStorage).forEach(key => {
+            if (key.startsWith('authenticatedStore_')) {
+                sessionStorage.removeItem(key);
+            }
+        });
       }
-      // If no redirect happened, ensure UI mode is landing (might be redundant if default is landing)
-      // Only set to landing if not actively trying to show login/signup/storeSelect
-      if (uiMode !== 'adminLogin' && uiMode !== 'adminSignup' && uiMode !== 'storeSelect') {
+      
+      setIsRedirecting(false); // Stop showing loader after check
+
+      if (!redirected && uiMode !== 'adminLogin' && uiMode !== 'adminSignup' && uiMode !== 'storeSelect') {
         setUiMode('landing');
       }
     }
-  }, [hasMounted, router, uiMode]); // Added uiMode to dependencies to re-evaluate if mode changes externally
+  }, [hasMounted, router, uiMode]);
 
 
   const showAdminLogin = () => setUiMode('adminLogin');
   const showAdminSignup = () => setUiMode('adminSignup');
-  const hideAuthForms = () => setUiMode('landing'); // This will also trigger the bypass useEffect if user logs in
+  const hideAuthFormsAndRecheck = () => {
+    setUiMode('landing');
+    setIsRedirecting(true); // Trigger re-check of auth state
+  };
 
   const showStoreSelect = () => setUiMode('storeSelect');
   const hideStoreSelect = () => setUiMode('landing');
 
-  if (!hasMounted) {
+  if (!hasMounted || isRedirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Image
+          src="https://placehold.co/128x128.png"
+          alt={`${APP_NAME} Logo`}
+          width={80}
+          height={80}
+          className="mb-6 rounded-xl shadow-lg animate-pulse"
+          data-ai-hint="logo company"
+        />
         <p className="text-lg text-muted-foreground">Loading Application...</p>
       </div>
     );
   }
-
-  // If redirection is in progress (e.g. adminToken exists but router.replace hasn't completed),
-  // we might want to show a loader or null to prevent rendering landing page briefly.
-  // Check if we are in landing mode and if a redirection condition is met.
-  const adminToken = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-  const adminRole = localStorage.getItem('userRole');
-  const lastAuthStoreId = sessionStorage.getItem('lastAuthenticatedStoreId');
-  const isStoreStillAuthenticated = lastAuthStoreId && sessionStorage.getItem(`authenticatedStore_${lastAuthStoreId}`) === 'true';
-
-  if (hasMounted && ((adminToken && adminRole === 'admin') || isStoreStillAuthenticated) && uiMode === 'landing') {
-      // Actively redirecting or about to, show minimal content
-      return (
-          <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-              <p className="text-lg text-muted-foreground">Loading Dashboard...</p>
-          </div>
-      );
-  }
-
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -111,16 +110,16 @@ export default function HomePage() {
 
       {uiMode === 'adminLogin' && (
         <AdminLoginEmbedded
-          onLoginSuccess={hideAuthForms}
-          onCancel={hideAuthForms}
+          onLoginSuccess={hideAuthFormsAndRecheck}
+          onCancel={() => setUiMode('landing')}
           onSwitchToSignup={showAdminSignup}
         />
       )}
 
       {uiMode === 'adminSignup' && (
         <AdminSignupEmbedded
-          onSignupSuccess={hideAuthForms}
-          onCancel={hideAuthForms}
+          onSignupSuccess={hideAuthFormsAndRecheck}
+          onCancel={() => setUiMode('landing')}
           onSwitchToLogin={showAdminLogin}
         />
       )}
@@ -131,3 +130,5 @@ export default function HomePage() {
     </div>
   );
 }
+
+    

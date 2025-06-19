@@ -5,10 +5,10 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { BillingForm } from '@/components/billing/billing-form';
-import type { Store, BillMode, Staff } from '@/types';
+import type { Store, BillMode } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
-import { LogOut, ShoppingCart, MessageSquare, Trash2, AlertTriangle } from 'lucide-react';
+import { LogOut, ShoppingCart, MessageSquare, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
@@ -19,8 +19,9 @@ import {
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogHead, // Renamed to avoid conflict with DialogHeader
-  AlertDialogTitle as AlertDialogTit, // Renamed to avoid conflict with DialogTitle
+  AlertDialogHeader as AlertDialogHead,
+  AlertDialogTitle as AlertDialogTit,
+  AlertDialogDescription as AlertDialogDesc,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 
@@ -35,29 +36,30 @@ export default function StoreBillingPage() {
   const { 
     getStoreById, 
     clearChatForStore,
-    fetchMessagesForStore, // Added
-    messagesByStore // Added to listen for updates
+    fetchMessagesForStore,
+    messagesByStore,
+    fetchProducts, // Added for product data needed by BillingForm
+    fetchCompanyProfile, // Added for company profile data (e.g., default notes)
   } = useInventoryStore((state) => ({
      getStoreById: state.getStoreById,
      clearChatForStore: state.clearChatForStore,
      fetchMessagesForStore: state.fetchMessagesForStore,
      messagesByStore: state.messagesByStore,
+     fetchProducts: state.fetchProducts,
+     fetchCompanyProfile: state.fetchCompanyProfile,
   }));
-
 
   const [isStoreAuthenticated, setIsStoreAuthenticated] = useState(false);
   const [currentStore, setCurrentStore] = useState<Store | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasMounted, setHasMounted] = useState(false);
   const [isChatDialogOpen, setIsChatDialogOpen] = useState(false);
-  const [companyIdForChat, setCompanyIdForChat] = useState<string | null>(null);
-
+  const [companyIdForSession, setCompanyIdForSession] = useState<string | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
 
-  // Store authentication & initial data fetch
   useEffect(() => {
     if (!hasMounted || !storeId) {
       setIsLoading(true);
@@ -65,32 +67,38 @@ export default function StoreBillingPage() {
     }
 
     setIsLoading(true);
-    const store = getStoreById(storeId);
-
-    if (!store) {
-      setCurrentStore(null);
-      router.replace('/storeportal'); 
-      setIsLoading(false);
-      return;
-    }
-    setCurrentStore(store);
-    setCompanyIdForChat(store.companyId); // Set companyId for chat operations
-
     const authenticatedStoreSession = sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true';
-    if (authenticatedStoreSession) {
-      setIsStoreAuthenticated(true);
-      // Fetch messages if store is authenticated and companyId is available
-      if (store.companyId) {
-        fetchMessagesForStore(storeId, store.companyId).finally(() => setIsLoading(false));
-      } else {
-        setIsLoading(false); // No companyId on store, can't fetch chat
-      }
-    } else {
+    const storedCompanyId = sessionStorage.getItem(`store_${storeId}_companyId`);
+
+    if (!authenticatedStoreSession || !storedCompanyId) {
       setIsStoreAuthenticated(false);
       router.replace(`/storeportal/${storeId}/login`);
       setIsLoading(false);
+      return;
     }
-  }, [storeId, router, getStoreById, hasMounted, fetchMessagesForStore]);
+    
+    setCompanyIdForSession(storedCompanyId);
+    setIsStoreAuthenticated(true);
+
+    const store = getStoreById(storeId);
+    if (store) {
+      setCurrentStore(store);
+      // Fetch necessary data for the billing form and chat
+      Promise.all([
+        fetchMessagesForStore(storeId, storedCompanyId),
+        fetchProducts(storedCompanyId), // For ProductSearchInput in BillingForm
+        fetchCompanyProfile(storedCompanyId) // For default notes, etc.
+      ]).finally(() => setIsLoading(false));
+    } else {
+      // This might happen if Zustand store is not yet populated from a fresh load
+      // For a robust solution, getStoreById might need to become async or fetch if not found.
+      // For now, if not in Zustand, treat as an error or redirect.
+      console.warn(`Store ${storeId} not found in client store after authentication.`);
+      toast({variant: "destructive", title: "Store Data Error", description: "Could not load store details. Please try logging out and in."});
+      router.replace(`/storeportal/${storeId}/login`);
+      setIsLoading(false);
+    }
+  }, [storeId, router, getStoreById, hasMounted, fetchMessagesForStore, fetchProducts, fetchCompanyProfile]);
 
 
   useEffect(() => {
@@ -102,6 +110,8 @@ export default function StoreBillingPage() {
     const allowedOps = currentStore.allowedOperations || [];
 
     if (allowedOps.length === 0) {
+      // If no operations allowed, it's a misconfiguration. Default to sell but show warning or restrict.
+      // For now, let's assume at least one operation is always allowed by admin.
       if (!currentMode) {
         router.replace(`/storeportal/${storeId}/billing?mode=sell`); 
       }
@@ -111,23 +121,26 @@ export default function StoreBillingPage() {
     if (!currentMode) {
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     } else if (!allowedOps.includes(currentMode)) {
+      toast({variant:"destructive", title: "Operation Not Allowed", description: `This terminal is not permitted to perform '${currentMode}' operations. Switching to default.`});
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     }
-  }, [storeId, isStoreAuthenticated, currentStore, nextSearchParams, router, hasMounted, isLoading]);
+  }, [storeId, isStoreAuthenticated, currentStore, nextSearchParams, router, hasMounted, isLoading, toast]);
 
   const handleStoreLogout = () => {
     if (hasMounted && storeId) {
       sessionStorage.removeItem(`authenticatedStore_${storeId}`);
       sessionStorage.removeItem('lastAuthenticatedStoreId');
+      sessionStorage.removeItem(`store_${storeId}_companyId`);
     }
     setIsStoreAuthenticated(false);
+    setCurrentStore(null); // Clear store data
     if (storeId) router.push(`/storeportal/${storeId}/login`);
     else router.push('/storeportal');
   };
 
   const handleClearChat = async () => {
-    if (storeId && currentStore && companyIdForChat) {
-      const success = await clearChatForStore(storeId, companyIdForChat);
+    if (storeId && currentStore && companyIdForSession) {
+      const success = await clearChatForStore(storeId, companyIdForSession);
       if (success) {
         toast({
           title: "Chat Cleared",
@@ -144,51 +157,27 @@ export default function StoreBillingPage() {
     }
   };
 
-  if (!hasMounted || (!storeId && hasMounted)) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
-        <p className="text-lg text-muted-foreground">Initializing Store Portal...</p>
-      </div>
-    );
-  }
+  const loadingScreen = (message: string) => (
+    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
+      <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
+      <p className="text-lg text-muted-foreground">{message}</p>
+    </div>
+  );
 
-  if (isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
-        <p className="text-lg text-muted-foreground">Loading {currentStore ? currentStore.name : 'Store'} Terminal...</p>
-      </div>
-    );
-  }
+  if (!hasMounted) return loadingScreen("Initializing Store Portal...");
+  if (isLoading) return loadingScreen(`Loading ${currentStore ? currentStore.name : 'Store'} Terminal...`);
 
   if (!currentStore && !isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
-        <p className="text-lg text-destructive mb-4">Store not found. Redirecting...</p>
-      </div>
-    );
+    return loadingScreen("Store not found or error loading. Redirecting...");
   }
-
   if (currentStore && !isStoreAuthenticated && !isLoading) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4">
-        <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg" data-ai-hint="logo company"/>
-        <p className="text-lg text-muted-foreground mb-4">Redirecting to login for {currentStore.name}...</p>
-      </div>
-    );
+    return loadingScreen(`Redirecting to login for ${currentStore.name}...`);
   }
   
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
-  if (!currentStore || !isStoreAuthenticated) { 
-      return (
-           <div className="flex min-h-screen flex-col items-center justify-center p-4">
-              <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
-              <p className="text-lg text-muted-foreground">Preparing Store Terminal...</p>
-          </div>
-      );
+  if (!currentStore || !isStoreAuthenticated || !companyIdForSession) { 
+      return loadingScreen("Preparing Store Terminal...");
   }
 
   return (
@@ -223,9 +212,9 @@ export default function StoreBillingPage() {
                   <AlertDialogTit className="flex items-center gap-2">
                      <AlertTriangle className="h-5 w-5 text-destructive" /> Are you absolutely sure?
                   </AlertDialogTit>
-                  <DialogDescription>
+                  <AlertDialogDesc>
                     This action cannot be undone. This will permanently delete all chat messages for <strong>{currentStore.name}</strong>.
-                  </DialogDescription>
+                  </AlertDialogDesc>
                 </AlertDialogHead>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -239,19 +228,14 @@ export default function StoreBillingPage() {
           <div className="flex-1 overflow-hidden p-0">
             <ChatInterface 
               storeId={currentStore.id} 
-              currentUserId={currentStore.id} // Store terminal sends as its own ID
+              currentUserId={currentStore.id}
               currentUserName={currentStore.name}
             />
           </div>
         </DialogContent>
       </Dialog>
 
-      <Suspense fallback={
-        <div className="flex-1 flex items-center justify-center">
-          <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
-          <p className="text-lg text-muted-foreground">Loading Billing Interface...</p>
-        </div>
-      }>
+      <Suspense fallback={loadingScreen("Loading Billing Interface...")}>
         <BillingForm
           key={modeFromUrl || currentStore.id} 
           initialModeProp={modeFromUrl}

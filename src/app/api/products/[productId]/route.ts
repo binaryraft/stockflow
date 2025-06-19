@@ -4,10 +4,8 @@ import { readDB, writeDB } from '@/lib/db-access';
 import type { Product, ProductSKU, ProductVariant, AdditionalChargeDefinition } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
-// Helper to generate a unique ID
 const generateId = () => uuidv4();
 
-// GET a single product by ID
 export async function GET(req: NextRequest, { params }: { params: { productId: string } }) {
   try {
     const { productId } = params;
@@ -35,12 +33,11 @@ export async function GET(req: NextRequest, { params }: { params: { productId: s
   }
 }
 
-// PUT (update) a product by ID
 export async function PUT(req: NextRequest, { params }: { params: { productId: string } }) {
   try {
     const { productId } = params;
     const body = await req.json();
-    const { productData, companyId } = body; // Expect productData and companyId
+    const { productData, companyId } = body;
 
     if (!companyId || !productData) {
       return NextResponse.json({ success: false, message: 'Company ID and product data are required' }, { status: 400 });
@@ -51,7 +48,6 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     if (!productData.name || typeof productData.name !== 'string' || productData.name.trim() === '') {
         return NextResponse.json({ success: false, message: 'Product name is required' }, { status: 400 });
     }
-
 
     const db = await readDB();
     const productIndex = db.products.findIndex(p => p.id === productId && p.companyId === companyId);
@@ -64,7 +60,7 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
         if (!productName) return "Unknown Product";
         if (!optionValues || Object.keys(optionValues).length === 0) return productName;
         const sortedOptionsString = Object.entries(optionValues)
-          .filter(([, value]) => typeof value === 'string')
+          .filter(([, value]) => typeof value === 'string') // Ensure value is string before join
           .sort(([keyA], [keyB]) => keyA.localeCompare(keyB))
           .map(([, value]) => value)
           .join(' - ');
@@ -72,7 +68,6 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     };
 
     const existingProduct = db.products[productIndex];
-    // Ensure specific fields like ID, companyId, and imageUrl (if not provided in update) are preserved.
     const updatedProduct: Product = { 
         ...existingProduct, 
         ...productData,
@@ -81,7 +76,6 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
         imageUrl: productData.imageUrl !== undefined ? productData.imageUrl : existingProduct.imageUrl,
     };
     
-    // Ensure variants and their options have IDs, and productSKUs are updated/maintained
     if (productData.variants !== undefined) {
       updatedProduct.variants = productData.variants.map((variantData: any, variantIdx: number) => {
         const existingVariant = existingProduct.variants?.find(v => v.id === variantData.id || v.name === variantData.name);
@@ -100,24 +94,19 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     }
     
     if (productData.additionalChargeDefinitions !== undefined) {
-      updatedProduct.additionalChargeDefinitions = productData.additionalChargeDefinitions.map((ac: any) => ({
+      updatedProduct.additionalChargeDefinitions = productData.additionalChargeDefinitions.map((ac: AdditionalChargeDefinition) => ({ // Type added
           ...ac,
           id: ac.id || uuidv4(),
           type: ac.type || 'fixed',
       }));
     }
 
-    // Update SKU identifiers if product name or variants changed
-    // This assumes productSKUs are passed in productData if they are meant to be modified.
-    // If productData.productSKUs is undefined, we keep existingProduct.productSKUs and update identifiers.
     const skusToProcess = productData.productSKUs !== undefined ? productData.productSKUs : existingProduct.productSKUs;
-    updatedProduct.productSKUs = skusToProcess.map((sku: ProductSKU) => ({ // Ensure sku is typed
+    updatedProduct.productSKUs = skusToProcess.map((sku: ProductSKU) => ({
         ...sku,
         skuIdentifier: getSkuIdentifier(updatedProduct.name, sku.optionValues)
     }));
 
-
-    // Handle pricing for non-tracked, non-variant products
     if (updatedProduct.trackQuantity === false && (!updatedProduct.variants || updatedProduct.variants.length === 0)) {
         let defaultSku = updatedProduct.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
         const costPrice = productData.costPriceForNonTracked ?? 0;
@@ -127,6 +116,7 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
             if (defaultSku.stockLayers.length > 0) {
                 defaultSku.stockLayers[0].costPrice = costPrice;
                 defaultSku.stockLayers[0].sellPrice = sellPrice;
+                // initialQuantity and quantity for non-tracked are typically 0 or not relevant for this layer.
             } else {
                 defaultSku.stockLayers.push({
                     id: generateId(), purchaseBillId: 'UPDATED_NON_TRACKED_API', purchaseDate: new Date().toISOString(),
@@ -142,11 +132,9 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
                     initialQuantity: 0, quantity: 0, costPrice, sellPrice,
                 }],
             };
-            // Ensure this new default SKU is the only one if it's a non-variant product
-            updatedProduct.productSKUs = [defaultSku];
+            updatedProduct.productSKUs = [defaultSku]; // Replace existing SKUs if it's a non-variant, non-tracked item
         }
     }
-
 
     db.products[productIndex] = updatedProduct;
     await writeDB(db);
@@ -159,7 +147,6 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
   }
 }
 
-// DELETE a product by ID
 export async function DELETE(req: NextRequest, { params }: { params: { productId: string } }) {
   try {
     const { productId } = params;
@@ -189,3 +176,5 @@ export async function DELETE(req: NextRequest, { params }: { params: { productId
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
+
+    
