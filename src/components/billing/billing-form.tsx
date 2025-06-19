@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link'; 
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -64,7 +64,7 @@ export function BillingForm({
   const {
     addBill, searchProducts, getProductById, getAllStores,
     findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
-    getActiveSubscriptionPlan, userProfile, products: allProductsStoreHook, 
+    getActiveSubscriptionPlan, userProfile, products: allProductsStoreHook,
     fetchProducts
   } = useInventoryStore(state => ({
     addBill: state.addBill,
@@ -76,7 +76,7 @@ export function BillingForm({
     getSkuIdentifier: state.getSkuIdentifier,
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     userProfile: state.userProfile,
-    products: state.products, 
+    products: state.products,
     fetchProducts: state.fetchProducts,
   }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
@@ -124,7 +124,7 @@ export function BillingForm({
 
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
-  
+
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const costPriceInputRef = useRef<HTMLInputElement>(null);
@@ -266,7 +266,7 @@ export function BillingForm({
 
     if (sku) {
         const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
-        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name); 
+        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
         setSelectedVariantOptions(sku.optionValues || {});
 
         if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
@@ -281,15 +281,15 @@ export function BillingForm({
             setSellPrice(skuDetailsToUse.currentSellPrice !== null ? skuDetailsToUse.currentSellPrice.toString() : '');
         }
         if (mode === 'buy') {
-            setCostPrice(''); 
+            setCostPrice('');
         }
-    } else { 
+    } else {
         setProductNameQuery(product.name);
         setSelectedVariantOptions({});
-        updateSkuDisplayInfo(undefined); 
+        updateSkuDisplayInfo(undefined);
     }
 
-    setProductNotFoundHint(''); 
+    setProductNotFoundHint('');
 
     if (product.variants && product.variants.length > 0 && (!sku || Object.keys(sku.optionValues || {}).length < product.variants.length)) {
       const firstUnselectedVariant = product.variants.find(v => !(selectedVariantOptions[v.name]));
@@ -304,7 +304,7 @@ export function BillingForm({
             quantityInputRef.current?.select();
           }, 50);
       }
-    } else { 
+    } else {
       setTimeout(() => {
         quantityInputRef.current?.focus();
         quantityInputRef.current?.select();
@@ -450,7 +450,7 @@ export function BillingForm({
       if (product.trackQuantity === false) {
         itemCostPrice = skuDetails.averageCostPrice ?? 0;
       } else {
-        itemCostPrice = 0; 
+        itemCostPrice = 0;
       }
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
@@ -462,9 +462,9 @@ export function BillingForm({
         itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
       }
 
-    } else { 
-      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; 
-      itemCostPrice = skuDetails.averageCostPrice ?? 0; 
+    } else {
+      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0;
+      itemCostPrice = skuDetails.averageCostPrice ?? 0;
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0."});
         return;
@@ -486,7 +486,7 @@ export function BillingForm({
       isAdditionalCharge: false,
     };
     const itemsToAdd = [newItem];
-    
+
     if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0 && (mode === 'sell' || mode === 'return')) {
         product.additionalChargeDefinitions.forEach(charge => {
             let chargeValue = 0;
@@ -498,14 +498,14 @@ export function BillingForm({
 
             itemsToAdd.push({
                 id: uuidv4(),
-                productId: `CHARGE_ITEM_${charge.id}`, 
+                productId: `CHARGE_ITEM_${charge.id}`,
                 productName: charge.name,
-                quantity: 1, 
-                costPrice: 0, 
+                quantity: 1,
+                costPrice: 0,
                 sellPrice: chargeValue,
                 isAdditionalCharge: true,
                 sourceChargeDefinitionId: charge.id,
-                sgstAmount: 0, 
+                sgstAmount: 0,
                 cgstAmount: 0,
             });
         });
@@ -518,19 +518,19 @@ export function BillingForm({
 
   const handleHWBarecodeSubmit = async (barcodeValue: string) => {
     if (!barcodeValue.trim()) {
-        if (currentProductForSelection && !productNameQuery) { // If input is empty but a product is selected (e.g. via variant picks)
-             handleAddNewItem(); // Attempt to add the currently selected item
+        if (currentProductForSelection && !productNameQuery) {
+             handleAddNewItem();
         }
-        return; // Do nothing if input is empty and no product is selected
+        return;
     }
-  
-    const currentAllProducts = allProductsStoreHook; 
-  
+
+    const currentAllProducts = allProductsStoreHook;
+
     let foundProduct: Product | undefined = undefined;
     let foundSku: ProductSKU | undefined = undefined;
-  
+
     for (const p of currentAllProducts) {
-        if (p.sku === barcodeValue) { 
+        if (p.sku === barcodeValue) {
             foundProduct = p;
             foundSku = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
             break;
@@ -543,39 +543,34 @@ export function BillingForm({
             }
         }
         if (foundProduct) break;
+        // Fallback: if no direct SKU match, check product name (less ideal for pure barcode scanning)
         if (p.name.toLowerCase() === barcodeValue.toLowerCase() && !foundProduct) {
             foundProduct = p;
             foundSku = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
         }
     }
-  
+
     if (foundProduct) {
-        const skuToUse = foundSku || 
-                         (foundProduct.productSKUs.length > 0 ? 
-                          foundProduct.productSKUs[0] : 
+        const skuToUse = foundSku ||
+                         (foundProduct.productSKUs.length > 0 ?
+                          foundProduct.productSKUs[0] :
                           { id: foundProduct.id + '_default_hw_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
-  
+
         const suggestion: ProductSearchSuggestion = {
             product: foundProduct,
             sku: skuToUse,
-            displayInfo: { 
+            displayInfo: {
                 name: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).skuIdentifier || foundProduct.name,
                 stock: foundProduct.trackQuantity ? (getSkuDetails(skuToUse, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
                 price: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
             }
         };
-        handleProductSelectFromSearch(suggestion); 
+        handleProductSelectFromSearch(suggestion);
+        toast({title: "Product Found", description: `${suggestion.displayInfo.name} selected.`});
     } else {
         toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${barcodeValue}` });
-        setProductNameQuery(barcodeValue); 
+        setProductNameQuery(barcodeValue);
         setProductNotFoundHint(barcodeValue);
-    }
-    // Do not automatically reset all fields here.
-    // If product found, handleProductSelectFromSearch focuses quantity or variant.
-    // If not found, productNameQuery is set to barcodeValue and focus remains on product input.
-    // We only reset productNameQuery specifically after an item is successfully added.
-    if (foundProduct) {
-        // setProductNameQuery(''); // Cleared by handleProductSelectFromSearch or its subsequent focus changes.
     }
   };
 
@@ -591,7 +586,7 @@ export function BillingForm({
             };
             setNewProductDialogInitialValues(billingFormPreFill);
             setIsNewProductDialogOpen(true);
-        } else if (currentProductForSelection) { 
+        } else if (currentProductForSelection) {
             if (currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
                 const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                 if(firstUnselectedVariant) {
@@ -599,11 +594,11 @@ export function BillingForm({
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
                         variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
                     }, 50);
-                } else { 
+                } else {
                     quantityInputRef.current?.focus();
                     quantityInputRef.current?.select();
                 }
-            } else { 
+            } else {
                 quantityInputRef.current?.focus();
                 quantityInputRef.current?.select();
             }
@@ -651,7 +646,7 @@ export function BillingForm({
   };
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    if (mode !== 'buy') return; 
+    if (mode !== 'buy') return;
     setCurrentBillItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
@@ -685,8 +680,8 @@ export function BillingForm({
       grandTotal += totalSGST + totalCGST;
     } else if (mode === 'buy') {
         subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        grandTotal = subTotal; 
-        totalSGST = 0; 
+        grandTotal = subTotal;
+        totalSGST = 0;
         totalCGST = 0;
     } else if (mode === 'return') {
         grandTotal = subTotal + totalSGST + totalCGST;
@@ -820,7 +815,7 @@ export function BillingForm({
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
        } else {
-         router.push(basePath); 
+         router.push(basePath);
        }
     }
   };
@@ -877,16 +872,16 @@ export function BillingForm({
 
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, 
+      productId: `SERVICE_ITEM_${uuidv4()}`,
       productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0, 
+      costPrice: mode === 'buy' ? amount : 0,
       sellPrice: amount,
       isDefective: undefined,
       selectedVariantOptions: undefined,
       sgstAmount,
       cgstAmount,
-      isAdditionalCharge: false, 
+      isAdditionalCharge: false,
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
@@ -947,7 +942,7 @@ export function BillingForm({
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
               if(!open && isVerifyEmployeeDialogOpen) {
-                  setPendingBillPayload(null); 
+                  setPendingBillPayload(null);
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -955,7 +950,7 @@ export function BillingForm({
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
-      
+
       <div className="flex justify-center">
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1 h-11">
@@ -1031,7 +1026,7 @@ export function BillingForm({
             <div className={cn(
               "grid gap-4 items-baseline",
               "grid-cols-1",
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]" 
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]"
             )}>
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name / SKU / Barcode</Label>
@@ -1041,7 +1036,7 @@ export function BillingForm({
                     value={productNameQuery}
                     onValueChange={(v) => {
                         setProductNameQuery(v);
-                        if (!v) { 
+                        if (!v) {
                             setCurrentProductForSelection(null);
                             setSelectedVariantOptions({});
                             setProductNotFoundHint('');
@@ -1050,8 +1045,8 @@ export function BillingForm({
                         }
                     }}
                     onProductSelect={handleProductSelectFromSearch}
-                    onEnterWithoutSelection={handleHWBarecodeSubmit} 
-                    placeholder={mode === 'return' ? 'Scan or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
+                    onEnterWithoutSelection={handleHWBarecodeSubmit}
+                    placeholder={mode === 'return' ? 'Scan barcode or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
                     id="productNameGlobal"
                     className="flex-grow"
                     currentMode={mode}
@@ -1144,7 +1139,7 @@ export function BillingForm({
                   </div>
                 </>
               )}
-              
+
                <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                </Button>
@@ -1167,16 +1162,16 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
                                 setTimeout(() => {
-                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true })); 
+                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
                                   variantSelectRefs.current[nextVariantId]?.current?.focus();
                                 }, 50);
-                            } else { 
+                            } else {
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -1199,7 +1194,7 @@ export function BillingForm({
                                     const nextVariantId = currentProductForSelection!.variants![index + 1].id;
                                     setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
                                     variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                } else if (index === currentProductForSelection!.variants!.length -1) { 
+                                } else if (index === currentProductForSelection!.variants!.length -1) {
                                     e.preventDefault();
                                     setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
                                     quantityInputRef.current?.focus();
@@ -1311,7 +1306,7 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
                 />
             </div>
-            {mode !== 'buy' && ( 
+            {mode !== 'buy' && (
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
                     <Input
@@ -1324,7 +1319,7 @@ export function BillingForm({
                     />
                 </div>
             )}
-             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}> 
+             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
                 <Label htmlFor="notes">Notes</Label>
                 <Input
                 id="notes"
@@ -1361,7 +1356,7 @@ export function BillingForm({
              </div>
           </div>
 
-          {(mode === 'sell' || mode === 'buy') && ( 
+          {(mode === 'sell' || mode === 'buy') && (
               <div className="flex items-center space-x-2 self-start pt-2">
               <Switch
                   id="paymentStatus"
@@ -1393,3 +1388,5 @@ export function BillingForm({
     </div>
   );
 }
+
+    
