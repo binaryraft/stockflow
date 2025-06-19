@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import Link from 'next/link'; // Added import for Link
+import Link from 'next/link'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,7 +15,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, ScanLine } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -28,7 +28,6 @@ import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
-import { BarcodeScannerModal } from '@/components/common/barcode-scanner-modal';
 
 
 type PendingBillPayload = {
@@ -65,7 +64,7 @@ export function BillingForm({
   const {
     addBill, searchProducts, getProductById, getAllStores,
     findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
-    getActiveSubscriptionPlan, userProfile, products: allProductsStore,
+    getActiveSubscriptionPlan, userProfile, products: allProductsStoreHook, 
     fetchProducts
   } = useInventoryStore(state => ({
     addBill: state.addBill,
@@ -77,7 +76,7 @@ export function BillingForm({
     getSkuIdentifier: state.getSkuIdentifier,
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     userProfile: state.userProfile,
-    products: state.products,
+    products: state.products, 
     fetchProducts: state.fetchProducts,
   }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
@@ -125,9 +124,7 @@ export function BillingForm({
 
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
-  const [isBarcodeScannerOpen, setIsBarcodeScannerOpen] = useState(false);
-
-
+  
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
   const costPriceInputRef = useRef<HTMLInputElement>(null);
@@ -178,7 +175,6 @@ export function BillingForm({
     }
   }, [isAdminContext, allStores, preselectedStoreId, hasMounted, activePlan]);
 
-
   const resetFormFields = useCallback((focusProductName = true) => {
     setProductNameQuery('');
     setQuantity(1);
@@ -208,7 +204,7 @@ export function BillingForm({
     } else if (mode === 'buy') {
       setIsPaid(userProfile.defaultPurchasePaymentStatus === 'paid');
     } else {
-      setIsPaid(true); // Default for other modes
+      setIsPaid(true);
     }
 
     setIsEstimateMode(false);
@@ -270,7 +266,7 @@ export function BillingForm({
 
     if (sku) {
         const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
-        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
+        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name); 
         setSelectedVariantOptions(sku.optionValues || {});
 
         if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
@@ -285,15 +281,15 @@ export function BillingForm({
             setSellPrice(skuDetailsToUse.currentSellPrice !== null ? skuDetailsToUse.currentSellPrice.toString() : '');
         }
         if (mode === 'buy') {
-            setCostPrice('');
+            setCostPrice(''); 
         }
-    } else {
+    } else { 
         setProductNameQuery(product.name);
         setSelectedVariantOptions({});
-        updateSkuDisplayInfo(undefined);
+        updateSkuDisplayInfo(undefined); 
     }
 
-    setProductNotFoundHint('');
+    setProductNotFoundHint(''); 
 
     if (product.variants && product.variants.length > 0 && (!sku || Object.keys(sku.optionValues || {}).length < product.variants.length)) {
       const firstUnselectedVariant = product.variants.find(v => !(selectedVariantOptions[v.name]));
@@ -308,7 +304,7 @@ export function BillingForm({
             quantityInputRef.current?.select();
           }, 50);
       }
-    } else {
+    } else { 
       setTimeout(() => {
         quantityInputRef.current?.focus();
         quantityInputRef.current?.select();
@@ -454,7 +450,7 @@ export function BillingForm({
       if (product.trackQuantity === false) {
         itemCostPrice = skuDetails.averageCostPrice ?? 0;
       } else {
-        itemCostPrice = 0;
+        itemCostPrice = 0; 
       }
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
@@ -466,9 +462,9 @@ export function BillingForm({
         itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
       }
 
-    } else {
-      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0;
-      itemCostPrice = skuDetails.averageCostPrice ?? 0;
+    } else { 
+      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; 
+      itemCostPrice = skuDetails.averageCostPrice ?? 0; 
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0."});
         return;
@@ -490,8 +486,8 @@ export function BillingForm({
       isAdditionalCharge: false,
     };
     const itemsToAdd = [newItem];
-
-    if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0) {
+    
+    if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0 && (mode === 'sell' || mode === 'return')) {
         product.additionalChargeDefinitions.forEach(charge => {
             let chargeValue = 0;
             if (charge.type === 'fixed') {
@@ -502,14 +498,14 @@ export function BillingForm({
 
             itemsToAdd.push({
                 id: uuidv4(),
-                productId: `CHARGE_ITEM_${charge.id}`,
+                productId: `CHARGE_ITEM_${charge.id}`, 
                 productName: charge.name,
-                quantity: 1, // Fixed quantity for charges
-                costPrice: 0, // Charges have no cost for this context
+                quantity: 1, 
+                costPrice: 0, 
                 sellPrice: chargeValue,
                 isAdditionalCharge: true,
                 sourceChargeDefinitionId: charge.id,
-                sgstAmount: 0, // Charges are not taxed by product rates here
+                sgstAmount: 0, 
                 cgstAmount: 0,
             });
         });
@@ -520,39 +516,82 @@ export function BillingForm({
     resetFormFields(true);
   };
 
+  const handleHWBarecodeSubmit = async (barcodeValue: string) => {
+    if (!barcodeValue.trim()) {
+        if (currentProductForSelection && !productNameQuery) { // If input is empty but a product is selected (e.g. via variant picks)
+             handleAddNewItem(); // Attempt to add the currently selected item
+        }
+        return; // Do nothing if input is empty and no product is selected
+    }
+  
+    const currentAllProducts = allProductsStoreHook; 
+  
+    let foundProduct: Product | undefined = undefined;
+    let foundSku: ProductSKU | undefined = undefined;
+  
+    for (const p of currentAllProducts) {
+        if (p.sku === barcodeValue) { 
+            foundProduct = p;
+            foundSku = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
+            break;
+        }
+        for (const s of p.productSKUs) {
+            if (s.skuIdentifier === barcodeValue) {
+                foundProduct = p;
+                foundSku = s;
+                break;
+            }
+        }
+        if (foundProduct) break;
+        if (p.name.toLowerCase() === barcodeValue.toLowerCase() && !foundProduct) {
+            foundProduct = p;
+            foundSku = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
+        }
+    }
+  
+    if (foundProduct) {
+        const skuToUse = foundSku || 
+                         (foundProduct.productSKUs.length > 0 ? 
+                          foundProduct.productSKUs[0] : 
+                          { id: foundProduct.id + '_default_hw_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
+  
+        const suggestion: ProductSearchSuggestion = {
+            product: foundProduct,
+            sku: skuToUse,
+            displayInfo: { 
+                name: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).skuIdentifier || foundProduct.name,
+                stock: foundProduct.trackQuantity ? (getSkuDetails(skuToUse, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
+                price: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
+            }
+        };
+        handleProductSelectFromSearch(suggestion); 
+    } else {
+        toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${barcodeValue}` });
+        setProductNameQuery(barcodeValue); 
+        setProductNotFoundHint(barcodeValue);
+    }
+    // Do not automatically reset all fields here.
+    // If product found, handleProductSelectFromSearch focuses quantity or variant.
+    // If not found, productNameQuery is set to barcodeValue and focus remains on product input.
+    // We only reset productNameQuery specifically after an item is successfully added.
+    if (foundProduct) {
+        // setProductNameQuery(''); // Cleared by handleProductSelectFromSearch or its subsequent focus changes.
+    }
+  };
+
+
   const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
     if (currentField === 'productName') {
-       if (productNameQuery.trim() !== '' && !currentProductForSelection) {
-           const productsFound = searchProducts(productNameQuery);
-           if (productsFound.length === 1 &&
-               (!productsFound[0].variants || productsFound[0].variants.length === 0) &&
-               productsFound[0].productSKUs.length <= 1 &&
-               productNameQuery.toLowerCase() === productsFound[0].name.toLowerCase()) {
-                const productToSelect = productsFound[0];
-                const skuToSelect = productToSelect.productSKUs[0];
-                const suggestion: ProductSearchSuggestion = {
-                    product: productToSelect,
-                    sku: skuToSelect || { id: productToSelect.id + '_default_enter_nav', optionValues: {}, stockLayers: [], skuIdentifier: productToSelect.name },
-                    displayInfo: {
-                        name: getSkuDetails(skuToSelect, finalStoreIdForSkuDetails).skuIdentifier || productToSelect.name,
-                        stock: productToSelect.trackQuantity ? (getSkuDetails(skuToSelect, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
-                        price: getSkuDetails(skuToSelect, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToSelect, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
-                    }
-                };
-                handleProductSelectFromSearch(suggestion);
-           } else if (productNotFoundHint === productNameQuery) {
-                const billingFormPreFill = {
-                  name: productNameQuery,
-                  quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
-                  costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
-                  sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
-                };
-                setNewProductDialogInitialValues(billingFormPreFill);
-                setIsNewProductDialogOpen(true);
-            } else if (productsFound.length > 0 || productNameQuery.trim() !== '') {
-                setProductNotFoundHint(productNameQuery);
-            }
-       } else if (currentProductForSelection) {
+       if (productNameQuery.trim() !== '' && !currentProductForSelection && productNotFoundHint === productNameQuery) {
+            const billingFormPreFill = {
+              name: productNameQuery,
+              quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
+              costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
+              sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
+            };
+            setNewProductDialogInitialValues(billingFormPreFill);
+            setIsNewProductDialogOpen(true);
+        } else if (currentProductForSelection) { 
             if (currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
                 const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
                 if(firstUnselectedVariant) {
@@ -560,11 +599,11 @@ export function BillingForm({
                         setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
                         variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
                     }, 50);
-                } else {
+                } else { 
                     quantityInputRef.current?.focus();
                     quantityInputRef.current?.select();
                 }
-            } else {
+            } else { 
                 quantityInputRef.current?.focus();
                 quantityInputRef.current?.select();
             }
@@ -612,7 +651,7 @@ export function BillingForm({
   };
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    if (mode !== 'buy') return;
+    if (mode !== 'buy') return; 
     setCurrentBillItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
@@ -646,8 +685,8 @@ export function BillingForm({
       grandTotal += totalSGST + totalCGST;
     } else if (mode === 'buy') {
         subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        grandTotal = subTotal;
-        totalSGST = 0;
+        grandTotal = subTotal; 
+        totalSGST = 0; 
         totalCGST = 0;
     } else if (mode === 'return') {
         grandTotal = subTotal + totalSGST + totalCGST;
@@ -679,7 +718,6 @@ export function BillingForm({
         setBillToPotentiallyPrint(savedBill);
         setIsPrintConfirmDialogOpen(true);
       } else {
-        // addBill should throw on failure if API returns error, caught by catch block below
       }
     } catch (error) {
       console.error("Error during bill save process:", error);
@@ -690,7 +728,7 @@ export function BillingForm({
   const handleConfirmPrint = (print: boolean) => {
     setIsPrintConfirmDialogOpen(false);
     if (print && billToPotentiallyPrint) {
-        const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStore);
+        const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
         triggerPrint(printContent);
     }
     if (billToPotentiallyPrint) {
@@ -782,7 +820,7 @@ export function BillingForm({
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
        } else {
-         router.push(basePath);
+         router.push(basePath); 
        }
     }
   };
@@ -837,19 +875,18 @@ export function BillingForm({
     let sgstAmount: number | undefined = 0;
     let cgstAmount: number | undefined = 0;
 
-
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`,
+      productId: `SERVICE_ITEM_${uuidv4()}`, 
       productName: serviceDescription,
       quantity: 1,
-      costPrice: mode === 'buy' ? amount : 0,
+      costPrice: mode === 'buy' ? amount : 0, 
       sellPrice: amount,
       isDefective: undefined,
       selectedVariantOptions: undefined,
       sgstAmount,
       cgstAmount,
-      isAdditionalCharge: false,
+      isAdditionalCharge: false, 
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
@@ -857,71 +894,6 @@ export function BillingForm({
     setServiceAmount('');
     setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0);
   };
-
-  const handleBarcodeScanSuccess = async (decodedText: string) => {
-    setIsBarcodeScannerOpen(false); // Close scanner first
-
-    // Attempt to find product by SKU (or base product code)
-    // This is a simplified lookup; a real system might need a dedicated barcode field
-    let foundProduct: Product | undefined = undefined;
-    let foundSku: ProductSKU | undefined = undefined;
-
-    for (const p of allProductsStore) {
-        if (p.sku === decodedText) {
-            foundProduct = p;
-            foundSku = p.productSKUs.find(s => Object.keys(s.optionValues).length === 0); // Default SKU for base product code match
-            break;
-        }
-        for (const s of p.productSKUs) {
-            if (s.skuIdentifier === decodedText) {
-                foundProduct = p;
-                foundSku = s;
-                break;
-            }
-        }
-        if (foundProduct) break;
-    }
-
-    if (foundProduct) {
-        const skuToUse = foundSku || (foundProduct.productSKUs.length > 0 ? foundProduct.productSKUs[0] : { id: foundProduct.id + '_default_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
-
-        const suggestion: ProductSearchSuggestion = {
-            product: foundProduct,
-            sku: skuToUse,
-            displayInfo: {
-                name: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).skuIdentifier || foundProduct.name,
-                stock: foundProduct.trackQuantity ? (getSkuDetails(skuToUse, finalStoreIdForSkuDetails).totalStock ?? 0) : 'N/A',
-                price: getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice !== null ? `₹${getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice!.toFixed(2)}` : 'N/A',
-            }
-        };
-        handleProductSelectFromSearch(suggestion);
-        toast({ title: "Barcode Scanned", description: `Product: ${suggestion.displayInfo.name}` });
-
-        // Optional: auto-add item if quantity is 1 and no variants to select
-        if ( (!foundProduct.variants || foundProduct.variants.length === 0) && (parseFloat(quantity.toString()) === 1 || quantity === '') ) {
-            // Need to set fields as handleAddNewItem reads them
-            setQuantity(1); // Ensure quantity is 1
-            const sellPriceToUse = getSkuDetails(skuToUse, finalStoreIdForSkuDetails).currentSellPrice;
-            setSellPrice(sellPriceToUse !== null ? sellPriceToUse.toString() : '');
-            // This timeout allows state to update before calling handleAddNewItem
-            setTimeout(() => {
-                 handleAddNewItem();
-            }, 100);
-        }
-
-
-    } else {
-        toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${decodedText}` });
-        setProductNameQuery(decodedText); // Put scanned code in search for manual creation/search
-        productNameInputRef.current?.focus();
-    }
-  };
-
-  const handleBarcodeScanError = (error: Error) => {
-    toast({ variant: "destructive", title: "Barcode Scan Error", description: error.message || "Could not scan barcode." });
-    setIsBarcodeScannerOpen(false);
-  };
-
 
   const displayModes = allowedModes || ['sell', 'buy', 'return'];
   const activeModeConfig = {
@@ -975,7 +947,7 @@ export function BillingForm({
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
               if(!open && isVerifyEmployeeDialogOpen) {
-                  setPendingBillPayload(null);
+                  setPendingBillPayload(null); 
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -983,13 +955,7 @@ export function BillingForm({
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
-       <BarcodeScannerModal
-        isOpen={isBarcodeScannerOpen}
-        onOpenChange={setIsBarcodeScannerOpen}
-        onScanSuccess={handleBarcodeScanSuccess}
-        onScanError={handleBarcodeScanError}
-      />
-
+      
       <div className="flex justify-center">
         <Tabs value={mode} onValueChange={handleModeChange} className="w-auto">
           <TabsList className="grid w-full grid-cols-3 gap-1 h-11">
@@ -1065,17 +1031,17 @@ export function BillingForm({
             <div className={cn(
               "grid gap-4 items-baseline",
               "grid-cols-1",
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]" // Adjusted for barcode button
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto]" 
             )}>
               <div className="space-y-1.5 flex-grow">
-                <Label htmlFor="productNameGlobal">Product Name / SKU</Label>
+                <Label htmlFor="productNameGlobal">Product Name / SKU / Barcode</Label>
                 <div className="flex items-center gap-2">
                   <ProductSearchInput
                     inputRef={productNameInputRef}
                     value={productNameQuery}
                     onValueChange={(v) => {
                         setProductNameQuery(v);
-                        if (!v) {
+                        if (!v) { 
                             setCurrentProductForSelection(null);
                             setSelectedVariantOptions({});
                             setProductNotFoundHint('');
@@ -1084,22 +1050,12 @@ export function BillingForm({
                         }
                     }}
                     onProductSelect={handleProductSelectFromSearch}
-                    onEnterWithoutSelection={() => handleEnterNavigation('productName')}
-                    placeholder={mode === 'return' ? 'Search product to return' : 'Scan or type product name/SKU'}
+                    onEnterWithoutSelection={handleHWBarecodeSubmit} 
+                    placeholder={mode === 'return' ? 'Scan or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
                     id="productNameGlobal"
                     className="flex-grow"
                     currentMode={mode}
                   />
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={() => setIsBarcodeScannerOpen(true)} className="shrink-0" aria-label="Scan Barcode">
-                            <ScanLine className="h-5 w-5 text-primary" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Scan Product Barcode</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (
                     <TooltipProvider>
                       <Tooltip>
@@ -1188,7 +1144,7 @@ export function BillingForm({
                   </div>
                 </>
               )}
-
+              
                <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                </Button>
@@ -1211,16 +1167,16 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
                                 setTimeout(() => {
-                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
+                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true })); 
                                   variantSelectRefs.current[nextVariantId]?.current?.focus();
                                 }, 50);
-                            } else {
+                            } else { 
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -1243,7 +1199,7 @@ export function BillingForm({
                                     const nextVariantId = currentProductForSelection!.variants![index + 1].id;
                                     setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
                                     variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                } else if (index === currentProductForSelection!.variants!.length -1) {
+                                } else if (index === currentProductForSelection!.variants!.length -1) { 
                                     e.preventDefault();
                                     setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
                                     quantityInputRef.current?.focus();
@@ -1355,7 +1311,7 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
                 />
             </div>
-            {mode !== 'buy' && (
+            {mode !== 'buy' && ( 
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
                     <Input
@@ -1368,7 +1324,7 @@ export function BillingForm({
                     />
                 </div>
             )}
-             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
+             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}> 
                 <Label htmlFor="notes">Notes</Label>
                 <Input
                 id="notes"
@@ -1405,7 +1361,7 @@ export function BillingForm({
              </div>
           </div>
 
-          {(mode === 'sell' || mode === 'buy') && (
+          {(mode === 'sell' || mode === 'buy') && ( 
               <div className="flex items-center space-x-2 self-start pt-2">
               <Switch
                   id="paymentStatus"
