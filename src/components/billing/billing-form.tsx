@@ -66,7 +66,7 @@ export function BillingForm({
     addBill, searchProducts, getProductById, getAllStores,
     findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
     getActiveSubscriptionPlan, userProfile, products: allProductsStoreHook,
-    updateProduct: updateProductInStore, // Added
+    updateProduct: updateProductInStore, 
     fetchProducts
   } = useInventoryStore(state => ({
     addBill: state.addBill,
@@ -79,7 +79,7 @@ export function BillingForm({
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     userProfile: state.userProfile,
     products: state.products,
-    updateProduct: state.updateProduct, // Added
+    updateProduct: state.updateProduct, 
     fetchProducts: state.fetchProducts,
   }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
@@ -275,7 +275,7 @@ export function BillingForm({
 
     if (sku) {
         const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
-        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name); // Display SKU identifier or product name
+        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name); 
         setSelectedVariantOptions(sku.optionValues || {});
 
         if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
@@ -290,19 +290,17 @@ export function BillingForm({
             setSellPrice(skuDetailsToUse.currentSellPrice !== null ? skuDetailsToUse.currentSellPrice.toString() : '');
         }
         if (mode === 'buy') {
-            setCostPrice(''); // Cost price for buy is entered manually per batch
+            setCostPrice(''); 
         }
-    } else { // Should not happen if suggestion always has an SKU
+    } else { 
         setProductNameQuery(product.name);
         setSelectedVariantOptions({});
         updateSkuDisplayInfo(undefined);
     }
 
-    setProductNotFoundHint(''); // Clear any "not found" hint
+    setProductNotFoundHint(''); 
 
-    // Focus logic
     if (product.variants && product.variants.length > 0 && (!sku || Object.keys(sku.optionValues || {}).length < product.variants.length)) {
-      // If variants exist and not all are selected (e.g. base product selected from search)
       const firstUnselectedVariant = product.variants.find(v => !(selectedVariantOptions[v.name]));
       if (firstUnselectedVariant) {
           setTimeout(() => {
@@ -310,13 +308,12 @@ export function BillingForm({
             variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
           }, 50);
       } else if (Object.keys(selectedVariantOptions).length === product.variants.length) {
-          // All variants selected, focus quantity
           setTimeout(() => {
             quantityInputRef.current?.focus();
             quantityInputRef.current?.select();
           }, 50);
       }
-    } else { // No variants or all selected, focus quantity
+    } else { 
       setTimeout(() => {
         quantityInputRef.current?.focus();
         quantityInputRef.current?.select();
@@ -344,7 +341,6 @@ export function BillingForm({
         };
         handleProductSelectFromSearch(suggestionForNewProduct);
       }
-      // Clean up the URL parameter
       const newParams = new URLSearchParams(searchParamsHook.toString());
       newParams.delete('newlyAddedProductId');
       router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
@@ -376,7 +372,7 @@ export function BillingForm({
               const currentSku = currentProductForSelection.productSKUs.find(sku =>
                 JSON.stringify(Object.entries(sku.optionValues || {}).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
               );
-              updateSkuDisplayInfo(currentSku); // Update price/stock display for the fully selected SKU
+              updateSkuDisplayInfo(currentSku); 
               setTimeout(() => {
                   quantityInputRef.current?.focus();
                   quantityInputRef.current?.select();
@@ -432,8 +428,8 @@ export function BillingForm({
 
     if ((mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) && product.trackQuantity) {
         const stockToCheck = isDisplayingLayerStock && currentSkuStock !== null && mode === 'sell'
-                           ? currentSkuStock // If specific layer stock is shown (from suggestion)
-                           : (skuDetails.totalStock ?? 0); // Otherwise, total stock for the SKU
+                           ? currentSkuStock 
+                           : (skuDetails.totalStock ?? 0); 
 
         if (stockToCheck < currentQuantity) {
           toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store.` });
@@ -460,27 +456,25 @@ export function BillingForm({
         return;
       }
     } else if (mode === 'sell') {
-      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; // Use form input if set, else default from SKU
+      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; 
 
-      if (product.trackQuantity === false) { // Non-tracked items
-        itemCostPrice = skuDetails.averageCostPrice ?? 0; // Use average or default cost
-      } else { // Tracked items
-        itemCostPrice = 0; // COGS will be calculated on server FIFO for sales
+      if (product.trackQuantity === false) { 
+        itemCostPrice = skuDetails.averageCostPrice ?? 0; 
+      } else { 
+        itemCostPrice = 0; 
       }
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
         return;
       }
-      // Calculate tax for non-service items
       if (!isEstimateMode && !product.id?.startsWith('SERVICE_ITEM_')) {
         const itemSubTotal = itemSellPriceForBill * currentQuantity;
         itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
         itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
       }
 
-    } else { // mode === 'return'
-      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; // Price at which it's being returned
-      // Cost for returns is often the average cost price from inventory.
+    } else { 
+      itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0; 
       itemCostPrice = skuDetails.averageCostPrice ?? 0;
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
         toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0."});
@@ -500,31 +494,29 @@ export function BillingForm({
       selectedVariantOptions: (product.variants && product.variants.length > 0) ? { ...selectedVariantOptions } : undefined,
       sgstAmount: itemSgstAmount,
       cgstAmount: itemCgstAmount,
-      isAdditionalCharge: false, // This item itself is not an additional charge
+      isAdditionalCharge: false, 
     };
     const itemsToAdd = [newItem];
 
-    // Add associated additional charges if defined for the product
     if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0 && (mode === 'sell' || mode === 'return')) {
         product.additionalChargeDefinitions.forEach(charge => {
             let chargeValue = 0;
             if (charge.type === 'fixed') {
                 chargeValue = charge.value;
             } else if (charge.type === 'percentage') {
-                // Percentage calculated based on the main product item's line total (sellPrice * quantity)
                 chargeValue = ((itemSellPriceForBill * currentQuantity) * charge.value) / 100;
             }
 
             itemsToAdd.push({
                 id: uuidv4(),
-                productId: `CHARGE_ITEM_${charge.id}`, // Special ID prefix
+                productId: `CHARGE_ITEM_${charge.id}`, 
                 productName: charge.name,
-                quantity: 1, // Charges are typically per main item instance or per bill
-                costPrice: 0, // Charges usually don't have a cost price in this context
+                quantity: 1, 
+                costPrice: 0, 
                 sellPrice: chargeValue,
                 isAdditionalCharge: true,
                 sourceChargeDefinitionId: charge.id,
-                sgstAmount: 0, // Additional charges typically don't have their own GST in this model
+                sgstAmount: 0, 
                 cgstAmount: 0,
             });
         });
@@ -538,18 +530,19 @@ export function BillingForm({
   const findAndPopulateProductByBarcode = async (barcodeValue: string) => {
     if (!barcodeValue.trim()) return;
     setIsLoadingProductSearch(true);
-  
+    setProductNotFoundHint(''); // Clear previous hint
+
     let foundProduct: Product | undefined = undefined;
     let foundSkuForProduct: ProductSKU | undefined = undefined;
   
     for (const p of allProductsStoreHook) {
-      if (p.sku === barcodeValue) { // Prioritize base product SKU
+      if (p.sku && p.sku === barcodeValue) { 
         foundProduct = p;
         foundSkuForProduct = p.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || p.productSKUs[0];
         break;
       }
       for (const s of p.productSKUs) {
-        if (s.skuIdentifier === barcodeValue) { // Then check variant SKU identifiers
+        if (s.skuIdentifier && s.skuIdentifier === barcodeValue) { 
           foundProduct = p;
           foundSkuForProduct = s;
           break;
@@ -573,13 +566,30 @@ export function BillingForm({
       };
       handleProductSelectFromSearch(suggestion);
       toast({ title: "Product Found", description: `${suggestion.displayInfo.name} selected for billing.` });
-      resetFormFields(false); 
-      setTimeout(() => quantityInputRef.current?.focus(), 50);
+      resetFormFields(false); // Don't refocus product name after successful barcode scan
+      setTimeout(() => quantityInputRef.current?.focus(), 50); // Focus quantity
     } else {
-      toast({ variant: "destructive", title: "Barcode Not Found", description: `No product matched barcode: ${barcodeValue}` });
-      setProductNameQuery(barcodeValue);
-      setProductNotFoundHint(barcodeValue);
+      toast({ variant: "destructive", title: "Product Not Found", description: `Product with code '${barcodeValue}' not found. Press Enter again on the product name to add it as a new product.` });
+      setProductNameQuery(barcodeValue); 
+      setProductNotFoundHint(barcodeValue); // Set hint for potential new product addition
       productNameInputRef.current?.focus();
+    }
+  };
+
+  const handleProductNameSubmit = (inputValue: string) => {
+    if (productNotFoundHint && inputValue.trim() !== '' && inputValue === productNotFoundHint) {
+        const billingFormPreFill = {
+            name: inputValue,
+            quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
+            costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
+            sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
+        };
+        setNewProductDialogInitialValues(billingFormPreFill);
+        setIsNewProductDialogOpen(true);
+        setProductNotFoundHint(''); // Clear hint after acting on it
+        // resetFormFields(true); // No need to reset here, dialog handles it
+    } else {
+        findAndPopulateProductByBarcode(inputValue);
     }
   };
 
@@ -604,16 +614,14 @@ export function BillingForm({
       try {
         const updatedProduct = await updateProductInStore(
           productToUpdate.id,
-          { sku: barcodeValue }, // Update the base 'sku' field of the Product
+          { sku: barcodeValue }, 
           companyId
         );
         if (updatedProduct) {
           toast({ title: "Product SKU Updated", description: `Base SKU for ${updatedProduct.name} set to ${barcodeValue}.` });
           if (currentProductForSelection && currentProductForSelection.id === updatedProduct.id) {
             setCurrentProductForSelection(updatedProduct);
-            // Update product name query if it was displaying the old SKU or if user expects visual feedback
-            setProductNameQuery(updatedProduct.name); // Or updatedProduct.sku
-            // Re-fetch and display details for the updated product
+            setProductNameQuery(updatedProduct.name); 
             const skuToUse = updatedProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || updatedProduct.productSKUs[0] || {id: updatedProduct.id + '_temp', optionValues:{}, stockLayers:[], skuIdentifier: updatedProduct.name};
             updateSkuDisplayInfo(skuToUse);
           }
@@ -631,40 +639,13 @@ export function BillingForm({
   };
 
 
-  const handleEnterNavigation = (currentField: 'productName' | 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
-    if (currentField === 'productName') {
-       if (productNotFoundHint && productNameQuery === productNotFoundHint && productNameQuery.trim() !== '') {
-            const billingFormPreFill = {
-              name: productNameQuery,
-              quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
-              costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
-              sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
-            };
-            setNewProductDialogInitialValues(billingFormPreFill);
-            setIsNewProductDialogOpen(true);
-        } else if (currentProductForSelection) {
-            if (currentProductForSelection.variants && currentProductForSelection.variants.length > 0) {
-                const firstUnselectedVariant = currentProductForSelection.variants.find(v => !selectedVariantOptions[v.name]);
-                if(firstUnselectedVariant) {
-                    setTimeout(() => {
-                        setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true }));
-                        variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
-                    }, 50);
-                } else { // All variants selected
-                    quantityInputRef.current?.focus();
-                    quantityInputRef.current?.select();
-                }
-            } else { // No variants
-                quantityInputRef.current?.focus();
-                quantityInputRef.current?.select();
-            }
-       }
-    } else if (currentField === 'quantity') {
+  const handleEnterNavigation = (currentField: 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
+     if (currentField === 'quantity') {
       if (mode === 'buy') {
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
       } else if (mode === 'sell' || mode === 'return') {
-        handleAddNewItem(); // Attempt to add item after quantity entry
+        handleAddNewItem(); 
       }
     } else if (currentField === 'costPrice') {
       if (mode === 'buy') {
@@ -672,7 +653,7 @@ export function BillingForm({
         sellPriceBatchInputRef.current?.select();
       }
     } else if (currentField === 'sellPrice') {
-      if (mode === 'buy') handleAddNewItem(); // Add item after sell price for buy mode
+      if (mode === 'buy') handleAddNewItem(); 
     } else if (currentField === 'serviceDescription') {
       serviceAmountInputRef.current?.focus();
       serviceAmountInputRef.current?.select();
@@ -686,7 +667,6 @@ export function BillingForm({
       prevItems.map(item => {
         if (item.id === itemId) {
           let updatedItem = { ...item, quantity: Math.max(0, newQuantity) };
-          // Recalculate tax if quantity changes for sell/return items
           if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
             const product = getProductById(item.productId);
             if (product) {
@@ -698,12 +678,12 @@ export function BillingForm({
           return updatedItem;
         }
         return item;
-      }).filter(item => item.quantity > 0 || item.isAdditionalCharge) // Remove if quantity is 0, unless it's a charge
+      }).filter(item => item.quantity > 0 || item.isAdditionalCharge) 
     );
   };
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    if (mode !== 'buy') return; // Only allow price edit in buy mode for bill items
+    if (mode !== 'buy') return; 
     setCurrentBillItems(prevItems =>
       prevItems.map(item =>
         item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
@@ -722,7 +702,7 @@ export function BillingForm({
 
     currentBillItems.forEach(item => {
       const itemSubTotal = item.sellPrice * item.quantity;
-      subTotal += itemSubTotal; // For sell/return, subtotal is sum of sellPrice*qty of all items (products+charges)
+      subTotal += itemSubTotal; 
       
       if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
         totalSGST += item.sgstAmount || 0;
@@ -733,18 +713,18 @@ export function BillingForm({
     let grandTotal;
     if (mode === 'buy') {
         subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        grandTotal = subTotal; // For buy bills, grand total is total cost
-        totalSGST = 0; // No output tax on buy bills
+        grandTotal = subTotal; 
+        totalSGST = 0; 
         totalCGST = 0;
     } else if ((mode === 'sell' || mode === 'return')) {
         if (isEstimateMode) {
-            grandTotal = subTotal; // No tax on estimates
+            grandTotal = subTotal; 
             totalSGST = 0;
             totalCGST = 0;
         } else {
             grandTotal = subTotal + totalSGST + totalCGST;
         }
-    } else { // Should not happen
+    } else { 
         grandTotal = subTotal;
     }
     return { subTotal, totalSGST, totalCGST, grandTotal };
@@ -772,9 +752,8 @@ export function BillingForm({
 
       if (savedBill) {
         setBillToPotentiallyPrint(savedBill);
-        setIsPrintConfirmDialogOpen(true); // Trigger print confirmation
+        setIsPrintConfirmDialogOpen(true); 
       } else {
-        // addBill already throws an error if API fails, which is caught below
       }
     } catch (error) {
       console.error("Error during bill save process:", error);
@@ -788,13 +767,12 @@ export function BillingForm({
         const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
         triggerPrint(printContent);
     }
-    // Proceed with success animation regardless of print choice
-    if (billToPotentiallyPrint) { // Check if bill was actually saved
+    if (billToPotentiallyPrint) { 
         setLastSavedBillMode(billToPotentiallyPrint.type);
         setLastSavedBillIsEstimate(billToPotentiallyPrint.isEstimate || false);
         setIsSavingAnimationVisible(true);
     }
-    setBillToPotentiallyPrint(null); // Clear for next bill
+    setBillToPotentiallyPrint(null); 
   };
 
   const handleSaveBill = () => {
@@ -812,26 +790,25 @@ export function BillingForm({
                 toast({ variant: "destructive", title: "Store Required", description: "Please add your store in Store Management before creating bills on the Starter plan."});
                 return;
             }
-        } else { // Growth or Pro plan
+        } else { 
             if (allStores.length === 0) {
                  toast({ variant: "destructive", title: "No Stores Configured", description: "Please add stores in Store Management before creating bills." });
                  return;
             }
-            if (!selectedStoreIdForAdmin) { // Multi-store setup but no store selected
+            if (!selectedStoreIdForAdmin) { 
                 toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
                 return;
             }
             finalStoreId = selectedStoreIdForAdmin;
         }
-    } else { // Store context (billing terminal)
+    } else { 
       finalStoreId = storeIdFromProp;
     }
 
-    // Prepare items payload
     const billItemsForStore: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'>[] = currentBillItems.map(item => ({
       productId: item.productId, quantity: item.quantity,
-      costPrice: item.costPrice || 0, // Ensure costPrice is a number
-      sellPrice: item.sellPrice || 0, // Ensure sellPrice is a number
+      costPrice: item.costPrice || 0, 
+      sellPrice: item.sellPrice || 0, 
       isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
       isAdditionalCharge: item.isAdditionalCharge,
       sourceChargeDefinitionId: item.sourceChargeDefinitionId,
@@ -847,15 +824,15 @@ export function BillingForm({
       isEstimate: mode === 'sell' ? isEstimateMode : undefined,
     };
 
-    if (!isAdminContext && storeIdFromProp) { // Store terminal context
+    if (!isAdminContext && storeIdFromProp) { 
         setPendingBillPayload(currentBillPayload);
         setIsVerifyEmployeeDialogOpen(true);
-    } else if (isAdminContext) { // Admin context
-        if (!finalStoreId && activePlan && activePlan.maxStores > 0) { // Should be caught earlier, but defensive
+    } else if (isAdminContext) { 
+        if (!finalStoreId && activePlan && activePlan.maxStores > 0) { 
             toast({ variant: "destructive", title: "Store Required", description: "A store context is required to save this bill for your plan."});
             return;
         }
-        startSaveProcess('admin_self_billed', currentBillPayload); // Admin bills on their own behalf
+        startSaveProcess('admin_self_billed', currentBillPayload); 
     }
   };
 
@@ -866,27 +843,23 @@ export function BillingForm({
     } else {
         toast({ variant: "destructive", title: "Error", description: "Billing data was unexpectedly cleared. Please try saving again." });
     }
-    setPendingBillPayload(null); // Clear pending payload
+    setPendingBillPayload(null); 
   };
 
   const handleAnimationClose = () => {
     setIsSavingAnimationVisible(false);
     setLastSavedBillMode(null);
     setLastSavedBillIsEstimate(false);
-    resetFullForm(); // Reset the entire form for a new bill
+    resetFullForm(); 
 
-    // For admin, if the URL has ?mode=... we keep it, otherwise navigate to base /admin/billing
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParamsHook.get('mode');
       const basePath = '/admin/billing';
        if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
-         // Stay on the current mode page
        } else {
-         // If no mode in URL or it's an action like 'new', go to history view
-         router.push(basePath); // This will show bill history by default
+         router.push(basePath); 
        }
     }
-    // For store portal, it just resets the form, stays on the same page.
   };
 
   const handleModeChange = (newModeString: string) => {
@@ -897,10 +870,9 @@ export function BillingForm({
     }
 
     if (newMode !== mode) {
-        resetFullForm(); // Reset everything when mode changes
+        resetFullForm(); 
         setMode(newMode);
-        // Update URL to reflect the new mode without full page reload
-        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); // Fallback for admin if storeId somehow missing
+        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'); 
         router.push(`${basePath}?mode=${newMode}`, { scroll: false });
     }
   };
@@ -908,7 +880,6 @@ export function BillingForm({
   const handleEditProductClick = () => {
     if (currentProductForSelection) {
         const params = new URLSearchParams();
-        // Construct the current billing URL (including any existing query params)
         const currentBillingUrl = `${pathname}?${searchParamsHook.toString()}`;
         params.set('returnTo', encodeURIComponent(currentBillingUrl));
         router.push(`/admin/products/${currentProductForSelection.id}?${params.toString()}`);
@@ -917,12 +888,11 @@ export function BillingForm({
 
   const handleNewProductAddedFromDialog = (newProduct: Product) => {
     setIsNewProductDialogOpen(false);
-    // Select the newly added product in the ProductSearchInput
     const skuToSelect = newProduct.productSKUs.length > 0 ? newProduct.productSKUs[0] : undefined;
     const skuDetails = getSkuDetails(skuToSelect, finalStoreIdForSkuDetails);
      const suggestion: ProductSearchSuggestion = {
       product: newProduct,
-      sku: skuToSelect || { id: newProduct.id + '_default_dialog_add', optionValues: {}, stockLayers: [], skuIdentifier: newProduct.name }, // conceptual SKU if none
+      sku: skuToSelect || { id: newProduct.id + '_default_dialog_add', optionValues: {}, stockLayers: [], skuIdentifier: newProduct.name }, 
       displayInfo: {
         name: skuDetails.skuIdentifier || newProduct.name,
         stock: newProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
@@ -940,30 +910,27 @@ export function BillingForm({
     }
 
     const amount = parseFloat(serviceAmount.toString());
-    // Services/charges usually don't have their own GST calculated this way; GST is on the main product items.
-    // If services *are* taxable, this logic would need SGST/CGST rates for services. For now, assuming 0.
     let sgstAmount: number | undefined = 0;
     let cgstAmount: number | undefined = 0;
 
-    // For 'buy' mode, the service amount is a cost. For 'sell'/'return', it's a revenue/refund amount.
     const serviceItem: BillItem = {
       id: uuidv4(),
-      productId: `SERVICE_ITEM_${uuidv4()}`, // Special prefix to identify as service
+      productId: `SERVICE_ITEM_${uuidv4()}`, 
       productName: serviceDescription,
-      quantity: 1, // Services are typically quantity 1
-      costPrice: mode === 'buy' ? amount : 0, // Cost if buying a service
-      sellPrice: amount, // Sell price for sell/return, or could be 0 if it's just an expense
+      quantity: 1, 
+      costPrice: mode === 'buy' ? amount : 0, 
+      sellPrice: amount, 
       isDefective: undefined,
       selectedVariantOptions: undefined,
-      sgstAmount, // Assuming services are not taxed this way in this system
+      sgstAmount, 
       cgstAmount,
-      isAdditionalCharge: false, // This is a primary service, not an additional charge to another product
+      isAdditionalCharge: false, 
     };
 
     setCurrentBillItems(prevItems => [...prevItems, serviceItem]);
     setServiceDescription('');
     setServiceAmount('');
-    setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0); // Focus back to description for next service
+    setTimeout(() => serviceDescriptionInputRef.current?.focus(), 0); 
   };
 
   const displayModes = allowedModes || ['sell', 'buy', 'return'];
@@ -973,13 +940,11 @@ export function BillingForm({
     return: { icon: RotateCcw, color: "data-[state=active]:bg-amber-400 data-[state=active]:text-amber-900 dark:data-[state=active]:bg-amber-500 dark:data-[state=active]:text-amber-950", label: "Return" },
   };
 
-  // For admin context, determine if store selection is needed/allowed
   const showAdminStoreSelector = isAdminContext &&
                                activePlan &&
                                activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER &&
                                allStores.length > 1;
 
-  // Get current mode from URL for reliable state, fallback to determined mode
   const currentUrlMode = searchParamsHook.get('mode') as BillMode | null;
 
 
@@ -1015,12 +980,12 @@ export function BillingForm({
           initialValues={newProductDialogInitialValues}
         />
       )}
-      {(!isAdminContext && storeIdFromProp) && ( // Store context, needs employee auth
+      {(!isAdminContext && storeIdFromProp) && ( 
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
-              if(!open && isVerifyEmployeeDialogOpen) { // If dialog is closed without verification
-                  setPendingBillPayload(null); // Clear pending bill
+              if(!open && isVerifyEmployeeDialogOpen) { 
+                  setPendingBillPayload(null); 
               }
               setIsVerifyEmployeeDialogOpen(open);
           }}
@@ -1059,10 +1024,8 @@ export function BillingForm({
         </Tabs>
       </div>
 
-      {/* Main Billing Form Card */}
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
-          {/* Store Selector for Admin Context */}
           {showAdminStoreSelector && (
               <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
                 <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium text-primary">
@@ -1078,26 +1041,22 @@ export function BillingForm({
                         ))}
                     </SelectContent>
                 </Select>
-                 {/* Validation message if admin hasn't selected a store for multi-store plan */}
                  {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length > 1 && !selectedStoreIdForAdmin && (
                     <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>
                  )}
               </div>
           )}
-          {/* Message if admin is on Starter plan but no store is configured */}
           {isAdminContext && activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
              <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
                 No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
              </p>
           )}
-          {/* Message if admin is on Growth/Pro but no stores configured */}
           {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
              <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
                 No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
              </p>
           )}
 
-          {/* Estimate Mode Toggle for Sales */}
           {mode === 'sell' && (
             <div className="flex items-center space-x-2 pt-2 pb-2 justify-end">
                 <Label htmlFor="estimateMode" className="font-medium text-primary">Estimate Mode</Label>
@@ -1111,17 +1070,15 @@ export function BillingForm({
           )}
 
 
-          {/* Item Input Section */}
           <div className="space-y-4 pb-4 border-b border-dashed">
             <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
                 <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
             </h3>
             <div className={cn(
               "grid gap-4 items-baseline",
-              "grid-cols-1", // Default to single column for small screens
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto]" // More columns for wider screens
+              "grid-cols-1", 
+              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto]" 
             )}>
-              {/* Product Search Input and Barcode/Edit Icons */}
               <div className="space-y-1.5 flex-grow">
                 <Label htmlFor="productNameGlobal">Product Name / SKU / Barcode</Label>
                 <div className="flex items-center gap-2">
@@ -1130,17 +1087,17 @@ export function BillingForm({
                     value={productNameQuery}
                     onValueChange={(v) => {
                         setProductNameQuery(v);
-                        if (!v) { // Clear selection if input is empty
+                        if (!v) { 
                             setCurrentProductForSelection(null);
                             setSelectedVariantOptions({});
                             setProductNotFoundHint('');
-                            updateSkuDisplayInfo(undefined); // Reset SKU display
+                            updateSkuDisplayInfo(undefined); 
                             setIsDisplayingLayerStock(false);
                         }
                     }}
                     onProductSelect={handleProductSelectFromSearch}
-                    onEnterWithoutSelection={findAndPopulateProductByBarcode} // Use this for Enter key on input
-                    placeholder={mode === 'return' ? 'Scan barcode or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
+                    onEnterWithoutSelection={handleProductNameSubmit} 
+                    placeholder={mode === 'return' ? 'Scan or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
                     id="productNameGlobal"
                     className="flex-grow"
                     currentMode={mode}
@@ -1183,7 +1140,6 @@ export function BillingForm({
                         {currentProductForSelection.trackQuantity && (isDisplayingLayerStock && mode === 'sell' ? "" : " (from oldest batch)")}
                       </span>
                     )}
-                     {/* Display Tax Info if applicable */}
                      {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && !currentProductForSelection.id?.startsWith('SERVICE_ITEM_') && (
                         <span className="block text-primary/80">
                             Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%
@@ -1191,7 +1147,6 @@ export function BillingForm({
                      )}
                   </div>
                 )}
-                {/* "Product not found" hint */}
                 {productNotFoundHint && productNameQuery === productNotFoundHint && (
                     <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
                         <Info size={16} className="text-accent shrink-0" />
@@ -1200,7 +1155,6 @@ export function BillingForm({
                 )}
               </div>
 
-              {/* Quantity Input */}
               <div className="space-y-1.5 w-full md:w-24">
                 <Label htmlFor="quantityGlobal">Quantity</Label>
                 <Input
@@ -1211,13 +1165,12 @@ export function BillingForm({
                   onChange={(e) => setQuantity(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
                   onFocus={(e) => e.target.select()}
-                  step="any" // Allow float quantities
+                  step="any" 
                   min="0.01"
                   placeholder="1"
                 />
               </div>
 
-              {/* Price Inputs for Buy Mode */}
               {mode === 'buy' && (
                 <>
                   <div className="space-y-1.5 w-full md:w-32">
@@ -1249,17 +1202,14 @@ export function BillingForm({
                 </>
               )}
 
-              {/* Add Item Button */}
                <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
                     <PlusCircle className="mr-2 h-4 w-4" /> Add
                </Button>
             </div>
 
-            {/* Variant Selection Section (if product has variants) */}
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
               <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
                 {currentProductForSelection.variants.map((variant, index) => {
-                   // Ensure ref is created for each variant select
                    if (!variantSelectRefs.current[variant.id]) {
                       variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
                     }
@@ -1274,17 +1224,16 @@ export function BillingForm({
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
                             setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); // Close current select
+                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false })); 
 
-                            // Auto-focus next variant select or quantity input
                             const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
                             if (currentIndex < currentProductForSelection!.variants!.length - 1) {
                                 const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => { // Delay to allow state update and re-render
+                                setTimeout(() => { 
                                   setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
                                   variantSelectRefs.current[nextVariantId]?.current?.focus();
                                 }, 50);
-                            } else { // Last variant selected, focus quantity
+                            } else { 
                                 setTimeout(() => {
                                    quantityInputRef.current?.focus();
                                    quantityInputRef.current?.select();
@@ -1296,20 +1245,20 @@ export function BillingForm({
                           id={`variant-select-${variant.id}-trigger`}
                           ref={variantSelectRefs.current[variant.id]}
                           className="w-full select-trigger-class"
-                           onKeyDown={(e) => { // Handle Enter and Tab for variant selects
-                            if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) { // Open dropdown on Enter if closed
+                           onKeyDown={(e) => { 
+                            if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) { 
                                 e.preventDefault();
                                 setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
-                            } else if (e.key === 'Tab' && !e.shiftKey) { // Move to next variant or quantity on Tab
-                                if (index < currentProductForSelection!.variants!.length -1) { // If not the last variant
+                            } else if (e.key === 'Tab' && !e.shiftKey) { 
+                                if (index < currentProductForSelection!.variants!.length -1) { 
                                     e.preventDefault();
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false })); // Close current
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false })); 
                                     const nextVariantId = currentProductForSelection!.variants![index + 1].id;
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true })); // Open next
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true })); 
                                     variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                } else if (index === currentProductForSelection!.variants!.length -1) { // If last variant
+                                } else if (index === currentProductForSelection!.variants!.length -1) { 
                                     e.preventDefault();
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false })); // Close current
+                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false })); 
                                     quantityInputRef.current?.focus();
                                     quantityInputRef.current?.select();
                                 }
@@ -1331,7 +1280,6 @@ export function BillingForm({
               </div>
             )}
 
-            {/* Defective Item Toggle for Return Mode */}
             {mode === 'return' && (
               <div className="flex items-center space-x-2 pt-2">
                 <Switch
@@ -1344,14 +1292,13 @@ export function BillingForm({
             )}
           </div>
 
-          {/* Bill Items List */}
           <div className="flex-grow overflow-hidden">
             {currentBillItems.length > 0 && <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} />}
             <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]">
               {currentBillItems.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
               ) : (
-                <div className="space-y-0"> {/* No vertical space between rows */}
+                <div className="space-y-0"> 
                   {currentBillItems.map((item) => (
                     <BillItemRow
                       key={item.id}
@@ -1368,7 +1315,6 @@ export function BillingForm({
             </ScrollArea>
           </div>
 
-          {/* Ad-hoc Service/Charge Section for Sell/Buy Modes */}
           {(mode === 'sell' || mode === 'buy') && (
             <div className="pt-4 border-t border-dashed mt-auto space-y-3">
               <h3 className="text-md font-medium text-foreground flex items-center gap-2">
@@ -1410,9 +1356,7 @@ export function BillingForm({
         </CardContent>
 
         <Separator className="my-0"/>
-        {/* Bill Footer: Customer/Vendor Details, Totals, Actions */}
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
-          {/* Customer/Vendor Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div className="space-y-1.5">
                 <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
@@ -1424,7 +1368,7 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
                 />
             </div>
-            {mode !== 'buy' && ( // Only show phone for sell/return
+            {mode !== 'buy' && ( 
                  <div className="space-y-1.5">
                     <Label htmlFor="customerPhone">Customer Phone</Label>
                     <Input
@@ -1437,7 +1381,6 @@ export function BillingForm({
                     />
                 </div>
             )}
-             {/* Notes - span full width if phone isn't shown */}
              <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
                 <Label htmlFor="notes">Notes</Label>
                 <Input
@@ -1451,9 +1394,7 @@ export function BillingForm({
 
           <Separator className="my-2"/>
 
-          {/* Bill Totals */}
           <div className="flex flex-col items-end gap-0.5 text-sm">
-             {/* Conditional tax display for Sell/Return (non-estimate) */}
              { (mode === 'sell' || mode === 'return') && !isEstimateMode && ((billTotals.totalSGST ?? 0) > 0 || (billTotals.totalCGST ?? 0) > 0 || currentBillItems.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
                 <>
                     <div className="flex justify-between w-full max-w-xs">
@@ -1471,14 +1412,12 @@ export function BillingForm({
                     <Separator className="my-1 w-full max-w-xs"/>
                 </>
              )}
-             {/* Buy mode subtotal (which is the grand total) */}
              { mode === 'buy' && (
                 <div className="flex justify-between w-full max-w-xs">
                     <span className="text-muted-foreground">Total Cost:</span>
                     <span className="font-semibold text-destructive">₹{billTotals.grandTotal.toFixed(2)}</span>
                 </div>
              )}
-             {/* Grand Total for Sell/Return, or if it's an Estimate */}
              { (mode === 'sell' || mode === 'return') && (
                 <div className="flex justify-between w-full max-w-xs text-lg font-semibold text-primary">
                     <span>{isEstimateMode && mode === 'sell' ? 'Estimate Total:' : 'Grand Total:'}</span>
@@ -1487,7 +1426,6 @@ export function BillingForm({
              )}
           </div>
 
-          {/* Payment Status Toggle for Sell/Buy modes */}
           {(mode === 'sell' || mode === 'buy') && (
               <div className="flex items-center space-x-2 self-start pt-2">
               <Switch
@@ -1503,7 +1441,6 @@ export function BillingForm({
           )}
 
 
-          {/* Action Buttons */}
           <div className="flex gap-3 mt-2">
             <Button variant="outline" onClick={resetFullForm} className="flex-1">
               <Eraser className="mr-2 h-4 w-4" /> Clear Bill
@@ -1521,4 +1458,4 @@ export function BillingForm({
     </div>
   );
 }
-    
+
