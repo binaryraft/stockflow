@@ -15,14 +15,14 @@ interface HeroSectionProps {
   onStoreSelectClick: () => void;
 }
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; 
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Ensure this constant is defined
 
 export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSectionProps) {
-  const router = useRouter(); 
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false); 
-  const [hasMounted, setHasMounted] = useState(false); 
+  const router = useRouter();
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
-  useEffect(() => { 
+  useEffect(() => {
     setHasMounted(true);
     if (typeof window !== 'undefined') {
       const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
@@ -31,7 +31,7 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
     }
   }, []);
 
-  const handleAdminAccessClick = () => { 
+  const handleAdminAccessClick = () => {
     if (isAdminLoggedIn) {
       router.push('/admin');
     } else {
@@ -39,7 +39,7 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
     }
   };
 
-  if (!hasMounted) { 
+  if (!hasMounted) {
       return (
           <section className="relative section-padding bg-gradient-to-br from-primary/5 via-background to-background/0 overflow-hidden min-h-[70vh] flex items-center">
               <div className="section-container text-center">
@@ -69,7 +69,7 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
             <Image
               src="https://placehold.co/160x160.png"
               alt={`${APP_NAME} Logo`}
-              width={160} 
+              width={160}
               height={160}
               className="rounded-3xl shadow-2xl border-4 border-card/80"
               data-ai-hint="modern tech logo"
@@ -84,22 +84,22 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
           </p>
         </div>
         <div className="flex flex-col sm:flex-row justify-center items-center gap-5 md:gap-8 animate-fadeInUp delay-700">
-          <Button 
-            size="lg" 
-            className="bg-primary hover:bg-primary/85 text-primary-foreground shadow-lg hover:shadow-primary/40 transition-all-fast px-12 py-7 text-xl rounded-xl group transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-primary/30" 
+          <Button
+            size="lg"
+            className="bg-primary hover:bg-primary/85 text-primary-foreground shadow-lg hover:shadow-primary/40 transition-all-fast px-12 py-7 text-xl rounded-xl group transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-primary/30"
             onClick={handleAdminAccessClick}
           >
             {isAdminLoggedIn ? 'Go to Admin Dashboard' : 'Admin Access'}
-            <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1.5 transition-transform-fast" /> 
+            <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1.5 transition-transform-fast" />
           </Button>
-          <Button 
-            variant="outline" 
-            size="lg" 
-            className="shadow-md hover:shadow-lg transition-all-fast border-secondary/50 hover:border-secondary text-secondary hover:bg-secondary/10 px-12 py-7 text-xl rounded-xl group transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-secondary/30" 
+          <Button
+            variant="outline"
+            size="lg"
+            className="shadow-md hover:shadow-lg transition-all-fast border-secondary/50 hover:border-secondary text-secondary hover:bg-secondary/10 px-12 py-7 text-xl rounded-xl group transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-secondary/30"
             onClick={onStoreSelectClick}
           >
             <Building className="mr-3 h-6 w-6" /> Store Terminal
-            <ArrowRight className="ml-2.5 h-5 w-5 text-secondary/70 group-hover:translate-x-1 transition-transform-fast" /> 
+            <ArrowRight className="ml-2.5 h-5 w-5 text-secondary/70 group-hover:translate-x-1 transition-transform-fast" />
           </Button>
         </div>
         <p className="mt-16 text-base text-muted-foreground animate-fadeInUp delay-700 flex items-center justify-center gap-2">
@@ -117,5 +117,3 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
     </section>
   );
 }
-
-    

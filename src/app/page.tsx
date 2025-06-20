@@ -12,13 +12,13 @@ import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/CallToActionSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
-import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
+// import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded'; // No longer used for login flow
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
-type UIMode = 'landing' | 'adminLogin' | 'adminSignup' | 'storeSelect';
+type UIMode = 'landing' | 'adminLogin' | 'adminSignup'; // Removed 'storeSelect'
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -58,7 +58,7 @@ export default function HomePage() {
       
       setIsRedirecting(false);
 
-      if (!redirected && uiMode !== 'adminLogin' && uiMode !== 'adminSignup' && uiMode !== 'storeSelect') {
+      if (!redirected && uiMode !== 'adminLogin' && uiMode !== 'adminSignup') {
         setUiMode('landing');
       }
     }
@@ -69,15 +69,18 @@ export default function HomePage() {
   const showAdminSignup = () => setUiMode('adminSignup');
   const hideAuthFormsAndRecheck = () => {
     setUiMode('landing');
-    setIsRedirecting(true);
+    setIsRedirecting(true); 
   };
 
-  const showStoreSelect = () => setUiMode('storeSelect');
-  const hideStoreSelect = () => setUiMode('landing');
+  // Store login now directly navigates to /storeportal
+  const handleStoreLoginClick = () => {
+    router.push('/storeportal');
+  };
+
 
   if (!hasMounted || isRedirecting) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image
           src="https://placehold.co/128x128.png"
           alt={`${APP_NAME} Logo`}
@@ -98,9 +101,9 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {uiMode === 'landing' && (
         <>
-          <LandingHeader onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelect} />
+          <LandingHeader onAdminLoginClick={showAdminLogin} onStoreLoginClick={handleStoreLoginClick} />
           <main className="flex-grow">
-            <HeroSection onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelect} />
+            <HeroSection onAdminLoginClick={showAdminLogin} onStoreSelectClick={handleStoreLoginClick} />
             <FeaturesSection />
             <PricingSectionLanding />
             <OtherSection />
@@ -125,10 +128,6 @@ export default function HomePage() {
           onCancel={() => setUiMode('landing')}
           onSwitchToLogin={showAdminLogin}
         />
-      )}
-
-      {uiMode === 'storeSelect' && (
-        <StoreSelectorEmbedded onCancel={hideStoreSelect} />
       )}
     </div>
   );

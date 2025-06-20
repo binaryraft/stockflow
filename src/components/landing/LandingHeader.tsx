@@ -10,10 +10,10 @@ import { cn } from '@/lib/utils';
 
 interface LandingHeaderProps {
   onAdminLoginClick: () => void;
-  onStoreSelectClick: () => void;
+  onStoreLoginClick: () => void; // Changed from onStoreSelectClick
 }
 
-export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: LandingHeaderProps) {
+export function LandingHeader({ onAdminLoginClick, onStoreLoginClick }: LandingHeaderProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur-lg shadow-sm">
       <div className="section-container flex h-20 items-center justify-between">
@@ -42,7 +42,7 @@ export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: Landing
           <Button 
             variant="outline" 
             size="default" 
-            onClick={onStoreSelectClick} 
+            onClick={onStoreLoginClick} // Changed from onStoreSelectClick
             className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg shadow-sm hover:shadow-md"
           >
             <StoreIcon className="mr-2 h-4 w-4" /> Store Login
@@ -59,5 +59,3 @@ export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: Landing
     </header>
   );
 }
-
-    
