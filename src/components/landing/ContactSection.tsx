@@ -22,35 +22,35 @@ export function ContactSection() {
   return (
     <section id="contact" className="section-padding bg-background">
       <div className="section-container">
-        <div className="text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+        <div className="text-center mb-16 md:mb-20">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground animate-fadeInDown">
             Get in <span className="text-gradient-primary">Touch</span>
           </h2>
-          <p className="mt-4 max-w-xl mx-auto text-lg text-muted-foreground">
+          <p className="mt-6 max-w-xl mx-auto text-lg text-muted-foreground animate-fadeInDown delay-200">
             Have questions, feedback, or need support? We&apos;re here to help you succeed.
           </p>
         </div>
-        <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-start">
-          <div className="space-y-8 animate-fadeInUp" style={{animationDelay: '0.2s'}}>
+        <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-start">
+          <div className="space-y-10 animate-fadeInUp delay-300">
             <div>
-              <h3 className="text-2xl font-semibold text-primary mb-4">Contact Information</h3>
-              <div className="space-y-4 text-muted-foreground">
-                <p className="flex items-start gap-3 text-base">
-                  <MapPin className="h-6 w-6 text-primary shrink-0 mt-1" />
+              <h3 className="text-2xl font-semibold text-primary mb-5">Contact Information</h3>
+              <div className="space-y-5 text-muted-foreground">
+                <p className="flex items-start gap-4 text-base transition-colors hover:text-secondary">
+                  <MapPin className="h-7 w-7 text-secondary shrink-0 mt-0.5" />
                   <span>{COMPANY_ADDRESS}</span>
                 </p>
-                <p className="flex items-center gap-3 text-base">
-                  <Mail className="h-6 w-6 text-primary shrink-0" />
+                <p className="flex items-center gap-4 text-base">
+                  <Mail className="h-7 w-7 text-secondary shrink-0" />
                   <a href={`mailto:${displayEmail}`} className="hover:text-primary transition-colors">{displayEmail}</a>
                 </p>
-                <p className="flex items-center gap-3 text-base">
-                  <Phone className="h-6 w-6 text-primary shrink-0" />
+                <p className="flex items-center gap-4 text-base">
+                  <Phone className="h-7 w-7 text-secondary shrink-0" />
                   <a href={`tel:${displayPhone.replace(/[^\d+]/g, '')}`} className="hover:text-primary transition-colors">{displayPhone}</a>
                 </p>
               </div>
             </div>
             <div className="pt-4">
-              <h3 className="text-2xl font-semibold text-primary mb-4">Office Hours</h3>
+              <h3 className="text-2xl font-semibold text-primary mb-5">Office Hours</h3>
               <p className="text-muted-foreground text-base">Monday - Friday: 9:00 AM - 6:00 PM</p>
               <p className="text-muted-foreground text-base">Saturday: 10:00 AM - 3:00 PM</p>
               <p className="text-muted-foreground text-base">Sunday: Closed</p>
@@ -58,27 +58,26 @@ export function ContactSection() {
           </div>
           <form 
             onSubmit={handleSubmit} 
-            className="space-y-6 p-6 md:p-8 bg-card rounded-xl shadow-xl border border-border/70 animate-fadeInUp"
-            style={{animationDelay: '0.4s'}}
+            className="space-y-8 p-8 md:p-10 bg-card rounded-2xl shadow-2xl border border-border/70 animate-fadeInUp delay-500"
           >
             <div>
-              <Label htmlFor="contact-name" className="text-foreground font-medium">Full Name</Label>
-              <Input id="contact-name" type="text" placeholder="Your Name" required className="mt-2 h-11" />
+              <Label htmlFor="contact-name" className="text-foreground font-medium text-base">Full Name</Label>
+              <Input id="contact-name" type="text" placeholder="Your Name" required className="mt-2.5 h-12 text-base" />
             </div>
             <div>
-              <Label htmlFor="contact-email" className="text-foreground font-medium">Email Address</Label>
-              <Input id="contact-email" type="email" placeholder="you@example.com" required className="mt-2 h-11" />
+              <Label htmlFor="contact-email" className="text-foreground font-medium text-base">Email Address</Label>
+              <Input id="contact-email" type="email" placeholder="you@example.com" required className="mt-2.5 h-12 text-base" />
             </div>
             <div>
-              <Label htmlFor="contact-subject" className="text-foreground font-medium">Subject</Label>
-              <Input id="contact-subject" type="text" placeholder="Regarding..." className="mt-2 h-11" />
+              <Label htmlFor="contact-subject" className="text-foreground font-medium text-base">Subject</Label>
+              <Input id="contact-subject" type="text" placeholder="Regarding..." className="mt-2.5 h-12 text-base" />
             </div>
             <div>
-              <Label htmlFor="contact-message" className="text-foreground font-medium">Message</Label>
-              <Textarea id="contact-message" placeholder="How can we help you?" required rows={5} className="mt-2" />
+              <Label htmlFor="contact-message" className="text-foreground font-medium text-base">Message</Label>
+              <Textarea id="contact-message" placeholder="How can we help you?" required rows={6} className="mt-2.5 text-base" />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3 text-base rounded-lg group">
-              Send Message <Send className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 text-lg rounded-lg group transition-all duration-300 transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-primary/30">
+              Send Message <Send className="ml-2.5 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
             </Button>
           </form>
         </div>

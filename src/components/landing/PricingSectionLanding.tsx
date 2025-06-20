@@ -4,22 +4,22 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { SUBSCRIPTION_PLANS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants'; // Added SUBSCRIPTION_PLAN_IDS
-import { CheckCircle, BadgeCheck, ArrowRight } from 'lucide-react';
+import { SUBSCRIPTION_PLANS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { CheckCircle, BadgeCheck, ArrowRight, Star } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export function PricingSectionLanding() {
-  const popularPlanId = SUBSCRIPTION_PLANS.find(p => p.isPopular)?.id || SUBSCRIPTION_PLANS[1]?.id; // Fallback to second plan if no popular
-  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1 && p.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY); // Exclude contact and admin_only from main display
+  const popularPlanId = SUBSCRIPTION_PLANS.find(p => p.isPopular)?.id || SUBSCRIPTION_PLANS[1]?.id;
+  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1 && p.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY);
 
   return (
     <section id="pricing" className="section-padding bg-background">
       <div className="section-container">
-        <div className="text-center mb-12 md:mb-16">
-          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground">
+        <div className="text-center mb-16 md:mb-20">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground animate-fadeInDown">
             Flexible <span className="text-gradient-primary">Pricing Plans</span>
           </h2>
-          <p className="mt-4 max-w-xl mx-auto text-lg text-muted-foreground">
+          <p className="mt-6 max-w-xl mx-auto text-lg text-muted-foreground animate-fadeInDown delay-200">
             Choose the plan that best fits your business needs. No hidden fees, transparent value.
           </p>
         </div>
@@ -28,20 +28,21 @@ export function PricingSectionLanding() {
             <Card 
               key={plan.id} 
               className={cn(
-                "flex flex-col transition-all duration-300 hover:shadow-2xl shadow-lg rounded-xl border-border/70 animate-fadeInUp",
-                plan.id === popularPlanId ? 'border-2 border-primary ring-4 ring-primary/20 relative' : 'hover:border-primary/50',
-                "bg-card"
+                "flex flex-col transition-all duration-300 hover:shadow-2xl shadow-lg rounded-2xl border border-border/70 animate-fadeInUp",
+                plan.id === popularPlanId ? 'border-2 border-primary ring-4 ring-primary/20 relative transform scale-100 lg:scale-105' : 'hover:border-primary/50',
+                plan.id !== popularPlanId ? 'bg-card' : 'bg-card', // Can differentiate popular plan bg slightly if needed
+                "group" 
               )}
-              style={{ animationDelay: `${index * 150}ms` }}
+              style={{ animationDelay: `${index * 150 + 300}ms` }}
             >
               {plan.id === popularPlanId && (
-                <div className="absolute -top-3 -right-3 bg-primary text-primary-foreground p-2 rounded-full shadow-lg z-10">
-                  <BadgeCheck className="h-6 w-6" />
+                <div className="absolute -top-4 -right-4 bg-primary text-primary-foreground p-2.5 rounded-full shadow-lg z-10 animate-pulse-badge">
+                  <Star className="h-6 w-6 fill-current" />
                 </div>
               )}
-              <CardHeader className="pb-6 pt-8 px-6">
+              <CardHeader className="pb-6 pt-10 px-8">
                 <CardTitle className={cn(
-                  "text-2xl md:text-3xl font-bold mb-2", 
+                  "text-2xl md:text-3xl font-bold mb-3", 
                   plan.id === popularPlanId ? "text-primary" : "text-foreground"
                 )}>
                   {plan.name}
@@ -50,32 +51,32 @@ export function PricingSectionLanding() {
                   <span className="text-4xl md:text-5xl font-extrabold text-foreground">₹{plan.price}</span>
                   <span className="text-base text-muted-foreground ml-1.5">{plan.priceSuffix}</span>
                 </div>
-                <CardDescription className="text-sm text-muted-foreground h-10">
-                  {plan.name === 'Starter' ? "Perfect for new businesses and solo entrepreneurs." : 
-                   plan.name === 'Growth' ? "Ideal for growing businesses needing more capacity." :
-                   "For established businesses scaling operations." }
+                <CardDescription className="text-sm text-muted-foreground h-12 pt-1">
+                  {plan.name === 'Starter' ? "Perfect for new businesses and solo entrepreneurs ready to organize." : 
+                   plan.name === 'Growth' ? "Ideal for growing businesses needing more capacity and robust features." :
+                   "For established businesses aiming to scale operations efficiently." }
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex-grow space-y-4 pt-0 px-6">
-                <ul className="space-y-2.5 text-sm text-muted-foreground">
+              <CardContent className="flex-grow space-y-4 pt-0 px-8">
+                <ul className="space-y-3 text-base text-muted-foreground">
                   {plan.features.map((feature, idx) => (
                     <li key={idx} className="flex items-start">
-                      <CheckCircle className="h-5 w-5 mr-2.5 mt-0.5 text-green-500 shrink-0" />
+                      <CheckCircle className="h-5 w-5 mr-3 mt-0.5 text-green-500 shrink-0" />
                       <span>{feature}</span>
                     </li>
                   ))}
                 </ul>
               </CardContent>
-              <CardFooter className="p-6 mt-auto">
+              <CardFooter className="p-8 mt-auto">
                 <Button 
                   asChild 
                   className={cn(
-                    "w-full text-base py-3 rounded-lg group", 
-                    plan.id === popularPlanId ? "bg-primary hover:bg-primary/80 text-primary-foreground" : "bg-secondary hover:bg-secondary/80 text-secondary-foreground"
+                    "w-full text-base py-3.5 rounded-lg group transition-all duration-300 transform hover:scale-105 focus:scale-105", 
+                    plan.id === popularPlanId ? "bg-primary hover:bg-primary/80 text-primary-foreground shadow-lg hover:shadow-primary/50" : "bg-secondary hover:bg-secondary/80 text-secondary-foreground shadow hover:shadow-md"
                   )} 
                   size="lg"
                 >
-                  <Link href="/admin"> {/* All plans link to admin login/signup */}
+                  <Link href="/admin">
                     Get Started <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                   </Link>
                 </Button>
@@ -83,9 +84,9 @@ export function PricingSectionLanding() {
             </Card>
           ))}
         </div>
-        <div className="mt-16 text-center">
-          <p className="text-muted-foreground">
-            Need more? We offer an <Link href="#contact" className="text-primary hover:underline font-medium">Enterprise plan</Link> with custom solutions.
+        <div className="mt-20 text-center animate-fadeInUp delay-500">
+          <p className="text-muted-foreground text-lg">
+            Need more? We offer an <Link href="#contact" className="text-primary hover:underline font-semibold">Enterprise plan</Link> with custom solutions.
           </p>
         </div>
       </div>
