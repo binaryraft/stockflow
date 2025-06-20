@@ -1,6 +1,6 @@
 
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
+import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare, Contact } from 'lucide-react';
 import type { SubscriptionPlan, CurrencyOption } from '@/types';
 
 export interface NavLink {
@@ -14,6 +14,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
   { href: '/admin/products', label: 'Products', icon: Package },
+  { href: '/admin/customers', label: 'Customers', icon: Contact },
   { href: '/admin/staff', label: 'Staff', icon: Users },
   { href: '/admin/stores', label: 'Stores', icon: Building },
   { href: '/admin/chat', label: 'Chat', icon: MessageSquare },
@@ -37,10 +38,25 @@ export const SUBSCRIPTION_PLAN_IDS = {
   GROWTH: 'plan_growth',
   PRO: 'plan_pro',
   ENTERPRISE: 'plan_enterprise_contact',
-  ADMIN_ONLY: 'plan_admin_only_basic', // Keep if defined elsewhere, or remove if not used
+  ADMIN_ONLY: 'plan_admin_only_basic',
 };
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
+   {
+    id: SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY,
+    name: 'Basic Admin',
+    price: 0, 
+    priceSuffix: '/ month',
+    features: [
+        'Admin Dashboard Access',
+        'Product Management',
+        'Billing Management',
+        'Limited Reporting',
+        'No Store or Staff Management',
+    ],
+    maxStores: 0,
+    maxEmployees: 0,
+  },
   {
     id: SUBSCRIPTION_PLAN_IDS.STARTER,
     name: 'Starter',
@@ -51,7 +67,8 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
         'Up to 2 Employees',
         'Unlimited Products',
         'Unlimited Bills',
-        'Basic Reporting'
+        'Basic Reporting',
+        'Store Chat with Admin'
     ],
     maxStores: 1,
     maxEmployees: 2,
@@ -90,7 +107,7 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: SUBSCRIPTION_PLAN_IDS.ENTERPRISE,
     name: 'Enterprise',
-    price: -1, // Indicates "Contact Us"
+    price: -1, 
     priceSuffix: 'Custom Pricing',
     features: [
         'Custom Store & Employee Limits',

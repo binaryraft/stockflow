@@ -1,7 +1,7 @@
 
 import fs from 'fs/promises';
 import path from 'path';
-import type { Product, Bill, Category, User, Store, Company, ChatMessage } from '@/types';
+import type { Product, Bill, Category, User, Store, Company, ChatMessage, Customer } from '@/types';
 
 export const DB_PATH = path.join(process.cwd(), 'data', 'db.json');
 
@@ -11,6 +11,7 @@ export interface Database {
   products: Product[];
   bills: Bill[];
   categories: Category[];
+  customers: Customer[];
   staffs: User[]; // Kept for data structure consistency, but logic should primarily use users with role 'employee'
   stores: Store[];
   messagesByStore?: Record<string, ChatMessage[]>;
@@ -31,6 +32,7 @@ export async function readDB(): Promise<Database> {
       products: jsonData.products || [],
       bills: jsonData.bills || [],
       categories: jsonData.categories || [],
+      customers: jsonData.customers || [],
       staffs: jsonData.staffs || [],
       stores: jsonData.stores || [],
       messagesByStore: jsonData.messagesByStore || {},
@@ -40,7 +42,7 @@ export async function readDB(): Promise<Database> {
     if (error.code === 'ENOENT') {
       console.warn(`${routeNamePrefix} db.json not found. Returning default empty structure and attempting to create it.`);
       const defaultDB: Database = {
-        companies: [], users: [], products: [], bills: [], categories: [], staffs: [], stores: [], messagesByStore: {},
+        companies: [], users: [], products: [], bills: [], categories: [], customers: [], staffs: [], stores: [], messagesByStore: {},
       };
       try {
         await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
@@ -57,7 +59,7 @@ export async function readDB(): Promise<Database> {
     // For other errors (e.g., JSON parse error), log critically.
     console.error(`${routeNamePrefix} CRITICAL: db.json appears to be malformed or unreadable. Error: ${error.message}. Returning default empty structure to prevent app crash, but data integrity is compromised.`);
     return {
-      companies: [], users: [], products: [], bills: [], categories: [], staffs: [], stores: [], messagesByStore: {},
+      companies: [], users: [], products: [], bills: [], categories: [], customers: [], staffs: [], stores: [], messagesByStore: {},
     };
   }
 }

@@ -21,11 +21,11 @@
       "name": "danielinc",
       "token": "TOKEN_71D4F98A-E2D3-40E4-BAF5-1C859BC7C597",
       "activeSubscriptionId": "plan_starter",
-      "logoUrl": null,
-      "slogan": null,
-      "phone": null,
-      "address": null,
-      "gstNo": null,
+      "logoUrl": "",
+      "slogan": "",
+      "phone": "",
+      "address": "",
+      "gstNo": "",
       "defaultBillNotes": "",
       "defaultSalesPaymentStatus": "paid",
       "defaultPurchasePaymentStatus": "unpaid",
@@ -191,6 +191,7 @@
       "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7"
     }
   ],
+  "customers": [],
   "staffs": [],
   "stores": [
     {

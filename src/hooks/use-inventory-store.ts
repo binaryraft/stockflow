@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
@@ -22,6 +22,7 @@ interface InventoryState {
   products: Product[]; 
   bills: Bill[];
   categories: Category[];
+  customers: Customer[];
   staffs: User[]; 
   stores: Store[];
   userProfile: UserProfile;
@@ -54,6 +55,11 @@ interface InventoryState {
   fetchCategories: (companyId: string) => Promise<void>;
   addCategory: (categoryName: string, companyId: string) => Promise<Category | null>;
   searchCategories: (searchTerm: string) => string[];
+
+  fetchCustomers: (companyId: string) => Promise<void>;
+  getCustomerById: (customerId: string) => Customer | undefined;
+  getAllCustomers: (companyId?: string) => Customer[];
+
 
   fetchStaff: (companyId: string) => Promise<void>;
   addStaff: (staffData: Omit<User, 'id' | 'role' | 'companyId'|'password'> & {password:string}, companyId: string) => Promise<User | null>;
@@ -136,6 +142,7 @@ export const useInventoryStore = create<InventoryState>()(
       products: [],
       bills: [],
       categories: [], 
+      customers: [],
       staffs: [],
       stores: [],
       userProfile: { ...defaultUserProfile },
@@ -317,6 +324,32 @@ export const useInventoryStore = create<InventoryState>()(
             return result.data;
           } else { console.error("Failed to add category via API:", result.message); return null; }
         } catch (error) { console.error("Error adding category via API:", error); return null; }
+      },
+
+      fetchCustomers: async (companyId: string) => {
+        if (!companyId) { console.warn("fetchCustomers: companyId is required"); set({ customers: [] }); return; }
+        try {
+          const response = await fetch(`/api/customers?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch customers: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) {
+            set({ customers: result.data });
+          } else {
+            console.error("Failed to fetch customers or data format incorrect:", result.message);
+            set({ customers: [] });
+          }
+        } catch (error) {
+          console.error("Error fetching customers:", error);
+          set({ customers: [] });
+        }
+      },
+      getCustomerById: (customerId: string) => get().customers.find((c) => c.id === customerId),
+      getAllCustomers: (companyId?: string) => {
+        const state = get();
+        if (companyId) {
+          return state.customers.filter(c => c.companyId === companyId);
+        }
+        return state.customers;
       },
 
       fetchMessagesForStore: async (storeId, companyId) => {
@@ -952,7 +985,7 @@ export const useInventoryStore = create<InventoryState>()(
             localStorage.setItem('companyId', defaultCompanyId);
           }
 
-          const arraysToReset: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories'];
+          const arraysToReset: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories', 'customers'];
           arraysToReset.forEach(key => {
             if (!Array.isArray((state as any)[key]) || (state as any)[key].length > 0) {
               (state as any)[key] = []; storeUpdated = true;
@@ -986,7 +1019,7 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) {
           console.error("Critical error during inventory store hydration, resetting to defaults:", error);
           set({
-            products: [], bills: [], categories: [], staffs: [], stores: [], 
+            products: [], bills: [], categories: [], customers: [], staffs: [], stores: [], 
             userProfile: { ...defaultUserProfile }, messagesByStore: {}
           });
         }
@@ -1009,7 +1042,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
         return persistedState;
       },
-      version: 3, // Incremented version for currency addition
+      version: 4, // Incremented version for customer addition
     }
   )
 );
@@ -1029,7 +1062,8 @@ if (typeof window !== 'undefined') {
         state.fetchBills(companyId),
         state.fetchCategories(companyId),
         state.fetchStaff(companyId),
-        state.fetchStores(companyId)
+        state.fetchStores(companyId),
+        state.fetchCustomers(companyId) 
       ]).catch(err => console.error("Error during initial data fetch:", err));
       (window as any).__initialDataFetched = true;
     }

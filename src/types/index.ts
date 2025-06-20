@@ -110,7 +110,7 @@ export interface Company {
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
-  currency?: string; // Added currency field
+  currency?: string;
 }
 
 export interface User {
@@ -159,7 +159,7 @@ export interface UserProfile {
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
-  companyCurrency?: string; // Added currency field
+  companyCurrency?: string;
 }
 
 export interface ChatMessage {
@@ -196,9 +196,24 @@ export interface ProductLedgerEntry {
   currentStock: number | 'N/A';
 }
 
-// Represents a currency option for the settings dropdown
 export interface CurrencyOption {
-  code: string; // e.g., "INR", "USD"
-  symbol: string; // e.g., "₹", "$"
-  name: string; // e.g., "Indian Rupee", "US Dollar"
+  code: string;
+  symbol: string;
+  name: string;
+}
+
+export interface Customer {
+  id: string; // Can be phone number or a generated UUID
+  companyId: string;
+  name?: string;
+  phone?: string; // Primary identifier if names are not unique
+  email?: string;
+  address?: string;
+  firstSeen: string; // ISO date string
+  lastSeen: string; // ISO date string
+  // Aggregated data (to be computed later)
+  // totalVisits: number;
+  // totalSpend: number;
+  // totalReturns: number;
+  // preferredProducts: Array<{ productId: string, productName: string, count: number }>;
 }
