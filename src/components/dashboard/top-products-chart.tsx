@@ -6,6 +6,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getCurrencySymbol } from '@/lib/utils';
 
 const chartConfig = {
   revenue: {
@@ -21,12 +22,18 @@ interface ProductRevenueData {
 
 export function TopProductsChart() {
   const getTopSellingProductsByRevenue = useInventoryStore((state) => state.getTopSellingProductsByRevenue);
+  const userProfile = useInventoryStore((state) => state.userProfile);
   const [chartData, setChartData] = useState<ProductRevenueData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
+
+  useEffect(() => {
+    setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
+  }, [userProfile.companyCurrency]);
 
   useEffect(() => {
     setIsLoading(true);
-    const data = getTopSellingProductsByRevenue(5); // Get top 5 products
+    const data = getTopSellingProductsByRevenue(5); 
     setChartData(data);
     setIsLoading(false);
   }, [getTopSellingProductsByRevenue]);
@@ -47,7 +54,7 @@ export function TopProductsChart() {
         margin={{
           top: 5,
           right: 10,
-          left: 5, // Adjusted for Y-axis labels
+          left: 5, 
           bottom: 0,
         }}
       >
@@ -55,7 +62,7 @@ export function TopProductsChart() {
         <XAxis 
           type="number" 
           dataKey="revenue" 
-          tickFormatter={(value) => `₹${value / 1000}k`} 
+          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} 
           axisLine={false} 
           tickLine={false}
         />
@@ -65,17 +72,16 @@ export function TopProductsChart() {
           tickLine={false} 
           axisLine={false} 
           tickMargin={5}
-          width={100} // Give more space for product names
-          interval={0} // Ensure all labels are shown
+          width={100} 
+          interval={0} 
         />
         <Tooltip 
           cursor={{ fill: 'hsl(var(--muted))' }} 
           content={<ChartTooltipContent 
             indicator="dot"
-             formatter={(value) => `₹${Number(value).toFixed(2)}`}
+             formatter={(value) => `${currencySymbol}${Number(value).toFixed(2)}`}
           />}
         />
-        {/* <Legend /> Removed legend as it's clear from context */}
         <Bar dataKey="revenue" fill={chartConfig.revenue.color} radius={4} barSize={30}/>
       </BarChart>
     </ChartContainer>

@@ -6,7 +6,7 @@ import { persist, createJSONStorage, type PersistOptions } from 'zustand/middlew
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
-import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME } from '@/lib/constants';
+import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 
 const generateId = () => uuidv4();
 
@@ -120,7 +120,8 @@ const defaultUserProfile: UserProfile = {
   defaultBillNotes: 'Thank you for your business!',
   defaultSalesPaymentStatus: 'paid',
   defaultPurchasePaymentStatus: 'paid',
-  dataMode: 'local', // Will be overridden by server data if available
+  companyCurrency: DEFAULT_CURRENCY_CODE,
+  dataMode: 'local', 
 };
 
 type InventoryPersist = (
@@ -364,7 +365,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success) {
             set((state) => {
               const newMessagesByStore = { ...state.messagesByStore };
-              delete newMessagesByStore[storeId]; // Clears all messages for this store
+              delete newMessagesByStore[storeId]; 
               return { messagesByStore: newMessagesByStore };
             });
             return true;
@@ -400,7 +401,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             set((state) => ({ bills: [result.data, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
-            get().fetchProducts(billData.companyId); // Re-fetch products to update stock
+            get().fetchProducts(billData.companyId); 
             return result.data;
           } else {
             console.error("Failed to add bill via API:", result.message);
@@ -418,7 +419,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success) {
             set((state) => ({ bills: state.bills.filter((b) => b.id !== billId) }));
-            get().fetchProducts(companyId); // Re-fetch products as stock might need re-evaluation by server logic (though current server doesn't rollback)
+            get().fetchProducts(companyId); 
             return true;
           } else {
             console.error("Failed to delete bill via API:", result.message);
@@ -472,6 +473,7 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultBillNotes: companyData.defaultBillNotes,
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
+                companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE, // Use fetched or default
                 dataMode: 'global',
             }});
             return companyData;
@@ -497,10 +499,9 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             const updatedCompany = result.data as Company;
-            // Update client-side userProfile cache based on the successfully updated company data
             set((state) => ({
               userProfile: {
-                ...state.userProfile, // Keep any non-company fields from existing profile
+                ...state.userProfile, 
                 companyName: updatedCompany.name,
                 companyLogoUrl: updatedCompany.logoUrl,
                 companySlogan: updatedCompany.slogan,
@@ -511,6 +512,7 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultBillNotes: updatedCompany.defaultBillNotes,
                 defaultSalesPaymentStatus: updatedCompany.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: updatedCompany.defaultPurchasePaymentStatus,
+                companyCurrency: updatedCompany.currency || state.userProfile.companyCurrency || DEFAULT_CURRENCY_CODE,
                 dataMode: 'global',
               }
             }));
@@ -548,11 +550,6 @@ export const useInventoryStore = create<InventoryState>()(
         );
         if (!sku) {
            const skuIdentifier = get().getSkuIdentifier(product.name, optionValues);
-           // For client-side operations, we might need to create a conceptual SKU if not found,
-           // but the server should handle actual persistence if this new SKU is used in a bill.
-           // For now, if not found, it means it wasn't explicitly created via API or previous bills.
-           // So, returning a conceptual one for UI purposes might be okay, but it won't have stock layers.
-           // console.warn(`Client-side SKU not found for ${product.name} with options ${JSON.stringify(optionValues)}. Server will create if billed.`);
            return { id: generateId() + '_conceptual', optionValues: { ...optionValues }, skuIdentifier: skuIdentifier, stockLayers: [] };
         }
         return sku;
@@ -571,7 +568,7 @@ export const useInventoryStore = create<InventoryState>()(
             : sku.stockLayers;
 
         if (product.trackQuantity === false) {
-          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; // Fallback to any layer if no store-specific
+          const priceLayer = relevantStockLayers.find(layer => layer) || sku.stockLayers[0]; 
           return {
             totalStock: null,
             currentSellPrice: priceLayer?.sellPrice ?? null,
@@ -736,7 +733,6 @@ export const useInventoryStore = create<InventoryState>()(
                 const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
                 return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
              }
-             // For tracked items in expense bills, item.sellPrice is the intended sell price set at purchase
              return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
@@ -795,18 +791,15 @@ export const useInventoryStore = create<InventoryState>()(
             totalRevenue += bill.subTotal ?? bill.totalAmount; 
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
-              const costForItem = (item.costPrice || 0); // COGS is already calculated and stored in billItem for sales
+              const costForItem = (item.costPrice || 0); 
               totalCOGS += costForItem * item.quantity;
             });
           } else if (bill.type === 'buy') {
-            // All items in a 'buy' bill contribute to totalExpenses (COGS for items purchased, direct expenses for services)
             totalExpenses += bill.totalAmount;
           }
         });
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses; // For this model, COGS from sales and direct purchases are separate from operational expenses.
-                                                      // If 'buy' bills are *only* for inventory, totalExpenses might be better named 'totalPurchasesCost' and netProfit logic would change.
-                                                      // Assuming 'buy' bills can be direct expenses too.
+        const netProfit = grossProfit - totalExpenses; 
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
       getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { 
@@ -857,7 +850,7 @@ export const useInventoryStore = create<InventoryState>()(
                   productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
                 }
                 const itemRevenue = (item.sellPrice || 0) * item.quantity;
-                const itemCogs = (item.costPrice || 0) * item.quantity; // COGS is recorded per sales bill item
+                const itemCogs = (item.costPrice || 0) * item.quantity; 
 
                 productFinancials[skuIdentifier].revenue += itemRevenue;
                 productFinancials[skuIdentifier].cogs += itemCogs;
@@ -896,9 +889,8 @@ export const useInventoryStore = create<InventoryState>()(
             if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
             
             const productRef = get().getProductById(item.productId);
-            if(!productRef) return; // Only process items for known products
+            if(!productRef) return; 
 
-            // For ledger, we group by base product ID, not individual SKUs/productName from bill
             const baseProductId = productRef.id; 
 
             if (!ledgerMap[baseProductId]) {
@@ -931,14 +923,13 @@ export const useInventoryStore = create<InventoryState>()(
           let currentStock: number | 'N/A' = 'N/A';
           if (product.trackQuantity) {
             currentStock = product.productSKUs.reduce((sum, sku) => {
-                // For ledger, get overall stock, not store-specific for simplicity here
                 const skuDetails = get().getSkuDetails(sku, undefined); 
                 return sum + (skuDetails.totalStock ?? 0);
             }, 0);
           }
           return {
             productId: product.id,
-            productName: product.name, // Display base product name
+            productName: product.name, 
             category: product.category,
             ...summary,
             currentStock,
@@ -955,10 +946,8 @@ export const useInventoryStore = create<InventoryState>()(
         try {
           const state = get();
           let storeUpdated = false;
-          const defaultCompanyId = "comp_default_001"; // Match db.json
+          const defaultCompanyId = "comp_default_001"; 
 
-          // Ensure companyId is present in localStorage for client-side operations.
-          // This is a placeholder; real multi-company would require login context.
           if (typeof window !== 'undefined' && !localStorage.getItem('companyId')) {
             localStorage.setItem('companyId', defaultCompanyId);
           }
@@ -981,6 +970,10 @@ export const useInventoryStore = create<InventoryState>()(
                     storeUpdated = true;
                 }
             });
+             if (!state.userProfile.companyCurrency) { // Ensure currency is set
+                state.userProfile.companyCurrency = DEFAULT_CURRENCY_CODE;
+                storeUpdated = true;
+            }
           }
           
           if(!state.messagesByStore || typeof state.messagesByStore !== 'object') {
@@ -1000,7 +993,7 @@ export const useInventoryStore = create<InventoryState>()(
       }
     }),
     {
-      name: 'stockflow-app-storage', // Changed name to avoid conflict if old one exists
+      name: 'stockflow-app-storage', 
       storage: createJSONStorage(() => localStorage),
       onRehydrateStorage: () => (state) => {
         if (state?._hydrate) {
@@ -1008,30 +1001,27 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       migrate: (persistedState: any, version: number) => {
-        // Example migration: if an old version of state exists without userProfile.dataMode
         if (persistedState && persistedState.userProfile && persistedState.userProfile.dataMode === undefined) {
-          persistedState.userProfile.dataMode = 'local'; // Default old states to local
+          persistedState.userProfile.dataMode = 'local'; 
         }
-        // If old storage was 'stockflow-inventory-storage', clear it conceptually to avoid conflicts
-        // Actual clearing of old localStorage items would need to be done explicitly if desired.
+        if (persistedState && persistedState.userProfile && persistedState.userProfile.companyCurrency === undefined) {
+          persistedState.userProfile.companyCurrency = DEFAULT_CURRENCY_CODE;
+        }
         return persistedState;
       },
-      version: 2, // Increment version if schema changes significantly
+      version: 3, // Incremented version for currency addition
     }
   )
 );
 
-// Initial hydration call if Zustand hasn't already hydrated
 if (typeof window !== 'undefined') {
   const state = useInventoryStore.getState();
   if (state._hydrate && !(state as any).__hydrated) {
     state._hydrate();
     (useInventoryStore.getState() as any).__hydrated = true;
   }
-  // Ensure critical data is fetched on load if a company context exists
   const companyId = localStorage.getItem('companyId');
   if (companyId) {
-    // Use a flag to prevent multiple fetches on hot reloads during development
     if (!(window as any).__initialDataFetched) {
       Promise.all([
         state.fetchCompanyProfile(companyId),
@@ -1045,5 +1035,3 @@ if (typeof window !== 'undefined') {
     }
   }
 }
-
-    

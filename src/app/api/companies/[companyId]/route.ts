@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Company } from '@/types';
-import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, SUPPORTED_CURRENCIES } from '@/lib/constants';
 
 const routeNamePrefix = "[API_COMPANIES_SINGLE /api/companies/[companyId]]";
 
@@ -59,17 +59,15 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
       return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
     }
 
-    // Destructure to prevent accidental update of 'id' or 'token' from payload
     const { id, token, ...updateableData } = companyDataToUpdate;
 
-    // Validate specific fields if they are present in the update
     if (updateableData.name !== undefined && (typeof updateableData.name !== 'string' || updateableData.name.trim() === '')) {
         console.warn(`${routeLogName} Company name cannot be empty if provided for update.`);
         return NextResponse.json({ success: false, message: 'Company name cannot be empty if provided for update.' }, { status: 400 });
     }
     if (updateableData.activeSubscriptionId) {
       const validPlan = SUBSCRIPTION_PLANS.find(p => p.id === updateableData.activeSubscriptionId);
-      if (!validPlan || updateableData.activeSubscriptionId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) { // Enterprise plan requires special handling
+      if (!validPlan || updateableData.activeSubscriptionId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) { 
           console.warn(`${routeLogName} Invalid or restricted subscription plan ID provided: ${updateableData.activeSubscriptionId}.`);
           return NextResponse.json({ success: false, message: 'Invalid or restricted subscription plan ID provided.' }, { status: 400 });
       }
@@ -82,10 +80,14 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
         console.warn(`${routeLogName} Invalid default purchase payment status: ${updateableData.defaultPurchasePaymentStatus}. Must be 'paid' or 'unpaid'.`);
         return NextResponse.json({ success: false, message: "Invalid default purchase payment status. Must be 'paid' or 'unpaid'." }, { status: 400 });
     }
+    if (updateableData.currency && !SUPPORTED_CURRENCIES.find(c => c.code === updateableData.currency)) {
+        console.warn(`${routeLogName} Invalid currency code provided: ${updateableData.currency}.`);
+        return NextResponse.json({ success: false, message: 'Invalid currency code provided.' }, { status: 400 });
+    }
+
 
     const originalCompany = db.companies[companyIndex];
     const updatedCompany = { ...originalCompany, ...updateableData };
-    // Ensure name is trimmed if updated
     if (updateableData.name) updatedCompany.name = updateableData.name.trim();
 
     db.companies[companyIndex] = updatedCompany;

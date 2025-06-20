@@ -10,15 +10,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { UserProfile, Company } from '@/types';
-import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info } from 'lucide-react';
+import type { UserProfile, Company, CurrencyOption } from '@/types';
+import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 
 export default function SettingsPage() {
   const { 
-    userProfile, // Client-side cache of Company data
-    updateUserProfileFields, // Updates Company on server
+    userProfile, 
+    updateUserProfileFields, 
     fetchCompanyProfile 
   } = useInventoryStore();
   const { toast } = useToast();
@@ -27,6 +28,7 @@ export default function SettingsPage() {
   const [defaultBillNotes, setDefaultBillNotes] = useState('');
   const [defaultSalesPaymentStatus, setDefaultSalesPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [defaultPurchasePaymentStatus, setDefaultPurchasePaymentStatus] = useState<'paid' | 'unpaid'>('paid');
+  const [selectedCurrency, setSelectedCurrency] = useState<string>(DEFAULT_CURRENCY_CODE);
   
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,7 +40,7 @@ export default function SettingsPage() {
     if (companyIdFromStorage) {
       setCurrentCompanyId(companyIdFromStorage);
       setIsLoading(true);
-      fetchCompanyProfile(companyIdFromStorage) // Fetch full company data
+      fetchCompanyProfile(companyIdFromStorage) 
         .then(() => setIsLoading(false))
         .catch(() => {
           toast({ variant: "destructive", title: "Error", description: "Could not load company settings." });
@@ -51,16 +53,16 @@ export default function SettingsPage() {
   }, [fetchCompanyProfile, toast]);
 
   useEffect(() => {
-    // Populate local state from userProfile (which is updated by fetchCompanyProfile)
     if (hasMounted && !isLoading && userProfile) {
       setDefaultBillNotes(userProfile.defaultBillNotes || '');
       setDefaultSalesPaymentStatus(userProfile.defaultSalesPaymentStatus || 'paid');
       setDefaultPurchasePaymentStatus(userProfile.defaultPurchasePaymentStatus || 'paid');
+      setSelectedCurrency(userProfile.companyCurrency || DEFAULT_CURRENCY_CODE);
     }
   }, [hasMounted, isLoading, userProfile]);
 
   const handleSaveSetting = async (
-    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus'>, 
+    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus' | 'currency'>, 
     value: any, 
     successMessage: string
   ) => {
@@ -69,10 +71,8 @@ export default function SettingsPage() {
       return;
     }
     try {
-      // updateUserProfileFields now syncs to the Company record on the server
       await updateUserProfileFields({ [field]: value } as Partial<Omit<Company, 'id'|'token'>>, currentCompanyId);
       toast({ title: 'Setting Saved', description: successMessage });
-      // No need to manually update local state if userProfile in store is source of truth and re-renders
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save setting." });
     }
@@ -121,7 +121,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultSalesPaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultSalesPaymentStatus(value); // Optimistic UI update
+                  setDefaultSalesPaymentStatus(value); 
                   handleSaveSetting('defaultSalesPaymentStatus', value, 'Default sales payment status updated.');
                 }}
               >
@@ -140,7 +140,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultPurchasePaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultPurchasePaymentStatus(value); // Optimistic UI update
+                  setDefaultPurchasePaymentStatus(value); 
                   handleSaveSetting('defaultPurchasePaymentStatus', value, 'Default purchase payment status updated.');
                 }}
               >
@@ -154,6 +154,55 @@ export default function SettingsPage() {
               </Select>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card className="shadow-md border-t-2 border-t-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary"/>Localization</CardTitle>
+          <CardDescription>Manage currency and language preferences for the application.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="currencySelect">Default Currency</Label>
+              <Select
+                value={selectedCurrency}
+                onValueChange={(value: string) => {
+                  setSelectedCurrency(value);
+                  handleSaveSetting('currency', value, `Default currency updated to ${value}.`);
+                }}
+              >
+                <SelectTrigger id="currencySelect" className="select-trigger-class w-full md:w-1/2">
+                  <SelectValue placeholder="Select default currency" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SUPPORTED_CURRENCIES.map((currency: CurrencyOption) => (
+                    <SelectItem key={currency.code} value={currency.code}>
+                      {currency.name} ({currency.symbol} - {currency.code})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Selected currency will be used for displaying monetary values across the application.
+              </p>
+            </div>
+             <div className="space-y-1.5">
+                <Label htmlFor="languageSelect" className="flex items-center gap-1.5">
+                    <Languages className="h-4 w-4 text-muted-foreground"/> Application Language
+                </Label>
+                <Select disabled value="en">
+                    <SelectTrigger id="languageSelect" className="select-trigger-class w-full md:w-1/2">
+                        <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="en">English (United States)</SelectItem>
+                    </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                    Multi-language support is planned for a future update. Currently, only English is available.
+                </p>
+            </div>
         </CardContent>
       </Card>
 
@@ -187,10 +236,9 @@ export default function SettingsPage() {
             Examples of future settings:
           </p>
           <ul className="list-disc list-inside mt-2 text-xs text-muted-foreground space-y-1">
-            <li>Default currency and number formatting.</li>
             <li>Date and time zone settings.</li>
             <li>Notification preferences (e.g., low stock alerts).</li>
-            <li>Data import/export options.</li>
+            <li>Data import/export options for various modules.</li>
           </ul>
         </CardContent>
       </Card>

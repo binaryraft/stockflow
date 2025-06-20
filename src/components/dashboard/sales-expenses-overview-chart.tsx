@@ -7,6 +7,7 @@ import { Line, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Responsi
 import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
+import { getCurrencySymbol } from '@/lib/utils';
 
 const chartConfig = {
   sales: {
@@ -27,12 +28,18 @@ interface DailyData {
 
 export function SalesExpensesOverviewChart() {
   const getDailySalesAndExpenses = useInventoryStore((state) => state.getDailySalesAndExpenses);
+  const userProfile = useInventoryStore((state) => state.userProfile);
   const [chartData, setChartData] = useState<DailyData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
+
+  useEffect(() => {
+    setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
+  }, [userProfile.companyCurrency]);
 
   useEffect(() => {
     setIsLoading(true);
-    const data = getDailySalesAndExpenses(7); // Get data for the last 7 days
+    const data = getDailySalesAndExpenses(7); 
     setChartData(data);
     setIsLoading(false);
   }, [getDailySalesAndExpenses]);
@@ -52,7 +59,7 @@ export function SalesExpensesOverviewChart() {
         margin={{
           top: 5,
           right: 10,
-          left: -25, // Adjust to show Y-axis labels if cut off
+          left: -15, // Adjust to show Y-axis labels if cut off, considering currency symbol
           bottom: 0,
         }}
       >
@@ -62,13 +69,13 @@ export function SalesExpensesOverviewChart() {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(value) => value} // Already formatted 'MMM d'
+          tickFormatter={(value) => value} 
         />
         <YAxis
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(value) => `₹${value / 1000}k`} // Format as thousands
+          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} 
         />
         <Tooltip
           cursor={true}
@@ -77,7 +84,7 @@ export function SalesExpensesOverviewChart() {
             formatter={(value, name) => (
               <div className="flex flex-col">
                 <span className="capitalize">{name}</span>
-                <span>₹{Number(value).toFixed(2)}</span>
+                <span>{currencySymbol}{Number(value).toFixed(2)}</span>
               </div>
             )}
           />}

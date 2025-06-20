@@ -5,10 +5,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import type { Bill } from '@/types'; // Assuming Bill type is sufficient
+import type { Bill } from '@/types'; 
 import { format } from 'date-fns';
 import { CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getCurrencySymbol } from '@/lib/utils';
 
 interface ExpenseBillWithCoverage extends Bill {
   totalCost: number;
@@ -18,16 +19,19 @@ interface ExpenseBillWithCoverage extends Bill {
 
 export function ExpenseTrackerCard() {
   const getRecentExpenseBills = useInventoryStore((state) => state.getRecentExpenseBillsWithPotentialCoverage);
+  const userProfile = useInventoryStore((state) => state.userProfile);
   const [expenseBills, setExpenseBills] = useState<ExpenseBillWithCoverage[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setHasMounted(true);
-  }, []);
+    setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
+  }, [userProfile.companyCurrency]);
 
   useEffect(() => {
     if (hasMounted) {
-      setExpenseBills(getRecentExpenseBills(7)); // Get last 7 expense bills for the tracker
+      setExpenseBills(getRecentExpenseBills(7)); 
     }
   }, [hasMounted, getRecentExpenseBills]);
 
@@ -41,7 +45,7 @@ export function ExpenseTrackerCard() {
         <CardDescription>Overview of recent expenses and their potential revenue coverage.</CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
-        <ScrollArea className="h-[300px] pr-3"> {/* Added pr-3 for scrollbar spacing */}
+        <ScrollArea className="h-[300px] pr-3"> 
           { !hasMounted || expenseBills.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">No recent expense bills to display.</p>
           ) : (
@@ -68,11 +72,11 @@ export function ExpenseTrackerCard() {
                   <div className="mt-1.5 pt-1.5 border-t border-dashed grid grid-cols-2 gap-x-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Cost: </span>
-                      <span className="font-semibold text-destructive">₹{bill.totalCost.toFixed(2)}</span>
+                      <span className="font-semibold text-destructive">{currencySymbol}{bill.totalCost.toFixed(2)}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-muted-foreground">Pot. Revenue: </span>
-                      <span className="font-semibold text-primary">₹{bill.potentialRevenue.toFixed(2)}</span>
+                      <span className="font-semibold text-primary">{currencySymbol}{bill.potentialRevenue.toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -84,5 +88,3 @@ export function ExpenseTrackerCard() {
     </Card>
   );
 }
-
-    

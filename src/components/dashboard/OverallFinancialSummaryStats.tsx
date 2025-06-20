@@ -7,15 +7,19 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { DollarSign, TrendingUp, TrendingDown, BarChart, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { FinancialSummary } from '@/types';
+import { getCurrencySymbol } from '@/lib/utils';
 
 export function OverallFinancialSummaryStats() {
   const getSummary = useInventoryStore((state) => state.getOverallFinancialSummary);
+  const userProfile = useInventoryStore((state) => state.userProfile);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setHasMounted(true);
-  }, []);
+    setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
+  }, [userProfile.companyCurrency]);
 
   useEffect(() => {
     if (hasMounted) {
@@ -65,7 +69,7 @@ export function OverallFinancialSummaryStats() {
                 {React.cloneElement(item.icon, { size: 18 })}
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</h4>
               </div>
-              <p className={cn("text-xl font-bold", item.colorClass)}>₹{item.value.toFixed(2)}</p>
+              <p className={cn("text-xl font-bold", item.colorClass)}>{currencySymbol}{item.value.toFixed(2)}</p>
             </div>
           ))}
         </div>

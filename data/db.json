@@ -1,3 +1,4 @@
+
 {
   "companies": [
     {
@@ -12,7 +13,8 @@
       "gstNo": "29DEFAULTGST1Z5",
       "defaultBillNotes": "Thank you for your business!",
       "defaultSalesPaymentStatus": "paid",
-      "defaultPurchasePaymentStatus": "paid"
+      "defaultPurchasePaymentStatus": "paid",
+      "currency": "INR"
     },
     {
       "id": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7",
@@ -26,7 +28,8 @@
       "gstNo": null,
       "defaultBillNotes": "",
       "defaultSalesPaymentStatus": "paid",
-      "defaultPurchasePaymentStatus": "unpaid"
+      "defaultPurchasePaymentStatus": "unpaid",
+      "currency": "INR"
     },
     {
       "id": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
@@ -40,7 +43,8 @@
       "gstNo": "",
       "defaultBillNotes": "Thank you for your business!",
       "defaultSalesPaymentStatus": "paid",
-      "defaultPurchasePaymentStatus": "paid"
+      "defaultPurchasePaymentStatus": "paid",
+      "currency": "INR"
     }
   ],
   "users": [
@@ -98,28 +102,78 @@
   ],
   "products": [
     {
+      "id": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
       "name": "gold",
       "category": "",
       "trackQuantity": true,
+      "sku": "GOLD-MAIN-SKU",
+      "expiryDate": "",
+      "imageUrl": "https://placehold.co/100x100.png?text=gold&font=roboto",
       "description": "",
       "variants": [],
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
-      "additionalChargeDefinitions": [],
-      "id": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
-      "imageUrl": "https://placehold.co/100x100.png?text=gold&font=roboto",
       "productSKUs": [
         {
           "id": "992c81a1-f951-464d-b0b9-ce838836c08c",
           "optionValues": {},
           "skuIdentifier": "gold",
-          "stockLayers": []
+          "stockLayers": [
+            {
+              "id": "f0c8b564-8c0c-41e8-9372-62b509a02096",
+              "purchaseBillId": "202506200435544_23c64e",
+              "purchaseDate": "2025-06-20T04:35:54.491Z",
+              "initialQuantity": 50,
+              "quantity": 50,
+              "costPrice": 10,
+              "sellPrice": 20,
+              "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06"
+            }
+          ]
         }
       ],
-      "sku": "",
-      "expiryDate": ""
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "sgstRate": 0,
+      "cgstRate": 0,
+      "additionalChargeDefinitions": []
     }
   ],
-  "bills": [],
+  "bills": [
+    {
+      "id": "202506200435544_23c64e",
+      "type": "buy",
+      "date": "2025-06-20T04:35:54.491Z",
+      "timestamp": 1750394154491,
+      "vendorOrCustomerName": "Gold Supplier Inc.",
+      "customerPhone": null,
+      "items": [
+        {
+          "id": "056ace72-8e4d-406c-9b21-08ab96005401",
+          "productId": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
+          "productName": "gold",
+          "quantity": 50,
+          "costPrice": 10,
+          "sellPrice": 20,
+          "isDefective": false,
+          "selectedVariantOptions": {},
+          "sgstAmount": 0,
+          "cgstAmount": 0,
+          "isAdditionalCharge": false,
+          "sourceChargeDefinitionId": null
+        }
+      ],
+      "subTotal": 500,
+      "totalSGST": 0,
+      "totalCGST": 0,
+      "totalAmount": 500,
+      "isEstimate": false,
+      "notes": "Thank you for your business!",
+      "paymentStatus": "paid",
+      "billedByStaffId": "user_admin_44669c5a-6d65-4f1c-98ea-f875a54c6aee",
+      "billedByStaffName": "danie",
+      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+      "storeName": "gold",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
+    }
+  ],
   "categories": [
     {
       "id": "cat_default_electronics",

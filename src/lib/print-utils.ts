@@ -2,6 +2,7 @@
 import { format } from 'date-fns';
 import type { Bill, BillItem, ProductSKU, Product, UserProfile } from '@/types';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
+import { getCurrencySymbol } from './utils'; // Import the new helper
 
 // Helper function to get SKU details - simplified, assumes product and SKU exist
 const getProductSkuForPrint = (
@@ -46,10 +47,9 @@ const getPartyNameLabelForPrint = (billType: Bill['type']): string => {
 export const generateBillPrintContent = (
     billToPrint: Bill, 
     userProfile: UserProfile | undefined,
-    products: Product[] // Pass all products to find details
-    // getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; },
-    // findProductSKUfromStore: (productId: string, selectedOptions?: Record<string, string>) => ProductSKU | undefined
+    products: Product[]
 ): string => {
+  const currencySymbol = getCurrencySymbol(userProfile?.companyCurrency);
   let content = '<html><head><title>Print Bill</title>';
   const styles =
     "<style>\n" +
@@ -85,8 +85,8 @@ export const generateBillPrintContent = (
 
   content += '<div class="header">';
   content += `<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`;
-  content += `<p>${COMPANY_ADDRESS}</p>`;
-  content += `<p>${COMPANY_CONTACT}</p>`;
+  content += `<p>${userProfile?.companyAddress || COMPANY_ADDRESS}</p>`; // Use profile address
+  content += `<p>Phone: ${userProfile?.companyPhone || 'N/A'} | GSTIN: ${userProfile?.companyGstNo || 'N/A'}</p>`; // Use profile phone/GST
   content += `<h2>${billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE' : (billToPrint.type === 'sell' ? 'TAX INVOICE' : getBillTypeNameForPrint(billToPrint).toUpperCase())}</h2>`;
   content += '</div>';
 
@@ -149,15 +149,15 @@ export const generateBillPrintContent = (
         content += `<td class="text-right">${purchasedQty.toFixed(2)}</td>`;
         content += `<td class="text-right" style="color: green;">${soldQty.toFixed(2)}</td>`;
         content += `<td class="text-right font-medium">${remainingQty.toFixed(2)}</td>`;
-        content += `<td class="text-right">₹${costPrice.toFixed(2)}</td>`;
-        content += `<td class="text-right">₹${sellPriceSet.toFixed(2)}</td>`;
-        content += `<td class="text-right font-medium">₹${(item.quantity * costPrice).toFixed(2)}</td>`;
+        content += `<td class="text-right">${currencySymbol}${costPrice.toFixed(2)}</td>`;
+        content += `<td class="text-right">${currencySymbol}${sellPriceSet.toFixed(2)}</td>`;
+        content += `<td class="text-right font-medium">${currencySymbol}${(item.quantity * costPrice).toFixed(2)}</td>`;
         content += '</tr>';
     });
   } else { 
     const itemSubTotalColName = showTaxDetailsInItems ? "Subtotal" : "Item Total";
     content += '<table><thead><tr><th>#</th><th>Product/Charge</th><th>Qty</th><th>Price/Unit</th>';
-    if (showTaxDetailsInItems && billToPrint.items.some(i => !i.isAdditionalCharge)) { // Show tax columns only if there are taxable products
+    if (showTaxDetailsInItems && billToPrint.items.some(i => !i.isAdditionalCharge)) { 
       content += '<th>SGST</th><th>CGST</th>';
     }
     content += `<th class="text-right">${itemSubTotalColName}</th></tr></thead><tbody>`;
@@ -186,17 +186,17 @@ export const generateBillPrintContent = (
         }
         content += '</td>';
         content += `<td class="text-right">${item.quantity.toFixed(2)}</td>`;
-        content += `<td class="text-right">₹${sellPrice.toFixed(2)}</td>`;
+        content += `<td class="text-right">${currencySymbol}${sellPrice.toFixed(2)}</td>`;
         if (showTaxDetailsInItems && billToPrint.items.some(i => !i.isAdditionalCharge)) {
           if (item.isAdditionalCharge) {
             content += `<td class="text-right">-</td>`;
             content += `<td class="text-right">-</td>`;
           } else {
-            content += `<td class="text-right">₹${itemSgst.toFixed(2)}</td>`;
-            content += `<td class="text-right">₹${itemCgst.toFixed(2)}</td>`;
+            content += `<td class="text-right">${currencySymbol}${itemSgst.toFixed(2)}</td>`;
+            content += `<td class="text-right">${currencySymbol}${itemCgst.toFixed(2)}</td>`;
           }
         }
-        content += `<td class="text-right font-medium">₹${(showTaxDetailsInItems && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</td>`;
+        content += `<td class="text-right font-medium">${currencySymbol}${(showTaxDetailsInItems && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</td>`;
         content += '</tr>';
     });
   }
@@ -223,18 +223,18 @@ export const generateBillPrintContent = (
     }, 0);
     const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
     const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c'; 
-    content += `<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
-    content += `<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">₹${expectedRevenue.toFixed(2)}</td></tr>`;
-    content += `<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">₹${expectedProfitOrLoss.toFixed(2)}</td></tr>`;
+    content += `<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
+    content += `<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">${currencySymbol}${expectedRevenue.toFixed(2)}</td></tr>`;
+    content += `<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">${currencySymbol}${expectedProfitOrLoss.toFixed(2)}</td></tr>`;
   } else if (billToPrint.type === 'sell' || billToPrint.type === 'return') {
      if (showTaxDetailsInItems) { 
-        content += `<tr><td style="text-align:right; border: none;">Subtotal:</td><td class="text-right" style="border: none;">₹${(billToPrint.subTotal || 0).toFixed(2)}</td></tr>`;
-        content += `<tr><td style="text-align:right; border: none;">Total SGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`;
-        content += `<tr><td style="text-align:right; border: none;">Total CGST:</td><td class="text-right" style="border: none;">₹${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`;
+        content += `<tr><td style="text-align:right; border: none;">Subtotal:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.subTotal || 0).toFixed(2)}</td></tr>`;
+        content += `<tr><td style="text-align:right; border: none;">Total SGST:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`;
+        content += `<tr><td style="text-align:right; border: none;">Total CGST:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`;
      }
      const totalRowColor = billToPrint.type === 'sell' ? (billToPrint.isEstimate ? '#1d4ed8' : '#166534') : '#b45309';
      const totalLabel = billToPrint.type === 'sell' && billToPrint.isEstimate ? 'Estimate Total:' : 'Grand Total:';
-     content += `<tr class="total-row"><td style="text-align:right; border: none; color: ${totalRowColor};"><strong>${totalLabel}</strong></td><td class="text-right" style="border: none; color: ${totalRowColor};"><strong>₹${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
+     content += `<tr class="total-row"><td style="text-align:right; border: none; color: ${totalRowColor};"><strong>${totalLabel}</strong></td><td class="text-right" style="border: none; color: ${totalRowColor};"><strong>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
   }
   content += '</table>';
   content += '</div>';
@@ -255,4 +255,3 @@ export const triggerPrint = (content: string) => {
         alert("Please allow popups to print the bill.");
     }
 };
-

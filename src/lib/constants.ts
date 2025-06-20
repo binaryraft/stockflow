@@ -1,7 +1,7 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare } from 'lucide-react';
-import type { SubscriptionPlan } from '@/types';
+import type { SubscriptionPlan, CurrencyOption } from '@/types';
 
 export interface NavLink {
   href: string;
@@ -37,6 +37,7 @@ export const SUBSCRIPTION_PLAN_IDS = {
   GROWTH: 'plan_growth',
   PRO: 'plan_pro',
   ENTERPRISE: 'plan_enterprise_contact',
+  ADMIN_ONLY: 'plan_admin_only_basic', // Keep if defined elsewhere, or remove if not used
 };
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
@@ -97,7 +98,17 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
         'Dedicated Account Manager',
         'Custom Integrations & Features'
     ],
-    maxStores: Infinity, // Represented as Infinity, but truly custom
-    maxEmployees: Infinity, // Represented as Infinity, but truly custom
+    maxStores: Infinity, 
+    maxEmployees: Infinity,
   },
 ];
+
+export const SUPPORTED_CURRENCIES: CurrencyOption[] = [
+  { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+  { code: 'USD', symbol: '$', name: 'US Dollar' },
+  { code: 'EUR', symbol: '€', name: 'Euro' },
+  { code: 'GBP', symbol: '£', name: 'British Pound' },
+  { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+];
+
+export const DEFAULT_CURRENCY_CODE = 'INR';

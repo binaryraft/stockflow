@@ -42,7 +42,7 @@ export interface Product {
   trackQuantity: boolean;
   sku?: string;
   expiryDate?: string;
-  imageUrl?: string;
+  imageUrl?: string | null;
   description?: string;
   variants?: ProductVariant[];
   productSKUs: ProductSKU[];
@@ -102,8 +102,7 @@ export interface Company {
   name: string;
   token: string;
   activeSubscriptionId: string;
-  // Fields moved from UserProfile
-  logoUrl?: string;
+  logoUrl?: string | null;
   slogan?: string;
   phone?: string;
   address?: string;
@@ -111,6 +110,7 @@ export interface Company {
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
+  currency?: string; // Added currency field
 }
 
 export interface User {
@@ -147,28 +147,25 @@ export interface SubscriptionPlan {
   isPopular?: boolean;
 }
 
-// UserProfile now primarily for client-side preferences not stored with Company,
-// or as a denormalized cache of Company data.
-// For this iteration, it will largely mirror Company fields for convenience but be populated
-// by fetching the main Company record.
 export interface UserProfile {
   companyName: string;
-  companyLogoUrl?: string;
+  companyLogoUrl?: string | null;
   companySlogan?: string;
   companyPhone?: string;
   companyAddress?: string;
   companyGstNo?: string;
   activeSubscriptionId: string;
-  dataMode: 'local' | 'global'; // Keep for now, though 'global' (server) is the target
+  dataMode: 'local' | 'global';
   defaultBillNotes?: string;
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
+  companyCurrency?: string; // Added currency field
 }
 
 export interface ChatMessage {
   id: string;
   storeId: string;
-  companyId: string; // Added for better server-side scoping/validation
+  companyId: string;
   senderId: 'admin' | string;
   senderName: string;
   text: string;
@@ -199,4 +196,9 @@ export interface ProductLedgerEntry {
   currentStock: number | 'N/A';
 }
 
-    
+// Represents a currency option for the settings dropdown
+export interface CurrencyOption {
+  code: string; // e.g., "INR", "USD"
+  symbol: string; // e.g., "₹", "$"
+  name: string; // e.g., "Indian Rupee", "US Dollar"
+}
