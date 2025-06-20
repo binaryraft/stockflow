@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import Image from 'next/image';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 type SortableLedgerColumns = keyof Omit<ProductLedgerEntry, 'productId' | 'category'> | 'category' | 'productName';
 
@@ -94,29 +95,30 @@ export function InventoryLedgerTable() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto bg-background"
         />
-        {/* Add other filters like category if needed later */}
       </div>
-      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+      
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[60px] py-3 px-4">Img</TableHead>
+              <TableHead className="w-[60px] py-3 px-4 hidden lg:table-cell">Img</TableHead>
               <TableHead onClick={() => requestSort('productName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 min-w-[200px]">
                 Product Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden md:table-cell">
+              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
                 Category <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('totalPurchased')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('totalPurchased')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 hidden sm:table-cell">
                 Purchased <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('totalSold')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Sold <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('totalRestockedReturns')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 hidden sm:table-cell">
+              <TableHead onClick={() => requestSort('totalRestockedReturns')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
                 Restocked <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('totalDefectiveReturns')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 hidden sm:table-cell">
+              <TableHead onClick={() => requestSort('totalDefectiveReturns')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
                 Defective <ArrowUpDown className="ml-1 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('currentStock')} className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4">
@@ -131,7 +133,7 @@ export function InventoryLedgerTable() {
                 const productDetails = getProductById(entry.productId);
                 return (
                 <TableRow key={entry.productId}>
-                  <TableCell className="py-2 px-3">
+                  <TableCell className="py-2 px-3 hidden lg:table-cell">
                     <Image
                       src={productDetails?.imageUrl || `https://placehold.co/48x48.png?text=${entry.productName.charAt(0)}`}
                       alt={entry.productName}
@@ -151,13 +153,13 @@ export function InventoryLedgerTable() {
                         <TooltipContent><p>View/Edit Product Details</p></TooltipContent>
                     </Tooltip>
                   </TableCell>
-                  <TableCell className="py-3 px-4 hidden md:table-cell">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell">
                     {entry.category ? <Badge variant="secondary">{entry.category}</Badge> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 text-blue-600 dark:text-blue-400">{entry.totalPurchased}</TableCell>
+                  <TableCell className="text-right py-3 px-4 text-blue-600 dark:text-blue-400 hidden sm:table-cell">{entry.totalPurchased}</TableCell>
                   <TableCell className="text-right py-3 px-4 text-green-600 dark:text-green-400">{entry.totalSold}</TableCell>
-                  <TableCell className="text-right py-3 px-4 text-teal-600 dark:text-teal-400 hidden sm:table-cell">{entry.totalRestockedReturns}</TableCell>
-                  <TableCell className="text-right py-3 px-4 text-orange-600 dark:text-orange-400 hidden sm:table-cell">{entry.totalDefectiveReturns}</TableCell>
+                  <TableCell className="text-right py-3 px-4 text-teal-600 dark:text-teal-400 hidden lg:table-cell">{entry.totalRestockedReturns}</TableCell>
+                  <TableCell className="text-right py-3 px-4 text-orange-600 dark:text-orange-400 hidden lg:table-cell">{entry.totalDefectiveReturns}</TableCell>
                   <TableCell className={cn("text-right py-3 px-4 font-semibold", entry.currentStock !== 'N/A' && entry.currentStock <= 0 ? "text-destructive" : "text-primary")}>
                     {entry.currentStock}
                   </TableCell>
@@ -185,6 +187,71 @@ export function InventoryLedgerTable() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {filteredAndSortedEntries.length > 0 ? (
+          filteredAndSortedEntries.map((entry) => {
+            const productDetails = getProductById(entry.productId);
+            return (
+              <Card key={`mobile-${entry.productId}`} className="shadow-md border-t-2 border-t-primary overflow-hidden">
+                <CardHeader className="p-3 flex flex-row items-center gap-3 bg-muted/30">
+                  <Image
+                    src={productDetails?.imageUrl || `https://placehold.co/40x40.png?text=${entry.productName.charAt(0)}`}
+                    alt={entry.productName}
+                    width={32}
+                    height={32}
+                    className="rounded object-cover aspect-square border"
+                  />
+                  <div className="flex-1">
+                    <CardTitle className="text-sm font-semibold">
+                       <Link href={`/admin/products/${entry.productId}`} className="hover:underline hover:text-primary transition-colors">
+                         {entry.productName}
+                       </Link>
+                    </CardTitle>
+                    {entry.category && <Badge variant="secondary" className="text-xs mt-0.5">{entry.category}</Badge>}
+                  </div>
+                   <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                      <Link href={`/admin/products/${entry.productId}`}>
+                          <PackageSearch className="h-4 w-4" />
+                      </Link>
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground">Purchased:</p>
+                    <p className="font-medium text-blue-600 dark:text-blue-400">{entry.totalPurchased}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground">Sold:</p>
+                    <p className="font-medium text-green-600 dark:text-green-400">{entry.totalSold}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground">Restocked:</p>
+                    <p className="font-medium text-teal-600 dark:text-teal-400">{entry.totalRestockedReturns}</p>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="text-muted-foreground">Defective:</p>
+                    <p className="font-medium text-orange-600 dark:text-orange-400">{entry.totalDefectiveReturns}</p>
+                  </div>
+                  <div className="space-y-0.5 col-span-2 text-center border-t pt-2 mt-1">
+                    <p className="text-muted-foreground">Current Stock:</p>
+                    <p className={cn("text-lg font-bold", entry.currentStock !== 'N/A' && entry.currentStock <= 0 ? "text-destructive" : "text-primary")}>
+                      {entry.currentStock}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            No product ledger data found.
+          </div>
+        )}
+      </div>
     </TooltipProvider>
   );
 }
+
+    

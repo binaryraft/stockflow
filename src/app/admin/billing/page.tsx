@@ -33,7 +33,7 @@ const HistoryStoreSelector: React.FC<{
 
   if ((isStarterPlan && stores.length === 1) || (!isStarterPlan && stores.length ===1)) {
     return (
-      <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50">
+      <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50 w-full sm:w-auto">
         <Building size={16} />
         {stores[0].name}
       </span>
@@ -47,7 +47,7 @@ const HistoryStoreSelector: React.FC<{
         value={currentStoreId || ""}
         onValueChange={(value) => onStoreChange(value || undefined)}
       >
-        <SelectTrigger id="store-context-select-history-trigger" className="w-auto min-w-[180px] h-9 select-trigger-class">
+        <SelectTrigger id="store-context-select-history-trigger" className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
           <SelectValue placeholder="Select Store..." />
         </SelectTrigger>
         <SelectContent position="popper">
@@ -191,40 +191,39 @@ function BillingContent() {
     }
     
     const newBillPageTitleActions = (
-        <div className="flex items-center gap-3">
-            {hasMounted && isAdminContext && !isStarterPlan && allStoresState.length > 1 && (
-                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">Billing For Store:</span>
-                    <Select
-                        key={`store-select-new-bill-${activePlan?.id}-${allStoresState.length}-${selectedStoreForForm}`}
-                        value={selectedStoreForForm || ""}
-                        onValueChange={(value) => setSelectedStoreForForm(value || undefined)}
-                    >
-                        <SelectTrigger id="store-select-new-bill-trigger" className="w-auto min-w-[180px] h-9 select-trigger-class">
-                          <SelectValue placeholder="Select Store..." />
-                        </SelectTrigger>
-                        <SelectContent position="popper">
-                        {allStoresState.map(store => ( <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem> ))}
-                        </SelectContent>
-                    </Select>
+        <>
+            {(hasMounted && isAdminContext && ((!isStarterPlan && allStoresState.length > 1) || ((isStarterPlan || allStoresState.length === 1) && allStoresState.length > 0))) && (
+                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
+                    <span className="text-sm font-medium whitespace-nowrap text-muted-foreground shrink-0">Billing For Store:</span>
+                    {hasMounted && isAdminContext && !isStarterPlan && allStoresState.length > 1 && (
+                        <Select
+                            key={`store-select-new-bill-${activePlan?.id}-${allStoresState.length}-${selectedStoreForForm}`}
+                            value={selectedStoreForForm || ""}
+                            onValueChange={(value) => setSelectedStoreForForm(value || undefined)}
+                        >
+                            <SelectTrigger id="store-select-new-bill-trigger" className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+                              <SelectValue placeholder="Select Store..." />
+                            </SelectTrigger>
+                            <SelectContent position="popper">
+                            {allStoresState.map(store => ( <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem> ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+                    {hasMounted && isAdminContext && (isStarterPlan || allStoresState.length === 1) && allStoresState.length > 0 && (
+                        <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50 w-full sm:w-auto">
+                            <Building size={16} />
+                            {allStoresState.find(s => s.id === selectedStoreForForm)?.name || allStoresState[0]?.name}
+                        </span>
+                    )}
                  </div>
             )}
-            {hasMounted && isAdminContext && (isStarterPlan || allStoresState.length === 1) && allStoresState.length > 0 && (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">Billing For Store:</span>
-                    <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50">
-                        <Building size={16} />
-                        {allStoresState.find(s => s.id === selectedStoreForForm)?.name || allStoresState[0]?.name}
-                    </span>
-                </div>
-            )}
-            <Button variant="outline" onClick={() => handleViewToggle('history')}>
+            <Button variant="outline" onClick={() => handleViewToggle('history')} className="w-full md:w-auto">
               <HistoryIcon className="mr-2 h-4 w-4" /> Bill History
             </Button>
-            <Button variant="outline" onClick={() => handleViewToggle('ledger')}>
+            <Button variant="outline" onClick={() => handleViewToggle('ledger')} className="w-full md:w-auto">
               <ListChecks className="mr-2 h-4 w-4" /> Inventory Ledger
             </Button>
-        </div>
+        </>
     );
 
     return (
@@ -243,58 +242,62 @@ function BillingContent() {
   const newBillHrefPath = `/admin/billing?action=new&mode=sell${currentContextStoreId ? `&storeId=${currentContextStoreId}` : (allStoresState.length === 1 ? `&storeId=${allStoresState[0].id}` : '')}`;
   
   const mainPageActions = (
-    <div className="flex items-center gap-3">
-        {hasMounted && isAdminContext && allStoresState.length > 0 && activeBillingView === 'history' && (
-            <div className="flex items-center gap-2">
-                <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">New Bill Context:</span>
-                <HistoryStoreSelector stores={allStoresState} activePlanId={activePlan?.id} currentStoreId={currentContextStoreId} onStoreChange={setCurrentContextStoreId} />
+    <>
+      {(hasMounted && isAdminContext && allStoresState.length > 0 && activeBillingView === 'history' || activeBillingView === 'history') && (
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full">
+          {hasMounted && isAdminContext && allStoresState.length > 0 && activeBillingView === 'history' && (
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+              <span className="text-sm font-medium whitespace-nowrap text-muted-foreground shrink-0">New Bill Store:</span>
+              <HistoryStoreSelector stores={allStoresState} activePlanId={activePlan?.id} currentStoreId={currentContextStoreId} onStoreChange={setCurrentContextStoreId} />
             </div>
-        )}
-        {activeBillingView === 'history' && (
-            <div className="flex items-center gap-2">
-                <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
-                    <SelectTrigger className="w-[180px] h-9 select-trigger-class">
-                        <SelectValue placeholder="Filter by time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="today">Today</SelectItem>
-                        <SelectItem value="thisWeek">This Week</SelectItem>
-                        <SelectItem value="thisMonth">This Month</SelectItem>
-                        <SelectItem value="lastMonth">Last Month</SelectItem>
-                        <SelectItem value="thisYear">This Year</SelectItem>
-                        <SelectItem value="lastYear">Last Year</SelectItem>
-                        <SelectItem value="all">All Time</SelectItem>
-                        <SelectItem value="custom">Custom Range</SelectItem>
-                    </SelectContent>
-                </Select>
-                {timePeriodFilter === 'custom' && (
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button id="date" variant={"outline"} className={cn("w-[260px] justify-start text-left font-normal h-9", !customDateRange && "text-muted-foreground" )}>
-                                <CalendarDays className="mr-2 h-4 w-4" />
-                                {customDateRange?.from ? (
-                                    customDateRange.to ? (
-                                        <>{format(customDateRange.from, "LLL dd, y")} - {format(customDateRange.to, "LLL dd, y")}</>
-                                    ) : ( format(customDateRange.from, "LLL dd, y") )
-                                ) : ( <span>Pick a date range</span> )}
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar initialFocus mode="range" defaultMonth={customDateRange?.from} selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
-                        </PopoverContent>
-                    </Popover>
-                )}
-            </div>
-        )}
-        <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline">
+          )}
+          {activeBillingView === 'history' && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+                  <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
+                      <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+                          <SelectValue placeholder="Filter by time" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="today">Today</SelectItem>
+                          <SelectItem value="thisWeek">This Week</SelectItem>
+                          <SelectItem value="thisMonth">This Month</SelectItem>
+                          <SelectItem value="lastMonth">Last Month</SelectItem>
+                          <SelectItem value="thisYear">This Year</SelectItem>
+                          <SelectItem value="lastYear">Last Year</SelectItem>
+                          <SelectItem value="all">All Time</SelectItem>
+                          <SelectItem value="custom">Custom Range</SelectItem>
+                      </SelectContent>
+                  </Select>
+                  {timePeriodFilter === 'custom' && (
+                      <Popover>
+                          <PopoverTrigger asChild>
+                              <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !customDateRange && "text-muted-foreground" )}>
+                                  <CalendarDays className="mr-2 h-4 w-4" />
+                                  {customDateRange?.from ? (
+                                      customDateRange.to ? (
+                                          <>{format(customDateRange.from, "LLL dd, y")} - {format(customDateRange.to, "LLL dd, y")}</>
+                                      ) : ( format(customDateRange.from, "LLL dd, y") )
+                                  ) : ( <span>Pick a date range</span> )}
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="end">
+                              <Calendar initialFocus mode="range" defaultMonth={customDateRange?.from} selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
+                          </PopoverContent>
+                      </Popover>
+                  )}
+              </div>
+          )}
+        </div>
+      )}
+        <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline" className="w-full md:w-auto">
             {activeBillingView === 'history' ? <ListChecks className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
             {activeBillingView === 'history' ? 'Inventory Ledger' : 'Bill History'}
         </Button>
-        <Button asChild disabled={isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0}>
+        <Button asChild disabled={isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0} className="w-full md:w-auto">
             <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> Create New Bill</Link>
         </Button>
-        {isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0 && (<p className="text-xs text-muted-foreground">Add a store first</p>)}
-    </div>
+        {isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0 && (<p className="text-xs text-muted-foreground text-center md:text-left">Add a store first</p>)}
+    </>
   );
 
   const pageTitleText = activeBillingView === 'ledger' ? 'Inventory Ledger' : 'Bill History';
@@ -305,7 +308,7 @@ function BillingContent() {
       <PageTitle title={pageTitleText} icon={pageTitleIcon} actions={mainPageActions} />
       {activeBillingView === 'ledger' ? <InventoryLedgerTable /> : 
         <BillHistoryTable 
-            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${currentContextStoreId || 'all-stores'}`} 
+            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${currentContextStoreId || 'all-stores'}`}
             filterByStoreId={currentContextStoreId}
             timePeriodFilter={timePeriodFilter} 
             customStartDate={customDateRange?.from} 
@@ -325,3 +328,5 @@ export default function AdminBillingPage() {
     </div>
   );
 }
+
+    

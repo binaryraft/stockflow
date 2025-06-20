@@ -18,7 +18,7 @@ export function PageTitle({ title, icon: Icon, className, actions }: PageTitlePr
           {title}
         </h1>
       </div>
-      {actions && <div className="flex items-center gap-2 self-start md:self-center">{actions}</div>}
+      {actions && <div className="flex flex-col items-stretch gap-3 self-stretch w-full mt-4 md:flex-row md:items-center md:gap-3 md:self-center md:w-auto md:mt-0">{actions}</div>}
     </div>
   );
 }
