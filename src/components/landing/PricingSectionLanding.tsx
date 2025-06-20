@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { SUBSCRIPTION_PLANS, APP_NAME } from '@/lib/constants';
+import { SUBSCRIPTION_PLANS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants'; // Added SUBSCRIPTION_PLAN_IDS
 import { CheckCircle, BadgeCheck, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
