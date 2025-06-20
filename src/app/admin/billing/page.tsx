@@ -85,7 +85,7 @@ function BillingContent() {
     fetchBills: state.fetchBills,
     fetchStores: state.fetchStores, 
     stores: state.stores, 
-    companyId: state.userProfile.dataMode === 'global' ? localStorage.getItem('companyId') : "comp_default_001"
+    companyId: localStorage.getItem('companyId') 
   }));
 
   const [allStoresState, setAllStoresState] = useState<Store[]>([]);
@@ -126,7 +126,6 @@ function BillingContent() {
       } else if (allStoresState.length === 1) {
          setCurrentContextStoreId(allStoresState[0].id);
       } else if (allStoresState.length > 1) {
-        // For multi-store plans, default to the first store if none is selected or if the selected one is invalid.
         const validStoreId = allStoresState.find(s => s.id === storeIdFromUrl) ? storeIdFromUrl : allStoresState[0].id;
         setCurrentContextStoreId(validStoreId);
       }
@@ -142,7 +141,7 @@ function BillingContent() {
         setSelectedStoreForForm(storeIdFromUrl);
       } else if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER) {
         setSelectedStoreForForm(defaultStoreId);
-      } else { // Growth or Pro plan
+      } else {
         setSelectedStoreForForm(allStoresState.length === 1 ? defaultStoreId : (storeIdFromUrl || defaultStoreId));
       }
     } else if (hasMounted && activePlan && allStoresState.length === 0) {

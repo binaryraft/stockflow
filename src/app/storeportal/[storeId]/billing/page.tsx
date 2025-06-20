@@ -38,8 +38,8 @@ export default function StoreBillingPage() {
     clearChatForStore,
     fetchMessagesForStore,
     messagesByStore,
-    fetchProducts, // Added for product data needed by BillingForm
-    fetchCompanyProfile, // Added for company profile data (e.g., default notes)
+    fetchProducts,
+    fetchCompanyProfile,
   } = useInventoryStore((state) => ({
      getStoreById: state.getStoreById,
      clearChatForStore: state.clearChatForStore,
@@ -83,22 +83,18 @@ export default function StoreBillingPage() {
     const store = getStoreById(storeId);
     if (store) {
       setCurrentStore(store);
-      // Fetch necessary data for the billing form and chat
       Promise.all([
         fetchMessagesForStore(storeId, storedCompanyId),
-        fetchProducts(storedCompanyId), // For ProductSearchInput in BillingForm
-        fetchCompanyProfile(storedCompanyId) // For default notes, etc.
+        fetchProducts(storedCompanyId), 
+        fetchCompanyProfile(storedCompanyId)
       ]).finally(() => setIsLoading(false));
     } else {
-      // This might happen if Zustand store is not yet populated from a fresh load
-      // For a robust solution, getStoreById might need to become async or fetch if not found.
-      // For now, if not in Zustand, treat as an error or redirect.
       console.warn(`Store ${storeId} not found in client store after authentication.`);
       toast({variant: "destructive", title: "Store Data Error", description: "Could not load store details. Please try logging out and in."});
       router.replace(`/storeportal/${storeId}/login`);
       setIsLoading(false);
     }
-  }, [storeId, router, getStoreById, hasMounted, fetchMessagesForStore, fetchProducts, fetchCompanyProfile]);
+  }, [storeId, router, getStoreById, hasMounted, fetchMessagesForStore, fetchProducts, fetchCompanyProfile, toast]);
 
 
   useEffect(() => {
@@ -110,8 +106,6 @@ export default function StoreBillingPage() {
     const allowedOps = currentStore.allowedOperations || [];
 
     if (allowedOps.length === 0) {
-      // If no operations allowed, it's a misconfiguration. Default to sell but show warning or restrict.
-      // For now, let's assume at least one operation is always allowed by admin.
       if (!currentMode) {
         router.replace(`/storeportal/${storeId}/billing?mode=sell`); 
       }
@@ -133,7 +127,7 @@ export default function StoreBillingPage() {
       sessionStorage.removeItem(`store_${storeId}_companyId`);
     }
     setIsStoreAuthenticated(false);
-    setCurrentStore(null); // Clear store data
+    setCurrentStore(null);
     if (storeId) router.push(`/storeportal/${storeId}/login`);
     else router.push('/storeportal');
   };
@@ -247,5 +241,3 @@ export default function StoreBillingPage() {
     </div>
   );
 }
-
-    

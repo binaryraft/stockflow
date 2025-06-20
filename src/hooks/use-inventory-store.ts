@@ -506,7 +506,7 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultBillNotes: companyData.defaultBillNotes,
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
-                companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE, // Use fetched or default
+                companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE,
                 dataMode: 'global',
             }});
             return companyData;
@@ -896,7 +896,7 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit);
       },
-      getProductLedgerSummary: (params): ProductLedgerEntry[] => { 
+      getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
         const { companyId, startDate, endDate } = params || {};
         let productsToConsider = get().products;
         let billsToConsider = get().bills; 
@@ -987,7 +987,7 @@ export const useInventoryStore = create<InventoryState>()(
 
           const arraysToReset: (keyof InventoryState)[] = ['products', 'bills', 'staffs', 'stores', 'categories', 'customers'];
           arraysToReset.forEach(key => {
-            if (!Array.isArray((state as any)[key]) || (state as any)[key].length > 0) {
+            if (!Array.isArray((state as any)[key])) { // Only reset if not an array, to preserve empty arrays
               (state as any)[key] = []; storeUpdated = true;
             }
           });
@@ -1003,7 +1003,7 @@ export const useInventoryStore = create<InventoryState>()(
                     storeUpdated = true;
                 }
             });
-             if (!state.userProfile.companyCurrency) { // Ensure currency is set
+             if (!state.userProfile.companyCurrency) {
                 state.userProfile.companyCurrency = DEFAULT_CURRENCY_CODE;
                 storeUpdated = true;
             }
@@ -1042,7 +1042,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
         return persistedState;
       },
-      version: 4, // Incremented version for customer addition
+      version: 4,
     }
   )
 );
@@ -1056,6 +1056,7 @@ if (typeof window !== 'undefined') {
   const companyId = localStorage.getItem('companyId');
   if (companyId) {
     if (!(window as any).__initialDataFetched) {
+      console.log("Performing initial data fetch for company:", companyId);
       Promise.all([
         state.fetchCompanyProfile(companyId),
         state.fetchProducts(companyId),
@@ -1067,5 +1068,7 @@ if (typeof window !== 'undefined') {
       ]).catch(err => console.error("Error during initial data fetch:", err));
       (window as any).__initialDataFetched = true;
     }
+  } else {
+      console.warn("No companyId found in localStorage. Initial data fetch skipped. User may need to login/signup.");
   }
 }

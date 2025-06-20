@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: { productId: s
     console.log(`${routeLogName} Product (ID: ${productId}) found and returned successfully.`);
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
-    console.error(`${routeLogName} Error:`, error);
+    console.error(`${routeNamePrefix} Error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
@@ -48,7 +48,6 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
   try {
     const { productId } = params;
     const body = await req.json();
-    // Expect productData and companyId in the body for authorization and data
     const { productData, companyId } = body; 
 
     if (!companyId || !productData) {
@@ -84,14 +83,13 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     };
 
     const existingProduct = db.products[productIndex];
-    // Create a new object with existing data, then spread allowed productData fields
     const updatedProduct: Product = { 
         ...existingProduct, 
         name: productData.name.trim(),
         description: productData.description !== undefined ? productData.description : existingProduct.description,
         category: productData.category !== undefined ? productData.category : existingProduct.category,
         trackQuantity: typeof productData.trackQuantity === 'boolean' ? productData.trackQuantity : existingProduct.trackQuantity,
-        sku: productData.sku !== undefined ? productData.sku.trim() : existingProduct.sku, // Base SKU
+        sku: productData.sku !== undefined ? productData.sku.trim() : existingProduct.sku,
         expiryDate: productData.expiryDate !== undefined ? productData.expiryDate : existingProduct.expiryDate,
         imageUrl: productData.imageUrl !== undefined ? (productData.imageUrl.trim() === '' ? null : productData.imageUrl.trim()) : existingProduct.imageUrl,
         sgstRate: typeof productData.sgstRate === 'number' ? productData.sgstRate : (productData.sgstRate === null ? undefined : existingProduct.sgstRate),
@@ -113,20 +111,16 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
         additionalChargeDefinitions: productData.additionalChargeDefinitions !== undefined ? productData.additionalChargeDefinitions.map((ac: AdditionalChargeDefinition) => ({
             ...ac, id: ac.id || uuidv4(), type: ac.type || 'fixed',
         })) : existingProduct.additionalChargeDefinitions,
-        // Regenerate SKU identifiers if name or variants change. Stock layers are preserved within SKUs.
         productSKUs: existingProduct.productSKUs.map(sku => ({
             ...sku,
-            skuIdentifier: getSkuIdentifier(updatedProduct.name, sku.optionValues)
+            skuIdentifier: getSkuIdentifier(productData.name.trim(), sku.optionValues) // Use updated product name
         })),
-        // Ensure ID and companyId are not changed from original
         id: existingProduct.id, 
         companyId: existingProduct.companyId, 
     };
     
-    // Handle non-tracked product price updates (if variants are not used)
     if (updatedProduct.trackQuantity === false && (!updatedProduct.variants || updatedProduct.variants.length === 0)) {
         let defaultSku = updatedProduct.productSKUs.find(sku => Object.keys(sku.optionValues).length === 0);
-        // Use prices from productData if available, otherwise keep existing or default to 0
         const costPrice = productData.costPriceForNonTracked !== undefined ? productData.costPriceForNonTracked : (defaultSku?.stockLayers[0]?.costPrice ?? 0);
         const sellPrice = productData.sellPriceForNonTracked !== undefined ? productData.sellPriceForNonTracked : (defaultSku?.stockLayers[0]?.sellPrice ?? 0);
 
@@ -134,14 +128,14 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
             if (defaultSku.stockLayers.length > 0) {
                 defaultSku.stockLayers[0].costPrice = costPrice;
                 defaultSku.stockLayers[0].sellPrice = sellPrice;
-            } else { // Add a conceptual stock layer if none exists
+            } else { 
                 defaultSku.stockLayers.push({
                     id: generateId(), purchaseBillId: 'UPDATED_NON_TRACKED_API_PUT', purchaseDate: new Date().toISOString(),
                     initialQuantity: 0, quantity: 0, costPrice, sellPrice,
                 });
             }
-            defaultSku.skuIdentifier = getSkuIdentifier(updatedProduct.name, defaultSku.optionValues); // Ensure identifier is updated
-        } else { // If no default SKU exists at all, create one
+            defaultSku.skuIdentifier = getSkuIdentifier(updatedProduct.name, defaultSku.optionValues);
+        } else { 
              defaultSku = {
                 id: generateId(), optionValues: {}, skuIdentifier: getSkuIdentifier(updatedProduct.name, {}),
                 stockLayers: [{
@@ -149,9 +143,13 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
                     initialQuantity: 0, quantity: 0, costPrice, sellPrice,
                 }],
             };
-            updatedProduct.productSKUs = [defaultSku]; // Replace if no SKUs existed, or add if others did (though unlikely for non-variant)
+            updatedProduct.productSKUs = [defaultSku];
         }
     }
+    if (!updatedProduct.imageUrl && updatedProduct.name) {
+        updatedProduct.imageUrl = `https://placehold.co/100x100.png?text=${encodeURIComponent(updatedProduct.name.substring(0, 10))}&font=roboto`;
+    }
+
 
     db.products[productIndex] = updatedProduct;
     await writeDB(db);
@@ -159,7 +157,7 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     console.log(`${routeLogName} Product (ID: ${productId}) updated successfully.`);
     return NextResponse.json({ success: true, data: updatedProduct });
   } catch (error) {
-    console.error(`${routeLogName} Error updating product:`, error);
+    console.error(`${routeNamePrefix} Error updating product:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
@@ -185,7 +183,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { productId
 
     const db = await readDB();
     const initialLength = db.products.length;
-    // Filter out the product, ensuring it belongs to the correct company
     db.products = db.products.filter(p => !(p.id === productId && p.companyId === companyId));
 
     if (db.products.length === initialLength) {
@@ -197,7 +194,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { productId
     console.log(`${routeLogName} Product (ID: ${productId}) deleted successfully for company (ID: ${companyId}).`);
     return NextResponse.json({ success: true, message: 'Product deleted successfully.' });
   } catch (error) {
-    console.error(`${routeLogName} Error deleting product:`, error);
+    console.error(`${routeNamePrefix} Error deleting product:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

@@ -12,7 +12,7 @@ export interface Database {
   bills: Bill[];
   categories: Category[];
   customers: Customer[];
-  staffs: User[]; // Kept for data structure consistency, but logic should primarily use users with role 'employee'
+  staffs: User[];
   stores: Store[];
   messagesByStore?: Record<string, ChatMessage[]>;
 }
@@ -24,7 +24,7 @@ export async function readDB(): Promise<Database> {
   try {
     const data = await fs.readFile(DB_PATH, 'utf-8');
     const jsonData = JSON.parse(data) as Database;
-    console.log(`${routeNamePrefix} Successfully read and parsed db.json. Companies found: ${jsonData.companies?.length || 0}, Users: ${jsonData.users?.length || 0}`);
+    console.log(`${routeNamePrefix} Successfully read and parsed db.json. Companies: ${jsonData.companies?.length || 0}, Users: ${jsonData.users?.length || 0}, Products: ${jsonData.products?.length || 0}, Bills: ${jsonData.bills?.length || 0}`);
     return {
       companies: jsonData.companies || [],
       users: jsonData.users || [],
@@ -32,7 +32,7 @@ export async function readDB(): Promise<Database> {
       bills: jsonData.bills || [],
       categories: jsonData.categories || [],
       customers: jsonData.customers || [],
-      staffs: jsonData.staffs || [], // Maintained for potential legacy data or structure consistency
+      staffs: jsonData.staffs || [],
       stores: jsonData.stores || [],
       messagesByStore: jsonData.messagesByStore || {},
     };
@@ -61,7 +61,7 @@ export async function readDB(): Promise<Database> {
 }
 
 export async function writeDB(data: Database): Promise<void> {
-  console.log(`${routeNamePrefix} Attempting to write to database at: ${DB_PATH}. Companies: ${data.companies?.length || 0}, Users: ${data.users?.length || 0}`);
+  console.log(`${routeNamePrefix} Attempting to write to database at: ${DB_PATH}. Companies: ${data.companies?.length || 0}, Users: ${data.users?.length || 0}, Products: ${data.products?.length || 0}, Bills: ${data.bills?.length || 0}`);
   try {
     await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
     await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');

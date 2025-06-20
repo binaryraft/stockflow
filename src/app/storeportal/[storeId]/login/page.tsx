@@ -18,7 +18,7 @@ export default function StoreLoginPage() {
   const params = useParams();
   const storeId = params.storeId as string;
 
-  const { getStoreById } = useInventoryStore();
+  const { getStoreById, fetchStores } = useInventoryStore(); // Added fetchStores
   const { toast } = useToast();
 
   const [passkey, setPasskey] = useState('');
@@ -37,38 +37,46 @@ export default function StoreLoginPage() {
 
     if (!storeId) {
       toast({ variant: "destructive", title: "Invalid URL", description: "Store identifier is missing."});
-      router.replace('/storeportal'); // Redirect to generic portal page
+      router.replace('/storeportal'); 
       setInitialLoading(false);
       return;
     }
 
-    const store = getStoreById(storeId);
-    if (store) {
-      setStoreName(store.name);
-      setCompanyIdForStore(store.companyId); // Store the companyId for this store
-      // Check if already authenticated for this store in this session
-      if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
-        router.replace(`/storeportal/${storeId}/billing`);
-        return; // Don't set initialLoading to false here to allow redirect to complete
+    const loadStoreData = async () => {
+      let store = getStoreById(storeId);
+      if (!store) {
+        // If store not in Zustand, try fetching all stores for the current company
+        // This assumes we are in a context where a companyId might be known, 
+        // e.g. if an admin is navigating or if we embed companyId in store portal URL.
+        // For now, we assume the app's general companyId from localStorage is relevant if admin linked.
+        const generalCompanyId = localStorage.getItem('companyId');
+        if (generalCompanyId) {
+          await fetchStores(generalCompanyId); // Fetch stores for the general company context
+          store = getStoreById(storeId); // Try getting again
+        }
       }
-    } else {
-      // If store not found in Zustand, it might be due to initial load or invalid ID
-      // Let's try fetching it from localStorage-based companyId, if we assume all stores might be under one.
-      // This is a fallback, ideally getStoreById from Zustand should be sufficient after initial data load.
-      console.warn(`Store with ID ${storeId} not immediately found in Zustand. This might be okay on first load.`);
-      // For now, if not found in Zustand, we consider it an issue.
-      // In a multi-company scenario, we'd need to know which company this storeId belongs to.
-      toast({
-        variant: "destructive",
-        title: "Store Not Found",
-        description: "The requested store may not exist or is not accessible.",
-      });
-      router.replace('/storeportal');
+
+      if (store) {
+        setStoreName(store.name);
+        setCompanyIdForStore(store.companyId);
+        if (sessionStorage.getItem(`authenticatedStore_${storeId}`) === 'true') {
+          router.replace(`/storeportal/${storeId}/billing`);
+          return; 
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Store Not Found",
+          description: "The requested store may not exist or is not accessible.",
+        });
+        router.replace('/storeportal');
+      }
       setInitialLoading(false);
-      return;
-    }
-    setInitialLoading(false);
-  }, [storeId, getStoreById, router, toast, hasMounted]);
+    };
+
+    loadStoreData();
+
+  }, [storeId, getStoreById, fetchStores, router, toast, hasMounted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,7 +97,7 @@ export default function StoreLoginPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           loginType: 'store',
-          companyId: companyIdForStore, // Use the companyId associated with the store
+          companyId: companyIdForStore,
           storeId: storeId,
           storePasskey: passkey,
         }),
@@ -100,7 +108,7 @@ export default function StoreLoginPage() {
       if (response.ok && data.success && data.store) {
         sessionStorage.setItem(`authenticatedStore_${storeId}`, 'true');
         sessionStorage.setItem('lastAuthenticatedStoreId', storeId);
-        sessionStorage.setItem(`store_${storeId}_companyId`, data.store.companyId); // Store companyId for the session
+        sessionStorage.setItem(`store_${storeId}_companyId`, data.store.companyId);
 
         toast({
           title: "Login Successful",
@@ -189,5 +197,3 @@ export default function StoreLoginPage() {
     </div>
   );
 }
-
-    

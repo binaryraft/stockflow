@@ -10,12 +10,13 @@ import { PricingSectionLanding } from '@/components/landing/PricingSectionLandin
 import { OtherSection } from '@/components/landing/OtherSection';
 import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
-import { CallToActionSection } from '@/components/landing/call-to-action-section';
+import { CallToActionSection } from '@/components/landing/CallToActionSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
+import { Loader2 } from 'lucide-react';
 
 type UIMode = 'landing' | 'adminLogin' | 'adminSignup' | 'storeSelect';
 
@@ -26,7 +27,7 @@ export default function HomePage() {
   const router = useRouter();
   const [uiMode, setUiMode] = useState<UIMode>('landing');
   const [hasMounted, setHasMounted] = useState(false);
-  const [isRedirecting, setIsRedirecting] = useState(true); // Start as true to show loader
+  const [isRedirecting, setIsRedirecting] = useState(true);
 
   useEffect(() => {
     setHasMounted(true);
@@ -47,7 +48,6 @@ export default function HomePage() {
         router.replace(`/storeportal/${lastAuthStoreId}/billing`);
         redirected = true;
       } else {
-        // Clean up potentially stale store session info if admin is not logged in
         if (lastAuthStoreId) sessionStorage.removeItem('lastAuthenticatedStoreId');
         Object.keys(sessionStorage).forEach(key => {
             if (key.startsWith('authenticatedStore_')) {
@@ -56,7 +56,7 @@ export default function HomePage() {
         });
       }
       
-      setIsRedirecting(false); // Stop showing loader after check
+      setIsRedirecting(false);
 
       if (!redirected && uiMode !== 'adminLogin' && uiMode !== 'adminSignup' && uiMode !== 'storeSelect') {
         setUiMode('landing');
@@ -69,7 +69,7 @@ export default function HomePage() {
   const showAdminSignup = () => setUiMode('adminSignup');
   const hideAuthFormsAndRecheck = () => {
     setUiMode('landing');
-    setIsRedirecting(true); // Trigger re-check of auth state
+    setIsRedirecting(true);
   };
 
   const showStoreSelect = () => setUiMode('storeSelect');
@@ -86,7 +86,10 @@ export default function HomePage() {
           className="mb-6 rounded-xl shadow-lg animate-pulse"
           data-ai-hint="logo company"
         />
-        <p className="text-lg text-muted-foreground">Loading Application...</p>
+         <div className="flex items-center gap-2 text-lg text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading Application...</span>
+        </div>
       </div>
     );
   }
@@ -130,5 +133,3 @@ export default function HomePage() {
     </div>
   );
 }
-
-    

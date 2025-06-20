@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
-import { useInventoryStore } from '@/hooks/use-inventory-store'; // Added
+import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -18,7 +18,7 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { fetchCompanyProfile } = useInventoryStore(); // Added
+  const { fetchCompanyProfile } = useInventoryStore();
 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -40,10 +40,8 @@ export default function AdminLayout({
 
     if (token && userRole === ADMIN_ROLE && companyId) {
       setIsAuthenticated(true);
-      // Ensure company profile is fetched for the admin context
       fetchCompanyProfile(companyId).catch(err => {
         console.error("AdminLayout: Failed to fetch company profile on auth check:", err);
-        // Decide if this is critical enough to log out or just warn
       });
     } else {
       setIsAuthenticated(false);
@@ -53,16 +51,15 @@ export default function AdminLayout({
       localStorage.removeItem('userRole');
       localStorage.removeItem('companyId');
       localStorage.removeItem('assignedStoreIds');
-      // Clear session storage related to stores
       Object.keys(sessionStorage).forEach(key => {
         if (key.startsWith('authenticatedStore_') || key === 'lastAuthenticatedStoreId') {
           sessionStorage.removeItem(key);
         }
       });
-      router.replace('/'); // Redirect to homepage for login
+      router.replace('/');
     }
     setIsLoadingAuth(false);
-  }, [router, hasMounted, fetchCompanyProfile, pathname]); // Added pathname to re-check on route changes
+  }, [router, hasMounted, fetchCompanyProfile, pathname]);
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
@@ -87,12 +84,8 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    // If not authenticated, redirection should have happened.
-    // Returning null prevents rendering children briefly before redirect.
     return null;
   }
 
   return <AppShell>{children}</AppShell>;
 }
-
-    

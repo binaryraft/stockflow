@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
-import type { Product, ProductSKU, ProductVariant, AdditionalChargeDefinition, StockLayer } from '@/types';
+import type { Product, ProductSKU, ProductVariant, AdditionalChargeDefinition, StockLayer, Bill, Company } from '@/types'; // Added Bill, Company
 import { v4 as uuidv4 } from 'uuid';
 import { SUBSCRIPTION_PLANS } from '@/lib/constants';
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     console.log(`${routeLogName} Found ${companyProducts.length} products for company ${companyId}.`);
     return NextResponse.json({ success: true, data: companyProducts });
   } catch (error) {
-    console.error(`${routeLogName} Error fetching products:`, error);
+    console.error(`${routeNamePrefix} Error fetching products:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
@@ -38,7 +38,6 @@ export async function POST(req: NextRequest) {
   console.log(`${routeLogName} Received request to create a new product.`);
   try {
     const body = await req.json();
-    // Expect productData and companyId in the body
     const { productData, companyId } = body; 
 
     if (!companyId || !productData || !productData.name || typeof productData.name !== 'string' || productData.name.trim() === '') {
@@ -54,11 +53,15 @@ export async function POST(req: NextRequest) {
     }
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === company.activeSubscriptionId);
-    const MAX_PRODUCTS_ALLOWED = plan ? (plan.features.some(f => f.toLowerCase().includes("unlimited products")) ? Infinity : 500) : 500; // Default limit if plan not found
+    // Determine max products allowed. Default to a high number if plan has "Unlimited products".
+    const MAX_PRODUCTS_ALLOWED = plan?.features.some(f => f.toLowerCase().includes("unlimited products")) 
+        ? Infinity 
+        : (plan?.maxProducts || 500); // Assuming plan might have a maxProducts property, fallback to 500
+        
     const companyProductsCount = db.products.filter(p => p.companyId === companyId).length;
 
     if (companyProductsCount >= MAX_PRODUCTS_ALLOWED) {
-      console.warn(`${routeLogName} Product limit reached for company ${companyId} on plan ${plan?.name || 'Unknown'}. Limit: ${MAX_PRODUCTS_ALLOWED}, Current: ${companyProductsCount}.`);
+      console.warn(`${routeNamePrefix} Product limit reached for company ${companyId} on plan ${plan?.name || 'Unknown'}. Limit: ${MAX_PRODUCTS_ALLOWED}, Current: ${companyProductsCount}.`);
       return NextResponse.json({ success: false, message: `Product limit (${MAX_PRODUCTS_ALLOWED}) reached for your current plan. Please upgrade.` }, { status: 403 });
     }
 
@@ -86,7 +89,7 @@ export async function POST(req: NextRequest) {
       name: productData.name.trim(),
       category: productData.category || '',
       trackQuantity: typeof productData.trackQuantity === 'boolean' ? productData.trackQuantity : true,
-      sku: productData.sku ? productData.sku.trim() : '', // Base product SKU/barcode
+      sku: productData.sku ? productData.sku.trim() : '',
       expiryDate: productData.expiryDate || '',
       description: productData.description || '',
       variants: productVariants,
@@ -100,84 +103,68 @@ export async function POST(req: NextRequest) {
     const newProduct: Product = {
       ...newProductBase,
       id: generateId(),
-      companyId: companyId, // Ensure companyId is set
-      imageUrl: productData.imageUrl ? productData.imageUrl.trim() : null, // Store null if empty, let frontend handle placeholder
+      companyId: companyId,
+      imageUrl: productData.imageUrl ? productData.imageUrl.trim() : null,
       productSKUs: [],
     };
-    if (!newProduct.imageUrl) {
+    if (!newProduct.imageUrl && productData.name) {
         newProduct.imageUrl = `https://placehold.co/100x100.png?text=${encodeURIComponent(newProduct.name.substring(0, 10))}&font=roboto`;
     }
 
 
-    // Create a default SKU if no variants OR if it's a non-tracked item needing price storage
     if (!productVariants || productVariants.length === 0) {
       const skuIdentifier = getSkuIdentifier(newProduct.name, {});
       const defaultSku: ProductSKU = {
         id: generateId(), optionValues: {}, skuIdentifier: skuIdentifier, stockLayers: [],
       };
-      // If non-tracked and prices are provided, create a conceptual stock layer for them
       if (newProduct.trackQuantity === false && productData.costPriceForNonTracked !== undefined && productData.sellPriceForNonTracked !== undefined) {
         defaultSku.stockLayers.push({
           id: generateId(), purchaseBillId: 'INITIAL_SETUP_NON_TRACKED_API_POST', purchaseDate: new Date().toISOString(),
-          initialQuantity: 0, quantity: 0, // Non-tracked, so quantity is conceptual
+          initialQuantity: 0, quantity: 0,
           costPrice: productData.costPriceForNonTracked ?? 0,
           sellPrice: productData.sellPriceForNonTracked ?? 0,
         });
       }
       newProduct.productSKUs.push(defaultSku);
     }
-    // For products with variants, ProductSKUs are typically created through purchase bills if stock is tracked.
-
+    
     db.products.push(newProduct);
     
-    // If initialStock and costPrice are provided for a new TRACKED product (likely from NewProductDialog)
-    // create a conceptual initial purchase bill to establish the stock.
-    if (newProduct.trackQuantity && productData.initialStock > 0 && productData.costPrice !== undefined && productData.sellPrice !== undefined) {
+    if (newProduct.trackQuantity && productData.initialStock && productData.initialStock > 0 && productData.costPrice !== undefined && productData.sellPrice !== undefined) {
         const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0,8)}`;
+        const firstStore = db.stores.find(s => s.companyId === companyId);
+
         const conceptualBill: Bill = {
-            id: initialBillId,
-            type: 'buy',
-            date: new Date().toISOString(),
-            timestamp: Date.now(),
+            id: initialBillId, type: 'buy', date: new Date().toISOString(), timestamp: Date.now(),
             items: [{
-                id: uuidv4(),
-                productId: newProduct.id,
-                productName: newProduct.name, // Assuming non-variant for this conceptual bill
-                quantity: productData.initialStock,
-                costPrice: productData.costPrice,
-                sellPrice: productData.sellPrice, // Sell price set at purchase
+                id: uuidv4(), productId: newProduct.id, productName: newProduct.name,
+                quantity: productData.initialStock, costPrice: productData.costPrice, sellPrice: productData.sellPrice,
             }],
             totalAmount: productData.initialStock * productData.costPrice,
-            companyId: companyId,
-            billedByStaffId: 'SYSTEM_INIT', // System generated
-            storeId: db.stores.find(s => s.companyId === companyId)?.id, // Assign to first store of company if exists
+            companyId: companyId, billedByStaffId: 'SYSTEM_INIT', 
+            storeId: firstStore?.id, storeName: firstStore?.name,
+            paymentStatus: company.defaultPurchasePaymentStatus || 'paid',
+            notes: company.defaultBillNotes || 'Initial stock entry.',
         };
         db.bills.push(conceptualBill);
 
-        // Find the default SKU (or the first one) and add the stock layer
         const targetSku = newProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || newProduct.productSKUs[0];
         if (targetSku) {
             targetSku.stockLayers.push({
-                id: generateId(),
-                purchaseBillId: initialBillId,
-                purchaseDate: conceptualBill.date,
-                initialQuantity: productData.initialStock,
-                quantity: productData.initialStock,
-                costPrice: productData.costPrice,
-                sellPrice: productData.sellPrice,
+                id: generateId(), purchaseBillId: initialBillId, purchaseDate: conceptualBill.date,
+                initialQuantity: productData.initialStock, quantity: productData.initialStock,
+                costPrice: productData.costPrice, sellPrice: productData.sellPrice,
                 storeId: conceptualBill.storeId,
             });
         }
-        console.log(`${routeLogName} Created conceptual initial purchase bill ${initialBillId} for ${newProduct.name} with ${productData.initialStock} units.`);
+        console.log(`${routeNamePrefix} Created conceptual initial purchase bill ${initialBillId} for ${newProduct.name} with ${productData.initialStock} units.`);
     }
 
-
     await writeDB(db);
-
-    console.log(`${routeLogName} New product "${newProduct.name}" (ID: ${newProduct.id}) created successfully for company ${companyId}.`);
-    return NextResponse.json({ success: true, data: newProduct }, { status: 201 }); // 201 Created
+    console.log(`${routeNamePrefix} New product "${newProduct.name}" (ID: ${newProduct.id}) created successfully for company ${companyId}.`);
+    return NextResponse.json({ success: true, data: newProduct }, { status: 201 });
   } catch (error) {
-    console.error(`${routeLogName} Error creating product:`, error);
+    console.error(`${routeNamePrefix} Error creating product:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

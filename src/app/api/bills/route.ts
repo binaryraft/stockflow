@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
-import type { Bill, Product, ProductSKU, StockLayer, BillItem } from '@/types';
+import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
 
@@ -23,12 +23,12 @@ export async function GET(req: NextRequest) {
     const db = await readDB();
     const companyBills = db.bills
       .filter(b => b.companyId === companyId)
-      .sort((a, b) => b.timestamp - a.timestamp); // Sort by newest first
+      .sort((a, b) => b.timestamp - a.timestamp);
 
     console.log(`${routeLogName} Found ${companyBills.length} bills for company ${companyId}.`);
     return NextResponse.json({ success: true, data: companyBills });
   } catch (error) {
-    console.error(`${routeLogName} Error:`, error);
+    console.error(`${routeNamePrefix} Error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
@@ -42,7 +42,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { billData, itemsData } = body;
     
-    // Validate main billData fields
     const { companyId, storeId, type: billType, isEstimate, billedByStaffId } = billData;
 
     if (!companyId || !billType || !itemsData || !Array.isArray(itemsData) || itemsData.length === 0) {
@@ -55,11 +54,15 @@ export async function POST(req: NextRequest) {
     }
 
     const db = await readDB();
-    const companyProducts = db.products.filter(p => p.companyId === companyId);
-    let productsToUpdate: Product[] = JSON.parse(JSON.stringify(companyProducts)); // Deep clone for modifications
+    const company = db.companies.find(c => c.id === companyId);
+    if (!company) {
+      console.warn(`${routeLogName} Company not found (ID: ${companyId}). Cannot create bill.`);
+      return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
+    }
+
+    let productsToUpdate: Product[] = JSON.parse(JSON.stringify(db.products.filter(p => p.companyId === companyId)));
 
     const currentDate = new Date();
-    // Generate a more readable and sortable bill ID
     const newBillId = format(currentDate, 'yyyyMMddHHmmssS') + `_${uuidv4().slice(0,6)}`;
     const billTimestamp = currentDate.getTime();
     
@@ -74,12 +77,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ success: false, message: `Invalid data for item: ${item.productId || 'Unknown'}. Quantity must be > 0.` }, { status: 400 });
       }
       
-      const productIndex = productsToUpdate.findIndex(p => p.id === item.productId);
-      if (productIndex === -1 && !item.productId.startsWith('SERVICE_ITEM_') && !item.productId.startsWith('CHARGE_ITEM_')) {
+      const isServiceOrCharge = item.productId.startsWith('SERVICE_ITEM_') || item.productId.startsWith('CHARGE_ITEM_');
+      const productIndex = !isServiceOrCharge ? productsToUpdate.findIndex(p => p.id === item.productId) : -1;
+      
+      if (!isServiceOrCharge && productIndex === -1) {
         console.warn(`${routeLogName} Product with ID ${item.productId} not found for company ${companyId}.`);
         return NextResponse.json({ success: false, message: `Product with ID ${item.productId} not found for this company.` }, { status: 404 });
       }
-      const product = productIndex !== -1 ? productsToUpdate[productIndex] : null; // product can be null for service/charge items
+      const product = productIndex !== -1 ? productsToUpdate[productIndex] : null;
 
       let sku: ProductSKU | undefined;
       if (product && item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
@@ -90,24 +95,17 @@ export async function POST(req: NextRequest) {
       }
       
       if (product && !sku && product.variants && product.variants.length > 0) {
-         // If product has variants defined but no matching SKU was found, this is an issue.
-         // For simplicity, we might create a conceptual SKU, but better to error if strict.
-         // For robustness, let's assume SKU should exist if variants are involved.
          const skuIdentifierFromName = product.name + (Object.values(item.selectedVariantOptions || {}).length > 0 ? ` (${Object.values(item.selectedVariantOptions || {}).join(' - ')})` : '');
-         console.warn(`${routeLogName} SKU not found for variant product ${skuIdentifierFromName}. Product ID: ${product.id}. This may indicate missing SKU setup.`);
-         // Create a conceptual SKU for this transaction to proceed, server-side.
-         // This SKU won't have pre-existing stock layers.
+         console.warn(`${routeLogName} SKU not found for variant product ${skuIdentifierFromName}. Creating conceptual SKU.`);
          sku = { id: uuidv4(), optionValues: item.selectedVariantOptions || {}, skuIdentifier: skuIdentifierFromName, stockLayers: [] };
          product.productSKUs.push(sku);
       } else if (product && !sku && (!product.variants || product.variants.length === 0)) {
-         // No variants, but no default SKU found either (e.g., a new product not yet purchased)
          sku = product.productSKUs[0] || { id: uuidv4(), optionValues: {}, skuIdentifier: product.name, stockLayers: [] };
          if (!product.productSKUs.includes(sku)) product.productSKUs.push(sku);
       }
 
-
-      const itemProductNameForBill = sku?.skuIdentifier || product?.name || item.productName || "Service/Charge"; // Fallback for service/charge items
-      let itemCostPrice = item.costPrice || 0; // For sales, this is COGS
+      const itemProductNameForBill = sku?.skuIdentifier || product?.name || item.productName || "Service/Charge";
+      let itemCostPrice = item.costPrice || 0;
       let itemSellPrice = item.sellPrice || 0;
       let itemSgstAmount = 0;
       let itemCgstAmount = 0;
@@ -118,7 +116,7 @@ export async function POST(req: NextRequest) {
           let costOfGoodsSoldThisItem = 0;
           const relevantLayers = (sku?.stockLayers || [])
             .filter(l => (l.storeId === storeId || !l.storeId || storeId === undefined) && l.quantity > 0)
-            .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime()); // FIFO
+            .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
 
           if (relevantLayers.reduce((sum, l) => sum + l.quantity, 0) < quantityToSell) {
             console.warn(`${routeLogName} Insufficient stock for ${itemProductNameForBill} at store ${storeId}. Available: ${relevantLayers.reduce((sum, l) => sum + l.quantity, 0)}, needed: ${quantityToSell}`);
@@ -134,14 +132,14 @@ export async function POST(req: NextRequest) {
           }
           itemCostPrice = item.quantity > 0 ? costOfGoodsSoldThisItem / item.quantity : 0;
         } else {
-          itemCostPrice = sku?.stockLayers[0]?.costPrice || 0; // Non-tracked: use default/last cost for COGS reference
+          itemCostPrice = sku?.stockLayers[0]?.costPrice || 0;
         }
       } else if (billType === 'buy' && product) {
         if (itemCostPrice <= 0 && product.trackQuantity) {
            console.warn(`${routeLogName} Cost price must be > 0 for tracked purchases: ${itemProductNameForBill}`);
            return NextResponse.json({ success: false, message: `Cost price must be > 0 for tracked purchase: ${itemProductNameForBill}.`}, { status: 400 });
         }
-        if (itemSellPrice <= 0 && product.trackQuantity && itemCostPrice > 0) { // Ensure sell price is also set if cost price is set
+        if (itemSellPrice <= 0 && product.trackQuantity && itemCostPrice > 0) {
             console.warn(`${routeLogName} Sell price must be > 0 for tracked purchases when setting batch price: ${itemProductNameForBill}`);
             return NextResponse.json({ success: false, message: `Sell price for purchased batch must be > 0 if cost price is set: ${itemProductNameForBill}.`}, { status: 400 });
         }
@@ -154,26 +152,24 @@ export async function POST(req: NextRequest) {
           sku.stockLayers.push(newLayer);
         }
       } else if (billType === 'return' && product) {
-        // Determine cost price for return: either from item data (if provided from original bill) or estimate based on current stock
         itemCostPrice = item.costPrice || sku?.stockLayers.find(sl => sl.quantity > 0)?.costPrice || 0;
-        if (product.trackQuantity && !item.isDefective && sku) { // Restock non-defective items
+        if (product.trackQuantity && !item.isDefective && sku) {
           const returnLayer: StockLayer = {
-            id: uuidv4(), purchaseBillId: newBillId, // Link to this return bill
-            purchaseDate: currentDate.toISOString(), initialQuantity: item.quantity, quantity: item.quantity,
+            id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(), 
+            initialQuantity: item.quantity, quantity: item.quantity,
             costPrice: itemCostPrice, sellPrice: itemSellPrice, storeId: storeId,
           };
           sku.stockLayers.push(returnLayer);
         }
       }
       
-      // Calculate taxes for sell/return items if not an estimate and product exists
-      if ((billType === 'sell' || billType === 'return') && !isEstimate && product && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+      if ((billType === 'sell' || billType === 'return') && !isEstimate && product && !isServiceOrCharge) {
           const itemPreTaxValue = itemSellPrice * item.quantity;
           itemSgstAmount = (itemPreTaxValue * (product.sgstRate || 0)) / 100;
           itemCgstAmount = (itemPreTaxValue * (product.cgstRate || 0)) / 100;
       }
       
-      const currentItemSubTotal = itemSellPrice * item.quantity;
+      const currentItemSubTotal = isServiceOrCharge ? itemSellPrice * item.quantity : itemSellPrice * item.quantity; // For services, sellPrice is the total amount
       billSubTotal += currentItemSubTotal;
       billTotalSGST += itemSgstAmount;
       billTotalCGST += itemCgstAmount;
@@ -187,7 +183,6 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    // Process additional charges based on product definitions for sell/return bills
     if (billType === 'sell' || billType === 'return') {
         const mainProductBillItems = processedBillItems.filter(it => !it.isAdditionalCharge && !it.productId.startsWith('SERVICE_ITEM_'));
         for (const mainItem of mainProductBillItems) {
@@ -204,22 +199,21 @@ export async function POST(req: NextRequest) {
                         sgstAmount: 0, cgstAmount: 0, isAdditionalCharge: true, sourceChargeDefinitionId: chargeDef.id,
                     };
                     processedBillItems.push(chargeBillItem);
-                    billSubTotal += chargeValue; // Add to subtotal, taxes for charges are typically handled differently or not applied
+                    billSubTotal += chargeValue;
                 });
             }
         }
     }
 
-
     let grandTotalAmount;
-    if (billType === 'buy') { // For 'buy' bills, total amount is based on cost price of items.
+    if (billType === 'buy') {
         grandTotalAmount = processedBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        billSubTotal = grandTotalAmount; // For purchase, subtotal equals total cost. Taxes are input-side.
-        billTotalSGST = 0; billTotalCGST = 0; // SGST/CGST are typically for sales-side.
-    } else if ((billType === 'sell' || billType === 'return') && isEstimate) { // Estimates don't include taxes in grand total
+        billSubTotal = grandTotalAmount; 
+        billTotalSGST = 0; billTotalCGST = 0;
+    } else if ((billType === 'sell' || billType === 'return') && isEstimate) {
         grandTotalAmount = billSubTotal;
-        billTotalSGST = 0; billTotalCGST = 0; // No taxes for estimates
-    } else { // Sell or Return (non-estimate)
+        billTotalSGST = 0; billTotalCGST = 0;
+    } else { 
         grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
     }
     
@@ -234,7 +228,7 @@ export async function POST(req: NextRequest) {
       subTotal: billSubTotal, totalSGST: billTotalSGST, totalCGST: billTotalCGST,
       totalAmount: grandTotalAmount, 
       isEstimate: !!isEstimate, 
-      notes: billData.notes || undefined,
+      notes: billData.notes || company.defaultBillNotes || '',
       paymentStatus: billData.paymentStatus, 
       billedByStaffId: staffUser?.id, billedByStaffName: staffUser?.name,
       storeId: storeDetails?.id, storeName: storeDetails?.name, 
@@ -242,7 +236,6 @@ export async function POST(req: NextRequest) {
     };
 
     db.bills.push(newBill);
-    // Persist product updates (stock changes, conceptual SKU creation)
     db.products = db.products.map(p => {
       const updatedProduct = productsToUpdate.find(up => up.id === p.id);
       return updatedProduct || p;
@@ -253,7 +246,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, data: newBill }, { status: 201 });
 
   } catch (error) {
-    console.error(`${routeLogName} Error creating bill:`, error);
+    console.error(`${routeNamePrefix} Error creating bill:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred during bill creation.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
