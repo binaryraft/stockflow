@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -15,8 +14,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Added Card components
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
-import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate } from 'date-fns'; // Added getDate
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -111,7 +111,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       setIsLoading(true);
       fetchBills(currentCompanyId).finally(() => setIsLoading(false));
     } else {
-      setIsLoading(false); // No companyId, nothing to fetch
+      setIsLoading(false); 
     }
   }, [currentCompanyId, fetchBills]);
 
@@ -133,13 +133,12 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   }, [getProductById]);
 
   const filteredAndSortedBills = useMemo(() => {
-    let processBills = [...allBillsFromStore]; // Use bills from the store
+    let processBills = [...allBillsFromStore]; 
 
     if (filterByStoreId) {
       processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
     }
     
-    // Apply time period filter
     if (timePeriodFilter === 'today') {
       processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
     } else if (timePeriodFilter === 'thisWeek') {
@@ -230,7 +229,6 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
-        // Default sort by timestamp descending (newest first) if no specific sort is applied
         processBills.sort((a,b) => b.timestamp - a.timestamp); 
     }
 
@@ -290,7 +288,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       }, currentCompanyId);
 
       if (updatedBill) {
-        setSelectedBill(updatedBill); // Update selectedBill with the response from API
+        setSelectedBill(updatedBill); 
         toast({ title: "Bill Updated", description: "Payment status and/or notes have been updated." });
         setIsEditingBillDetails(false);
       } else {
@@ -632,7 +630,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
               <div className="flex gap-2 mt-2 sm:mt-0">
                  {!isEditingBillDetails && (
-                  <Button variant="outline" onClick={handleEnterEditMode} disabled={selectedBill.type === 'sell' && selectedBill.isEstimate}>
+                  <Button variant="outline" onClick={handleEnterEditMode} disabled={(selectedBill.type === 'sell' && selectedBill.isEstimate) || selectedBill.type === 'return'}>
                     <Edit2 className="mr-2 h-4 w-4" /> Edit
                   </Button>
                 )}
@@ -713,14 +711,12 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         </Select>
       </div>
 
-
-      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="py-2 px-3 w-[100px] md:w-[150px]">
-                Date / Time
-              </TableHead>
+              <TableHead className="py-2 px-3 w-[90px] md:w-[120px]">Date / Time</TableHead>
               <TableHead className="py-3 px-4 hidden md:table-cell w-[180px]">ID</TableHead>
               <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 w-[150px]"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
@@ -745,17 +741,21 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedBills.length > 0 ? (
+            {isLoading ? (
+                <TableRow>
+                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">Loading bills...</TableCell>
+                </TableRow>
+            ) : filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
                 const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
-                  <TableCell className="py-2 px-3 w-[100px] md:w-[150px]">
+                  <TableCell className="py-2 px-3 w-[90px] md:w-[120px]">
                     <div className="flex flex-col items-start leading-tight">
-                      <span className="text-lg font-bold text-primary">{format(billDate, 'EEE').toUpperCase()}</span>
-                      <span className="text-xs text-muted-foreground">{format(billDate, 'MMM dd, yyyy')}</span>
-                      <span className="text-xs text-muted-foreground">{format(billDate, 'p')}</span>
+                      <span className="text-xl font-bold text-primary">{getDate(billDate)}</span>
+                      <span className="text-xs text-muted-foreground">{format(billDate, 'MMM yyyy')}</span>
+                      <span className="text-xs text-muted-foreground mt-0.5">{format(billDate, 'p')}</span>
                     </div>
                   </TableCell>
                   <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell w-[180px] text-secondary">{bill.id}</TableCell>
@@ -855,14 +855,133 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center py-3 px-4">
-                  {isLoading ? "Loading bills..." : "No bills found for the selected filters."}
+                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                  No bills found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
       </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-10"><p className="text-muted-foreground">Loading bills...</p></div>
+        ) : filteredAndSortedBills.length > 0 ? (
+          filteredAndSortedBills.map((bill) => {
+            const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
+            const billDate = new Date(bill.date);
+            return (
+              <Card key={bill.id} className="shadow-md border-t-2 border-t-primary overflow-hidden">
+                <CardHeader className="p-4 flex flex-row items-start justify-between bg-muted/30">
+                  <div>
+                    <CardTitle className={cn("text-md flex items-center gap-1.5", billDisplayInfo.titleColor)}>
+                      {React.cloneElement(billDisplayInfo.icon, { className: "h-4 w-4" })}
+                      {billDisplayInfo.name}
+                    </CardTitle>
+                    <CardDescription className="text-xs font-mono text-muted-foreground mt-1">
+                      ID: {bill.id}
+                    </CardDescription>
+                  </div>
+                  <div className="text-right text-xs">
+                     <p className="font-medium">{format(billDate, 'MMM d, yyyy')}</p>
+                     <p className="text-muted-foreground">{format(billDate, 'p')}</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-1.5 text-sm">
+                  {bill.vendorOrCustomerName && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Party:</span> 
+                        <span className="font-medium truncate text-right">{bill.vendorOrCustomerName}</span>
+                    </div>
+                  )}
+                  {bill.customerPhone && (
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Phone:</span> 
+                        <span className="font-medium text-right">{bill.customerPhone}</span>
+                    </div>
+                  )}
+                  {bill.storeName && (
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Store:</span> 
+                        <span className="font-medium text-right">{bill.storeName}</span>
+                    </div>
+                  )}
+                   <div className="flex justify-between">
+                        <span className="text-muted-foreground">Items:</span> 
+                        <span className="font-medium text-right">{bill.items.length}</span>
+                    </div>
+                  {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate && (
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Payment:</span>
+                        <Badge 
+                            className={cn(
+                                "capitalize text-xs py-0.5 px-1.5", 
+                                bill.paymentStatus === 'paid' 
+                                ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                            )}
+                        >
+                            {bill.paymentStatus}
+                        </Badge>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="p-4 bg-muted/30 flex justify-between items-center">
+                  <p className="text-lg font-bold">
+                    <span className={cn(billDisplayInfo.titleColor === 'text-destructive' ? 'text-destructive' : 'text-primary')}>
+                      ₹{bill.totalAmount.toFixed(2)}
+                    </span>
+                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleViewBill(bill)}>
+                          <Eye className="mr-2 h-4 w-4" /> View / Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
+                          <Printer className="mr-2 h-4 w-4" /> Print Bill
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHead>
+                                <AlertDialogTit>Are you sure?</AlertDialogTit>
+                                <AlertDialogDesc>
+                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}.
+                                    Stock levels will NOT be automatically readjusted.
+                                </AlertDialogDesc>
+                                </AlertDialogHead>
+                                <AlertDialogFoot>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => { handleDeleteBillClick(bill.id, bill.id); setIsViewDialogOpen(false); }} className="bg-destructive hover:bg-destructive/90">
+                                    Delete Bill
+                                </AlertDialogAction>
+                                </AlertDialogFoot>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardFooter>
+              </Card>
+            );
+          })
+        ) : (
+          <p className="text-center text-muted-foreground py-10">No bills found for the selected filters.</p>
+        )}
+      </div>
     </>
   );
 }
+
