@@ -2,11 +2,11 @@
 "use client";
 
 import React, { Suspense, useEffect, useState, useMemo } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'; // Added useRouter, usePathname
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'; 
 import type { BillMode, Store } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { BillingForm } from '@/components/billing/billing-form';
-import { BillHistoryTable, type TimePeriodFilterOption } from '@/components/history/bill-history-table'; // Import TimePeriodFilterOption
+import { BillHistoryTable, type TimePeriodFilterOption } from '@/components/history/bill-history-table'; 
 import { InventoryLedgerTable } from '@/components/billing/inventory-ledger-table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -31,7 +31,7 @@ const HistoryStoreSelector: React.FC<{
 }> = ({ stores, activePlanId, currentStoreId, onStoreChange }) => {
   const isStarterPlan = activePlanId === SUBSCRIPTION_PLAN_IDS.STARTER;
 
-  if (isStarterPlan && stores.length === 1) {
+  if ((isStarterPlan && stores.length === 1) || (!isStarterPlan && stores.length ===1)) {
     return (
       <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50">
         <Building size={16} />
@@ -39,14 +39,7 @@ const HistoryStoreSelector: React.FC<{
       </span>
     );
   }
-  if (!isStarterPlan && stores.length === 1) {
-     return (
-      <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50">
-        <Building size={16} />
-        {stores[0].name}
-      </span>
-    );
-  }
+  
   if (!isStarterPlan && stores.length > 1) {
     return (
       <Select
@@ -84,15 +77,15 @@ function BillingContent() {
   const { 
     getActiveSubscriptionPlan, 
     fetchBills, 
-    fetchStores, // Added fetchStores
-    stores: storesFromZustand, // Get stores directly from Zustand for reactivity
-    companyId: currentCompanyId // Use currentCompanyId from store which gets it from localStorage
+    fetchStores, 
+    stores: storesFromZustand, 
+    companyId: currentCompanyIdFromStore, 
   } = useInventoryStore(state => ({
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     fetchBills: state.fetchBills,
-    fetchStores: state.fetchStores, // Add fetchStores selector
-    stores: state.stores, // Select stores array for reactivity
-    companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null
+    fetchStores: state.fetchStores, 
+    stores: state.stores, 
+    companyId: state.userProfile.dataMode === 'global' ? localStorage.getItem('companyId') : "comp_default_001"
   }));
 
   const [allStoresState, setAllStoresState] = useState<Store[]>([]);
@@ -105,56 +98,52 @@ function BillingContent() {
   const [hasMounted, setHasMounted] = useState(false);
   const isAdminContext = true; 
 
-  // Date range filter state for BillHistoryTable
   const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('thisMonth');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
 
 
   useEffect(() => {
     setHasMounted(true);
-    if (currentCompanyId) {
-      fetchBills(currentCompanyId);
-      fetchStores(currentCompanyId); // Fetch stores when companyId is available
+    if (currentCompanyIdFromStore) {
+      fetchBills(currentCompanyIdFromStore);
+      fetchStores(currentCompanyIdFromStore); 
     }
-  }, [currentCompanyId, fetchBills, fetchStores]); // Added fetchStores to dependencies
+  }, [currentCompanyIdFromStore, fetchBills, fetchStores]); 
 
   useEffect(() => {
     if (hasMounted) {
-      setAllStoresState(storesFromZustand); // Update allStoresState based on fetched stores
+      setAllStoresState(storesFromZustand); 
       setActivePlan(getActiveSubscriptionPlan());
       setActiveBillingView(currentViewFromUrl || 'history');
     }
-  }, [hasMounted, storesFromZustand, getActiveSubscriptionPlan, currentViewFromUrl]); // Depend on storesFromZustand
+  }, [hasMounted, storesFromZustand, getActiveSubscriptionPlan, currentViewFromUrl]); 
 
 
   useEffect(() => {
     if (hasMounted && activePlan && allStoresState.length > 0) {
-      if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length > 0) {
+      if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER) {
         setCurrentContextStoreId(allStoresState[0].id);
-      } else if (activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length === 1) {
-        setCurrentContextStoreId(allStoresState[0].id);
-      } else if (activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length > 1) {
-        setCurrentContextStoreId(allStoresState[0].id); 
-      } else {
-        setCurrentContextStoreId(undefined);
+      } else if (allStoresState.length === 1) {
+         setCurrentContextStoreId(allStoresState[0].id);
+      } else if (allStoresState.length > 1) {
+        // For multi-store plans, default to the first store if none is selected or if the selected one is invalid.
+        const validStoreId = allStoresState.find(s => s.id === storeIdFromUrl) ? storeIdFromUrl : allStoresState[0].id;
+        setCurrentContextStoreId(validStoreId);
       }
     } else if (hasMounted && activePlan && allStoresState.length === 0) {
       setCurrentContextStoreId(undefined);
     }
-  }, [hasMounted, allStoresState, activePlan]);
+  }, [hasMounted, allStoresState, activePlan, storeIdFromUrl]);
 
   useEffect(() => {
     if (hasMounted && activePlan && allStoresState.length > 0) {
+      const defaultStoreId = allStoresState[0]?.id;
       if (storeIdFromUrl && allStoresState.find(s => s.id === storeIdFromUrl)) {
         setSelectedStoreForForm(storeIdFromUrl);
-      } else if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length > 0) {
-        setSelectedStoreForForm(allStoresState[0].id);
-      } else if (activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length === 1) {
-        setSelectedStoreForForm(allStoresState[0].id);
-      } else if (activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStoresState.length > 1) {
-        setSelectedStoreForForm(allStoresState[0].id);
-      } else {
-        setSelectedStoreForForm(undefined);
+      } else if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER) {
+        setSelectedStoreForForm(defaultStoreId);
+      } else { // Growth or Pro plan
+        setSelectedStoreForForm(allStoresState.length === 1 ? defaultStoreId : (storeIdFromUrl || defaultStoreId));
       }
     } else if (hasMounted && activePlan && allStoresState.length === 0) {
        setSelectedStoreForForm(undefined);
@@ -174,7 +163,7 @@ function BillingContent() {
   const handleTimePeriodChange = (period: TimePeriodFilterOption) => {
     setTimePeriodFilter(period);
     if (period !== 'custom') {
-      setCustomDateRange(undefined); // Clear custom range if a predefined period is selected
+      setCustomDateRange(undefined); 
     }
   };
 
@@ -208,7 +197,7 @@ function BillingContent() {
                  <div className="flex items-center gap-2">
                     <span className="text-sm font-medium whitespace-nowrap text-muted-foreground">Billing For Store:</span>
                     <Select
-                        key={`store-select-new-bill-${activePlan?.id}-${allStoresState.length}`}
+                        key={`store-select-new-bill-${activePlan?.id}-${allStoresState.length}-${selectedStoreForForm}`}
                         value={selectedStoreForForm || ""}
                         onValueChange={(value) => setSelectedStoreForForm(value || undefined)}
                     >
@@ -317,7 +306,7 @@ function BillingContent() {
       <PageTitle title={pageTitleText} icon={pageTitleIcon} actions={mainPageActions} />
       {activeBillingView === 'ledger' ? <InventoryLedgerTable /> : 
         <BillHistoryTable 
-            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}`} // Re-render if filter changes
+            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${filterByStoreId || 'all-stores'}`} // Ensure re-render if store filter (implicit in AdminBillingPage context) or time filters change
             timePeriodFilter={timePeriodFilter} 
             customStartDate={customDateRange?.from} 
             customEndDate={customDateRange?.to}

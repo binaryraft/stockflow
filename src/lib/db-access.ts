@@ -11,17 +11,19 @@ export interface Database {
   products: Product[];
   bills: Bill[];
   categories: Category[];
-  staffs: User[]; // Note: 'staffs' might be merged with 'users' if structure is consolidated
+  staffs: User[]; // Kept for data structure consistency, but logic should primarily use users with role 'employee'
   stores: Store[];
   messagesByStore?: Record<string, ChatMessage[]>;
 }
 
+const routeNamePrefix = "[DB_ACCESS]";
+
 export async function readDB(): Promise<Database> {
-  console.log(`[DB_ACCESS] Reading database from: ${DB_PATH}`);
+  console.log(`${routeNamePrefix} Reading database from: ${DB_PATH}`);
   try {
     const data = await fs.readFile(DB_PATH, 'utf-8');
     const jsonData = JSON.parse(data) as Database;
-    console.log("[DB_ACCESS] Successfully read and parsed db.json.");
+    console.log(`${routeNamePrefix} Successfully read and parsed db.json.`);
     // Ensure all expected top-level arrays exist to prevent runtime errors if db.json is malformed or incomplete
     return {
       companies: jsonData.companies || [],
@@ -29,29 +31,31 @@ export async function readDB(): Promise<Database> {
       products: jsonData.products || [],
       bills: jsonData.bills || [],
       categories: jsonData.categories || [],
-      staffs: jsonData.staffs || [], // Kept for now, but consider consolidating with 'users'
+      staffs: jsonData.staffs || [],
       stores: jsonData.stores || [],
       messagesByStore: jsonData.messagesByStore || {},
     };
   } catch (error: any) {
-    console.error(`[DB_ACCESS] Error reading DB from ${DB_PATH}. Error: ${error.message}`);
+    console.error(`${routeNamePrefix} Error reading DB from ${DB_PATH}. Error: ${error.message}`);
     if (error.code === 'ENOENT') {
-      console.warn("[DB_ACCESS] db.json not found. Returning default empty structure and attempting to create it.");
+      console.warn(`${routeNamePrefix} db.json not found. Returning default empty structure and attempting to create it.`);
       const defaultDB: Database = {
         companies: [], users: [], products: [], bills: [], categories: [], staffs: [], stores: [], messagesByStore: {},
       };
       try {
         await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
         await fs.writeFile(DB_PATH, JSON.stringify(defaultDB, null, 2), 'utf-8');
-        console.log("[DB_ACCESS] Successfully created a new empty db.json.");
+        console.log(`${routeNamePrefix} Successfully created a new empty db.json.`);
         return defaultDB;
       } catch (writeError: any) {
-        console.error(`[DB_ACCESS] FATAL: Could not create db.json after read failure. Error: ${writeError.message}`);
-        throw new Error(`Could not initialize database file at ${DB_PATH}. Please check file system permissions and ensure the 'data' directory can be created/written to.`);
+        console.error(`${routeNamePrefix} FATAL: Could not create db.json after read failure. Error: ${writeError.message}`);
+        // In a real production scenario, you might want to throw a more specific error or handle this critical failure differently.
+        // For this context, re-throwing helps surface the problem.
+        throw new Error(`Could not initialize database file at ${DB_PATH}. Please check file system permissions and ensure the 'data' directory can be created/written to. Original write error: ${writeError.message}`);
       }
     }
-    // For other errors (e.g., JSON parse error), log critically and return a default structure to prevent app crash.
-    console.error("[DB_ACCESS] Returning default empty structure due to a read error (e.g., JSON malformed). Check db.json integrity.");
+    // For other errors (e.g., JSON parse error), log critically.
+    console.error(`${routeNamePrefix} CRITICAL: db.json appears to be malformed or unreadable. Error: ${error.message}. Returning default empty structure to prevent app crash, but data integrity is compromised.`);
     return {
       companies: [], users: [], products: [], bills: [], categories: [], staffs: [], stores: [], messagesByStore: {},
     };
@@ -59,13 +63,17 @@ export async function readDB(): Promise<Database> {
 }
 
 export async function writeDB(data: Database): Promise<void> {
-  console.log(`[DB_ACCESS] Attempting to write to database at: ${DB_PATH}`);
+  console.log(`${routeNamePrefix} Attempting to write to database at: ${DB_PATH}`);
   try {
+    // Ensure the data directory exists
     await fs.mkdir(path.dirname(DB_PATH), { recursive: true });
+    // Write data to db.json
     await fs.writeFile(DB_PATH, JSON.stringify(data, null, 2), 'utf-8');
-    console.log("[DB_ACCESS] Successfully wrote to db.json.");
+    console.log(`${routeNamePrefix} Successfully wrote to db.json.`);
   } catch (error: any) {
-    console.error(`[DB_ACCESS] Error writing DB to ${DB_PATH}. Error: ${error.message}`);
+    console.error(`${routeNamePrefix} FATAL: Error writing DB to ${DB_PATH}. Error: ${error.message}`);
+    // In a production environment, this error should be handled critically.
+    // For example, by alerting administrators or attempting a retry/backup strategy.
     throw new Error(`Could not save data to the database at ${DB_PATH}. Error: ${error.message}. Please check file system permissions.`);
   }
 }

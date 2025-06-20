@@ -1,4 +1,8 @@
 
-// This file is intentionally blank and will be removed by the file system operation.
-// This route is deprecated and its functionality is covered by PUT /api/companies/[companyId]
+// This file is intentionally blank and signifies its removal.
+// The functionality to update a company's subscription plan
+// has been consolidated into the PUT /api/companies/[companyId] route
 // by updating the 'activeSubscriptionId' field.
+// Keeping this file empty (or deleting it from the project) achieves this.
+// Ensure any client-side code previously calling this route is updated
+// to use PUT /api/companies/[companyId] instead.

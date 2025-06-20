@@ -23,17 +23,25 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 
 
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
 
 export function ProductsTable() {
-  const { products, fetchProducts, deleteProduct: deleteProductFromStore, getSkuDetails } = useInventoryStore(
+  const { 
+    products, 
+    fetchProducts, 
+    deleteProduct: deleteProductFromStore, 
+    getSkuDetails,
+    getActiveSubscriptionPlan 
+  } = useInventoryStore(
     (state) => ({
       products: state.products,
       fetchProducts: state.fetchProducts,
-      deleteProduct: state.deleteProduct, // Renamed to avoid conflict with local function
+      deleteProduct: state.deleteProduct,
       getSkuDetails: state.getSkuDetails,
+      getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     })
   );
   const { toast } = useToast();
@@ -43,6 +51,8 @@ export function ProductsTable() {
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
+  const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
+
 
   useEffect(() => {
     setHasMounted(true);
@@ -52,9 +62,14 @@ export function ProductsTable() {
     } else {
       console.error("Company ID not found for fetching products.");
       setIsLoading(false);
-      // Potentially show an error message to the user or redirect
     }
   }, []);
+
+  useEffect(() => {
+    if (hasMounted) {
+       setActivePlan(getActiveSubscriptionPlan());
+    }
+  }, [hasMounted, getActiveSubscriptionPlan]);
 
   useEffect(() => {
     if (hasMounted && companyId) {
@@ -65,7 +80,7 @@ export function ProductsTable() {
 
 
   const filteredAndSortedProducts = useMemo(() => {
-    let sortableProducts = [...products]; // Use the products from the store (client-side cache)
+    let sortableProducts = [...products]; 
     if (searchTerm) {
       sortableProducts = sortableProducts.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -165,6 +180,26 @@ export function ProductsTable() {
     
     return `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
   };
+  
+  const canAddProducts = useMemo(() => {
+    if (!activePlan) return false; // Default to false if plan isn't loaded
+    const planDetails = SUBSCRIPTION_PLANS.find(p => p.id === activePlan.id);
+    if (!planDetails) return false;
+    const productLimitFeature = planDetails.features.find(f => f.toLowerCase().includes("unlimited products"));
+    if (productLimitFeature) return true; // Unlimited
+    
+    // Assuming a numerical limit if not "unlimited products"
+    // This part is conceptual as current plans mostly say "Unlimited Products"
+    // For a real numeric limit, it would be stored in planDetails.maxProducts or similar
+    const currentProductCount = products.length;
+    const MAX_PRODUCTS_ALLOWED = 500; // Example: Fallback or a specific plan's limit
+    return currentProductCount < MAX_PRODUCTS_ALLOWED;
+  }, [activePlan, products.length]);
+
+  const addProductButtonTooltipContent = !canAddProducts && activePlan
+    ? `Product limit reached for your current plan (${activePlan.name}). Please upgrade.`
+    : "Add New Product";
+
 
   if (isLoading && hasMounted) {
     return <div className="flex-1 flex items-center justify-center p-6">Loading products...</div>;
@@ -183,11 +218,28 @@ export function ProductsTable() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-sm"
         />
-        <Button asChild>
-          <Link href="/admin/products/add">
-            <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-          </Link>
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="inline-block"> {/* Wrapper for Tooltip when button is disabled */}
+              <Button asChild={canAddProducts} disabled={!canAddProducts}>
+                {canAddProducts ? (
+                  <Link href="/admin/products/add">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </Link>
+                ) : (
+                  <span>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                  </span>
+                )}
+              </Button>
+            </div>
+          </TooltipTrigger>
+          {!canAddProducts && (
+            <TooltipContent side="bottom" align="end">
+              <p>{addProductButtonTooltipContent}</p>
+            </TooltipContent>
+          )}
+        </Tooltip>
       </div>
       <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
@@ -254,6 +306,7 @@ export function ProductsTable() {
                       height={48}
                       className="rounded-md object-cover aspect-square"
                       data-ai-hint="product item generic"
+                      onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/64x64.png?text=${product.name.charAt(0)}&font=roboto`; }}
                     />
                   </TableCell>
                   <TableCell className="font-medium py-3 px-4 align-top">
