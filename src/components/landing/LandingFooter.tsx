@@ -9,12 +9,12 @@ import { cn } from '@/lib/utils';
 export function LandingFooter() {
   const currentYear = new Date().getFullYear();
   return (
-    <footer className="section-padding pb-12 md:pb-16 border-t bg-muted/20 dark:bg-secondary/5">
+    <footer className="section-padding pb-12 md:pb-16 border-t border-border/50 bg-muted/30 dark:bg-secondary/10">
       <div className="section-container">
         <div className="grid md:grid-cols-3 gap-10 items-center">
           <div className="flex flex-col items-center md:items-start animate-fadeInUp delay-100">
-             <Link href="/" className="flex items-center gap-3 mb-4 transition-opacity hover:opacity-80">
-                <Package2 className="h-10 w-10 text-primary" />
+             <Link href="/" className="flex items-center gap-3 mb-4 transition-opacity hover:opacity-80 group">
+                <Package2 className="h-10 w-10 text-primary group-hover:animate-pulse" />
                 <span className="text-3xl font-bold text-primary">{APP_NAME}</span>
             </Link>
             <p className="text-base text-muted-foreground text-center md:text-left">
@@ -22,11 +22,11 @@ export function LandingFooter() {
             </p>
           </div>
           
-          <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 text-base text-muted-foreground animate-fadeInUp delay-300">
-            <Link href="#features" className="hover:text-primary transition-colors duration-200">Features</Link>
-            <Link href="#pricing" className="hover:text-primary transition-colors duration-200">Pricing</Link>
-            <Link href="#contact" className="hover:text-primary transition-colors duration-200">Contact</Link>
-            <Link href="/admin" className="hover:text-primary transition-colors duration-200">Admin Login</Link>
+          <nav className="flex flex-wrap justify-center gap-x-8 gap-y-4 text-base text-muted-foreground animate-fadeInUp delay-300">
+            <Link href="#features" className="hover:text-primary transition-colors duration-200 relative after:content-[''] after:absolute after:left-0 after:bottom-[-2px] after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-300 hover:after:w-full">Features</Link>
+            <Link href="#pricing" className="hover:text-primary transition-colors duration-200 relative after:content-[''] after:absolute after:left-0 after:bottom-[-2px] after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-300 hover:after:w-full">Pricing</Link>
+            <Link href="#contact" className="hover:text-primary transition-colors duration-200 relative after:content-[''] after:absolute after:left-0 after:bottom-[-2px] after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-300 hover:after:w-full">Contact</Link>
+            <Link href="/admin" className="hover:text-primary transition-colors duration-200 relative after:content-[''] after:absolute after:left-0 after:bottom-[-2px] after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-300 hover:after:w-full">Admin Login</Link>
           </nav>
 
           <div className="flex justify-center md:justify-end gap-6 animate-fadeInUp delay-500">
@@ -41,9 +41,9 @@ export function LandingFooter() {
             </Link>
           </div>
         </div>
-        <div className="mt-12 pt-10 border-t border-border/50 text-center text-sm text-muted-foreground animate-fadeInUp delay-700">
+        <div className="mt-16 pt-10 border-t border-border/70 text-center text-sm text-muted-foreground animate-fadeInUp delay-700">
           &copy; {currentYear} {APP_NAME}. All rights reserved. 
-          <Link href="/privacy-policy" className="ml-3 hover:text-primary transition-colors duration-200">Privacy Policy</Link>
+          <Link href="/privacy-policy" className="ml-4 hover:text-primary transition-colors duration-200">Privacy Policy</Link>
           <span className="mx-2 text-border">|</span>
           <Link href="/terms-of-service" className="hover:text-primary transition-colors duration-200">Terms of Service</Link>
         </div>
@@ -51,3 +51,5 @@ export function LandingFooter() {
     </footer>
   );
 }
+
+    

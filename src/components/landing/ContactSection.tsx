@@ -20,7 +20,7 @@ export function ContactSection() {
   const displayPhone = phoneMatch ? phoneMatch[1] : '(555) 000-0000';
 
   return (
-    <section id="contact" className="section-padding bg-background">
+    <section id="contact" className="section-padding bg-background dark:bg-tertiary">
       <div className="section-container">
         <div className="text-center mb-16 md:mb-20">
           <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight text-foreground animate-fadeInDown">
@@ -35,7 +35,7 @@ export function ContactSection() {
             <div>
               <h3 className="text-2xl font-semibold text-primary mb-5">Contact Information</h3>
               <div className="space-y-5 text-muted-foreground">
-                <p className="flex items-start gap-4 text-base transition-colors hover:text-secondary">
+                <p className="flex items-start gap-4 text-base transition-colors hover:text-primary">
                   <MapPin className="h-7 w-7 text-secondary shrink-0 mt-0.5" />
                   <span>{COMPANY_ADDRESS}</span>
                 </p>
@@ -58,26 +58,26 @@ export function ContactSection() {
           </div>
           <form 
             onSubmit={handleSubmit} 
-            className="space-y-8 p-8 md:p-10 bg-card rounded-2xl shadow-2xl border border-border/70 animate-fadeInUp delay-500"
+            className="space-y-8 p-8 md:p-10 bg-card rounded-2xl shadow-2xl dark:shadow-primary/15 border border-border/70 animate-fadeInUp delay-500"
           >
             <div>
               <Label htmlFor="contact-name" className="text-foreground font-medium text-base">Full Name</Label>
-              <Input id="contact-name" type="text" placeholder="Your Name" required className="mt-2.5 h-12 text-base" />
+              <Input id="contact-name" type="text" placeholder="Your Name" required className="mt-2.5 h-12 text-base rounded-lg" />
             </div>
             <div>
               <Label htmlFor="contact-email" className="text-foreground font-medium text-base">Email Address</Label>
-              <Input id="contact-email" type="email" placeholder="you@example.com" required className="mt-2.5 h-12 text-base" />
+              <Input id="contact-email" type="email" placeholder="you@example.com" required className="mt-2.5 h-12 text-base rounded-lg" />
             </div>
             <div>
               <Label htmlFor="contact-subject" className="text-foreground font-medium text-base">Subject</Label>
-              <Input id="contact-subject" type="text" placeholder="Regarding..." className="mt-2.5 h-12 text-base" />
+              <Input id="contact-subject" type="text" placeholder="Regarding..." className="mt-2.5 h-12 text-base rounded-lg" />
             </div>
             <div>
               <Label htmlFor="contact-message" className="text-foreground font-medium text-base">Message</Label>
-              <Textarea id="contact-message" placeholder="How can we help you?" required rows={6} className="mt-2.5 text-base" />
+              <Textarea id="contact-message" placeholder="How can we help you?" required rows={6} className="mt-2.5 text-base rounded-lg" />
             </div>
-            <Button type="submit" className="w-full bg-primary hover:bg-primary/80 text-primary-foreground py-3.5 text-lg rounded-lg group transition-all duration-300 transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-primary/30">
-              Send Message <Send className="ml-2.5 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/85 text-primary-foreground py-3.5 text-lg rounded-xl group transition-all-fast transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-primary/30">
+              Send Message <Send className="ml-2.5 h-5 w-5 group-hover:translate-x-1 transition-transform-fast" />
             </Button>
           </form>
         </div>
@@ -85,3 +85,5 @@ export function ContactSection() {
     </section>
   );
 }
+
+    

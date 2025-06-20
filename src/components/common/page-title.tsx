@@ -11,14 +11,14 @@ interface PageTitleProps {
 
 export function PageTitle({ title, icon: Icon, className, actions }: PageTitleProps) {
   return (
-    <div className={cn("flex items-center justify-between mb-6 py-4 border-b", className)}>
-      <div className="flex items-center gap-3">
-        {Icon && <Icon className="h-7 w-7 text-primary" />}
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+    <div className={cn("flex flex-col md:flex-row items-start md:items-center justify-between mb-8 py-4 border-b-2 border-primary/20", className)}>
+      <div className="flex items-center gap-3 mb-3 md:mb-0">
+        {Icon && <Icon className="h-8 w-8 text-primary" />}
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
           {title}
         </h1>
       </div>
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && <div className="flex items-center gap-2 self-start md:self-center">{actions}</div>}
     </div>
   );
 }

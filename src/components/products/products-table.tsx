@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit3, Trash2, Eye, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { getCurrencySymbol } from '@/lib/utils';
 
 
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
@@ -34,7 +35,8 @@ export function ProductsTable() {
     fetchProducts, 
     deleteProduct: deleteProductFromStore, 
     getSkuDetails,
-    getActiveSubscriptionPlan 
+    getActiveSubscriptionPlan,
+    userProfile 
   } = useInventoryStore(
     (state) => ({
       products: state.products,
@@ -42,6 +44,7 @@ export function ProductsTable() {
       deleteProduct: state.deleteProduct,
       getSkuDetails: state.getSkuDetails,
       getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
+      userProfile: state.userProfile,
     })
   );
   const { toast } = useToast();
@@ -52,10 +55,11 @@ export function ProductsTable() {
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [hasMounted, setHasMounted] = useState(false);
   const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
-
+  const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setHasMounted(true);
+    setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
     const storedCompanyId = localStorage.getItem('companyId');
     if (storedCompanyId) {
       setCompanyId(storedCompanyId);
@@ -63,7 +67,7 @@ export function ProductsTable() {
       console.error("Company ID not found for fetching products.");
       setIsLoading(false);
     }
-  }, []);
+  }, [userProfile.companyCurrency]);
 
   useEffect(() => {
     if (hasMounted) {
@@ -167,33 +171,37 @@ export function ProductsTable() {
     if (prices.length === 0) return "N/A"; 
     
     const allPricesAreZero = prices.every(price => price === 0);
-    if (allPricesAreZero && prices.length > 0) return `₹0.00`;
+    if (allPricesAreZero && prices.length > 0) return `${currencySymbol}0.00`;
 
     const validPrices = prices.filter(price => price > 0); 
-    if (validPrices.length === 0 && prices.length > 0) return `₹0.00`; 
+    if (validPrices.length === 0 && prices.length > 0) return `${currencySymbol}0.00`; 
     if (validPrices.length === 0) return "N/A"; 
 
     const minPrice = Math.min(...validPrices);
     const maxPrice = Math.max(...validPrices);
 
-    if (minPrice === maxPrice) return `₹${minPrice.toFixed(2)}`;
+    if (minPrice === maxPrice) return `${currencySymbol}${minPrice.toFixed(2)}`;
     
-    return `₹${minPrice.toFixed(2)} - ₹${maxPrice.toFixed(2)}`;
+    return `${currencySymbol}${minPrice.toFixed(2)} - ${currencySymbol}${maxPrice.toFixed(2)}`;
   };
   
   const canAddProducts = useMemo(() => {
-    if (!activePlan) return false; // Default to false if plan isn't loaded
+    if (!activePlan) return false;
     const planDetails = SUBSCRIPTION_PLANS.find(p => p.id === activePlan.id);
     if (!planDetails) return false;
-    const productLimitFeature = planDetails.features.find(f => f.toLowerCase().includes("unlimited products"));
-    if (productLimitFeature) return true; // Unlimited
     
-    // Assuming a numerical limit if not "unlimited products"
-    // This part is conceptual as current plans mostly say "Unlimited Products"
-    // For a real numeric limit, it would be stored in planDetails.maxProducts or similar
-    const currentProductCount = products.length;
-    const MAX_PRODUCTS_ALLOWED = 500; // Example: Fallback or a specific plan's limit
-    return currentProductCount < MAX_PRODUCTS_ALLOWED;
+    const isUnlimited = planDetails.features.some(f => f.toLowerCase().includes("unlimited products") || f.toLowerCase().includes("unlimited items"));
+    if (isUnlimited) return true;
+    
+    // If a specific numeric limit is defined (e.g., maxProducts in plan)
+    // const productLimit = (planDetails as any).maxProducts; // Conceptual; actual plan structure might differ
+    // if (typeof productLimit === 'number') {
+    //   return products.length < productLimit;
+    // }
+
+    // Fallback if no specific limit and not explicitly "unlimited"
+    // This depends on business rules. For demo, let's assume a high implicit limit or rely on `maxProducts`
+    return true; // For now, assume true if not explicitly limited by "Unlimited" or a numeric cap.
   }, [activePlan, products.length]);
 
   const addProductButtonTooltipContent = !canAddProducts && activePlan
@@ -211,24 +219,28 @@ export function ProductsTable() {
 
   return (
     <TooltipProvider>
-      <div className="flex items-center justify-between mb-4 gap-2">
+      <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 p-4 border rounded-xl bg-card shadow-md">
         <Input
           placeholder="Search products (name, category, SKU identifier)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
+          className="max-w-md w-full md:w-auto h-11 text-base"
         />
         <Tooltip>
           <TooltipTrigger asChild>
-            <div className="inline-block"> {/* Wrapper for Tooltip when button is disabled */}
-              <Button asChild={canAddProducts} disabled={!canAddProducts}>
+            <div className="inline-block w-full md:w-auto">
+              <Button 
+                asChild={canAddProducts} 
+                disabled={!canAddProducts}
+                className="w-full md:w-auto h-11 text-base"
+              >
                 {canAddProducts ? (
                   <Link href="/admin/products/add">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                    <PlusCircle className="mr-2 h-5 w-5" /> Add Product
                   </Link>
                 ) : (
                   <span>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                    <PlusCircle className="mr-2 h-5 w-5" /> Add Product
                   </span>
                 )}
               </Button>
@@ -241,54 +253,48 @@ export function ProductsTable() {
           )}
         </Tooltip>
       </div>
-      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+      <div className="border rounded-xl overflow-hidden shadow-xl bg-card">
         <Table>
-          <TableHeader>
+          <TableHeader className="bg-muted/50">
             <TableRow>
               <TableHead className="w-[80px] py-3 px-4">Image</TableHead>
-              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/80 py-3 px-4">
                 <Tooltip>
-                  <TooltipTrigger className="flex items-center">Name <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center">Name <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Name</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+              <TableHead onClick={() => requestSort('category')} className="cursor-pointer hover:bg-muted/80 py-3 px-4 hidden sm:table-cell">
                 <Tooltip>
-                  <TooltipTrigger className="flex items-center">Category <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center">Category <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Category</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-               <TableHead onClick={() => requestSort('sku')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden md:table-cell">
+               <TableHead onClick={() => requestSort('sku')} className="cursor-pointer hover:bg-muted/80 py-3 px-4 hidden md:table-cell">
                 <Tooltip>
-                  <TooltipTrigger className="flex items-center">Base SKU <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center">Base SKU <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Base Product SKU</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('stock')}>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/80 py-3 px-4" onClick={() => requestSort('stock')}>
                 <Tooltip>
-                  <TooltipTrigger className="flex items-center w-full justify-end">Stock <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center w-full justify-end">Stock <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Stock Quantity</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('costPrice')}>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/80 py-3 px-4 hidden lg:table-cell" onClick={() => requestSort('costPrice')}>
                 <Tooltip>
-                  <TooltipTrigger className="flex items-center w-full justify-end">Avg. Cost <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center w-full justify-end">Avg. Cost <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Average Cost Price</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4" onClick={() => requestSort('sellPrice')}>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/80 py-3 px-4" onClick={() => requestSort('sellPrice')}>
                  <Tooltip>
-                  <TooltipTrigger className="flex items-center w-full justify-end">Sell Price <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
+                  <TooltipTrigger className="flex items-center w-full justify-end">Sell Price <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
                   <TooltipContent><p>Sort by Current Sell Price</p></TooltipContent>
                 </Tooltip>
               </TableHead>
-              <TableHead onClick={() => requestSort('expiryDate')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell">
-                <Tooltip>
-                  <TooltipTrigger className="flex items-center">Expiry <ArrowUpDown className="ml-1 h-3 w-3 inline" /></TooltipTrigger>
-                  <TooltipContent><p>Sort by Expiry Date</p></TooltipContent>
-                </Tooltip>
-              </TableHead>
-              <TableHead className="py-3 px-4 text-center">Tracked</TableHead>
+              <TableHead className="py-3 px-4 text-center hidden md:table-cell">Tracked</TableHead>
               <TableHead className="text-right py-3 px-4 w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -297,65 +303,62 @@ export function ProductsTable() {
               filteredAndSortedProducts.map((product) => {
                 const isVariantProduct = product.variants && product.variants.length > 0;
                 return (
-                <TableRow key={product.id}>
-                  <TableCell className="py-2 px-3">
+                <TableRow key={product.id} className="hover:bg-muted/30">
+                  <TableCell className="py-3 px-4">
                     <Image
                       src={product.imageUrl || `https://placehold.co/64x64.png?text=${product.name.charAt(0)}`}
                       alt={product.name}
-                      width={48}
-                      height={48}
-                      className="rounded-md object-cover aspect-square"
+                      width={52}
+                      height={52}
+                      className="rounded-lg object-cover aspect-square border border-border shadow-sm"
                       data-ai-hint="product item generic"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/64x64.png?text=${product.name.charAt(0)}&font=roboto`; }}
                     />
                   </TableCell>
-                  <TableCell className="font-medium py-3 px-4 align-top">
+                  <TableCell className="font-semibold py-3 px-4 align-top text-foreground">
                     <div>{product.name}</div>
                     {isVariantProduct && (
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {product.variants?.map(v => `${v.name} (${v.options.length})`).join(' / ')} ({product.productSKUs.length} SKU(s) defined)
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Variants: {product.variants?.map(v => `${v.name}`).join(' / ')} ({product.productSKUs.length} SKU(s))
                       </div>
                     )}
                   </TableCell>
-                  <TableCell className="py-3 px-4 align-top">
-                    {product.category ? <Badge variant="outline" className="bg-tertiary text-tertiary-foreground border-tertiary-foreground/30 whitespace-nowrap">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
+                  <TableCell className="py-3 px-4 align-top hidden sm:table-cell">
+                    {product.category ? <Badge variant="secondary" className="bg-tertiary text-tertiary-foreground whitespace-nowrap">{product.category}</Badge> : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="py-3 px-4 align-top font-mono text-xs hidden md:table-cell">
+                  <TableCell className="py-3 px-4 align-top font-mono text-xs hidden md:table-cell text-muted-foreground">
                     {product.sku || <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 align-top">
+                  <TableCell className="text-right py-3 px-4 align-top font-medium">
                     {getProductStockDisplay(product)}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 align-top">
+                  <TableCell className="text-right py-3 px-4 align-top hidden lg:table-cell">
                     {getProductPriceDisplay(product, 'averageCostPrice')}
                   </TableCell>
                   <TableCell className="text-right py-3 px-4 align-top">
                      {getProductPriceDisplay(product, 'currentSellPrice')}
                   </TableCell>
-                  <TableCell className="py-3 px-4 align-top text-xs hidden lg:table-cell">
-                    {product.expiryDate ? new Date(product.expiryDate).toLocaleDateString() : <span className="text-muted-foreground">-</span>}
-                  </TableCell>
-                  <TableCell className="py-3 px-4 align-top text-center">
-                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/80 hover:bg-primary" : "", "cursor-default text-xs")}>
+                  <TableCell className="py-3 px-4 align-top text-center hidden md:table-cell">
+                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/80 hover:bg-primary text-primary-foreground" : "text-muted-foreground border-border", "cursor-default text-xs font-medium")}>
                         {product.trackQuantity ? 'Yes' : 'No'}
                      </Badge>
                   </TableCell>
                   <TableCell className="text-right py-3 px-4 align-top">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
+                        <Button variant="ghost" className="h-9 w-9 p-0 text-muted-foreground hover:text-primary">
                           <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
+                          <MoreHorizontal className="h-5 w-5" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="shadow-xl">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem asChild>
+                        <DropdownMenuItem asChild className="cursor-pointer">
                           <Link href={`/admin/products/${product.id}`}>
                             <Edit3 className="mr-2 h-4 w-4" /> Edit / View Details
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
+                        <DropdownMenuItem asChild className="cursor-pointer">
                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? `&isVariant=true`: ""}`} target="_blank">
                                <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
                            </Link>
@@ -363,7 +366,7 @@ export function ProductsTable() {
                         <DropdownMenuSeparator />
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
                                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                                 </DropdownMenuItem>
                             </AlertDialogTrigger>
@@ -371,7 +374,7 @@ export function ProductsTable() {
                                 <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the product "{product.name}" and all associated data (including stock layers and SKU definitions). Bill history will retain references to this product name.
+                                    This will permanently delete "{product.name}" and all associated data. This action cannot be undone.
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
@@ -389,8 +392,8 @@ export function ProductsTable() {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center py-3 px-4">
-                  {isLoading ? "Loading products..." : (companyId ? "No products found for this company." : "Company ID not available.")}
+                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
+                  {isLoading ? "Loading products..." : (companyId ? "No products found. Add some to get started!" : "Company ID not available.")}
                 </TableCell>
               </TableRow>
             )}
@@ -400,3 +403,5 @@ export function ProductsTable() {
     </TooltipProvider>
   );
 }
+
+    

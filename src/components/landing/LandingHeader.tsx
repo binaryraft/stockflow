@@ -15,13 +15,13 @@ interface LandingHeaderProps {
 
 export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: LandingHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/80 backdrop-blur-lg shadow-sm">
-      <div className="section-container flex h-20 items-center justify-between"> {/* Increased height */}
-        <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80">
-          <Package2 className="h-8 w-8 text-primary" />
+    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur-lg shadow-sm">
+      <div className="section-container flex h-20 items-center justify-between">
+        <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 group">
+          <Package2 className="h-9 w-9 text-primary group-hover:animate-pulse" />
           <span className="text-2xl font-bold text-primary">{APP_NAME}</span>
         </Link>
-        <nav className="hidden items-center gap-8 text-sm md:flex"> {/* Increased gap */}
+        <nav className="hidden items-center gap-8 text-sm md:flex">
           {[
             { href: "#features", label: "Features" },
             { href: "#pricing", label: "Pricing" },
@@ -31,7 +31,7 @@ export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: Landing
             <a
               key={item.label}
               href={item.href}
-              className="font-medium text-muted-foreground transition-colors hover:text-primary text-base py-2" // Added py-2 for larger click area
+              className="font-medium text-muted-foreground transition-colors hover:text-primary text-base py-2 relative after:content-[''] after:absolute after:left-0 after:bottom-0 after:w-0 after:h-0.5 after:bg-primary after:transition-all after:duration-300 hover:after:w-full"
             >
               {item.label}
             </a>
@@ -41,16 +41,16 @@ export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: Landing
           <ThemeToggle />
           <Button 
             variant="outline" 
-            size="sm" 
+            size="default" 
             onClick={onStoreSelectClick} 
-            className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all duration-300"
+            className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg shadow-sm hover:shadow-md"
           >
             <StoreIcon className="mr-2 h-4 w-4" /> Store Login
           </Button>
           <Button 
-            size="sm" 
+            size="default" 
             onClick={onAdminLoginClick} 
-            className="bg-primary hover:bg-primary/80 text-primary-foreground transition-all duration-300 shadow-sm hover:shadow-md"
+            className="bg-primary hover:bg-primary/85 text-primary-foreground transition-all-fast rounded-lg shadow-md hover:shadow-lg"
           >
             <LogIn className="mr-2 h-4 w-4" /> Admin Login
           </Button>
@@ -59,3 +59,5 @@ export function LandingHeader({ onAdminLoginClick, onStoreSelectClick }: Landing
     </header>
   );
 }
+
+    

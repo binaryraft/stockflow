@@ -10,7 +10,7 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-md", // Default to shadow-md
+      "rounded-xl border bg-card text-card-foreground shadow-lg dark:shadow-2xl dark:shadow-primary/5", // Updated radius and shadow
       className
     )}
     {...props}
@@ -24,20 +24,20 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("flex flex-col space-y-1.5 p-6", className)}
+    className={cn("flex flex-col space-y-2 p-6", className)} // Increased space-y
     {...props}
   />
 ))
 CardHeader.displayName = "CardHeader"
 
 const CardTitle = React.forwardRef<
-  HTMLDivElement, // Changed from HTMLParagraphElement for semantic correctness
-  React.HTMLAttributes<HTMLHeadingElement> // Use HTMLHeadingElement for props
+  HTMLDivElement, 
+  React.HTMLAttributes<HTMLHeadingElement> 
 >(({ className, ...props }, ref) => (
-  <h3 // Changed from div to h3 for semantic correctness
+  <h3 
     ref={ref}
     className={cn(
-      "text-xl font-semibold leading-none tracking-tight text-primary", // Changed to text-primary, adjusted size
+      "text-xl font-semibold leading-tight tracking-tight text-primary group-hover:text-primary/90 transition-colors", // Adjusted size and leading
       className
     )}
     {...props}
@@ -49,9 +49,9 @@ const CardDescription = React.forwardRef<
   HTMLParagraphElement,
   React.HTMLAttributes<HTMLParagraphElement>
 >(({ className, ...props }, ref) => (
-  <p // Changed from div to p
+  <p 
     ref={ref}
-    className={cn("text-sm text-secondary", className)} // Changed to text-secondary
+    className={cn("text-sm text-muted-foreground", className)} 
     {...props}
   />
 ))
@@ -78,3 +78,5 @@ const CardFooter = React.forwardRef<
 CardFooter.displayName = "CardFooter"
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
+
+    
