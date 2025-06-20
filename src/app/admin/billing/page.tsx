@@ -306,7 +306,8 @@ function BillingContent() {
       <PageTitle title={pageTitleText} icon={pageTitleIcon} actions={mainPageActions} />
       {activeBillingView === 'ledger' ? <InventoryLedgerTable /> : 
         <BillHistoryTable 
-            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${filterByStoreId || 'all-stores'}`} // Ensure re-render if store filter (implicit in AdminBillingPage context) or time filters change
+            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${currentContextStoreId || 'all-stores'}`} 
+            filterByStoreId={currentContextStoreId}
             timePeriodFilter={timePeriodFilter} 
             customStartDate={customDateRange?.from} 
             customEndDate={customDateRange?.to}
