@@ -246,7 +246,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ stores: [...state.stores, result.data] }));
             return result.data;
-          } else { console.error("Failed to add store via API:", result.message); return null; }
+          } else { console.error("Failed to add store via API:", result.message); toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add store." }); return null; }
         } catch (error) { console.error("Error adding store via API:", error); return null; }
       },
       updateStore: async (storeId, storeData, companyId) => {
@@ -296,7 +296,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ staffs: [...state.staffs, result.data] }));
             return result.data;
-          } else { console.error("Failed to add staff via API:", result.message); return null; }
+          } else { console.error("Failed to add staff via API:", result.message); toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add staff member." }); return null; }
         } catch (error) { console.error("Error adding staff via API:", error); return null; }
       },
       updateStaff: async (staffId, staffData, companyId) => {
@@ -462,7 +462,6 @@ export const useInventoryStore = create<InventoryState>()(
             set((state) => ({ bills: [savedBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
             get().fetchProducts(billData.companyId); 
             
-            // --- Notification Logic ---
             toast({ title: "Bill Saved", description: `Bill ${savedBill.id.slice(-6)} created successfully.` });
 
             if (savedBill.type === 'sell') {
@@ -471,7 +470,7 @@ export const useInventoryStore = create<InventoryState>()(
                 const product = get().getProductById(item.productId);
                 if (product && product.trackQuantity) {
                   const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, savedBill.storeId).totalStock ?? 0), 0);
-                  if (totalStock < LOW_STOCK_THRESHOLD) {
+                  if (totalStock > 0 && totalStock < LOW_STOCK_THRESHOLD) {
                     toast({
                       variant: "destructive",
                       title: "Low Stock Warning",
@@ -481,7 +480,6 @@ export const useInventoryStore = create<InventoryState>()(
                 }
               });
             }
-            // --- End Notification Logic ---
 
             return savedBill;
           } else {

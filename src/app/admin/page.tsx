@@ -139,7 +139,7 @@ export default function DashboardPage() {
               <p className="text-sm text-muted-foreground text-center py-4">No recent bills to display.</p>
             ) : (
               recentBills.map(bill => {
-                const displayInfo = getBillTypeIconAndColor(bill.type, bill.type === 'return' && bill.items.some(i => i.isDefective));
+                const displayInfo = getBillTypeIconAndColor(bill.type, bill.items.some(i => i.isDefective));
                 return (
                   <div key={bill.id} className="flex items-center justify-between text-sm p-3 rounded-lg bg-tertiary shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
@@ -195,4 +195,3 @@ export default function DashboardPage() {
   );
 }
 
-    
