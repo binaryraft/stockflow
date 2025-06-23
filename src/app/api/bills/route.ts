@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
 import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
+import { format, isToday } from 'date-fns';
 
 const routeNamePrefix = "[API_BILLS_COLLECTION /api/bills]";
 
@@ -63,7 +63,14 @@ export async function POST(req: NextRequest) {
     let productsToUpdate: Product[] = JSON.parse(JSON.stringify(db.products.filter(p => p.companyId === companyId)));
 
     const currentDate = new Date();
-    const newBillId = format(currentDate, 'yyyyMMddHHmmssS') + `_${uuidv4().slice(0,6)}`;
+    
+    const datePrefix = format(currentDate, 'ddMMyy');
+    const billsTodayForCompany = db.bills.filter(bill => 
+      bill.companyId === companyId && isToday(new Date(bill.date))
+    );
+    const newBillNumber = billsTodayForCompany.length + 1;
+    const newBillId = `${datePrefix}${newBillNumber}`;
+    
     const billTimestamp = currentDate.getTime();
     
     let processedBillItems: BillItem[] = [];
@@ -247,7 +254,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error(`${routeNamePrefix} Error creating bill:`, error);
-    const message = error instanceof Error ? error.message : 'An internal server error occurred during bill creation.';
+    const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }
