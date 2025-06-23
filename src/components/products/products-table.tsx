@@ -496,11 +496,11 @@ export function ProductsTable() {
                    </div>
                    <div className="space-y-0.5">
                      <p className="text-muted-foreground">Tracked</p>
-                     <p><Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/20 text-primary-foreground" : "text-muted-foreground border-border")}>{product.trackQuantity ? 'Yes' : 'No'}</Badge></p>
+                     <Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/80 hover:bg-primary text-primary-foreground" : "text-muted-foreground border-border", "cursor-default text-xs font-medium")}>{product.trackQuantity ? 'Yes' : 'No'}</Badge>
                    </div>
                    {product.isArchived && (
                      <div className="space-y-0.5 col-span-2">
-                       <p><Badge variant="destructive">Archived</Badge></p>
+                       <Badge variant="destructive">Archived</Badge>
                      </div>
                    )}
                  </CardContent>
