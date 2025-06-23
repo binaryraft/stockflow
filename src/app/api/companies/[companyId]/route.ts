@@ -55,33 +55,33 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
     const companyIndex = db.companies.findIndex(c => c.id === companyId);
 
     if (companyIndex === -1) {
-      console.warn(`${routeLogName} Company not found (ID: ${companyId}). Cannot update.`);
+      console.warn(`${routeNamePrefix} Company not found (ID: ${companyId}). Cannot update.`);
       return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
     }
 
     const { id, token, ...updateableData } = companyDataToUpdate;
 
     if (updateableData.name !== undefined && (typeof updateableData.name !== 'string' || updateableData.name.trim() === '')) {
-        console.warn(`${routeLogName} Company name cannot be empty if provided for update.`);
+        console.warn(`${routeNamePrefix} Company name cannot be empty if provided for update.`);
         return NextResponse.json({ success: false, message: 'Company name cannot be empty if provided for update.' }, { status: 400 });
     }
     if (updateableData.activeSubscriptionId) {
       const validPlan = SUBSCRIPTION_PLANS.find(p => p.id === updateableData.activeSubscriptionId);
       if (!validPlan || updateableData.activeSubscriptionId === SUBSCRIPTION_PLAN_IDS.ENTERPRISE) { 
-          console.warn(`${routeLogName} Invalid or restricted subscription plan ID provided: ${updateableData.activeSubscriptionId}.`);
+          console.warn(`${routeNamePrefix} Invalid or restricted subscription plan ID provided: ${updateableData.activeSubscriptionId}.`);
           return NextResponse.json({ success: false, message: 'Invalid or restricted subscription plan ID provided.' }, { status: 400 });
       }
     }
     if (updateableData.defaultSalesPaymentStatus && !['paid', 'unpaid'].includes(updateableData.defaultSalesPaymentStatus)){
-        console.warn(`${routeLogName} Invalid default sales payment status: ${updateableData.defaultSalesPaymentStatus}. Must be 'paid' or 'unpaid'.`);
+        console.warn(`${routeNamePrefix} Invalid default sales payment status: ${updateableData.defaultSalesPaymentStatus}. Must be 'paid' or 'unpaid'.`);
         return NextResponse.json({ success: false, message: "Invalid default sales payment status. Must be 'paid' or 'unpaid'." }, { status: 400 });
     }
     if (updateableData.defaultPurchasePaymentStatus && !['paid', 'unpaid'].includes(updateableData.defaultPurchasePaymentStatus)){
-        console.warn(`${routeLogName} Invalid default purchase payment status: ${updateableData.defaultPurchasePaymentStatus}. Must be 'paid' or 'unpaid'.`);
+        console.warn(`${routeNamePrefix} Invalid default purchase payment status: ${updateableData.defaultPurchasePaymentStatus}. Must be 'paid' or 'unpaid'.`);
         return NextResponse.json({ success: false, message: "Invalid default purchase payment status. Must be 'paid' or 'unpaid'." }, { status: 400 });
     }
     if (updateableData.currency && !SUPPORTED_CURRENCIES.find(c => c.code === updateableData.currency)) {
-        console.warn(`${routeLogName} Invalid currency code provided: ${updateableData.currency}.`);
+        console.warn(`${routeNamePrefix} Invalid currency code provided: ${updateableData.currency}.`);
         return NextResponse.json({ success: false, message: 'Invalid currency code provided.' }, { status: 400 });
     }
 
@@ -93,10 +93,10 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
     db.companies[companyIndex] = updatedCompany;
     await writeDB(db);
 
-    console.log(`${routeLogName} Company (ID: ${companyId}) updated successfully.`);
+    console.log(`${routeNamePrefix} Company (ID: ${companyId}) updated successfully.`);
     return NextResponse.json({ success: true, data: updatedCompany });
   } catch (error) {
-    console.error(`${routeLogName} Error updating company:`, error);
+    console.error(`${routeNamePrefix} Error updating company:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

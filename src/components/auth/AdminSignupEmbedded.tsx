@@ -122,7 +122,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
           <CardTitle className="text-2xl">Create Admin Account</CardTitle>
           <CardDescription>Set up your company and admin profile.</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSignup}>
+        <form onSubmit={handleSubmit}>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="signup-company-name">
@@ -211,5 +211,3 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
     </div>
   );
 }
-
-    

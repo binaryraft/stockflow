@@ -50,30 +50,30 @@ export async function POST(req: NextRequest) {
         !staffData.email || typeof staffData.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffData.email) ||
         !staffData.password || typeof staffData.password !== 'string' || staffData.password.trim() === '' ||
         !staffData.phone || typeof staffData.phone !== 'string' || staffData.phone.trim().length < 10) {
-      console.warn(`${routeLogName} Missing or invalid fields. Required: companyId, staffData (name, valid email, password, phone min 10 digits).`);
+      console.warn(`${routeNamePrefix} Missing or invalid fields. Required: companyId, staffData (name, valid email, password, phone min 10 digits).`);
       return NextResponse.json({ success: false, message: 'Company ID and complete staff data (name, valid email, password, phone min 10 digits) are required.' }, { status: 400 });
     }
     if (staffData.password.length < 6) { // Password policy
-      console.warn(`${routeLogName} Password too short. Must be at least 6 characters.`);
+      console.warn(`${routeNamePrefix} Password too short. Must be at least 6 characters.`);
       return NextResponse.json({ success: false, message: 'Password must be at least 6 characters long.' }, { status: 400 });
     }
 
     const db = await readDB();
     const company = db.companies.find(c => c.id === companyId);
     if (!company) {
-      console.warn(`${routeLogName} Company not found (ID: ${companyId}). Cannot add staff.`);
+      console.warn(`${routeNamePrefix} Company not found (ID: ${companyId}). Cannot add staff.`);
       return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
     }
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === company.activeSubscriptionId);
     if (!plan) {
-      console.warn(`${routeLogName} Company subscription plan not found or invalid for company ${companyId}. Allowing add by default but this is an issue.`);
+      console.warn(`${routeNamePrefix} Company subscription plan not found or invalid for company ${companyId}. Allowing add by default but this is an issue.`);
       // In a production app, this might be a hard error or a fallback to a very restrictive default.
     }
 
     const currentStaffCount = db.users.filter(u => u.companyId === companyId && u.role === 'employee').length;
     if (plan && currentStaffCount >= plan.maxEmployees) {
-      console.warn(`${routeLogName} Employee limit (${plan.maxEmployees}) reached for company ${companyId} on plan ${plan.name}.`);
+      console.warn(`${routeNamePrefix} Employee limit (${plan.maxEmployees}) reached for company ${companyId} on plan ${plan.name}.`);
       return NextResponse.json({ success: false, message: `Employee limit reached for your current plan (${plan.name}). Max ${plan.maxEmployees} employees allowed.` }, { status: 403 }); // 403 Forbidden
     }
     
@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
         (u.companyId === companyId || u.role === 'admin') // Check if email exists in this company OR as any admin
     );
     if (existingUser) {
-      console.warn(`${routeLogName} Email "${staffData.email}" is already registered in this company or by an admin.`);
+      console.warn(`${routeNamePrefix} Email "${staffData.email}" is already registered in this company or by an admin.`);
       return NextResponse.json({ success: false, message: 'This email is already registered.' }, { status: 409 }); // 409 Conflict
     }
 
@@ -110,10 +110,10 @@ export async function POST(req: NextRequest) {
     await writeDB(db);
 
     const { password, ...staffWithoutPassword } = newStaff; // Exclude password from response
-    console.log(`${routeLogName} New staff member "${newStaff.name}" (ID: ${newStaff.id}) created successfully for company ${companyId}.`);
+    console.log(`${routeNamePrefix} New staff member "${newStaff.name}" (ID: ${newStaff.id}) created successfully for company ${companyId}.`);
     return NextResponse.json({ success: true, data: staffWithoutPassword }, { status: 201 }); // 201 Created
   } catch (error) {
-    console.error(`${routeLogName} Error creating staff member:`, error);
+    console.error(`${routeNamePrefix} Error creating staff member:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

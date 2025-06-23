@@ -12,13 +12,12 @@ import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/CallToActionSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
-// import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded'; // No longer used for login flow
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
-type UIMode = 'landing' | 'adminLogin' | 'adminSignup'; // Removed 'storeSelect'
+type UIMode = 'landing' | 'adminLogin' | 'adminSignup';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -72,7 +71,6 @@ export default function HomePage() {
     setIsRedirecting(true); 
   };
 
-  // Store login now directly navigates to /storeportal
   const handleStoreLoginClick = () => {
     router.push('/storeportal');
   };

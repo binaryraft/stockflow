@@ -65,7 +65,7 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
     if (!staffData.name || typeof staffData.name !== 'string' || staffData.name.trim() === '' || 
         !staffData.email || typeof staffData.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(staffData.email) ||
         !staffData.phone || typeof staffData.phone !== 'string' || staffData.phone.trim().length < 10) {
-      console.warn(`${routeLogName} Name (non-empty), valid email, and phone (min 10 digits) are required in staff data.`);
+      console.warn(`${routeNamePrefix} Name (non-empty), valid email, and phone (min 10 digits) are required in staff data.`);
       return NextResponse.json({ success: false, message: 'Staff name, a valid email, and a phone number (min 10 digits) are required.' }, { status: 400 });
     }
 
@@ -92,7 +92,7 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
             (u.companyId === companyId || u.role === 'admin') // Check within company or if it's an admin email
         );
         if (existingUserWithNewEmail) {
-            console.warn(`${routeLogName} Email "${staffData.email}" is already registered by another user in this company or as an admin.`);
+            console.warn(`${routeNamePrefix} Email "${staffData.email}" is already registered by another user in this company or as an admin.`);
             return NextResponse.json({ success: false, message: 'This email is already registered.' }, { status: 409 }); // 409 Conflict
         }
     }
@@ -124,7 +124,7 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
     await writeDB(db);
 
     const { password, ...staffWithoutPassword } = updatedStaff; // Exclude password from response
-    console.log(`${routeLogName} Staff member (ID: ${staffId}) updated successfully.`);
+    console.log(`${routeNamePrefix} Staff member (ID: ${staffId}) updated successfully.`);
     return NextResponse.json({ success: true, data: staffWithoutPassword });
   } catch (error) {
     console.error(`${routeLogName} Error updating staff member:`, error);
@@ -179,10 +179,10 @@ export async function DELETE(req: NextRequest, { params }: { params: { staffId: 
     db.users.splice(staffIndex, 1); // Remove the staff user
     await writeDB(db);
 
-    console.log(`${routeLogName} Staff member (ID: ${staffId}) deleted successfully from company (ID: ${companyId}).`);
+    console.log(`${routeNamePrefix} Staff member (ID: ${staffId}) deleted successfully from company (ID: ${companyId}).`);
     return NextResponse.json({ success: true, message: 'Staff member deleted successfully.' });
   } catch (error) {
-    console.error(`${routeLogName} Error deleting staff member:`, error);
+    console.error(`${routeNamePrefix} Error deleting staff member:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }

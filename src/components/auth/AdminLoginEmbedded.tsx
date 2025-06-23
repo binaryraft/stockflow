@@ -153,5 +153,3 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
     </div>
   );
 }
-
-    
