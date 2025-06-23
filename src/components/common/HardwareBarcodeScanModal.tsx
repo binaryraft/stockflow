@@ -12,15 +12,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Loader2, Barcode as BarcodeIconLucide, AlertCircle } from 'lucide-react'; // Changed alias
+import { Loader2, Barcode as BarcodeIconLucide, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HardwareBarcodeScanModalProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onScan: (barcodeValue: string) => void; // Changed from onScanSuccess
-  purpose?: 'addItem' | 'updateProductSku'; // Optional: to customize title/description
-  productNameForUpdate?: string; // Optional: to customize title when updating
+  onScan: (barcodeValue: string) => void;
+  purpose?: 'addItem' | 'updateProductSku';
+  productNameForUpdate?: string;
 }
 
 export function HardwareBarcodeScanModal({
@@ -31,7 +31,7 @@ export function HardwareBarcodeScanModal({
   productNameForUpdate,
 }: HardwareBarcodeScanModalProps) {
   const [inputValue, setInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Added for internal loading state if needed for visual feedback
+  const [isLoading, setIsLoading] = useState(false);
   const [internalError, setInternalError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -52,16 +52,11 @@ export function HardwareBarcodeScanModal({
       setInternalError("Please enter or scan a barcode.");
       return;
     }
-    setIsLoading(true); // Indicate processing
-    // Simulate a small delay if needed, or directly call onScan
+    setIsLoading(true);
     setTimeout(() => {
       onScan(inputValue.trim());
-      // The modal will be closed by the parent component via onOpenChange(false)
-      // or after onScan processes. Let parent control closing based on scan success.
-      // For now, we assume parent will close, so we don't call onOpenChange(false) here.
       setIsLoading(false);
-      // Input value will be cleared by useEffect when isOpen changes or modal reopens.
-    }, 100); // Small delay to show loading state
+    }, 100);
   };
 
   const dialogTitle = purpose === 'updateProductSku'
@@ -133,4 +128,3 @@ export function HardwareBarcodeScanModal({
     </Dialog>
   );
 }
-    

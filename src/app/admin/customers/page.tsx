@@ -4,13 +4,12 @@
 import React, { Suspense, useEffect, useState } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { CustomersTable } from '@/components/customers/customers-table';
-import { Contact } from 'lucide-react';
+import { Contact, Loader2, PlusCircle } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-export default function CustomersPage() {
+function CustomersContent() {
   const fetchCustomers = useInventoryStore((state) => state.fetchCustomers);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,9 +40,16 @@ export default function CustomersPage() {
       description: "Manually adding customers will be available in a future update.",
     });
   };
+  
+  if (isLoading && companyId) {
+    return <div className="flex-1 flex items-center justify-center">Fetching customer data...</div>
+  }
+  if (!isLoading && !companyId) {
+    return <div className="flex-1 flex items-center justify-center text-destructive">Could not load customers: Company ID missing.</div>
+  }
 
   return (
-    <div className="flex flex-col gap-6">
+    <>
       <PageTitle 
         title="Customers" 
         icon={Contact} 
@@ -53,10 +59,23 @@ export default function CustomersPage() {
           </Button>
         }
       />
-      <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading Customers...</div>}>
-        {isLoading && companyId && <div className="flex-1 flex items-center justify-center">Fetching customer data...</div>}
-        {!isLoading && !companyId && <div className="flex-1 flex items-center justify-center text-destructive">Could not load customers: Company ID missing.</div>}
-        {!isLoading && companyId && <CustomersTable />}
+      <CustomersTable />
+    </>
+  );
+}
+
+const LoadingFallback = () => (
+  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
+    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+    <p className="text-muted-foreground">Loading Customers...</p>
+  </div>
+);
+
+export default function CustomersPage() {
+  return (
+    <div className="flex flex-col gap-6">
+      <Suspense fallback={<LoadingFallback />}>
+        <CustomersContent />
       </Suspense>
     </div>
   );

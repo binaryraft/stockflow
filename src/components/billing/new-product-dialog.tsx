@@ -23,7 +23,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins } from 'lucide-react';
+import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins, Info } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -553,33 +553,35 @@ export function NewProductDialog({
                 </div>
               </div>
 
-              {!hasVariants && (
+              {!trackQuantityValue && !hasVariants && (
                 <>
-                  {trackQuantityValue && initialValues?.quantity !== undefined && (
-                     <div className="space-y-1.5">
-                        <Label htmlFor="dialog-initialStock">Initial Stock (from billing)</Label>
-                        <Input id="dialog-initialStock" type="number" step="any" {...register("initialStock")} disabled />
-                        <p className="text-xs text-muted-foreground">Stock will be added via the Expense Bill.</p>
-                     </div>
-                  )}
-                  {(!trackQuantityValue || initialValues?.costPrice !== undefined || initialValues?.sellPrice !== undefined) && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="dialog-costPrice">Cost Price {trackQuantityValue ? "(Ignored if tracking quantity)" : ""}</Label>
-                            <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" disabled={trackQuantityValue && !hasVariants} />
-                            {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="dialog-sellPrice">Sell Price {trackQuantityValue ? "(Ignored if tracking quantity)" : ""}</Label>
-                            <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" disabled={trackQuantityValue && !hasVariants} />
-                            {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
-                        </div>
+                   <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                        <span>
+                            For non-tracked items (like services), set their standard cost and sell price below.
+                        </span>
                     </div>
-                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                          <Label htmlFor="dialog-costPrice">Cost Price</Label>
+                          <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                          {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
+                      </div>
+                      <div className="space-y-1.5">
+                          <Label htmlFor="dialog-sellPrice">Sell Price</Label>
+                          <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                          {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
+                      </div>
+                  </div>
                 </>
               )}
-              {trackQuantityValue && hasVariants && (
-                 <p className="text-xs text-muted-foreground">For products with variants, stock and pricing are managed per specific combination (SKU) via Expense Bills.</p>
+              {trackQuantityValue && (
+                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                    <span>
+                        For quantity-tracked products, cost and sell prices are established via Expense Bills, not here.
+                    </span>
+                </div>
               )}
 
               <Separator className="my-4"/>
@@ -623,5 +625,3 @@ export function NewProductDialog({
     </Dialog>
   );
 }
-
-    

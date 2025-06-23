@@ -5,7 +5,7 @@ import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { PageTitle } from '@/components/common/page-title';
 import { ProductForm } from '@/components/products/product-form';
-import { PackagePlus } from 'lucide-react';
+import { Loader2, PackagePlus } from 'lucide-react';
 
 function AddProductPageContent() {
   const searchParams = useSearchParams();
@@ -23,12 +23,17 @@ function AddProductPageContent() {
   );
 }
 
+const LoadingFallback = () => (
+  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
+    <Loader2 className="h-8 w-8 text-primary animate-spin" />
+    <p className="text-muted-foreground">Loading Form...</p>
+  </div>
+);
+
 export default function AddProductPage() {
   return (
-    <Suspense fallback={<div className="flex-1 flex items-center justify-center">Loading form...</div>}>
+    <Suspense fallback={<LoadingFallback />}>
       <AddProductPageContent />
     </Suspense>
   );
 }
-
-    

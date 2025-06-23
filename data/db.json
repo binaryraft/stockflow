@@ -104,12 +104,41 @@
       "id": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
       "name": "gold",
       "category": "",
-      "trackQuantity": true,
+      "trackQuantity": false,
       "sku": "GOLD-MAIN-SKU",
       "expiryDate": "",
       "imageUrl": "https://placehold.co/100x100.png?text=gold&font=roboto",
       "description": "",
-      "variants": [],
+      "variants": [
+        {
+          "id": "variant-39185bfe-e36a-4d40-9aea-46acb9e3e4cc-0",
+          "name": "Color",
+          "options": [
+            {
+              "id": "option-508374f2-64f8-40e2-b59a-f903d4846907-0-0",
+              "value": "White"
+            },
+            {
+              "id": "option-03202f94-0b2e-4ed3-af5f-559d21c39d16-0-1",
+              "value": "Black"
+            }
+          ]
+        },
+        {
+          "id": "variant-a352b8e4-c40b-4ce0-8259-52e73deb7af5-1",
+          "name": "Size",
+          "options": [
+            {
+              "id": "option-41ae3683-bcb9-47a5-bfac-2b6f8bbb186b-1-0",
+              "value": "M"
+            },
+            {
+              "id": "option-9d590fb7-b106-4e63-90cc-fbbae33d77d5-1-1",
+              "value": "L"
+            }
+          ]
+        }
+      ],
       "productSKUs": [
         {
           "id": "992c81a1-f951-464d-b0b9-ce838836c08c",
@@ -132,7 +161,20 @@
       "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
       "sgstRate": 0,
       "cgstRate": 0,
-      "additionalChargeDefinitions": []
+      "additionalChargeDefinitions": [
+        {
+          "id": "98df3337-4856-479e-baa5-a6c2bb5f5750",
+          "name": "Packing",
+          "type": "fixed",
+          "value": 50
+        },
+        {
+          "id": "399bbb8d-36ea-4582-8368-855c26841a59",
+          "name": "delivery",
+          "type": "percentage",
+          "value": 20
+        }
+      ]
     }
   ],
   "bills": [

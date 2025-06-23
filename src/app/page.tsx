@@ -101,7 +101,7 @@ export default function HomePage() {
         <>
           <LandingHeader onAdminLoginClick={showAdminLogin} onStoreLoginClick={handleStoreLoginClick} />
           <main className="flex-grow">
-            <HeroSection onAdminLoginClick={showAdminLogin} onStoreSelectClick={handleStoreLoginClick} />
+            <HeroSection onAdminLoginClick={showAdminLogin} onStoreLoginClick={handleStoreLoginClick} />
             <FeaturesSection />
             <PricingSectionLanding />
             <OtherSection />
