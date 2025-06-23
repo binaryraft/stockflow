@@ -92,12 +92,37 @@ export function ProductsTable() {
     let visibleProducts = showArchived ? products : products.filter(p => !p.isArchived);
 
     if (searchTerm) {
-      visibleProducts = visibleProducts.filter(product =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) || 
-        product.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
+      const lowerSearchTerm = searchTerm.toLowerCase();
+
+      visibleProducts = visibleProducts.filter(product => {
+        const nameMatch = product.name.toLowerCase().includes(lowerSearchTerm);
+        const categoryMatch = product.category && product.category.toLowerCase().includes(lowerSearchTerm);
+        const descriptionMatch = product.description && product.description.toLowerCase().includes(lowerSearchTerm);
+        const skuMatch = (product.sku && product.sku.toLowerCase().includes(lowerSearchTerm)) ||
+                         product.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm));
+
+        if (nameMatch || categoryMatch || descriptionMatch || skuMatch) {
+          return true;
+        }
+        
+        // Numeric searches for stock and price
+        if (product.trackQuantity) {
+          const totalStock = product.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0);
+          if (totalStock.toString().includes(lowerSearchTerm)) {
+            return true;
+          }
+        }
+        
+        const prices = product.productSKUs
+          .map(sku => getSkuDetails(sku).currentSellPrice)
+          .filter(price => typeof price === 'number') as number[];
+        
+        if (prices.some(price => price.toString().includes(lowerSearchTerm))) {
+          return true;
+        }
+
+        return false;
+      });
     }
 
     if (sortConfig !== null) {
@@ -232,7 +257,7 @@ export function ProductsTable() {
     <TooltipProvider>
       <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 p-4 border rounded-xl bg-card shadow-md">
         <Input
-          placeholder="Search products (name, category, SKU identifier)..."
+          placeholder="Search (name, category, SKU, stock, price, description)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto h-11 text-base"
