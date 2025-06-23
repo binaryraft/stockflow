@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
@@ -14,9 +15,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; // Added Card components
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
-import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate } from 'date-fns'; // Added getDate
+import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -100,7 +101,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
   
-  type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'>;
+  type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'> | 'id';
   
   type BillTypeFilter = 'all' | BillMode | 'estimate'; 
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
@@ -195,10 +196,12 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
     if (sortConfig !== null) {
         processBills.sort((a, b) => {
-        let valA = a[sortConfig.key];
-        let valB = b[sortConfig.key];
+        let valA: string | number | undefined | null = a[sortConfig.key as keyof Omit<Bill, 'id'>];
+        let valB: string | number | undefined | null = b[sortConfig.key as keyof Omit<Bill, 'id'>];
 
-        if (sortConfig.key === 'date') {
+        if (sortConfig.key === 'id') {
+          valA = a.id; valB = b.id;
+        } else if (sortConfig.key === 'date') {
             valA = a.timestamp;
             valB = b.timestamp;
         } else if (sortConfig.key === 'type') {
@@ -215,17 +218,15 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             valB = b.paymentStatus || '';
         }
 
-
         let comparison = 0;
-        if (typeof valA === 'string' && typeof valB === 'string') {
+        if (valA === undefined || valA === null) comparison = sortConfig.direction === 'ascending' ? 1 : -1;
+        else if (valB === undefined || valB === null) comparison = sortConfig.direction === 'ascending' ? -1 : 1;
+        else if (typeof valA === 'string' && typeof valB === 'string') {
           comparison = valA.localeCompare(valB);
         } else if (typeof valA === 'number' && typeof valB === 'number') {
           comparison = valA - valB;
         }
         
-        if (valA === undefined || valA === null) comparison = -1;
-        if (valB === undefined || valB === null) comparison = 1;
-
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     } else {
@@ -331,7 +332,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                 Bill Details {selectedBill.type === 'sell' && selectedBill.isEstimate && "(Estimate)"}
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-secondary">{selectedBill.id}</span>)
+                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-muted-foreground">{selectedBill.id}</span>)
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
@@ -374,7 +375,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                       <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
                       <div>
                           <p className="text-xs text-muted-foreground">Bill ID</p>
-                          <p className="font-mono text-sm text-secondary">{selectedBill.id}</p>
+                          <p className="font-mono text-sm text-muted-foreground">{selectedBill.id}</p>
                       </div>
                       <div>
                           <p className="text-xs text-muted-foreground">Date & Time</p>
@@ -561,7 +562,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                           <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemCgst.toFixed(2)}` : '-'}</TableCell>
                                         </>
                                     )}
-                                    <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
+                                    <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
                                   </TableRow>
                                 )})}
                               </TableBody>
@@ -716,34 +717,33 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="py-2 px-3 w-[90px] md:w-[120px]">Date / Time</TableHead>
-              <TableHead className="py-3 px-4 hidden md:table-cell w-[180px]">ID</TableHead>
+              <TableHead className="py-2 px-3 w-[90px] md:w-[120px]">Date / ID</TableHead>
               <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 w-[150px]"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[180px]">
+              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[160px]">
                 Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[180px]">
+              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[160px]">
                 Store <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
               <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right py-3 px-4 w-[80px]">Items</TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 w-[120px]" onClick={() => requestSort('totalAmount')} >
+              <TableHead className="text-right py-3 px-4 w-[70px]">Items</TableHead>
+              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 w-[110px]" onClick={() => requestSort('totalAmount')} >
                 Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
                <TableHead className="text-center cursor-pointer hover:bg-muted/50 py-3 px-4 w-[100px]" onClick={() => requestSort('paymentStatus')}>
                 Payment <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
-              <TableHead className="text-right py-3 px-4 w-[80px]">Actions</TableHead>
+              <TableHead className="text-right py-3 px-4 w-[70px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
                 <TableRow>
-                    <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">Loading bills...</TableCell>
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Loading bills...</TableCell>
                 </TableRow>
             ) : filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
@@ -755,10 +755,10 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     <div className="flex flex-col items-start leading-tight">
                       <span className="text-xl font-bold text-primary">{getDate(billDate)}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'MMM yyyy')}</span>
-                      <span className="text-xs text-muted-foreground mt-0.5">{format(billDate, 'p')}</span>
+                       <span className="text-xs text-muted-foreground mt-0.5">{format(billDate, 'p')}</span>
+                       <span className="text-xs text-muted-foreground font-mono mt-0.5 opacity-80">{bill.id.slice(-6)}</span>
                     </div>
                   </TableCell>
-                  <TableCell className="font-mono text-xs py-3 px-4 hidden md:table-cell w-[180px] text-secondary">{bill.id}</TableCell>
                   <TableCell className="py-3 px-4 w-[150px]">
                     <div className="flex flex-col items-start gap-0.5">
                         <Badge
@@ -772,7 +772,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                         </Badge>
                     </div>
                   </TableCell>
-                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[180px]">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[160px]">
                     {bill.billedByStaffName ? (
                         <div className="text-sm flex items-center gap-1">
                             <Users size={14} className="text-muted-foreground shrink-0" />
@@ -780,7 +780,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                         </div>
                     ) : <span className="text-muted-foreground">-</span>}
                   </TableCell>
-                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[180px]">
+                  <TableCell className="py-3 px-4 hidden lg:table-cell w-[160px]">
                      {bill.storeName ? (
                         <div className="text-sm flex items-center gap-1">
                             <BuildingIcon size={14} className="text-muted-foreground shrink-0" />
@@ -792,8 +792,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                       <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
                       {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 w-[80px]">{bill.items.length}</TableCell>
-                  <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[120px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right py-3 px-4 w-[70px]">{bill.items.length}</TableCell>
+                  <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[110px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
                   <TableCell className="text-center py-3 px-4 w-[100px]">
                     {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate ? (
                       <Badge 
@@ -810,7 +810,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
-                  <TableCell className="text-right py-3 px-4 w-[80px]">
+                  <TableCell className="text-right py-3 px-4 w-[70px]">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -855,7 +855,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                   No bills found for the selected filters.
                 </TableCell>
               </TableRow>
@@ -984,4 +984,3 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     </>
   );
 }
-
