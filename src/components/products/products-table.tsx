@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
 import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
@@ -269,7 +270,9 @@ export function ProductsTable() {
           </Tooltip>
         </div>
       </div>
-      <div className="border rounded-xl overflow-hidden shadow-xl bg-card">
+      
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-xl overflow-hidden shadow-xl bg-card">
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
@@ -424,6 +427,66 @@ export function ProductsTable() {
             )}
           </TableBody>
         </Table>
+      </div>
+
+       {/* Mobile Card View */}
+       <div className="md:hidden space-y-3">
+        {filteredAndSortedProducts.length > 0 ? (
+          filteredAndSortedProducts.map((product) => {
+            const isVariantProduct = product.variants && product.variants.length > 0;
+            return (
+              <Card key={`mobile-${product.id}`} className={cn("shadow-md border-t-2 border-t-primary overflow-hidden", product.isArchived && "bg-secondary/10 opacity-70")}>
+                 <CardHeader className="p-3 flex flex-row items-center gap-3 bg-muted/30">
+                  <Image
+                    src={product.imageUrl || `https://placehold.co/48x48.png?text=${product.name.charAt(0)}`}
+                    alt={product.name}
+                    width={40}
+                    height={40}
+                    className="rounded-md object-cover aspect-square border"
+                  />
+                  <div className="flex-1">
+                    <CardTitle className="text-sm font-semibold">{product.name}</CardTitle>
+                    {product.category && <Badge variant="secondary" className="text-xs mt-0.5">{product.category}</Badge>}
+                  </div>
+                  <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                         <DropdownMenuItem asChild><Link href={`/admin/products/${product.id}`}><Edit3 className="mr-2 h-4 w-4" /> Edit / View Details</Link></DropdownMenuItem>
+                         {/* Other actions from desktop view can be added here */}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                 </CardHeader>
+                 <CardContent className="p-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                   <div className="space-y-0.5">
+                     <p className="text-muted-foreground">Stock</p>
+                     <p className="font-medium">{getProductStockDisplay(product)}</p>
+                   </div>
+                   <div className="space-y-0.5">
+                     <p className="text-muted-foreground">Sell Price</p>
+                     <p className="font-medium">{getProductPriceDisplay(product, 'currentSellPrice')}</p>
+                   </div>
+                   <div className="space-y-0.5">
+                     <p className="text-muted-foreground">Tracked</p>
+                     <p><Badge variant={product.trackQuantity ? "default" : "outline"} className={cn(product.trackQuantity ? "bg-primary/20 text-primary-foreground" : "text-muted-foreground border-border")}>{product.trackQuantity ? 'Yes' : 'No'}</Badge></p>
+                   </div>
+                   {product.isArchived && (
+                     <div className="space-y-0.5 col-span-2">
+                       <p><Badge variant="destructive">Archived</Badge></p>
+                     </div>
+                   )}
+                 </CardContent>
+              </Card>
+            )
+          })
+        ) : (
+          <div className="text-center py-10 text-muted-foreground">
+            {isLoading ? "Loading products..." : (searchTerm ? "No products match search" : "No products found.")}
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
