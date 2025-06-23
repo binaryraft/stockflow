@@ -6,7 +6,8 @@ import { persist, createJSONStorage, type PersistOptions } from 'zustand/middlew
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
-import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
+import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
+import { toast } from './use-toast';
 
 const generateId = () => uuidv4();
 
@@ -457,9 +458,32 @@ export const useInventoryStore = create<InventoryState>()(
           });
           const result = await response.json();
           if (result.success && result.data) {
-            set((state) => ({ bills: [result.data, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
+            const savedBill: Bill = result.data;
+            set((state) => ({ bills: [savedBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
             get().fetchProducts(billData.companyId); 
-            return result.data;
+            
+            // --- Notification Logic ---
+            toast({ title: "Bill Saved", description: `Bill ${savedBill.id.slice(-6)} created successfully.` });
+
+            if (savedBill.type === 'sell') {
+              savedBill.items.forEach(item => {
+                if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+                const product = get().getProductById(item.productId);
+                if (product && product.trackQuantity) {
+                  const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, savedBill.storeId).totalStock ?? 0), 0);
+                  if (totalStock < LOW_STOCK_THRESHOLD) {
+                    toast({
+                      variant: "destructive",
+                      title: "Low Stock Warning",
+                      description: `Stock for ${product.name} is now ${totalStock}. Consider reordering.`
+                    });
+                  }
+                }
+              });
+            }
+            // --- End Notification Logic ---
+
+            return savedBill;
           } else {
             console.error("Failed to add bill via API:", result.message);
             throw new Error(result.message || "Failed to save bill.");

@@ -129,3 +129,5 @@ export const SUPPORTED_CURRENCIES: CurrencyOption[] = [
 ];
 
 export const DEFAULT_CURRENCY_CODE = 'INR';
+
+export const LOW_STOCK_THRESHOLD = 10;

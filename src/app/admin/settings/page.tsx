@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,10 +11,76 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile, Company, CurrencyOption } from '@/types';
-import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages } from 'lucide-react';
+import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages, Check } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+
+const THEME_STORAGE_KEY = "app-color-theme";
+
+const themes = [
+  { name: 'default', color: 'hsl(145 60% 40%)' },
+  { name: 'zinc', color: 'hsl(240 5.9% 10%)' },
+  { name: 'slate', color: 'hsl(215.4 16.3% 46.9%)' },
+  { name: 'red', color: 'hsl(0 72.2% 50.6%)' },
+  { name: 'orange', color: 'hsl(24.6 95% 53.1%)' },
+  { name: 'green', color: 'hsl(142.1 76.2% 36.3%)' },
+  { name: 'blue', color: 'hsl(221.2 83.2% 53.3%)' },
+  { name: 'violet', color: 'hsl(262.1 83.3% 57.8%)' },
+  { name: 'rose', color: 'hsl(346.8 77.2% 49.8%)' },
+];
+
+function ThemeSelector() {
+  const [activeTheme, setActiveTheme] = useState('default');
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) || 'default';
+    setActiveTheme(savedTheme);
+  }, []);
+
+  const handleThemeChange = (themeName: string) => {
+    document.documentElement.setAttribute('data-theme', themeName);
+    localStorage.setItem(THEME_STORAGE_KEY, themeName);
+    setActiveTheme(themeName);
+  };
+
+  if (!hasMounted) {
+    return null; // or a skeleton loader
+  }
+
+  return (
+    <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-9 gap-3">
+      {themes.map((theme) => (
+        <TooltipProvider key={theme.name}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className={cn(
+                  "h-14 w-14 rounded-full border-2 transition-all",
+                  activeTheme === theme.name ? "border-primary ring-2 ring-primary/50" : "border-muted-foreground/30 hover:border-primary/50"
+                )}
+                style={{ backgroundColor: theme.color }}
+                onClick={() => handleThemeChange(theme.name)}
+                aria-label={`Select ${theme.name} theme`}
+              >
+                {activeTheme === theme.name && <Check className="h-6 w-6 text-white" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p className="capitalize">{theme.name}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ))}
+    </div>
+  );
+}
+
 
 export default function SettingsPage() {
   const { 
@@ -90,6 +156,30 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageTitle title="Application Settings" icon={SettingsIcon} />
+
+      <Card className="shadow-md border-t-2 border-t-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary"/>Appearance</CardTitle>
+          <CardDescription>Manage application theme and color preferences.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <Label>Color Theme</Label>
+            <p className="text-xs text-muted-foreground">Select a color scheme for the application interface.</p>
+            <ThemeSelector />
+          </div>
+          <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
+              <div className="space-y-0.5">
+                  <Label className="text-sm">Light/Dark Mode</Label>
+                  <p className="text-xs text-muted-foreground">
+                      Current mode: <span className="font-semibold capitalize text-foreground">{theme}</span>.
+                  </p>
+              </div>
+              <ThemeToggle />
+          </div>
+        </CardContent>
+      </Card>
+
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
@@ -205,24 +295,6 @@ export default function SettingsPage() {
             </div>
         </CardContent>
       </Card>
-
-      <Card className="shadow-md border-t-2 border-t-primary">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary"/>Appearance</CardTitle>
-          <CardDescription>Manage application theme preferences.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-            <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
-                <div className="space-y-0.5">
-                    <Label className="text-sm">Theme Preference</Label>
-                    <p className="text-xs text-muted-foreground">
-                        Current theme: <span className="font-semibold capitalize text-foreground">{theme}</span>. Use the toggle in the header to change.
-                    </p>
-                </div>
-                <ThemeToggle />
-            </div>
-        </CardContent>
-      </Card>
       
        <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
@@ -245,4 +317,3 @@ export default function SettingsPage() {
     </div>
   );
 }
-    

@@ -10,6 +10,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
+const THEME_STORAGE_KEY = "app-color-theme";
 
 export default function AdminLayout({
   children,
@@ -26,6 +27,11 @@ export default function AdminLayout({
 
   useEffect(() => {
     setHasMounted(true);
+    // Apply theme on initial load
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (savedTheme) {
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    }
   }, []);
 
   useEffect(() => {
