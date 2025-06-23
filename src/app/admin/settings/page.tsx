@@ -16,6 +16,7 @@ import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 const THEME_STORAGE_KEY = "app-color-theme";
 
