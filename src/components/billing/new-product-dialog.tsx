@@ -409,7 +409,7 @@ export function NewProductDialog({
     const companyIdFromStorage = localStorage.getItem('companyId');
     if (companyIdFromStorage) {
       setCurrentCompanyId(companyIdFromStorage);
-      if (isOpen) { // Fetch categories only when dialog opens and companyId is known
+      if (isOpen) {
         fetchCategories(companyIdFromStorage);
       }
     }
@@ -494,133 +494,135 @@ export function NewProductDialog({
             Quickly add a new product. For more detailed setup, use the main Products page.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1">
-          <FormProvider {...form}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 p-6">
-              <div>
-                <Label htmlFor="dialog-product-name">Product Name*</Label>
-                <Input id="dialog-product-name" {...register("name")} placeholder="Enter product name" />
-                {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
-              </div>
+        <FormProvider {...form}>
+          <form onSubmit={handleSubmit(onSubmit)} className="contents">
+            <ScrollArea className="flex-1">
+              <div className="space-y-6 p-6">
+                <div>
+                  <Label htmlFor="dialog-product-name">Product Name*</Label>
+                  <Input id="dialog-product-name" {...register("name")} placeholder="Enter product name" />
+                  {errors.name && <p className="text-xs text-destructive mt-1">{errors.name.message}</p>}
+                </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                      <Label htmlFor="dialog-category">Category</Label>
+                      <Controller
+                      name="category"
+                      control={control}
+                      render={({ field }) => (
+                          <CategorySearchInput
+                          id="dialog-category"
+                          value={field.value || ''}
+                          onValueChange={(value) => field.onChange(value)}
+                          onCategorySelect={(categoryName) => field.onChange(categoryName)}
+                          placeholder="Type or select category"
+                          />
+                      )}
+                      />
+                  </div>
+                  <div className="space-y-1.5 flex items-center pt-6">
+                      <Controller
+                          name="trackQuantity"
+                          control={control}
+                          render={({ field }) => (
+                          <Checkbox id="dialog-trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
+                          )}
+                      />
+                      <Label htmlFor="dialog-trackQuantity" className="font-normal text-sm ml-2">Track inventory quantity</Label>
+                  </div>
+                </div>
+
                 <div className="space-y-1.5">
-                    <Label htmlFor="dialog-category">Category</Label>
-                    <Controller
-                    name="category"
-                    control={control}
-                    render={({ field }) => (
-                        <CategorySearchInput
-                        id="dialog-category"
-                        value={field.value || ''}
-                        onValueChange={(value) => field.onChange(value)}
-                        onCategorySelect={(categoryName) => field.onChange(categoryName)}
-                        placeholder="Type or select category"
-                        />
-                    )}
-                    />
+                  <Label htmlFor="dialog-description">Description</Label>
+                  <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2}/>
                 </div>
-                <div className="space-y-1.5 flex items-center pt-6">
-                    <Controller
-                        name="trackQuantity"
-                        control={control}
-                        render={({ field }) => (
-                        <Checkbox id="dialog-trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                        )}
-                    />
-                    <Label htmlFor="dialog-trackQuantity" className="font-normal text-sm ml-2">Track inventory quantity</Label>
-                </div>
-              </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="dialog-description">Description</Label>
-                <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2}/>
-              </div>
-
-              <div className="space-y-3 pt-2">
-                <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-sgstRate">SGST Rate (%)</Label>
-                    <Input id="dialog-sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
-                    {errors.sgstRate && <p className="text-xs text-destructive mt-1">{errors.sgstRate.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-cgstRate">CGST Rate (%)</Label>
-                    <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
-                    {errors.cgstRate && <p className="text-xs text-destructive mt-1">{errors.cgstRate.message}</p>}
-                  </div>
-                </div>
-              </div>
-
-              {!trackQuantityValue && !hasVariants && (
-                <>
-                   <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                        <span>
-                            For non-tracked items (like services), set their standard cost and sell price below.
-                        </span>
+                <div className="space-y-3 pt-2">
+                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-sgstRate">SGST Rate (%)</Label>
+                      <Input id="dialog-sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
+                      {errors.sgstRate && <p className="text-xs text-destructive mt-1">{errors.sgstRate.message}</p>}
                     </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                          <Label htmlFor="dialog-costPrice">Cost Price</Label>
-                          <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
-                          {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
-                      </div>
-                      <div className="space-y-1.5">
-                          <Label htmlFor="dialog-sellPrice">Sell Price</Label>
-                          <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
-                          {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
-                      </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-cgstRate">CGST Rate (%)</Label>
+                      <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                      {errors.cgstRate && <p className="text-xs text-destructive mt-1">{errors.cgstRate.message}</p>}
+                    </div>
                   </div>
-                </>
-              )}
-              {trackQuantityValue && (
-                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For quantity-tracked products, cost and sell prices are established via Expense Bills, not here.
-                    </span>
                 </div>
-              )}
 
-              <Separator className="my-4"/>
-              <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
+                {!trackQuantityValue && !hasVariants && (
+                  <>
+                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                          <span>
+                              For non-tracked items (like services), set their standard cost and sell price below.
+                          </span>
+                      </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1.5">
+                            <Label htmlFor="dialog-costPrice">Cost Price</Label>
+                            <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                            {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="dialog-sellPrice">Sell Price</Label>
+                            <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                            {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
+                        </div>
+                    </div>
+                  </>
+                )}
+                {trackQuantityValue && (
+                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                      <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                      <span>
+                          For quantity-tracked products, cost and sell prices are established via Expense Bills, not here.
+                      </span>
+                  </div>
+                )}
 
-              <Separator className="my-4"/>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                    <Label className="text-md font-semibold text-primary">Variants (Max 2)</Label>
-                    {variantFields.length < 2 && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
-                    >
-                        <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
-                    </Button>
-                    )}
+                <Separator className="my-4"/>
+                <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
+
+                <Separator className="my-4"/>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                      <Label className="text-md font-semibold text-primary">Variants (Max 2)</Label>
+                      {variantFields.length < 2 && (
+                      <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                      >
+                          <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
+                      </Button>
+                      )}
+                  </div>
+                  {errors.variants?.root && <p className="text-xs text-destructive mt-1">{errors.variants.root.message}</p>}
+                  {variantFields.map((variantField, variantIndex) => (
+                      <VariantFormSection
+                      key={variantField.id}
+                      variantIndex={variantIndex}
+                      removeVariant={removeVariant}
+                      />
+                  ))}
+                  {errors.variants && typeof errors.variants.message === 'string' && <p className="text-xs text-destructive mt-1">{errors.variants.message}</p>}
                 </div>
-                {errors.variants?.root && <p className="text-xs text-destructive mt-1">{errors.variants.root.message}</p>}
-                {variantFields.map((variantField, variantIndex) => (
-                    <VariantFormSection
-                    key={variantField.id}
-                    variantIndex={variantIndex}
-                    removeVariant={removeVariant}
-                    />
-                ))}
-                {errors.variants && typeof errors.variants.message === 'string' && <p className="text-xs text-destructive mt-1">{errors.variants.message}</p>}
               </div>
-              <DialogFooter className="pt-6 border-t">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">Cancel</Button>
-                </DialogClose>
-                <Button type="submit" disabled={isSubmitting || !currentCompanyId}>{isSubmitting ? 'Adding...' : 'Add Product'}</Button>
-              </DialogFooter>
-            </form>
-          </FormProvider>
-        </ScrollArea>
+            </ScrollArea>
+            <DialogFooter className="p-6 pt-4 border-t">
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isSubmitting || !currentCompanyId}>{isSubmitting ? 'Adding...' : 'Add Product'}</Button>
+            </DialogFooter>
+          </form>
+        </FormProvider>
       </DialogContent>
     </Dialog>
   );

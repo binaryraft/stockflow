@@ -234,7 +234,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
       const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
       const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
       if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
-        append({ name: "", type: 'fixed', value: undefined }); 
+        append({ name: "", type: "fixed", value: undefined }); 
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
     }
@@ -387,8 +387,8 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const { 
     addProduct: addProductToStore, 
     updateProduct: updateProductInStore, 
-    fetchCategories, // Added
-    categories, // Added
+    fetchCategories,
+    categories,
     addCategory: addCategoryToStore, 
     getBillsForProduct, getSkuDetails,
   } = useInventoryStore();
@@ -431,7 +431,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     const storedCompanyId = localStorage.getItem('companyId');
     if (storedCompanyId) {
       setCurrentCompanyId(storedCompanyId);
-      fetchCategories(storedCompanyId); // Fetch categories for the company
+      fetchCategories(storedCompanyId);
     } else {
       console.error("ProductForm: Company ID not found in localStorage.");
       toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage products."});
@@ -502,7 +502,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     setIsLoading(true);
 
     if (data.category && !categories.find(c => c.name.toLowerCase() === data.category!.toLowerCase() && c.companyId === currentCompanyId)) {
-      await addCategoryToStore(data.category!, currentCompanyId); // Ensure category exists for the company
+      await addCategoryToStore(data.category!, currentCompanyId);
     }
 
     const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
@@ -569,290 +569,291 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
 
 
   return (
-    <Card className="w-full max-w-4xl mx-auto shadow-lg border-t-2 border-t-primary">
-      <CardContent className="pt-6">
-        <FormProvider {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1.5">
-                <Label htmlFor="name">Product Name*</Label>
-                <Input id="name" {...register("name")} placeholder="Enter product name" />
-                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="category">Category</Label>
-                <Controller
-                  name="category"
-                  control={control}
-                  render={({ field }) => (
-                    <CategorySearchInput
-                      id="category"
-                      value={field.value || ''}
-                      onValueChange={(value) => field.onChange(value)}
-                      onCategorySelect={(categoryName) => field.onChange(categoryName)}
-                      placeholder="Type or select category"
+    <div className="space-y-6">
+      <FormProvider {...form}>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Column for Main Form */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>General Information</CardTitle>
+                  <CardDescription>Basic details for your product.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="name">Product Name*</Label>
+                    <Input id="name" {...register("name")} placeholder="Enter product name" />
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="category">Category</Label>
+                    <Controller
+                      name="category"
+                      control={control}
+                      render={({ field }) => (
+                        <CategorySearchInput
+                          id="category"
+                          value={field.value || ''}
+                          onValueChange={(value) => field.onChange(value)}
+                          onCategorySelect={(categoryName) => field.onChange(categoryName)}
+                          placeholder="Type or select category"
+                        />
+                      )}
                     />
-                  )}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="description">Description</Label>
-              <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                <div className="space-y-1.5">
+                  </div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                     <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
-                </div>
-                <div className="space-y-1.5">
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Inventory & Pricing</CardTitle>
+                  <CardDescription>Manage stock tracking and pricing for this product.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center space-x-3 pt-2 pb-2">
+                    <Controller
+                      name="trackQuantity"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
+                      )}
+                    />
+                    <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
+                  </div>
+                  
+                  {trackQuantityValue ? (
+                      <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                          <span>
+                              For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills, not here.
+                          </span>
+                      </div>
+                  ) : (
+                    !hasVariants && (
+                      <>
+                        <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                            <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                            <span>
+                                For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                            <div className="space-y-1.5">
+                                <Label htmlFor="costPrice">Cost Price</Label>
+                                <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
+                                {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label htmlFor="sellPrice">Sell Price</Label>
+                                <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
+                                {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
+                            </div>
+                        </div>
+                      </>
+                    )
+                  )}
+                  
+                  {!trackQuantityValue && hasVariants && (
+                      <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                          <span>
+                              For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
+                          </span>
+                      </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tax & Additional Settings</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-3 pt-2">
+                    <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="sgstRate">SGST Rate (%)</Label>
+                        <Input id="sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
+                        {errors.sgstRate && <p className="text-sm text-destructive mt-1">{errors.sgstRate.message}</p>}
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="cgstRate">CGST Rate (%)</Label>
+                        <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                        {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
                     <Input id="expiryDate" type="date" {...register("expiryDate")} />
-                </div>
-            </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-            <div className="space-y-3 pt-2">
-              <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1.5">
-                  <Label htmlFor="sgstRate">SGST Rate (%)</Label>
-                  <Input id="sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
-                  {errors.sgstRate && <p className="text-sm text-destructive mt-1">{errors.sgstRate.message}</p>}
-                </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="cgstRate">CGST Rate (%)</Label>
-                  <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
-                  {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
-                </div>
-              </div>
-            </div>
-
-
-            <div className="flex items-center space-x-3 pt-2 pb-2">
-              <Controller
-                name="trackQuantity"
-                control={control}
-                render={({ field }) => (
-                  <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                )}
-              />
-              <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
-            </div>
-            
-            {trackQuantityValue && (
-                <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills. Base prices cannot be set here.
-                    </span>
-                </div>
-            )}
-
-            {!trackQuantityValue && !hasVariants && (
-                 <>
-                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                        <span>
-                            For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
-                        </span>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="costPrice">Cost Price</Label>
-                            <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
-                            {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="sellPrice">Sell Price</Label>
-                            <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
-                            {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
-                        </div>
-                    </div>
-                 </>
-            )}
-            
-            {!trackQuantityValue && hasVariants && (
-                 <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                    <span>
-                        For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
-                    </span>
-                </div>
-            )}
-
-
-            <Separator className="my-6"/>
-
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label className="text-lg font-semibold text-primary">Variants (Max 2 types, e.g., Color, Size)</Label>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Variants</CardTitle>
+                  <CardDescription>Define product variants like color or size. Maximum of 2 types.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
+                  {variantFields.map((variantField, variantIndex) => (
+                    <VariantFormSection
+                      key={variantField.id}
+                      variantIndex={variantIndex}
+                      removeVariant={removeVariant}
+                    />
+                  ))}
+                  {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
+                </CardContent>
                 {variantFields.length < 2 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
-                  >
-                    <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
-                  </Button>
+                  <CardFooter>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
+                    </Button>
+                  </CardFooter>
                 )}
-              </div>
-              <p className="text-xs text-muted-foreground -mt-2 mb-2">
-                  Define variant types like 'Color' or 'Size'. Options for each variant type (e.g., Red, Blue for Color; Small, Medium for Size) are added below each type. Specific stock and pricing for each variant combination (SKU) are set via Expense Bills if quantity is tracked.
-              </p>
-              {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
-
-              {variantFields.map((variantField, variantIndex) => (
-                <VariantFormSection
-                  key={variantField.id}
-                  variantIndex={variantIndex}
-                  removeVariant={removeVariant}
-                />
-              ))}
-              {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
+              </Card>
             </div>
 
-            <Separator className="my-6"/>
-            <AdditionalChargesFormSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
+            {/* Right Column for History & Actions */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3">
+                  <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
+                    {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
+                    Cancel
+                  </Button>
+                </CardContent>
+              </Card>
 
-
-            {isEditing && initialData && (
-              <>
-                <Separator className="my-6"/>
-                <Accordion type="single" collapsible className="w-full space-y-4">
-                  <AccordionItem value="stock-details">
-                    <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
-                        <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-                          <ListCollapse size={20} /> Purchase Batches & Stock Details
-                        </Label>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-0">
-                      <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
+              {isEditing && initialData && (
+                <Accordion type="single" collapsible className="w-full space-y-6">
+                   <Card>
+                    <AccordionItem value="stock-details" className="border-b-0">
+                      <AccordionTrigger className="p-4 hover:no-underline">
+                        <CardHeader className="p-0">
+                          <CardTitle>Purchase Batches & Stock</CardTitle>
+                          <CardDescription>View stock layers for each variant.</CardDescription>
+                        </CardHeader>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-6 pb-4">
                         {initialData.productSKUs.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found. Create an Expense Bill for this product/variant to add stock and set prices.</p>
+                          <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found.</p>
                         ) : (
-                          <ScrollArea className="max-h-[400px] -mx-4 px-4">
-                            <div className="space-y-4">
-                              {initialData.productSKUs.map(sku => {
-                                const skuDetails = getSkuDetails(sku); 
-                                return (
-                                  <Card key={sku.id} className="bg-tertiary/50 shadow-inner">
-                                    <CardHeader className="pb-2 pt-3 px-4">
-                                      <CardTitle className="text-md text-primary">
-                                        Variant: {sku.skuIdentifier || "Default"}
-                                      </CardTitle>
-                                      <CardDescription>Current Total Stock for this Variant: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="px-4 pb-3">
-                                      {sku.stockLayers.length === 0 ? (
-                                        <p className="text-xs text-muted-foreground">No purchase batches (stock layers) for this specific variant. Add via an Expense Bill if quantity is tracked, or set prices directly if not tracked and non-variant.</p>
-                                      ) : (
-                                        <Table className="text-xs">
-                                          <TableHeader>
-                                            <TableRow>
-                                              <TableHead>Purchased On</TableHead>
-                                              <TableHead>From Bill ID</TableHead>
-                                              <TableHead className="text-right">Initial Qty</TableHead>
-                                              <TableHead className="text-right">Sold Qty</TableHead>
-                                              <TableHead className="text-right">Rem. Qty</TableHead>
-                                              <TableHead className="text-right">Cost/Unit</TableHead>
-                                              <TableHead className="text-right">Sell Price (Set)</TableHead>
+                          <div className="space-y-4">
+                            {initialData.productSKUs.map(sku => {
+                              const skuDetails = getSkuDetails(sku); 
+                              return (
+                                <Card key={sku.id} className="bg-tertiary shadow-inner">
+                                  <CardHeader className="pb-2 pt-3 px-4">
+                                    <CardTitle className="text-base text-primary">
+                                      {sku.skuIdentifier || "Default"}
+                                    </CardTitle>
+                                    <CardDescription>Current Stock: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
+                                  </CardHeader>
+                                  <CardContent className="px-4 pb-3">
+                                    {sku.stockLayers.length > 0 && (
+                                      <Table className="text-xs">
+                                        <TableHeader>
+                                          <TableRow>
+                                            <TableHead>Purchased</TableHead>
+                                            <TableHead className="text-right">Qty</TableHead>
+                                            <TableHead className="text-right">Cost</TableHead>
+                                            <TableHead className="text-right">Sell</TableHead>
+                                          </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                          {sku.stockLayers.map(layer => (
+                                            <TableRow key={layer.id}>
+                                              <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yy')}</TableCell>
+                                              <TableCell className="text-right">{layer.quantity.toFixed(2)}</TableCell>
+                                              <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
+                                              <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
                                             </TableRow>
-                                          </TableHeader>
-                                          <TableBody>
-                                            {sku.stockLayers.map(layer => (
-                                              <TableRow key={layer.id}>
-                                                <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yyyy')}</TableCell>
-                                                <TableCell className="font-mono text-muted-foreground">{layer.purchaseBillId}</TableCell>
-                                                <TableCell className="text-right">{layer.initialQuantity.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right font-medium text-green-600 dark:text-green-500">{(layer.initialQuantity - layer.quantity).toFixed(2)}</TableCell>
-                                                <TableCell className="text-right font-semibold">{layer.quantity.toFixed(2)}</TableCell>
-                                                <TableCell className="text-right">
-                                                  ₹{typeof layer.costPrice === 'number' ? layer.costPrice.toFixed(2) : '0.00'}
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                  ₹{typeof layer.sellPrice === 'number' ? layer.sellPrice.toFixed(2) : '0.00'}
-                                                </TableCell>
-                                              </TableRow>
-                                            ))}
-                                          </TableBody>
-                                        </Table>
-                                      )}
-                                    </CardContent>
-                                  </Card>
-                                );
-                              })}
-                            </div>
-                          </ScrollArea>
+                                          ))}
+                                        </TableBody>
+                                      </Table>
+                                    )}
+                                  </CardContent>
+                                </Card>
+                              );
+                            })}
+                          </div>
                         )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-
-                  <AccordionItem value="transaction-history">
-                     <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
-                        <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-                            <PackageSearch size={20} /> Product Transaction History
-                        </Label>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-0">
-                      <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
+                      </AccordionContent>
+                    </AccordionItem>
+                   </Card>
+                   <Card>
+                    <AccordionItem value="transaction-history" className="border-b-0">
+                      <AccordionTrigger className="p-4 hover:no-underline">
+                        <CardHeader className="p-0">
+                          <CardTitle>Transaction History</CardTitle>
+                          <CardDescription>View all bills involving this product.</CardDescription>
+                        </CardHeader>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-6 pb-4">
                         {productBills.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
+                          <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
                         ) : (
-                            <ScrollArea className="max-h-[300px] -mx-4 px-4">
-                                <Table className="text-xs">
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Bill ID</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead className="text-right">Transaction Details</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {productBills.map(bill => {
-                                        if (!initialData) return null;
-                                        const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
-                                        return (
-                                            <TableRow key={bill.id}>
-                                                <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
-                                                <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
-                                                <TableCell>
-                                                <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right font-semibold">
-                                                {transactionInfo.quantity.toFixed(2)} unit(s)
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                        })}
-                                    </TableBody>
-                                </Table>
-                            </ScrollArea>
+                          <Table className="text-xs">
+                              <TableHeader>
+                                  <TableRow>
+                                      <TableHead>Bill ID</TableHead>
+                                      <TableHead>Date</TableHead>
+                                      <TableHead>Type</TableHead>
+                                      <TableHead className="text-right">Qty</TableHead>
+                                  </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                  {productBills.map(bill => {
+                                  if (!initialData) return null;
+                                  const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
+                                  return (
+                                      <TableRow key={bill.id}>
+                                          <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
+                                          <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
+                                          <TableCell>
+                                          <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
+                                          </TableCell>
+                                          <TableCell className="text-right font-semibold">
+                                          {transactionInfo.quantity.toFixed(2)}
+                                          </TableCell>
+                                      </TableRow>
+                                  );
+                                  })}
+                              </TableBody>
+                          </Table>
                         )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
+                      </AccordionContent>
+                    </AccordionItem>
+                   </Card>
                 </Accordion>
-              </>
-            )}
-
-            <CardFooter className="flex justify-end gap-3 pt-8 border-t">
-              <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
-                {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
-              </Button>
-            </CardFooter>
-          </form>
-        </FormProvider>
-      </CardContent>
-    </Card>
+              )}
+            </div>
+          </div>
+        </form>
+      </FormProvider>
+    </div>
   );
 }
-
-    

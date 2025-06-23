@@ -21,14 +21,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import type { Staff, Store } from '@/types';
+import type { User, Store } from '@/types';
 
 const staffFormSchema = z.object({
   name: z.string().min(2, { message: "Staff name must be at least 2 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
-  passkey: z.string().min(4, { message: "Passkey must be at least 4 characters." }).or(z.literal('')).optional(), // Allow empty for not changing
-  accessibleStoreIds: z.array(z.string()).optional().default([]),
+  password: z.string().min(6, { message: "Password must be at least 6 characters." }).or(z.literal('')).optional(), // Allow empty for not changing
+  assignedStoreIds: z.array(z.string()).optional().default([]),
 });
 
 type StaffFormData = z.infer<typeof staffFormSchema>;
@@ -37,7 +37,7 @@ interface StaffFormDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onFormSubmit: () => void;
-  editingStaff?: Staff | null;
+  editingStaff?: User | null;
   allStores: Store[];
 }
 
@@ -48,21 +48,25 @@ export function StaffFormDialog({
   editingStaff,
   allStores
 }: StaffFormDialogProps) {
-  const { addStaff, updateStaff } = useInventoryStore();
+  const { addStaff, updateStaff, companyId: currentCompanyId } = useInventoryStore(state => ({
+    addStaff: state.addStaff,
+    updateStaff: state.updateStaff,
+    companyId: localStorage.getItem('companyId')
+  }));
   const { toast } = useToast();
   
-  const { control, register, handleSubmit, formState: { errors }, reset, setValue, watch } = useForm<StaffFormData>({
+  const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StaffFormData>({
     resolver: zodResolver(staffFormSchema),
     defaultValues: {
       name: '',
       email: '',
       phone: '',
-      passkey: '',
-      accessibleStoreIds: [],
+      password: '',
+      assignedStoreIds: [],
     },
   });
 
-  const selectedStoreIds = watch('accessibleStoreIds') || [];
+  const selectedStoreIds = watch('assignedStoreIds') || [];
 
   useEffect(() => {
     if (isOpen) {
@@ -70,50 +74,65 @@ export function StaffFormDialog({
         reset({
           name: editingStaff.name,
           email: editingStaff.email,
-          phone: editingStaff.phone,
-          passkey: '', // Always start passkey empty for edits, to avoid showing old one
-          accessibleStoreIds: editingStaff.accessibleStoreIds || [],
+          phone: (editingStaff as any).phone || '', // Assuming phone exists on staff type
+          password: '', 
+          assignedStoreIds: editingStaff.assignedStoreIds || [],
         });
       } else {
         reset({
           name: '',
           email: '',
           phone: '',
-          passkey: '',
-          accessibleStoreIds: [],
+          password: '',
+          assignedStoreIds: [],
         });
       }
     }
   }, [isOpen, editingStaff, reset]);
 
-  const onSubmit = (data: StaffFormData) => {
-    const passkeyToSubmit = data.passkey?.trim() || (editingStaff ? undefined : ''); // If editing and passkey is empty, don't update it. If adding, require it.
+  const onSubmit = async (data: StaffFormData) => {
+    if (!currentCompanyId) {
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+      return;
+    }
+
+    const passwordToSubmit = data.password?.trim();
     
-    if (!editingStaff && !passkeyToSubmit) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new staff." });
+    if (!editingStaff && (!passwordToSubmit || passwordToSubmit.length < 6)) {
+        toast({ variant: "destructive", title: "Validation Error", description: "A password of at least 6 characters is required for new staff." });
         return;
     }
 
-    const staffPayload: Partial<Staff> & {name: string, email: string, phone: string, passkey?: string} = {
+    const staffPayload: Partial<User> = {
         name: data.name,
         email: data.email,
         phone: data.phone,
-        accessibleStoreIds: data.accessibleStoreIds,
+        assignedStoreIds: data.assignedStoreIds,
     };
-    if (passkeyToSubmit) {
-        staffPayload.passkey = passkeyToSubmit;
+
+    if (passwordToSubmit) {
+        staffPayload.password = passwordToSubmit;
     }
 
-
+    let success = false;
     if (editingStaff) {
-      updateStaff(editingStaff.id, staffPayload as Partial<Omit<Staff, 'id'>>);
-      toast({ title: "Staff Updated", description: `${data.name}'s details have been updated.` });
+      const updatedStaff = await updateStaff(editingStaff.id, staffPayload, currentCompanyId);
+      if (updatedStaff) {
+        toast({ title: "Staff Updated", description: `${data.name}'s details have been updated.` });
+        success = true;
+      }
     } else {
-      addStaff(staffPayload as Omit<Staff, 'id'>); // passkey is now definitely included if new
-      toast({ title: "Staff Added", description: `${data.name} has been added.` });
+      const newStaff = await addStaff(staffPayload as Required<typeof staffPayload>, currentCompanyId);
+      if (newStaff) {
+        toast({ title: "Staff Added", description: `${data.name} has been added.` });
+        success = true;
+      }
     }
-    onFormSubmit();
-    onOpenChange(false); 
+    
+    if (success) {
+      onFormSubmit();
+      onOpenChange(false);
+    }
   };
 
   return (
@@ -121,76 +140,78 @@ export function StaffFormDialog({
       if (!open) reset(); 
       onOpenChange(open);
     }}>
-      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
+        <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle>{editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}</DialogTitle>
           <DialogDescription>
             Fill in the staff details. Fields marked with * are required.
           </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="flex-1 my-1 -mx-6 px-6"> {/* Adjusted my-1 for tighter spacing */}
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 py-4">
-            <div>
-              <Label htmlFor="name">Full Name*</Label>
-              <Input id="name" {...register("name")} />
-              {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="email">Email Address*</Label>
-              <Input id="email" type="email" {...register("email")} />
-              {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="phone">Phone Number*</Label>
-              <Input id="phone" type="tel" {...register("phone")} />
-              {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
-            </div>
-            <div>
-              <Label htmlFor="passkey">Passkey*{editingStaff ? <span className="text-xs text-muted-foreground"> (Leave blank to keep current)</span> : ''}</Label>
-              <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStaff ? "Enter new passkey to change" : "Min. 4 characters"}/>
-              {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
-            </div>
-
-            {allStores.length > 0 && (
-              <div className="space-y-2 pt-2">
-                <Label>Accessible Stores (Optional)</Label>
-                <p className="text-xs text-muted-foreground">
-                  Select stores this staff member can access. If none selected, they can access all stores.
-                </p>
-                <ScrollArea className="h-32 border rounded-md p-2 bg-tertiary">
-                  <div className="space-y-1">
-                  {allStores.map((store) => (
-                    <div key={store.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`store-${store.id}`}
-                        checked={selectedStoreIds.includes(store.id)}
-                        onCheckedChange={(checked) => {
-                          const currentIds = selectedStoreIds;
-                          if (checked) {
-                            setValue('accessibleStoreIds', [...currentIds, store.id]);
-                          } else {
-                            setValue('accessibleStoreIds', currentIds.filter(id => id !== store.id));
-                          }
-                        }}
-                      />
-                      <Label htmlFor={`store-${store.id}`} className="font-normal text-sm">
-                        {store.name} <span className="text-xs text-muted-foreground">({store.location})</span>
-                      </Label>
-                    </div>
-                  ))}
-                  </div>
-                </ScrollArea>
-                {errors.accessibleStoreIds && <p className="text-sm text-destructive mt-1">{errors.accessibleStoreIds.message}</p>}
+        <form onSubmit={handleSubmit(onSubmit)} className="contents">
+          <ScrollArea className="flex-1">
+            <div className="space-y-4 p-6">
+              <div>
+                <Label htmlFor="name">Full Name*</Label>
+                <Input id="name" {...register("name")} />
+                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
               </div>
-            )}
-          </form>
-        </ScrollArea>
-        <DialogFooter className="border-t pt-4"> {/* Added border-t for visual separation */}
-          <DialogClose asChild>
-            <Button type="button" variant="outline">Cancel</Button>
-          </DialogClose>
-          <Button type="button" onClick={handleSubmit(onSubmit)} variant="default">{editingStaff ? 'Save Changes' : 'Add Staff'}</Button>
-        </DialogFooter>
+              <div>
+                <Label htmlFor="email">Email Address*</Label>
+                <Input id="email" type="email" {...register("email")} />
+                {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="phone">Phone Number*</Label>
+                <Input id="phone" type="tel" {...register("phone")} />
+                {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+              </div>
+              <div>
+                <Label htmlFor="password">Password*{editingStaff ? <span className="text-xs text-muted-foreground"> (Leave blank to keep current)</span> : ''}</Label>
+                <Input id="password" type="password" {...register("password")} placeholder={editingStaff ? "Enter new password to change" : "Min. 6 characters"}/>
+                {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
+              </div>
+
+              {allStores.length > 0 && (
+                <div className="space-y-2 pt-2">
+                  <Label>Accessible Stores (Optional)</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Select stores this staff member can access. If none selected, they cannot access any store terminal.
+                  </p>
+                  <ScrollArea className="h-32 border rounded-md p-2 bg-tertiary">
+                    <div className="space-y-1">
+                    {allStores.map((store) => (
+                      <div key={store.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`store-${store.id}`}
+                          checked={selectedStoreIds.includes(store.id)}
+                          onCheckedChange={(checked) => {
+                            const currentIds = selectedStoreIds;
+                            if (checked) {
+                              setValue('assignedStoreIds', [...currentIds, store.id]);
+                            } else {
+                              setValue('assignedStoreIds', currentIds.filter(id => id !== store.id));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={`store-${store.id}`} className="font-normal text-sm">
+                          {store.name} <span className="text-xs text-muted-foreground">({store.location})</span>
+                        </Label>
+                      </div>
+                    ))}
+                    </div>
+                  </ScrollArea>
+                  {errors.assignedStoreIds && <p className="text-sm text-destructive mt-1">{errors.assignedStoreIds.message}</p>}
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <DialogFooter className="p-6 pt-4 border-t">
+            <DialogClose asChild>
+              <Button type="button" variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : (editingStaff ? 'Save Changes' : 'Add Staff')}</Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );
