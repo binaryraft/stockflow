@@ -50,6 +50,7 @@ export interface Product {
   sgstRate?: number;
   cgstRate?: number;
   additionalChargeDefinitions?: AdditionalChargeDefinition[];
+  isArchived?: boolean;
 }
 
 export type BillMode = 'buy' | 'sell' | 'return';

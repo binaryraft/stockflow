@@ -31,7 +31,8 @@ interface InventoryState {
   fetchProducts: (companyId: string) => Promise<void>;
   addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
-  deleteProduct: (productId: string, companyId: string) => Promise<boolean>;
+  archiveProduct: (productId: string, companyId: string) => Promise<boolean>;
+  unarchiveProduct: (productId: string, companyId: string) => Promise<boolean>;
   getProductById: (productId: string) => Product | undefined; 
   getProductByName: (name: string) => Product | undefined; 
   searchProducts: (searchTerm: string) => Product[]; 
@@ -188,16 +189,39 @@ export const useInventoryStore = create<InventoryState>()(
           } else { console.error("Failed to update product via API:", result.message); return null; }
         } catch (error) { console.error("Error updating product via API:", error); return null; }
       },
-      deleteProduct: async (productId: string, companyId: string) => {
-        if (!companyId) { console.error("deleteProduct: companyId is required"); return false; }
+      archiveProduct: async (productId: string, companyId: string) => {
+        if (!companyId) { console.error("archiveProduct: companyId is required"); return false; }
         try {
           const response = await fetch(`/api/products/${productId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
           if (result.success) {
-            set((state) => ({ products: state.products.filter((p) => p.id !== productId) }));
+            set((state) => ({
+              products: state.products.map((p) =>
+                p.id === productId ? { ...p, isArchived: true } : p
+              ),
+            }));
             return true;
-          } else { console.error("Failed to delete product via API:", result.message); return false; }
-        } catch (error) { console.error("Error deleting product via API:", error); return false; }
+          } else { console.error("Failed to archive product via API:", result.message); return false; }
+        } catch (error) { console.error("Error archiving product via API:", error); return false; }
+      },
+      unarchiveProduct: async (productId: string, companyId: string) => {
+        if (!companyId) { console.error("unarchiveProduct: companyId is required"); return false; }
+        try {
+          const response = await fetch(`/api/products/${productId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ productData: { isArchived: false }, companyId }),
+          });
+          const result = await response.json();
+          if (result.success && result.data) {
+            set((state) => ({
+              products: state.products.map((p) =>
+                p.id === productId ? result.data : p
+              ),
+            }));
+            return true;
+          } else { console.error("Failed to unarchive product via API:", result.message); return false; }
+        } catch (error) { console.error("Error unarchiving product via API:", error); return false; }
       },
 
       fetchStores: async (companyId: string) => {
@@ -676,21 +700,22 @@ export const useInventoryStore = create<InventoryState>()(
         return get().staffs.length < plan.maxEmployees;
       },
       getProductById: (productId: string) => get().products.find((p) => p.id === productId),
-      getProductByName: (name: string) => get().products.find((p) => p.name.toLowerCase() === name.toLowerCase()),
+      getProductByName: (name: string) => get().products.find((p) => !p.isArchived && p.name.toLowerCase() === name.toLowerCase()),
       searchProducts: (searchTerm: string) => { 
         if (!searchTerm) return []; 
         const lowerSearchTerm = searchTerm.toLowerCase();
         return get().products.filter(
           (p) =>
-            p.name.toLowerCase().includes(lowerSearchTerm) ||
+            !p.isArchived &&
+            (p.name.toLowerCase().includes(lowerSearchTerm) ||
             (p.category && p.category.toLowerCase().includes(lowerSearchTerm)) ||
             (p.sku && p.sku.toLowerCase().includes(lowerSearchTerm)) ||
-            p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm))
+            p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm)))
         );
       },
       getLowStockProductCount: (threshold: number) => { 
         return get().products.reduce((count, product) => {
-          if (product.trackQuantity) {
+          if (!product.isArchived && product.trackQuantity) {
             const totalStock = product.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku, undefined).totalStock ?? 0), 0);
             if (totalStock > 0 && totalStock < threshold) {
               return count + 1;
@@ -898,7 +923,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
         const { companyId, startDate, endDate } = params || {};
-        let productsToConsider = get().products;
+        let productsToConsider = get().products.filter(p => !p.isArchived);
         let billsToConsider = get().bills; 
 
         if (companyId) {
@@ -1042,7 +1067,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
         return persistedState;
       },
-      version: 4,
+      version: 5,
     }
   )
 );

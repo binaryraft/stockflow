@@ -13,7 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
 import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -25,7 +25,8 @@ import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { getCurrencySymbol } from '@/lib/utils';
-
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
 
@@ -33,7 +34,8 @@ export function ProductsTable() {
   const { 
     products, 
     fetchProducts, 
-    deleteProduct: deleteProductFromStore, 
+    archiveProduct,
+    unarchiveProduct, 
     getSkuDetails,
     getActiveSubscriptionPlan,
     userProfile 
@@ -41,7 +43,8 @@ export function ProductsTable() {
     (state) => ({
       products: state.products,
       fetchProducts: state.fetchProducts,
-      deleteProduct: state.deleteProduct,
+      archiveProduct: state.archiveProduct,
+      unarchiveProduct: state.unarchiveProduct,
       getSkuDetails: state.getSkuDetails,
       getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
       userProfile: state.userProfile,
@@ -56,6 +59,7 @@ export function ProductsTable() {
   const [hasMounted, setHasMounted] = useState(false);
   const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -84,9 +88,10 @@ export function ProductsTable() {
 
 
   const filteredAndSortedProducts = useMemo(() => {
-    let sortableProducts = [...products]; 
+    let visibleProducts = showArchived ? products : products.filter(p => !p.isArchived);
+
     if (searchTerm) {
-      sortableProducts = sortableProducts.filter(product =>
+      visibleProducts = visibleProducts.filter(product =>
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (product.sku && product.sku.toLowerCase().includes(searchTerm.toLowerCase())) || 
@@ -95,7 +100,7 @@ export function ProductsTable() {
     }
 
     if (sortConfig !== null) {
-      sortableProducts.sort((a, b) => {
+      visibleProducts.sort((a, b) => {
         let valA, valB;
         if (sortConfig.key === 'stock') {
             valA = a.trackQuantity ? a.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0) : -1; 
@@ -133,8 +138,8 @@ export function ProductsTable() {
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     }
-    return sortableProducts;
-  }, [products, searchTerm, sortConfig, getSkuDetails]);
+    return visibleProducts;
+  }, [products, searchTerm, sortConfig, getSkuDetails, showArchived]);
 
   const requestSort = (key: SortableColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -144,16 +149,29 @@ export function ProductsTable() {
     setSortConfig({ key, direction });
   };
 
-  const handleDeleteProduct = async (productId: string, productName: string) => {
+  const handleArchiveProduct = async (productId: string, productName: string) => {
     if (!companyId) {
         toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
         return;
     }
-    const success = await deleteProductFromStore(productId, companyId);
+    const success = await archiveProduct(productId, companyId);
     if (success) {
-        toast({ title: "Product Deleted", description: `${productName} has been removed from inventory.` });
+        toast({ title: "Product Archived", description: `${productName} has been archived.` });
     } else {
-        toast({ variant: "destructive", title: "Deletion Failed", description: `Could not delete ${productName}.` });
+        toast({ variant: "destructive", title: "Archive Failed", description: `Could not archive ${productName}.` });
+    }
+  };
+
+  const handleUnarchiveProduct = async (productId: string, productName: string) => {
+    if (!companyId) {
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+        return;
+    }
+    const success = await unarchiveProduct(productId, companyId);
+    if (success) {
+        toast({ title: "Product Restored", description: `${productName} is now active again.` });
+    } else {
+        toast({ variant: "destructive", title: "Restore Failed", description: `Could not restore ${productName}.` });
     }
   };
 
@@ -193,15 +211,7 @@ export function ProductsTable() {
     const isUnlimited = planDetails.features.some(f => f.toLowerCase().includes("unlimited products") || f.toLowerCase().includes("unlimited items"));
     if (isUnlimited) return true;
     
-    // If a specific numeric limit is defined (e.g., maxProducts in plan)
-    // const productLimit = (planDetails as any).maxProducts; // Conceptual; actual plan structure might differ
-    // if (typeof productLimit === 'number') {
-    //   return products.length < productLimit;
-    // }
-
-    // Fallback if no specific limit and not explicitly "unlimited"
-    // This depends on business rules. For demo, let's assume a high implicit limit or rely on `maxProducts`
-    return true; // For now, assume true if not explicitly limited by "Unlimited" or a numeric cap.
+    return true; 
   }, [activePlan, products.length]);
 
   const addProductButtonTooltipContent = !canAddProducts && activePlan
@@ -226,32 +236,38 @@ export function ProductsTable() {
           onChange={(e) => setSearchTerm(e.target.value)}
           className="max-w-md w-full md:w-auto h-11 text-base"
         />
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div className="inline-block w-full md:w-auto">
-              <Button 
-                asChild={canAddProducts} 
-                disabled={!canAddProducts}
-                className="w-full md:w-auto h-11 text-base"
-              >
-                {canAddProducts ? (
-                  <Link href="/admin/products/add">
-                    <PlusCircle className="mr-2 h-5 w-5" /> Add Product
-                  </Link>
-                ) : (
-                  <span>
-                    <PlusCircle className="mr-2 h-5 w-5" /> Add Product
-                  </span>
-                )}
-              </Button>
-            </div>
-          </TooltipTrigger>
-          {!canAddProducts && (
-            <TooltipContent side="bottom" align="end">
-              <p>{addProductButtonTooltipContent}</p>
-            </TooltipContent>
-          )}
-        </Tooltip>
+        <div className="flex items-center space-x-4 w-full md:w-auto">
+          <div className="flex items-center space-x-2">
+            <Checkbox id="show-archived" checked={showArchived} onCheckedChange={(checked) => setShowArchived(checked as boolean)} />
+            <Label htmlFor="show-archived" className="text-sm font-medium">Show archived</Label>
+          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="inline-block flex-grow md:flex-grow-0">
+                <Button 
+                  asChild={canAddProducts} 
+                  disabled={!canAddProducts}
+                  className="w-full md:w-auto h-11 text-base"
+                >
+                  {canAddProducts ? (
+                    <Link href="/admin/products/add">
+                      <PlusCircle className="mr-2 h-5 w-5" /> Add Product
+                    </Link>
+                  ) : (
+                    <span>
+                      <PlusCircle className="mr-2 h-5 w-5" /> Add Product
+                    </span>
+                  )}
+                </Button>
+              </div>
+            </TooltipTrigger>
+            {!canAddProducts && (
+              <TooltipContent side="bottom" align="end">
+                <p>{addProductButtonTooltipContent}</p>
+              </TooltipContent>
+            )}
+          </Tooltip>
+        </div>
       </div>
       <div className="border rounded-xl overflow-hidden shadow-xl bg-card">
         <Table>
@@ -303,7 +319,7 @@ export function ProductsTable() {
               filteredAndSortedProducts.map((product) => {
                 const isVariantProduct = product.variants && product.variants.length > 0;
                 return (
-                <TableRow key={product.id} className="hover:bg-muted/30">
+                <TableRow key={product.id} className={cn("hover:bg-muted/30", product.isArchived && "bg-secondary/10 opacity-60 hover:opacity-100")}>
                   <TableCell className="py-3 px-4">
                     <Image
                       src={product.imageUrl || `https://placehold.co/64x64.png?text=${product.name.charAt(0)}`}
@@ -317,6 +333,7 @@ export function ProductsTable() {
                   </TableCell>
                   <TableCell className="font-semibold py-3 px-4 align-top text-foreground">
                     <div>{product.name}</div>
+                    {product.isArchived && <Badge variant="destructive" className="mt-1">Archived</Badge>}
                     {isVariantProduct && (
                       <div className="text-xs text-muted-foreground mt-1">
                         Variants: {product.variants?.map(v => `${v.name}`).join(' / ')} ({product.productSKUs.length} SKU(s))
@@ -358,33 +375,41 @@ export function ProductsTable() {
                             <Edit3 className="mr-2 h-4 w-4" /> Edit / View Details
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem asChild className="cursor-pointer">
-                           <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? `&isVariant=true`: ""}`} target="_blank">
-                               <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
-                           </Link>
-                        </DropdownMenuItem>
+                        {!product.isArchived && (
+                          <DropdownMenuItem asChild className="cursor-pointer">
+                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? `&isVariant=true`: ""}`} target="_blank">
+                                <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
-                        <AlertDialog>
+                        {product.isArchived ? (
+                          <DropdownMenuItem onSelect={() => handleUnarchiveProduct(product.id, product.name)} className="text-green-600 focus:text-green-700 focus:bg-green-100 dark:text-green-400 dark:focus:bg-green-700/20 cursor-pointer">
+                            <ArchiveRestore className="mr-2 h-4 w-4" /> Unarchive
+                          </DropdownMenuItem>
+                        ) : (
+                          <AlertDialog>
                             <AlertDialogTrigger asChild>
                                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10 cursor-pointer">
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    <Archive className="mr-2 h-4 w-4" /> Archive
                                 </DropdownMenuItem>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
                                 <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Archive "{product.name}"?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This will permanently delete "{product.name}" and all associated data. This action cannot be undone.
+                                    Archiving this product will hide it from new bills and searches, but preserve it for historical records. Are you sure?
                                 </AlertDialogDescription>
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteProduct(product.id, product.name)} className="bg-destructive hover:bg-destructive/90">
-                                    Delete Product
+                                <AlertDialogAction onClick={() => handleArchiveProduct(product.id, product.name)} className="bg-amber-600 hover:bg-amber-700">
+                                    Yes, Archive Product
                                 </AlertDialogAction>
                                 </AlertDialogFooter>
                             </AlertDialogContent>
-                        </AlertDialog>
+                          </AlertDialog>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
@@ -393,7 +418,7 @@ export function ProductsTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
-                  {isLoading ? "Loading products..." : (companyId ? "No products found. Add some to get started!" : "Company ID not available.")}
+                  {isLoading ? "Loading products..." : (companyId ? (searchTerm ? "No products match your search." : "No products found. Add some to get started!") : "Company ID not available.")}
                 </TableCell>
               </TableRow>
             )}
@@ -403,5 +428,3 @@ export function ProductsTable() {
     </TooltipProvider>
   );
 }
-
-    
