@@ -181,7 +181,11 @@ export interface FinancialSummary {
   netProfit: number;
 }
 
-export interface TodaysFinancialSummary extends FinancialSummary {
+export interface TodaysFinancialSummary {
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  totalExpenses: number;
   transactionsToday: number;
   defectivesToday: number;
 }

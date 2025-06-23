@@ -38,5 +38,3 @@ export function StatCard({ title, value, icon: Icon, description, isLoading = fa
     </Card>
   );
 }
-
-    

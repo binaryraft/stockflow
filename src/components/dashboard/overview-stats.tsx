@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { StatCard } from './stat-card';
-import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive, TrendingUp } from 'lucide-react';
+import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive, TrendingUp, Contact } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { TodaysFinancialSummary } from '@/types'; 
@@ -14,6 +14,7 @@ const LOW_STOCK_THRESHOLD = 5;
 
 interface DailyStats {
   totalProducts: number;
+  totalCustomers: number;
   salesToday: string; 
   purchasesToday: string; 
   transactionsToday: number;
@@ -27,16 +28,19 @@ export function OverviewStats() {
     products, 
     getLowStockProductCount, 
     getTodaysFinancialSummary,
-    userProfile 
+    userProfile,
+    getAllCustomers
   } = useInventoryStore((state) => ({
     products: state.products,
     getLowStockProductCount: state.getLowStockProductCount,
     getTodaysFinancialSummary: state.getTodaysFinancialSummary,
     userProfile: state.userProfile,
+    getAllCustomers: state.getAllCustomers,
   }));
 
   const [stats, setStats] = useState<DailyStats>({
     totalProducts: 0,
+    totalCustomers: 0,
     salesToday: '₹0.00',
     purchasesToday: '₹0.00',
     transactionsToday: 0,
@@ -56,6 +60,8 @@ export function OverviewStats() {
     
     const todaysFinancials = getTodaysFinancialSummary();
     const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
+    const totalCustomers = getAllCustomers().length;
+
     let lowStock = 0;
     if (typeof getLowStockProductCount === 'function') {
       lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
@@ -63,6 +69,7 @@ export function OverviewStats() {
 
     setStats({
       totalProducts: totalTrackedProducts,
+      totalCustomers: totalCustomers,
       salesToday: `${currencySymbol}${todaysFinancials.totalRevenue.toFixed(2)}`,
       purchasesToday: `${currencySymbol}${todaysFinancials.totalExpenses.toFixed(2)}`,
       transactionsToday: todaysFinancials.transactionsToday,
@@ -71,23 +78,24 @@ export function OverviewStats() {
       grossProfitToday: `${currencySymbol}${todaysFinancials.grossProfit.toFixed(2)}`,
     });
     setIsLoading(false);
-  }, [products, getLowStockProductCount, getTodaysFinancialSummary, currencySymbol]);
+  }, [products, getLowStockProductCount, getTodaysFinancialSummary, currencySymbol, getAllCustomers]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
-      <StatCard
-        title="Total Products"
-        value={stats.totalProducts}
-        icon={Package}
-        description="Number of distinct tracked products"
-        isLoading={isLoading}
-      />
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatCard
         title="Today's Sales"
         value={stats.salesToday}
         icon={DollarSign}
-        description="Total revenue from sales today"
+        description={`${stats.transactionsToday} transactions today`}
         isLoading={isLoading}
+      />
+       <StatCard
+        title="Today's Gross Profit"
+        value={stats.grossProfitToday}
+        icon={TrendingUp}
+        description="Sales minus Cost of Goods Sold"
+        isLoading={isLoading}
+        valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-primary" : "text-destructive"}
       />
       <StatCard
         title="Today's Purchases"
@@ -96,19 +104,18 @@ export function OverviewStats() {
         description="Total cost of purchases today"
         isLoading={isLoading}
       />
-      <StatCard
-        title="Today's Gross Profit"
-        value={stats.grossProfitToday}
-        icon={TrendingUp}
-        description="Sales minus Cost of Goods Sold today"
+       <StatCard
+        title="Total Customers"
+        value={stats.totalCustomers}
+        icon={Contact}
+        description="Unique customers in records"
         isLoading={isLoading}
-        valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-primary" : "text-destructive"}
       />
-      <StatCard
-        title="Today's Transactions"
-        value={stats.transactionsToday}
-        icon={ReceiptText}
-        description="Total bills processed today"
+       <StatCard
+        title="Total Products"
+        value={stats.totalProducts}
+        icon={Package}
+        description="Number of distinct tracked products"
         isLoading={isLoading}
       />
       <StatCard
@@ -123,7 +130,7 @@ export function OverviewStats() {
         title="Defectives Today"
         value={stats.defectivesToday}
         icon={AlertTriangle}
-        description="Items marked defective in returns today"
+        description="Items marked defective in returns"
         isLoading={isLoading}
         valueClassName={stats.defectivesToday > 0 ? "text-amber-600 dark:text-amber-500" : undefined}
       />

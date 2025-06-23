@@ -911,8 +911,7 @@ export const useInventoryStore = create<InventoryState>()(
           }
         });
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses;
-        return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, transactionsToday, defectivesToday };
+        return { totalRevenue, totalCOGS, grossProfit, totalExpenses, transactionsToday, defectivesToday };
       },
       getTopProfitableProducts: (limit: number, companyId): ProductProfitabilityData[] => { 
         let billsToConsider = get().bills;
