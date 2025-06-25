@@ -1,9 +1,10 @@
 
+
 "use client";
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -102,6 +103,7 @@ interface InventoryState {
   getAccountsReceivableSummary: (companyId?: string) => AccountsReceivableSummary;
   getAccountsPayableSummary: (companyId?: string) => AccountsPayableSummary;
   getCashFlowSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => CashFlowSummary;
+  getBalanceSheetSummary: (companyId?: string) => BalanceSheetSummary;
 
 
   fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
@@ -161,6 +163,39 @@ export const useInventoryStore = create<InventoryState>()(
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
       
+      getBalanceSheetSummary: (companyId) => {
+        const { products, getAccountsReceivableSummary, getAccountsPayableSummary, getOverallFinancialSummary } = get();
+      
+        let productsToConsider = products;
+        if (companyId) {
+          productsToConsider = products.filter(p => p.companyId === companyId);
+        }
+      
+        const inventoryValue = productsToConsider.reduce((totalValue, product) => {
+          if (!product.trackQuantity) return totalValue;
+      
+          const productValue = product.productSKUs.reduce((skuValue, sku) => {
+            const skuLayersValue = sku.stockLayers.reduce((layerValue, layer) => {
+              return layerValue + (layer.quantity * layer.costPrice);
+            }, 0);
+            return skuValue + skuLayersValue;
+          }, 0);
+      
+          return totalValue + productValue;
+        }, 0);
+      
+        const { totalReceivable } = getAccountsReceivableSummary(companyId);
+        const { totalPayable } = getAccountsPayableSummary(companyId);
+        const { netProfit } = getOverallFinancialSummary(companyId);
+      
+        return {
+          inventoryValue,
+          accountsReceivable: totalReceivable,
+          accountsPayable: totalPayable,
+          retainedEarnings: netProfit,
+        };
+      },
+
       getCashFlowSummaryByDateRange: (startDate, endDate, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {

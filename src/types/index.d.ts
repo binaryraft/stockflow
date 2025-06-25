@@ -1,4 +1,5 @@
 
+
 // This is a declaration file, it should not contain implementation details.
 // It is used for providing type information for the project.
 
@@ -282,6 +283,13 @@ export interface CashFlowSummary {
   cashInflows: number;
   cashOutflows: number;
   netCashFlow: number;
+}
+
+export interface BalanceSheetSummary {
+  inventoryValue: number;
+  accountsReceivable: number;
+  accountsPayable: number;
+  retainedEarnings: number;
 }
 
 // Ensure Staff type is defined for clarity, although it's a subset of User
