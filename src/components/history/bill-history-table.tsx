@@ -37,7 +37,7 @@ import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
   if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
-  if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-primary/70 text-primary-foreground hover:bg-primary/60', name: 'Estimate', titleColor: 'text-primary/80' };
+  if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-blue-500 text-blue-50 hover:bg-blue-600 dark:bg-blue-600 dark:text-blue-50 dark:hover:bg-blue-700', name: 'Estimate', titleColor: 'text-blue-600 dark:text-blue-500' };
   if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
   if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
   return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return', titleColor: 'text-amber-600 dark:text-amber-500' };

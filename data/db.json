@@ -175,6 +175,40 @@
           "value": 20
         }
       ]
+    },
+    {
+      "name": "dan",
+      "category": "",
+      "trackQuantity": true,
+      "sku": "",
+      "expiryDate": "",
+      "description": "",
+      "variants": [],
+      "sgstRate": 9,
+      "cgstRate": 9,
+      "additionalChargeDefinitions": [],
+      "id": "c227e6d0-0bc8-40c5-907f-42c88136b303",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "imageUrl": "https://placehold.co/100x100.png?text=dan&font=roboto",
+      "productSKUs": [
+        {
+          "id": "444dab2d-df94-443a-b87a-75d7442e01ce",
+          "optionValues": {},
+          "skuIdentifier": "dan",
+          "stockLayers": [
+            {
+              "id": "2520c73d-39e0-4ab9-a318-973a0cfe611e",
+              "purchaseBillId": "2506251",
+              "purchaseDate": "2025-06-25T04:20:51.740Z",
+              "initialQuantity": 20,
+              "quantity": 0,
+              "costPrice": 50,
+              "sellPrice": 150,
+              "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06"
+            }
+          ]
+        }
+      ]
     }
   ],
   "bills": [
@@ -265,6 +299,93 @@
       "totalSGST": 0,
       "totalCGST": 0,
       "totalAmount": 600,
+      "isEstimate": false,
+      "notes": "Thank you for your business!",
+      "paymentStatus": "paid",
+      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+      "storeName": "gold",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
+    },
+    {
+      "id": "2506251",
+      "type": "buy",
+      "date": "2025-06-25T04:20:51.740Z",
+      "timestamp": 1750825251740,
+      "items": [
+        {
+          "id": "f29618e8-bc66-467e-989a-c7ad0121bf1d",
+          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
+          "productName": "dan",
+          "quantity": 20,
+          "costPrice": 50,
+          "sellPrice": 150,
+          "sgstAmount": 90,
+          "cgstAmount": 90,
+          "isAdditionalCharge": false
+        }
+      ],
+      "subTotal": 1000,
+      "totalSGST": 90,
+      "totalCGST": 90,
+      "totalAmount": 1180,
+      "isEstimate": false,
+      "notes": "Thank you for your business!",
+      "paymentStatus": "paid",
+      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+      "storeName": "gold",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
+    },
+    {
+      "id": "2506252",
+      "type": "sell",
+      "date": "2025-06-25T04:21:13.648Z",
+      "timestamp": 1750825273648,
+      "items": [
+        {
+          "id": "4944e606-984f-4a25-a16b-5ebf8561605d",
+          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
+          "productName": "dan",
+          "quantity": 10,
+          "costPrice": 50,
+          "sellPrice": 150,
+          "sgstAmount": 135,
+          "cgstAmount": 135,
+          "isAdditionalCharge": false
+        }
+      ],
+      "subTotal": 1500,
+      "totalSGST": 135,
+      "totalCGST": 135,
+      "totalAmount": 1770,
+      "isEstimate": false,
+      "notes": "Thank you for your business!",
+      "paymentStatus": "paid",
+      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+      "storeName": "gold",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
+    },
+    {
+      "id": "2506253",
+      "type": "sell",
+      "date": "2025-06-25T04:21:24.156Z",
+      "timestamp": 1750825284156,
+      "items": [
+        {
+          "id": "335e534b-01d8-4b76-be54-8d57f2346a65",
+          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
+          "productName": "dan",
+          "quantity": 10,
+          "costPrice": 50,
+          "sellPrice": 150,
+          "sgstAmount": 135,
+          "cgstAmount": 135,
+          "isAdditionalCharge": false
+        }
+      ],
+      "subTotal": 1500,
+      "totalSGST": 135,
+      "totalCGST": 135,
+      "totalAmount": 1770,
       "isEstimate": false,
       "notes": "Thank you for your business!",
       "paymentStatus": "paid",

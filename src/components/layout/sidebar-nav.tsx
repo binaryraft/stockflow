@@ -4,8 +4,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { NAV_LINKS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
-import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, useSidebar } from '@/components/ui/sidebar';
+import { NAV_LINK_GROUPS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Package2, ChevronRight, PanelLeftOpen, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -79,54 +79,62 @@ export function SidebarNav() {
       <SidebarContent className="pt-2">
         <ScrollArea className="flex-1">
           <SidebarMenu className="px-2">
-            {NAV_LINKS.map((link) => {
-              const isAdminOnlyPlanOnClient = hasMounted && activePlanId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
-              const isDisabledBySubscription =
-                (link.href === '/admin/stores' || link.href === '/admin/staff' || link.href === '/admin/chat') && isAdminOnlyPlanOnClient;
+            {NAV_LINK_GROUPS.map((group, groupIndex) => (
+              <React.Fragment key={group.title || `group-${groupIndex}`}>
+                {group.title && sidebarState === 'expanded' && (
+                  <h4 className="text-xs font-semibold text-muted-foreground/70 tracking-wider uppercase px-3 py-2">
+                    {group.title}
+                  </h4>
+                )}
+                {group.links.map((link) => {
+                  const isAdminOnlyPlanOnClient = hasMounted && activePlanId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
+                  const isDisabledBySubscription =
+                    (link.href === '/admin/stores' || link.href === '/admin/staff' || link.href === '/admin/chat') && isAdminOnlyPlanOnClient;
 
-              const menuItemContent = (
-                <SidebarMenuButton
-                  asChild
-                  size="default"
-                  isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
-                  tooltip={link.label}
-                  aria-disabled={isDisabledBySubscription}
-                  className={cn(
-                    "h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold",
-                    isDisabledBySubscription && "opacity-50 cursor-not-allowed !bg-transparent !text-sidebar-foreground/50 hover:!text-sidebar-foreground/50"
-                  )}
-                >
-                  <Link
-                    href={link.href} 
-                    className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")} 
-                    onClick={(e) => { if (isDisabledBySubscription) e.preventDefault(); }}
-                  >
-                    <link.icon className={cn("h-5 w-5 shrink-0")} />
-                    {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
-                  </Link>
-                </SidebarMenuButton>
-              );
+                  const menuItemContent = (
+                    <SidebarMenuButton
+                      asChild
+                      size="default"
+                      isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
+                      tooltip={link.label}
+                      aria-disabled={isDisabledBySubscription}
+                      className={cn(
+                        "h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold",
+                        isDisabledBySubscription && "opacity-50 cursor-not-allowed !bg-transparent !text-sidebar-foreground/50 hover:!text-sidebar-foreground/50"
+                      )}
+                    >
+                      <Link
+                        href={link.href} 
+                        className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")} 
+                        onClick={(e) => { if (isDisabledBySubscription) e.preventDefault(); }}
+                      >
+                        <link.icon className={cn("h-5 w-5 shrink-0")} />
+                        {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
+                      </Link>
+                    </SidebarMenuButton>
+                  );
 
-              return (
-                <SidebarMenuItem key={link.href}>
-                  {(isDisabledBySubscription && sidebarState === 'expanded') ? (
-                    <Tooltip delayDuration={100}>
-                      <TooltipTrigger asChild>{menuItemContent}</TooltipTrigger>
-                      <TooltipContent side="right" align="start" className="ml-2">
-                        <p>Upgrade to access this feature.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ) : (
-                    menuItemContent
-                  )}
-                </SidebarMenuItem>
-              );
-            })}
+                  return (
+                    <SidebarMenuItem key={link.href}>
+                      {(isDisabledBySubscription && sidebarState === 'expanded') ? (
+                        <Tooltip delayDuration={100}>
+                          <TooltipTrigger asChild>{menuItemContent}</TooltipTrigger>
+                          <TooltipContent side="right" align="start" className="ml-2">
+                            <p>Upgrade to access this feature.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        menuItemContent
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
+                {groupIndex < NAV_LINK_GROUPS.length -1 && <SidebarSeparator className="my-2" />}
+              </React.Fragment>
+            ))}
           </SidebarMenu>
         </ScrollArea>
       </SidebarContent>
     </Sidebar>
   );
 }
-
-    

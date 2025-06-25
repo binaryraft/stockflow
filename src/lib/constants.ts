@@ -9,18 +9,44 @@ export interface NavLink {
   disabled?: boolean;
 }
 
-export const NAV_LINKS: NavLink[] = [
-  { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/admin/billing', label: 'Billing', icon: DollarSign },
-  { href: '/admin/accounting', label: 'Accounting', icon: BookOpen },
-  { href: '/admin/products', label: 'Products', icon: Package },
-  { href: '/admin/customers', label: 'Customers', icon: Contact },
-  { href: '/admin/staff', label: 'Staff', icon: Users },
-  { href: '/admin/stores', label: 'Stores', icon: Building },
-  { href: '/admin/chat', label: 'Chat', icon: MessageSquare },
-  { href: '/admin/profile', label: 'Profile', icon: UserIcon },
-  { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+export interface NavLinkGroup {
+  title?: string;
+  links: NavLink[];
+}
+
+export const NAV_LINK_GROUPS: NavLinkGroup[] = [
+  {
+    links: [
+      { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
+      { href: '/admin/billing', label: 'Billing', icon: DollarSign },
+      { href: '/admin/products', label: 'Products', icon: Package },
+    ],
+  },
+  {
+    links: [
+      { href: '/admin/accounting', label: 'Accounting', icon: BookOpen },
+    ],
+  },
+  {
+    links: [
+      { href: '/admin/customers', label: 'Customers', icon: Contact },
+      { href: '/admin/staff', label: 'Staff', icon: Users },
+      { href: '/admin/stores', label: 'Stores', icon: Building },
+    ],
+  },
+  {
+    links: [
+      { href: '/admin/chat', label: 'Chat', icon: MessageSquare },
+    ],
+  },
+  {
+    links: [
+      { href: '/admin/profile', label: 'Profile', icon: UserIcon },
+      { href: '/admin/settings', label: 'Settings', icon: SettingsIcon },
+    ],
+  },
 ];
+
 
 export const APP_NAME = "StockFlow";
 
