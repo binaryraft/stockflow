@@ -43,8 +43,8 @@ export function StaffTable() {
     if (searchTerm) {
       sortableStaff = sortableStaff.filter(staff =>
         staff.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        staff.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        staff.phone.toLowerCase().includes(searchTerm.toLowerCase())
+        (staff.email && staff.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (staff.phone && staff.phone.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -86,7 +86,12 @@ export function StaffTable() {
       toast({variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade."});
       return;
     }
-    deleteStaff(staffId);
+    const companyId = localStorage.getItem('companyId');
+    if (!companyId) {
+      toast({variant: "destructive", title: "Error", description: "Company ID not found."});
+      return;
+    }
+    deleteStaff(staffId, companyId);
     toast({ title: "Staff Deleted", description: `${staffName} has been removed.` });
   };
 
@@ -176,9 +181,9 @@ export function StaffTable() {
                   <TableCell className="py-3 px-4">{staff.email}</TableCell>
                   <TableCell className="py-3 px-4">{staff.phone}</TableCell>
                   <TableCell className="py-3 px-4 text-xs">
-                    {staff.accessibleStoreIds.length === 0 
+                    {(staff.assignedStoreIds || []).length === 0 
                       ? <span className="text-muted-foreground">All Stores</span> 
-                      : staff.accessibleStoreIds.map(storeId => stores.find(s => s.id === storeId)?.name || 'Unknown Store').join(', ')
+                      : staff.assignedStoreIds?.map(storeId => stores.find(s => s.id === storeId)?.name || 'Unknown Store').join(', ')
                     }
                   </TableCell>
                   <TableCell className="text-right py-3 px-4">
