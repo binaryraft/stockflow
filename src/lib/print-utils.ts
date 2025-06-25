@@ -244,6 +244,56 @@ export const generateBillPrintContent = (
   return content;
 };
 
+export const generateReportPrintContent = (
+    reportHtml: string,
+    reportTitle: string,
+    userProfile: UserProfile | undefined
+): string => {
+  let content = '<html><head><title>Print Report - ' + reportTitle + '</title>';
+  const styles =
+    "<style>\n" +
+    "  body { font-family: Arial, Helvetica, sans-serif; margin: 20px; line-height: 1.4; color: #333; font-size: 10pt; }\n" +
+    "  @page { size: auto; margin: 0.5in; }\n" +
+    "  .print-container { max-width: 800px; margin: auto; }\n" +
+    "  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 25px; }\n" +
+    "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: bold; color: #000; }\n" +
+    "  .header p { margin: 2px 0; font-size: 9pt; color: #444; }\n" +
+    "  h3 { font-size: 14pt; margin-bottom: 15px; text-align: center; }\n" +
+    "  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9pt; }\n" +
+    "  th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
+    "  th { background-color: #f7f7f7; font-weight: bold; color: #222; }\n" +
+    "  .card { border: 1px solid #e0e0e0; border-radius: 6px; margin-bottom: 15px; page-break-inside: avoid; }\n" +
+    "  .card-header { padding: 15px; border-bottom: 1px solid #eee; }\n" +
+    "  .card-title { font-size: 14pt; margin: 0; font-weight: bold; }\n" +
+    "  .card-description { font-size: 9pt; color: #555; margin: 4px 0 0 0; }\n" +
+    "  .card-content { padding: 15px; }\n" +
+    "  .card-footer { padding: 15px; border-top: 1px solid #eee; background-color: #f9f9f9; font-size: 8pt; }\n" +
+    "  .text-right { text-align: right; }\n" +
+    "  .text-destructive { color: #dc2626 !important; } \n" +
+    "  .text-green-600 { color: #16a34a !important; } \n" +
+    "  .flex { display: flex !important; } .justify-between { justify-content: space-between !important; } .items-center { align-items: center !important; } \n" +
+    "  .font-bold { font-weight: bold; } .font-semibold { font-weight: 600; } \n" +
+    "  .text-muted-foreground { color: #555; } \n" +
+    "  .no-print { display: none !important; } \n" +
+    "</style>\n";
+  content += styles;
+  content += '</head><body>';
+  content += '<div class="print-container">';
+
+  content += '<div class="header">';
+  content += `<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`;
+  content += `<p>${userProfile?.companyAddress || COMPANY_ADDRESS}</p>`;
+  content += `<p>Date Generated: ${format(new Date(), 'PPpp')}</p>`;
+  content += '</div>';
+
+  content += `<h3>${reportTitle}</h3>`;
+  content += reportHtml;
+
+  content += '</div></body></html>';
+  return content;
+};
+
+
 export const triggerPrint = (content: string) => {
     const printWindow = window.open('', '_blank', 'height=800,width=600');
     if (printWindow) {

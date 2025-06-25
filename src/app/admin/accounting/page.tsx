@@ -20,9 +20,12 @@ import { AccountsReceivableCard } from '@/components/accounting/AccountsReceivab
 import { AccountsPayableCard } from '@/components/accounting/AccountsPayableCard';
 import { CashFlowStatement } from '@/components/accounting/CashFlowStatement';
 import { BalanceSheet } from '@/components/accounting/BalanceSheet';
+import { generateReportPrintContent, triggerPrint } from '@/lib/print-utils';
+import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'all' | 'custom';
+type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
 
 function getDatesFromPreset(preset: TimePeriodPreset): DateRange | undefined {
   const now = new Date();
@@ -47,6 +50,8 @@ function getDatesFromPreset(preset: TimePeriodPreset): DateRange | undefined {
 function AccountingPageContent() {
   const [timePeriodPreset, setTimePeriodPreset] = useState<TimePeriodPreset>('thisMonth');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDatesFromPreset('thisMonth'));
+  const [activeTab, setActiveTab] = useState<AccountingTab>('pnl');
+  const userProfile = useInventoryStore(state => state.userProfile);
 
   const handlePresetChange = (preset: TimePeriodPreset) => {
     setTimePeriodPreset(preset);
@@ -59,6 +64,27 @@ function AccountingPageContent() {
     setTimePeriodPreset('custom');
     setDateRange(newRange);
   }
+
+  const handlePrintReport = () => {
+    const reportContentEl = document.getElementById(`${activeTab}-report-content`);
+    if (!reportContentEl) {
+      console.error('Could not find report content element to print.');
+      return;
+    }
+    
+    let reportTitle = '';
+    switch(activeTab) {
+        case 'pnl': reportTitle = 'Profit & Loss Statement'; break;
+        case 'cashflow': reportTitle = 'Cash Flow Statement'; break;
+        case 'balance-sheet': reportTitle = 'Simplified Financial Position'; break;
+        case 'gst': reportTitle = 'GST Report'; break;
+        default: reportTitle = 'Accounting Report';
+    }
+
+    const printContent = generateReportPrintContent(reportContentEl.innerHTML, reportTitle, userProfile);
+    triggerPrint(printContent);
+  };
+
 
   const pageActions = (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
@@ -92,7 +118,7 @@ function AccountingPageContent() {
                 </PopoverContent>
             </Popover>
         )}
-        <Button variant="outline" onClick={() => window.print()} className="h-9">
+        <Button variant="outline" onClick={handlePrintReport} className="h-9">
             <PrinterIcon className="mr-2 h-4 w-4" /> Print Report
         </Button>
     </div>
@@ -102,25 +128,33 @@ function AccountingPageContent() {
     <div className="flex flex-col gap-6" id="accounting-reports-container">
       <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
-      <Tabs defaultValue="pnl" className="w-full">
+      <Tabs defaultValue="pnl" value={activeTab} onValueChange={(v) => setActiveTab(v as AccountingTab)} className="w-full">
         <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-4 no-print">
           <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
           <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
           <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16}/>Balance Sheet</TabsTrigger>
           <TabsTrigger value="gst" className="gap-2"><FileText size={16}/>GST Report</TabsTrigger>
         </TabsList>
-        <TabsContent value="pnl" className="mt-6">
-          <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
-        </TabsContent>
-        <TabsContent value="cashflow" className="mt-6">
-          <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} />
-        </TabsContent>
-        <TabsContent value="balance-sheet" className="mt-6">
-          <BalanceSheet />
-        </TabsContent>
-        <TabsContent value="gst" className="mt-6">
-          <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
-        </TabsContent>
+        <div id="pnl-report-content">
+            <TabsContent value="pnl" className="mt-6">
+                <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
+            </TabsContent>
+        </div>
+         <div id="cashflow-report-content">
+            <TabsContent value="cashflow" className="mt-6">
+                <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} />
+            </TabsContent>
+        </div>
+        <div id="balance-sheet-report-content">
+            <TabsContent value="balance-sheet" className="mt-6">
+                <BalanceSheet />
+            </TabsContent>
+        </div>
+        <div id="gst-report-content">
+            <TabsContent value="gst" className="mt-6">
+                 <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
+            </TabsContent>
+        </div>
       </Tabs>
 
       <Separator className="my-8 no-print" />
