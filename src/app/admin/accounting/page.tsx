@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { ProfitLossStatement } from '@/components/accounting/profit-loss-statement';
-import { SalesTaxReport } from '@/components/accounting/sales-tax-report';
+import { GstReport } from '@/components/accounting/sales-tax-report';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { AccountsReceivableCard } from '@/components/accounting/AccountsReceivableCard';
@@ -106,7 +106,7 @@ function AccountingPageContent() {
           <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
         <TabsContent value="gst" className="mt-6">
-          <SalesTaxReport startDate={dateRange?.from} endDate={dateRange?.to} />
+          <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
       </Tabs>
 

@@ -170,13 +170,21 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      if ((billType === 'sell' || billType === 'return') && !isEstimate && product && !isServiceOrCharge) {
-          const itemPreTaxValue = itemSellPrice * item.quantity;
-          itemSgstAmount = (itemPreTaxValue * (product.sgstRate || 0)) / 100;
-          itemCgstAmount = (itemPreTaxValue * (product.cgstRate || 0)) / 100;
+      if (!isEstimate && product && !isServiceOrCharge) {
+        if (billType === 'sell' || billType === 'return') {
+            const itemPreTaxValue = itemSellPrice * item.quantity;
+            itemSgstAmount = (itemPreTaxValue * (product.sgstRate || 0)) / 100;
+            itemCgstAmount = (itemPreTaxValue * (product.cgstRate || 0)) / 100;
+        } else if (billType === 'buy') {
+            const itemPreTaxValue = itemCostPrice * item.quantity;
+            itemSgstAmount = (itemPreTaxValue * (product.sgstRate || 0)) / 100;
+            itemCgstAmount = (itemPreTaxValue * (product.cgstRate || 0)) / 100;
+        }
       }
-      
-      const currentItemSubTotal = isServiceOrCharge ? itemSellPrice * item.quantity : itemSellPrice * item.quantity; // For services, sellPrice is the total amount
+
+      const currentItemSubTotal = (billType === 'buy')
+        ? itemCostPrice * item.quantity
+        : itemSellPrice * item.quantity;
       billSubTotal += currentItemSubTotal;
       billTotalSGST += itemSgstAmount;
       billTotalCGST += itemCgstAmount;
@@ -190,7 +198,7 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    if (billType === 'sell' || billType === 'return') {
+    if ((billType === 'sell' || billType === 'return') && !isEstimate) {
         const mainProductBillItems = processedBillItems.filter(it => !it.isAdditionalCharge && !it.productId.startsWith('SERVICE_ITEM_'));
         for (const mainItem of mainProductBillItems) {
             const productDef = productsToUpdate.find(p => p.id === mainItem.productId);
@@ -212,17 +220,7 @@ export async function POST(req: NextRequest) {
         }
     }
 
-    let grandTotalAmount;
-    if (billType === 'buy') {
-        grandTotalAmount = processedBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        billSubTotal = grandTotalAmount; 
-        billTotalSGST = 0; billTotalCGST = 0;
-    } else if ((billType === 'sell' || billType === 'return') && isEstimate) {
-        grandTotalAmount = billSubTotal;
-        billTotalSGST = 0; billTotalCGST = 0;
-    } else { 
-        grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
-    }
+    const grandTotalAmount = billSubTotal + billTotalSGST + billTotalCGST;
     
     const staffUser = billedByStaffId ? db.users.find(u => u.id === billedByStaffId && u.companyId === companyId) : undefined;
     const storeDetails = storeId ? db.stores.find(s => s.id === storeId && s.companyId === companyId) : undefined;
@@ -232,8 +230,10 @@ export async function POST(req: NextRequest) {
       vendorOrCustomerName: billData.vendorOrCustomerName || undefined, 
       customerPhone: billData.customerPhone || undefined,
       items: processedBillItems, 
-      subTotal: billSubTotal, totalSGST: billTotalSGST, totalCGST: billTotalCGST,
-      totalAmount: grandTotalAmount, 
+      subTotal: billSubTotal, 
+      totalSGST: isEstimate ? 0 : billTotalSGST, 
+      totalCGST: isEstimate ? 0 : billTotalCGST,
+      totalAmount: isEstimate ? billSubTotal : grandTotalAmount, 
       isEstimate: !!isEstimate, 
       notes: billData.notes || company.defaultBillNotes || '',
       paymentStatus: billData.paymentStatus, 
