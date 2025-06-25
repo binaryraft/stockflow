@@ -103,7 +103,7 @@ function AccountingPageContent() {
       <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
       <Tabs defaultValue="pnl" className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-4">
+        <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-4 no-print">
           <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
           <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
           <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16}/>Balance Sheet</TabsTrigger>
@@ -123,9 +123,9 @@ function AccountingPageContent() {
         </TabsContent>
       </Tabs>
 
-      <Separator className="my-8" />
+      <Separator className="my-8 no-print" />
       
-      <div className="space-y-4">
+      <div className="space-y-4 no-print">
         <div className="flex items-center gap-2">
             <h2 className="text-2xl font-semibold tracking-tight">Outstanding Balances</h2>
             <Badge variant="outline">Live Data</Badge>
@@ -134,7 +134,7 @@ function AccountingPageContent() {
             These cards show current outstanding receivables and payables, and are not affected by the date filter above.
         </p>
       </div>
-      <div className="grid gap-6 md:grid-cols-2 mt-4">
+      <div className="grid gap-6 md:grid-cols-2 mt-4 no-print">
         <AccountsReceivableCard />
         <AccountsPayableCard />
       </div>

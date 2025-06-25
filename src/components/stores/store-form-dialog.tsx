@@ -23,6 +23,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Store, User, BillMode } from '@/types';
 import { Separator } from '@/components/ui/separator';
+import { Building, MapPin, Mail, Phone, KeyRound, Briefcase, ShoppingBag, Send, RotateCcw } from 'lucide-react';
 
 const billModeSchema = z.enum(['sell', 'buy', 'return']);
 
@@ -46,10 +47,10 @@ interface StoreFormDialogProps {
   allStaff: User[];
 }
 
-const operationOptions: { id: BillMode; label: string }[] = [
-  { id: 'sell', label: 'Sales Transactions' },
-  { id: 'buy', label: 'Expense Transactions (Purchases)' },
-  { id: 'return', label: 'Returns Processing' },
+const operationOptions: { id: BillMode; label: string, icon: React.ElementType }[] = [
+  { id: 'sell', label: 'Sales Transactions', icon: Send },
+  { id: 'buy', label: 'Expense Transactions (Purchases)', icon: ShoppingBag },
+  { id: 'return', label: 'Returns Processing', icon: RotateCcw },
 ];
 
 export function StoreFormDialog({
@@ -66,13 +67,8 @@ export function StoreFormDialog({
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StoreFormData>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: {
-      name: '',
-      location: '',
-      email: '',
-      phone: '',
-      passkey: '',
-      allowedStaffIds: [],
-      allowedOperations: ['sell', 'buy', 'return'],
+      name: '', location: '', email: '', phone: '', passkey: '',
+      allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
     },
   });
 
@@ -82,34 +78,21 @@ export function StoreFormDialog({
   useEffect(() => {
     if (isOpen) {
       const companyIdFromStorage = localStorage.getItem('companyId');
-      if (companyIdFromStorage) {
-        setCurrentCompanyId(companyIdFromStorage);
-      } else {
+      if (companyIdFromStorage) setCurrentCompanyId(companyIdFromStorage);
+      else {
         console.error("StoreFormDialog: Company ID not found in localStorage.");
         toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage stores."});
         onOpenChange(false); 
         return;
       }
-
       if (editingStore) {
         reset({
-          name: editingStore.name,
-          location: editingStore.location,
-          email: editingStore.email,
-          phone: editingStore.phone,
-          passkey: '', 
-          allowedStaffIds: editingStore.allowedStaffIds || [],
-          allowedOperations: editingStore.allowedOperations || ['sell', 'buy', 'return'],
+          name: editingStore.name, location: editingStore.location, email: editingStore.email, phone: editingStore.phone, passkey: '',
+          allowedStaffIds: editingStore.allowedStaffIds || [], allowedOperations: editingStore.allowedOperations || ['sell', 'buy', 'return'],
         });
       } else {
         reset({
-          name: '',
-          location: '',
-          email: '',
-          phone: '',
-          passkey: '', 
-          allowedStaffIds: [],
-          allowedOperations: ['sell', 'buy', 'return'],
+          name: '', location: '', email: '', phone: '', passkey: '', allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
         });
       }
     }
@@ -120,175 +103,129 @@ export function StoreFormDialog({
       toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot save store." });
       return;
     }
-
     const passkeyToSubmit = data.passkey?.trim();
-
     if (!editingStore && (!passkeyToSubmit || passkeyToSubmit.length < 4)) {
-        toast({ variant: "destructive", title: "Validation Error", description: "A passkey of at least 4 characters is required for new stores." });
-        return;
+      toast({ variant: "destructive", title: "Validation Error", description: "A passkey of at least 4 characters is required for new stores." });
+      return;
     }
-
-    const storePayload: Omit<Store, 'id' | 'companyId'> & { passkey?: string } = {
-        name: data.name,
-        location: data.location,
-        email: data.email,
-        phone: data.phone,
-        allowedStaffIds: data.allowedStaffIds || [],
-        allowedOperations: data.allowedOperations,
+    const storePayload: Partial<Omit<Store, 'id' | 'companyId'>> = {
+      name: data.name, location: data.location, email: data.email, phone: data.phone,
+      allowedStaffIds: data.allowedStaffIds || [], allowedOperations: data.allowedOperations,
     };
-
-    if (passkeyToSubmit && passkeyToSubmit.length >= 4) {
-        storePayload.passkey = passkeyToSubmit;
-    } else if (!editingStore) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new stores." });
-        return;
+    if (passkeyToSubmit && passkeyToSubmit.length >= 4) (storePayload as any).passkey = passkeyToSubmit;
+    else if (!editingStore) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new stores." });
+      return;
     }
-    
-    let success = false;
-    if (editingStore) {
-      const updatedStore = await updateStore(editingStore.id, storePayload, currentCompanyId);
-      if (updatedStore) {
-        toast({ title: "Store Updated", description: `${data.name}'s details have been updated.` });
-        success = true;
-      } else {
-        toast({ variant: "destructive", title: "Update Failed", description: "Could not update store." });
-      }
-    } else {
-      if (!storePayload.passkey) {
-        toast({ variant: "destructive", title: "Validation Error", description: "Passkey is missing for new store." });
-        return;
-      }
-      const newStore = await addStore(storePayload as Omit<Store, 'id' | 'companyId'>, currentCompanyId);
-      if (newStore) {
-        toast({ title: "Store Added", description: `${data.name} has been added.` });
-        success = true;
-      }
-    }
-
+    const success = editingStore 
+      ? await updateStore(editingStore.id, storePayload, currentCompanyId) 
+      : await addStore(storePayload as Omit<Store, 'id' | 'companyId'>, currentCompanyId);
+      
     if (success) {
+      toast({ title: `Store ${editingStore ? 'Updated' : 'Added'}`, description: `${data.name}'s details have been saved.` });
       onFormSubmit();
       onOpenChange(false);
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => {
-      if (!open) reset();
-      onOpenChange(open);
-    }}>
-      <DialogContent className="sm:max-w-lg flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) reset(); onOpenChange(open); }}>
+      <DialogContent className="sm:max-w-xl flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
         <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle>{editingStore ? 'Edit Store' : 'Add New Store'}</DialogTitle>
-          <DialogDescription>
-            Fill in the store details. Fields marked with * are required.
-          </DialogDescription>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Building className="h-6 w-6 text-primary"/>
+            {editingStore ? 'Edit Store' : 'Add New Store'}
+          </DialogTitle>
+          <DialogDescription>Fill in the store details. Fields marked with * are required.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="contents">
           <ScrollArea className="flex-1">
-            <div className="space-y-4 p-6">
-              <div>
-                <Label htmlFor="name">Store Name*</Label>
-                <Input id="name" {...register("name")} />
-                {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+            <div className="space-y-6 p-6">
+              <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14}/>Store Name*</Label>
+                    <Input id="name" {...register("name")} />
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14}/>Location*</Label>
+                    <Input id="location" {...register("location")} />
+                    {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14}/>Email Address*</Label>
+                      <Input id="email" type="email" {...register("email")} />
+                      {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14}/>Phone Number*</Label>
+                      <Input id="phone" type="tel" {...register("phone")} />
+                      {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                    </div>
+                  </div>
               </div>
-              <div>
-                <Label htmlFor="location">Location*</Label>
-                <Input id="location" {...register("location")} />
-                {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="email">Email Address*</Label>
-                <Input id="email" type="email" {...register("email")} />
-                {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="phone">Phone Number*</Label>
-                <Input id="phone" type="tel" {...register("phone")} />
-                {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
-              </div>
-              <div>
-                <Label htmlFor="passkey">Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground"> (Leave blank to keep current)</span> : ''}</Label>
-                <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"}/>
-                {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
+              
+              <Separator />
+              
+              <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-muted-foreground">SECURITY</h4>
+                  <div className="space-y-2">
+                    <Label htmlFor="passkey" className="flex items-center gap-1.5"><KeyRound size={14}/>Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
+                    <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"}/>
+                    {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
+                  </div>
               </div>
 
               <Separator />
 
-              <div className="space-y-2 pt-1">
-                <Label>Allowed Operations*</Label>
-                <p className="text-xs text-muted-foreground">
-                  Select which types of transactions are permitted at this store terminal.
-                </p>
-                {operationOptions.map((op) => (
-                  <div key={op.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`operation-${op.id}`}
-                      checked={selectedOperations.includes(op.id)}
-                      onCheckedChange={(checked) => {
-                        const currentOps = selectedOperations;
-                        if (checked) {
-                          setValue('allowedOperations', [...currentOps, op.id]);
-                        } else {
-                          if (currentOps.length > 1) {
-                            setValue('allowedOperations', currentOps.filter(id => id !== op.id));
-                          } else {
-                            toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed."});
-                          }
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm">
-                      {op.label}
-                    </Label>
-                  </div>
-                ))}
-                {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
-              </div>
-
-              {allStaff.length > 0 && (
-                <>
-                  <Separator />
+              <div className="space-y-4">
+                <h4 className="text-sm font-semibold text-muted-foreground">PERMISSIONS</h4>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5"><Briefcase size={14}/>Allowed Operations*</Label>
+                  <p className="text-xs text-muted-foreground -mt-1">Select which transaction types are permitted at this store terminal.</p>
                   <div className="space-y-2 pt-1">
-                    <Label>Allowed Staff (Optional)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Select staff members allowed to operate this store. If none selected, any staff member assigned to this store (or all stores if no specific assignment) can use their passkey.
-                    </p>
-                    <ScrollArea className="h-32 border rounded-md p-2 bg-tertiary">
-                      <div className="space-y-1">
-                      {allStaff.map((staff) => (
-                        <div key={staff.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`staff-${staff.id}`}
-                            checked={selectedStaffIds.includes(staff.id)}
-                            onCheckedChange={(checked) => {
+                    {operationOptions.map((op) => (
+                      <div key={op.id} className="flex items-center space-x-2">
+                        <Checkbox id={`operation-${op.id}`} checked={selectedOperations.includes(op.id)} onCheckedChange={(checked) => {
+                          const currentOps = selectedOperations;
+                          if (checked) setValue('allowedOperations', [...currentOps, op.id]);
+                          else if (currentOps.length > 1) setValue('allowedOperations', currentOps.filter(id => id !== op.id));
+                          else toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed."});
+                        }}/>
+                        <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm flex items-center gap-1.5"><op.icon size={16}/>{op.label}</Label>
+                      </div>
+                    ))}
+                  </div>
+                  {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
+                </div>
+                {allStaff.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <Label className="flex items-center gap-1.5"><UserIcon size={14}/>Allowed Staff (Optional)</Label>
+                    <p className="text-xs text-muted-foreground -mt-1">Select specific staff members allowed to access this store. If none are selected, any assigned staff can access it.</p>
+                    <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
+                      <div className="space-y-2">
+                        {allStaff.map((staff) => (
+                          <div key={staff.id} className="flex items-center space-x-2">
+                            <Checkbox id={`staff-${staff.id}`} checked={selectedStaffIds.includes(staff.id)} onCheckedChange={(checked) => {
                               const currentIds = selectedStaffIds;
-                              if (checked) {
-                                setValue('allowedStaffIds', [...currentIds, staff.id]);
-                              } else {
-                                setValue('allowedStaffIds', currentIds.filter(id => id !== staff.id));
-                              }
-                            }}
-                          />
-                          <Label htmlFor={`staff-${staff.id}`} className="font-normal text-sm">
-                            {staff.name} <span className="text-xs text-muted-foreground">({staff.email})</span>
-                          </Label>
-                        </div>
-                      ))}
+                              setValue('allowedStaffIds', checked ? [...currentIds, staff.id] : currentIds.filter(id => id !== staff.id));
+                            }}/>
+                            <Label htmlFor={`staff-${staff.id}`} className="font-normal text-sm">{staff.name} <span className="text-xs text-muted-foreground">({staff.email})</span></Label>
+                          </div>
+                        ))}
                       </div>
                     </ScrollArea>
                     {errors.allowedStaffIds && <p className="text-sm text-destructive mt-1">{errors.allowedStaffIds.message}</p>}
                   </div>
-                </>
-              )}
+                )}
+              </div>
             </div>
           </ScrollArea>
-          <DialogFooter className="p-6 pt-4 border-t">
-            <DialogClose asChild>
-              <Button type="button" variant="outline">Cancel</Button>
-            </DialogClose>
-            <Button type="submit" disabled={!currentCompanyId || isSubmitting}>
-              {isSubmitting ? (editingStore ? 'Saving...' : 'Adding...') : (editingStore ? 'Save Changes' : 'Add Store')}
-            </Button>
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
+            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
