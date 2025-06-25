@@ -1,3 +1,4 @@
+
 export interface ProductOption {
   id: string;
   value: string;
@@ -272,4 +273,10 @@ export interface ExpenseSummary {
   totalOutstandingCostOnUncoveredExpenses: number;
   coveredBillCount: number;
   uncoveredBillCount: number;
+}
+
+export interface CashFlowSummary {
+  cashInflows: number;
+  cashOutflows: number;
+  netCashFlow: number;
 }

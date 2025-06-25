@@ -4,7 +4,7 @@
 import React, { useState, Suspense } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, CalendarDays, Loader2, FileText, BarChart2 } from 'lucide-react';
+import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { AccountsReceivableCard } from '@/components/accounting/AccountsReceivableCard';
 import { AccountsPayableCard } from '@/components/accounting/AccountsPayableCard';
+import { CashFlowStatement } from '@/components/accounting/CashFlowStatement';
 
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -95,18 +96,22 @@ function AccountingPageContent() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageTitle title="Accounting &amp; Reports" icon={BookOpen} actions={pageActions} />
+      <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
       <Tabs defaultValue="pnl" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-2">
-          <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&amp;L Statement</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 md:w-auto md:grid-cols-3">
+          <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
           <TabsTrigger value="gst" className="gap-2"><FileText size={16}/>GST Report</TabsTrigger>
+          <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
         </TabsList>
         <TabsContent value="pnl" className="mt-6">
           <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
         <TabsContent value="gst" className="mt-6">
           <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
+        </TabsContent>
+        <TabsContent value="cashflow" className="mt-6">
+          <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
       </Tabs>
 

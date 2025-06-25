@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -101,6 +101,8 @@ interface InventoryState {
   getExpenseBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
   getAccountsReceivableSummary: (companyId?: string) => AccountsReceivableSummary;
   getAccountsPayableSummary: (companyId?: string) => AccountsPayableSummary;
+  getCashFlowSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => CashFlowSummary;
+
 
   fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
@@ -158,6 +160,34 @@ export const useInventoryStore = create<InventoryState>()(
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
+      
+      getCashFlowSummaryByDateRange: (startDate, endDate, companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+
+        if (startDate && endDate) {
+            const start = startOfDay(startDate).getTime();
+            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
+            billsToConsider = billsToConsider.filter(bill => {
+                const billTimestamp = new Date(bill.timestamp).getTime();
+                return billTimestamp >= start && billTimestamp <= end;
+            });
+        }
+        
+        const cashInflows = billsToConsider
+            .filter(bill => bill.type === 'sell' && !bill.isEstimate && bill.paymentStatus === 'paid')
+            .reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+        const cashOutflows = billsToConsider
+            .filter(bill => bill.type === 'buy' && bill.paymentStatus === 'paid')
+            .reduce((sum, bill) => sum + bill.totalAmount, 0);
+
+        const netCashFlow = cashInflows - cashOutflows;
+
+        return { cashInflows, cashOutflows, netCashFlow };
+      },
       
       getProductFinancialsByMonth: (productId: string): MonthlyProductFinancials[] => {
         const bills = get().bills.filter(b => b.items.some(i => i.productId === productId));
