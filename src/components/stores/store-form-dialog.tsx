@@ -138,9 +138,9 @@ export function StoreFormDialog({
           </DialogTitle>
           <DialogDescription>Fill in the store details. Fields marked with * are required.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="contents">
-          <ScrollArea className="flex-1">
-            <div className="space-y-6 p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-6">
               <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
                   <div className="space-y-2">
