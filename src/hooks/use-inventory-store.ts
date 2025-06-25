@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -98,6 +98,8 @@ interface InventoryState {
   getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => DateRangeReportSummary;
   getSalesBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
   getExpenseBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
+  getAccountsReceivableSummary: (companyId?: string) => AccountsReceivableSummary;
+  getAccountsPayableSummary: (companyId?: string) => AccountsPayableSummary;
 
   fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
@@ -287,8 +289,7 @@ export const useInventoryStore = create<InventoryState>()(
         };
       },
       
-      // Keep all existing functions and add new ones below
-      
+      // Reporting Functions
       getReportSummaryByDateRange: (startDate, endDate, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {
@@ -309,11 +310,15 @@ export const useInventoryStore = create<InventoryState>()(
         let totalExpenses = 0;
         let totalBills = 0;
         let totalItemsSold = 0;
+        let totalSGST = 0;
+        let totalCGST = 0;
     
         billsToConsider.forEach(bill => {
             totalBills++;
             if (bill.type === 'sell' && !bill.isEstimate) {
-                totalRevenue += bill.subTotal ?? bill.totalAmount;
+                totalRevenue += bill.subTotal ?? 0;
+                totalSGST += bill.totalSGST ?? 0;
+                totalCGST += bill.totalCGST ?? 0;
                 bill.items.forEach(item => {
                     if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
                         totalCOGS += (item.costPrice || 0) * item.quantity;
@@ -327,8 +332,9 @@ export const useInventoryStore = create<InventoryState>()(
     
         const grossProfit = totalRevenue - totalCOGS;
         const netProfit = grossProfit - totalExpenses;
+        const totalTax = totalSGST + totalCGST;
     
-        return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, totalBills, totalItemsSold };
+        return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, totalBills, totalItemsSold, totalSGST, totalCGST, totalTax };
       },
 
       getSalesBillsByDateRange: (startDate, endDate, companyId) => {
@@ -363,6 +369,35 @@ export const useInventoryStore = create<InventoryState>()(
               });
           }
           return billsToConsider.sort((a, b) => b.timestamp - a.timestamp);
+      },
+      
+      getAccountsReceivableSummary: (companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+        const unpaidInvoices = billsToConsider.filter(
+            bill => bill.type === 'sell' && !bill.isEstimate && bill.paymentStatus === 'unpaid'
+        );
+        const totalReceivable = unpaidInvoices.reduce((sum, bill) => sum + bill.totalAmount, 0);
+        return {
+            totalReceivable,
+            unpaidInvoices: unpaidInvoices.sort((a,b) => b.timestamp - a.timestamp),
+        };
+      },
+      getAccountsPayableSummary: (companyId) => {
+          let billsToConsider = get().bills;
+          if (companyId) {
+              billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+          }
+          const unpaidBills = billsToConsider.filter(
+              bill => bill.type === 'buy' && bill.paymentStatus === 'unpaid'
+          );
+          const totalPayable = unpaidBills.reduce((sum, bill) => sum + bill.totalAmount, 0);
+          return {
+              totalPayable,
+              unpaidBills: unpaidBills.sort((a,b) => b.timestamp - a.timestamp),
+          };
       },
 
 

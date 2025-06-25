@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, Suspense } from 'react';
@@ -13,6 +14,10 @@ import { cn } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { ProfitLossStatement } from '@/components/accounting/profit-loss-statement';
 import { SalesTaxReport } from '@/components/accounting/sales-tax-report';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { AccountsReceivableCard } from '@/components/accounting/AccountsReceivableCard';
+import { AccountsPayableCard } from '@/components/accounting/AccountsPayableCard';
 
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -104,6 +109,23 @@ function AccountingPageContent() {
           <SalesTaxReport startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
       </Tabs>
+
+      <Separator className="my-8" />
+      
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-semibold tracking-tight">Outstanding Balances</h2>
+            <Badge variant="outline">Live Data</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">
+            These cards show current outstanding receivables and payables, and are not affected by the date filter above.
+        </p>
+      </div>
+      <div className="grid gap-6 md:grid-cols-2 mt-4">
+        <AccountsReceivableCard />
+        <AccountsPayableCard />
+      </div>
+
     </div>
   );
 }

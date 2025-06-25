@@ -241,3 +241,13 @@ export interface ProductAnalytics {
   averageSellPrice: number | null;
   averageCostPrice: number | null;
 }
+
+export interface AccountsReceivableSummary {
+  totalReceivable: number;
+  unpaidInvoices: Bill[];
+}
+
+export interface AccountsPayableSummary {
+  totalPayable: number;
+  unpaidBills: Bill[];
+}
