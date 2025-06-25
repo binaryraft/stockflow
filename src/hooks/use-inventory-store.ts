@@ -1,3 +1,4 @@
+
 "use client";
 
 import { create } from 'zustand';
@@ -153,6 +154,80 @@ export const useInventoryStore = create<InventoryState>()(
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
+      
+      getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
+        const { companyId, startDate, endDate } = params || {};
+        let productsToConsider = get().products.filter(p => !p.isArchived);
+        let billsToConsider = get().bills; 
+
+        if (companyId) {
+          productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+        
+        if (startDate && endDate) {
+            const start = startOfDay(startDate).getTime();
+            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 -1); 
+            billsToConsider = billsToConsider.filter(bill => {
+                const billTimestamp = new Date(bill.timestamp).getTime();
+                return billTimestamp >= start && billTimestamp <= end;
+            });
+        }
+
+        const ledgerMap: Record<string, Omit<ProductLedgerEntry, 'productId' | 'productName' | 'currentStock' | 'category'>> = {};
+
+        billsToConsider.forEach(bill => {
+          bill.items.forEach(item => {
+            if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+            
+            const productRef = get().getProductById(item.productId);
+            if(!productRef) return; 
+
+            const baseProductId = productRef.id; 
+
+            if (!ledgerMap[baseProductId]) {
+              ledgerMap[baseProductId] = {
+                totalPurchased: 0,
+                totalSold: 0,
+                totalRestockedReturns: 0,
+                totalDefectiveReturns: 0,
+              };
+            }
+
+            if (bill.type === 'buy') {
+              ledgerMap[baseProductId].totalPurchased += item.quantity;
+            } else if (bill.type === 'sell' && !bill.isEstimate) { 
+              ledgerMap[baseProductId].totalSold += item.quantity;
+            } else if (bill.type === 'return') {
+              if (item.isDefective) {
+                ledgerMap[baseProductId].totalDefectiveReturns += item.quantity;
+              } else {
+                ledgerMap[baseProductId].totalRestockedReturns += item.quantity;
+              }
+            }
+          });
+        });
+
+        return productsToConsider.map(product => {
+          const summary = ledgerMap[product.id] || {
+            totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
+          };
+          let currentStock: number | 'N/A' = 'N/A';
+          if (product.trackQuantity) {
+            currentStock = product.productSKUs.reduce((sum, sku) => {
+                const skuDetails = get().getSkuDetails(sku, undefined); 
+                return sum + (skuDetails.totalStock ?? 0);
+            }, 0);
+          }
+          return {
+            productId: product.id,
+            productName: product.name, 
+            category: product.category,
+            ...summary,
+            currentStock,
+          };
+        }).sort((a, b) => a.productName.localeCompare(b.productName));
+      },
 
       // ... existing functions ...
       
@@ -1027,79 +1102,6 @@ export const useInventoryStore = create<InventoryState>()(
         return Object.values(productFinancials)
           .sort((a, b) => b.profit - a.profit)
           .slice(0, limit);
-      },
-      getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
-        const { companyId, startDate, endDate } = params || {};
-        let productsToConsider = get().products.filter(p => !p.isArchived);
-        let billsToConsider = get().bills; 
-
-        if (companyId) {
-          productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
-          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
-        }
-        
-        if (startDate && endDate) {
-            const start = startOfDay(startDate).getTime();
-            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 -1); 
-            billsToConsider = billsToConsider.filter(bill => {
-                const billTimestamp = new Date(bill.timestamp).getTime();
-                return billTimestamp >= start && billTimestamp <= end;
-            });
-        }
-
-        const ledgerMap: Record<string, Omit<ProductLedgerEntry, 'productId' | 'productName' | 'currentStock' | 'category'>> = {};
-
-        billsToConsider.forEach(bill => {
-          bill.items.forEach(item => {
-            if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
-            
-            const productRef = get().getProductById(item.productId);
-            if(!productRef) return; 
-
-            const baseProductId = productRef.id; 
-
-            if (!ledgerMap[baseProductId]) {
-              ledgerMap[baseProductId] = {
-                totalPurchased: 0,
-                totalSold: 0,
-                totalRestockedReturns: 0,
-                totalDefectiveReturns: 0,
-              };
-            }
-
-            if (bill.type === 'buy') {
-              ledgerMap[baseProductId].totalPurchased += item.quantity;
-            } else if (bill.type === 'sell' && !bill.isEstimate) { 
-              ledgerMap[baseProductId].totalSold += item.quantity;
-            } else if (bill.type === 'return') {
-              if (item.isDefective) {
-                ledgerMap[baseProductId].totalDefectiveReturns += item.quantity;
-              } else {
-                ledgerMap[baseProductId].totalRestockedReturns += item.quantity;
-              }
-            }
-          });
-        });
-
-        return productsToConsider.map(product => {
-          const summary = ledgerMap[product.id] || {
-            totalPurchased: 0, totalSold: 0, totalRestockedReturns: 0, totalDefectiveReturns: 0,
-          };
-          let currentStock: number | 'N/A' = 'N/A';
-          if (product.trackQuantity) {
-            currentStock = product.productSKUs.reduce((sum, sku) => {
-                const skuDetails = get().getSkuDetails(sku, undefined); 
-                return sum + (skuDetails.totalStock ?? 0);
-            }, 0);
-          }
-          return {
-            productId: product.id,
-            productName: product.name, 
-            category: product.category,
-            ...summary,
-            currentStock,
-          };
-        }).sort((a, b) => a.productName.localeCompare(b.productName));
       },
       
       getMessagesForStore: (storeId: string) => { 
