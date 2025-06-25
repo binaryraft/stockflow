@@ -7,17 +7,20 @@ import { PageTitle } from '@/components/common/page-title';
 import { ProductForm } from '@/components/products/product-form';
 import type { Product, Bill, ProductAnalytics } from '@/types';
 import { useEffect, useState, useMemo } from 'react';
-import { Edit, PackageSearch, ChevronLeft, ShoppingCart, DollarSign, TrendingUp, BarChart2, Package, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Edit, PackageSearch, ChevronLeft, BarChart2, Package, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { format } from 'date-fns';
-import { StatCard } from '@/components/dashboard/stat-card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/utils';
+import { ProductPerformanceChart } from '@/components/products/ProductPerformanceChart';
+import { ProductSummaryCard } from '@/components/products/ProductSummaryCard';
+import { StockLevelsCard } from '@/components/products/StockLevelsCard';
+
 
 function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
     const item = bill.items.find(i => i.productId === productId);
@@ -39,6 +42,25 @@ function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { qu
     }
     return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
 }
+
+const ProductEditCard = ({ product }: { product: Product }) => (
+  <Card className="shadow-lg">
+    <Accordion type="single" collapsible className="w-full" defaultValue="edit-details">
+      <AccordionItem value="edit-details" className="border-b-0">
+        <AccordionTrigger className="p-4 hover:no-underline [&[data-state=open]]:border-b">
+          <CardHeader className="p-0 text-left">
+            <CardTitle>Edit Product Details</CardTitle>
+            <CardDescription>Modify product information and variants.</CardDescription>
+          </CardHeader>
+        </AccordionTrigger>
+        <AccordionContent className="p-0">
+          <ProductForm initialData={product} />
+        </AccordionContent>
+      </AccordionItem>
+    </Accordion>
+  </Card>
+);
+
 
 export default function ProductDetailsPage() {
   const params = useParams();
@@ -118,27 +140,20 @@ export default function ProductDetailsPage() {
           </Card>
       )}
 
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard title="Lifetime Revenue" value={`${currencySymbol}${analytics?.totalRevenue.toFixed(2) || '0.00'}`} icon={DollarSign} isLoading={isLoading} />
-        <StatCard title="Gross Profit" value={`${currencySymbol}${analytics?.grossProfit.toFixed(2) || '0.00'}`} icon={TrendingUp} isLoading={isLoading} valueClassName={analytics && analytics.grossProfit >= 0 ? "text-primary" : "text-destructive"} />
-        <StatCard title="Total Units Sold" value={analytics?.totalSold || 0} icon={ShoppingCart} isLoading={isLoading} />
-        <StatCard title="Total Units Returned" value={analytics?.totalReturned || 0} icon={RotateCcw} isLoading={isLoading} valueClassName={analytics && analytics.totalReturned > 0 ? 'text-amber-600 dark:text-amber-500' : ''} />
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <ProductPerformanceChart analytics={analytics} currencySymbol={currencySymbol} />
+        </div>
+        <div className="lg:col-span-1">
+          <ProductSummaryCard analytics={analytics} currencySymbol={currencySymbol} />
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <StockLevelsCard product={product} />
+        <ProductEditCard product={product} />
       </div>
 
-      <Accordion type="single" collapsible className="w-full">
-        <AccordionItem value="edit-details">
-          <AccordionTrigger className="p-4 border rounded-lg bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
-            <div className="flex items-center gap-3">
-              <Edit className="h-6 w-6 text-primary"/>
-              <h3 className="text-lg font-semibold text-foreground">Edit Product Details</h3>
-            </div>
-          </AccordionTrigger>
-          <AccordionContent className="border border-t-0 rounded-b-lg pt-0">
-             <ProductForm initialData={product} />
-          </AccordionContent>
-        </AccordionItem>
-      </Accordion>
 
       <Card className="shadow-md">
           <CardHeader>
