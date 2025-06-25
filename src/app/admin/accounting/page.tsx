@@ -6,7 +6,7 @@ import { PageTitle } from '@/components/common/page-title';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet, Scale, PrinterIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
-import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
+import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format, startOfQuarter, endOfQuarter, subQuarters, getYear } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Button } from '@/components/ui/button';
@@ -24,8 +24,21 @@ import { generateReportPrintContent, triggerPrint } from '@/lib/print-utils';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 
 
-type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'all' | 'custom';
+type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'thisFY' | 'lastFY' | 'all' | 'custom';
 type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
+
+function getFiscalYearDates(date: Date, offsetYears: number = 0): { from: Date, to: Date } {
+  const currentYear = date.getFullYear();
+  const currentMonth = date.getMonth(); // 0-11
+  
+  let fiscalYearStartYear = currentMonth >= 3 ? currentYear : currentYear - 1; // In India, FY is April-March. April is month 3.
+  fiscalYearStartYear -= offsetYears;
+
+  const from = new Date(fiscalYearStartYear, 3, 1); // April 1st
+  const to = new Date(fiscalYearStartYear + 1, 2, 31); // March 31st
+  return { from, to };
+}
+
 
 function getDatesFromPreset(preset: TimePeriodPreset): DateRange | undefined {
   const now = new Date();
@@ -35,11 +48,20 @@ function getDatesFromPreset(preset: TimePeriodPreset): DateRange | undefined {
     case 'lastMonth':
       const lastMonthStart = startOfMonth(subDays(now, now.getDate() + 1));
       return { from: lastMonthStart, to: endOfMonth(lastMonthStart) };
+    case 'thisQuarter':
+      return { from: startOfQuarter(now), to: endOfQuarter(now) };
+    case 'lastQuarter':
+      const lastQuarterStart = startOfQuarter(subQuarters(now, 1));
+      return { from: lastQuarterStart, to: endOfQuarter(lastQuarterStart) };
     case 'thisYear':
       return { from: startOfYear(now), to: endOfYear(now) };
     case 'lastYear':
        const lastYearStart = startOfYear(subDays(now, 365));
        return { from: lastYearStart, to: endOfYear(lastYearStart) };
+    case 'thisFY':
+        return getFiscalYearDates(now);
+    case 'lastFY':
+        return getFiscalYearDates(now, 1);
     case 'all':
       return { from: new Date(2000, 0, 1), to: endOfYear(subDays(now, -365*5)) }; 
     default:
@@ -95,8 +117,12 @@ function AccountingPageContent() {
             <SelectContent>
                 <SelectItem value="thisMonth">This Month</SelectItem>
                 <SelectItem value="lastMonth">Last Month</SelectItem>
+                <SelectItem value="thisQuarter">This Quarter</SelectItem>
+                <SelectItem value="lastQuarter">Last Quarter</SelectItem>
                 <SelectItem value="thisYear">This Year</SelectItem>
                 <SelectItem value="lastYear">Last Year</SelectItem>
+                <SelectItem value="thisFY">This Fiscal Year (Apr-Mar)</SelectItem>
+                <SelectItem value="lastFY">Last Fiscal Year (Apr-Mar)</SelectItem>
                 <SelectItem value="all">All Time</SelectItem>
                 <SelectItem value="custom">Custom Range</SelectItem>
             </SelectContent>
@@ -129,7 +155,7 @@ function AccountingPageContent() {
       <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
       <Tabs defaultValue="pnl" value={activeTab} onValueChange={(v) => setActiveTab(v as AccountingTab)} className="w-full">
-        <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-4 no-print">
+        <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-4 no-print">
           <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
           <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
           <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16}/>Balance Sheet</TabsTrigger>

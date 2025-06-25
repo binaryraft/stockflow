@@ -20,6 +20,13 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   const [hasMounted, setHasMounted] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
+  const periodTextMap: Record<TimePeriod, string> = {
+    daily: "Today's",
+    weekly: "This Week's",
+    monthly: "This Month's",
+    yearly: "This Year's",
+  };
+
   useEffect(() => {
     setHasMounted(true);
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
@@ -27,18 +34,13 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
 
   useEffect(() => {
     if (hasMounted) {
-      setSummary(getSummary(period));
+      const companyId = localStorage.getItem('companyId') || undefined;
+      setSummary(getSummary(period, companyId));
     }
   }, [hasMounted, getSummary, period]);
 
-  const periodTextMap: Record<TimePeriod, string> = {
-    daily: "Last 7 Days",
-    weekly: "Last 4 Weeks",
-    monthly: "Last 12 Months",
-  };
-
   const cardTitle = `Financial Summary (${periodTextMap[period]})`;
-  const cardDescription = `Financial performance metrics for the ${periodTextMap[period].toLowerCase()}.`;
+  const cardDescription = `Financial performance metrics for the selected period.`;
 
 
   if (!hasMounted || !summary) {

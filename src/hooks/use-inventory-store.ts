@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
 import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
+import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval, subMonths, getMonth, getYear, startOfWeek, endOfWeek } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
 import { toast } from './use-toast';
 
@@ -88,7 +88,7 @@ interface InventoryState {
   getTopSellingProductsByRevenue: (limit: number, period: TimePeriod, companyId?: string) => Array<{ name: string; revenue: number; quantity: number; }>;
   getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId?: string) => ExpenseBillWithCoverage[];
   getExpenseSummaryStats: (companyId?: string) => ExpenseSummary;
-  getOverallFinancialSummary: (companyId?: string) => FinancialSummary;
+  getOverallFinancialSummary: (period: TimePeriod, companyId?: string) => FinancialSummary;
   getTodaysFinancialSummary: (companyId?: string) => TodaysFinancialSummary;
   getPeriodFinancialSummary: (period: TimePeriod, companyId?: string) => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number, period: TimePeriod, companyId?: string) => ProductProfitabilityData[];
@@ -150,6 +150,22 @@ type InventoryPersist = (
   options: PersistOptions<InventoryState>
 ) => (set: any, get: any, api: any) => InventoryState;
 
+const filterBillsByPeriod = (bills: Bill[], period: TimePeriod): Bill[] => {
+    const now = new Date();
+    switch (period) {
+        case 'daily':
+            return bills.filter(bill => isToday(new Date(bill.date)));
+        case 'weekly':
+            return bills.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
+        case 'monthly':
+            return bills.filter(bill => isThisMonth(new Date(bill.date)));
+        case 'yearly':
+            return bills.filter(bill => isThisYear(new Date(bill.date)));
+        default:
+            return bills.filter(bill => isToday(new Date(bill.date)));
+    }
+};
+
 
 export const useInventoryStore = create<InventoryState>()(
   (persist as InventoryPersist)(
@@ -186,13 +202,22 @@ export const useInventoryStore = create<InventoryState>()(
       
         const { totalReceivable } = getAccountsReceivableSummary(companyId);
         const { totalPayable } = getAccountsPayableSummary(companyId);
-        const { netProfit } = getOverallFinancialSummary(companyId);
+        // Note: The getOverallFinancialSummary now requires a period. For a full balance sheet, 
+        // we'd typically use all-time profit. For this simplified view, we'll fetch all-time.
+        // Let's create a temporary all-time version.
+        const allBills = get().bills.filter(b => !companyId || b.companyId === companyId);
+        let totalRevenue = 0, totalCOGS = 0, totalExpenses = 0;
+        allBills.forEach(bill => {
+          if (bill.type === 'sell' && !bill.isEstimate) { totalRevenue += bill.subTotal ?? 0; bill.items.forEach(item => { if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) { totalCOGS += (item.costPrice || 0) * item.quantity; } });
+          } else if (bill.type === 'buy') { totalExpenses += bill.totalAmount; }
+        });
+        const retainedEarnings = totalRevenue - totalCOGS - totalExpenses;
       
         return {
           inventoryValue,
           accountsReceivable: totalReceivable,
           accountsPayable: totalPayable,
-          retainedEarnings: netProfit,
+          retainedEarnings: retainedEarnings,
         };
       },
 
@@ -646,7 +671,7 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ staffs: [...state.staffs, result.data] }));
             return result.data;
-          } else {
+          } else { 
             toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add staff member." });
             return null;
           }
@@ -1122,59 +1147,49 @@ export const useInventoryStore = create<InventoryState>()(
         }
         const dailyDataMap: Record<string, { sales: number; expenses: number }> = {};
         const now = new Date();
+        
         let daysToIterate: number;
         let formatStr: string;
+        let groupBy: 'day' | 'week' | 'month' = 'day';
 
         switch(period) {
-          case 'daily': daysToIterate = 7; formatStr = 'MMM d'; break;
-          case 'weekly': daysToIterate = 28; formatStr = 'MMM d'; break; // 4 weeks
-          case 'monthly': daysToIterate = 365; formatStr = 'MMM yyyy'; break;
-          default: daysToIterate = 7; formatStr = 'MMM d'; break;
+          case 'daily': daysToIterate = 7; formatStr = 'MMM d'; groupBy = 'day'; break;
+          case 'weekly': daysToIterate = 28; formatStr = 'MMM d'; groupBy = 'day'; break; 
+          case 'monthly': daysToIterate = 365; formatStr = 'MMM yyyy'; groupBy = 'month'; break;
+          case 'yearly': daysToIterate = 365; formatStr = 'MMM yyyy'; groupBy = 'month'; break;
+          default: daysToIterate = 7; formatStr = 'MMM d'; groupBy = 'day';
         }
-
-        // Initialize date keys
-        if (period === 'monthly') {
-            for (let i = 0; i < 12; i++) {
-                const targetMonth = startOfMonth(subDays(now, i * 30));
-                const monthStr = format(targetMonth, formatStr);
-                dailyDataMap[monthStr] = { sales: 0, expenses: 0 };
-            }
-        } else {
-            for (let i = 0; i < daysToIterate; i++) {
-                const targetDate = startOfDay(subDays(now, i));
-                const dateStr = format(targetDate, formatStr);
-                dailyDataMap[dateStr] = { sales: 0, expenses: 0 };
-            }
-        }
-
-
+        
+        const cutoffDate = subDays(now, daysToIterate);
+        
         billsToConsider.forEach(bill => {
           const billDate = new Date(bill.date);
-          const billDateStr = format(startOfDay(billDate), formatStr);
-          
-          if (dailyDataMap[billDateStr]) {
-            if (bill.type === 'sell' && !bill.isEstimate) { 
-              dailyDataMap[billDateStr].sales += bill.totalAmount; 
-            } else if (bill.type === 'buy') {
-              dailyDataMap[billDateStr].expenses += bill.totalAmount;
-            }
+          if(billDate >= cutoffDate) {
+              let dateKey: string;
+              if (groupBy === 'day') {
+                  dateKey = format(billDate, formatStr);
+              } else { // month
+                  dateKey = format(startOfMonth(billDate), formatStr);
+              }
+
+              if (!dailyDataMap[dateKey]) dailyDataMap[dateKey] = { sales: 0, expenses: 0 };
+
+              if (bill.type === 'sell' && !bill.isEstimate) { 
+                  dailyDataMap[dateKey].sales += bill.totalAmount; 
+              } else if (bill.type === 'buy') {
+                  dailyDataMap[dateKey].expenses += bill.totalAmount;
+              }
           }
         });
-        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).reverse();
+        
+        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       },
       getTopSellingProductsByRevenue: (limit: number, period: TimePeriod, companyId) => { 
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
-        const now = new Date();
-        const periodFilteredBills = billsToConsider.filter(bill => {
-          const billDate = new Date(bill.date);
-          if (period === 'daily') return isToday(billDate);
-          if (period === 'weekly') return isThisWeek(billDate, { weekStartsOn: 1 });
-          if (period === 'monthly') return isThisMonth(billDate);
-          return false;
-        });
+        const periodFilteredBills = filterBillsByPeriod(billsToConsider, period);
 
         const productRevenue: Record<string, { name: string; revenue: number; quantity: number }> = {};
 
@@ -1257,29 +1272,35 @@ export const useInventoryStore = create<InventoryState>()(
           coveredBillCount, uncoveredBillCount,
         };
       },
-      getOverallFinancialSummary: (companyId): FinancialSummary => { 
+      getOverallFinancialSummary: (period: TimePeriod, companyId?: string): FinancialSummary => {
         let billsToConsider = get().bills;
         if (companyId) {
-          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
-        let totalRevenue = 0; let totalCOGS = 0; let totalExpenses = 0;
 
-        billsToConsider.forEach(bill => {
-          if (bill.type === 'sell' && !bill.isEstimate) { 
-            totalRevenue += bill.subTotal ?? bill.totalAmount; 
-            bill.items.forEach(item => {
-              if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
-              const costForItem = (item.costPrice || 0); 
-              totalCOGS += costForItem * item.quantity;
-            });
-          } else if (bill.type === 'buy') {
-            totalExpenses += bill.totalAmount;
-          }
+        const filteredBills = filterBillsByPeriod(billsToConsider, period);
+
+        let totalRevenue = 0;
+        let totalCOGS = 0;
+        let totalExpenses = 0;
+
+        filteredBills.forEach(bill => {
+            if (bill.type === 'sell' && !bill.isEstimate) {
+                totalRevenue += bill.subTotal ?? bill.totalAmount;
+                bill.items.forEach(item => {
+                    if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+                    const costForItem = (item.costPrice || 0);
+                    totalCOGS += costForItem * item.quantity;
+                });
+            } else if (bill.type === 'buy') {
+                totalExpenses += bill.totalAmount;
+            }
         });
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses; 
+        const netProfit = grossProfit - totalExpenses;
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit };
       },
+
       getTodaysFinancialSummary: (companyId): TodaysFinancialSummary => { 
          let billsToConsider = get().bills;
         if (companyId) {
@@ -1317,21 +1338,7 @@ export const useInventoryStore = create<InventoryState>()(
               billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
           }
           
-          let filteredBills: Bill[] = [];
-          
-          switch(period) {
-              case 'daily':
-                  filteredBills = billsToConsider.filter(bill => isToday(new Date(bill.date)));
-                  break;
-              case 'weekly':
-                  filteredBills = billsToConsider.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
-                  break;
-              case 'monthly':
-                  filteredBills = billsToConsider.filter(bill => isThisMonth(new Date(bill.date)));
-                  break;
-              default:
-                  filteredBills = billsToConsider.filter(bill => isToday(new Date(bill.date)));
-          }
+          const filteredBills = filterBillsByPeriod(billsToConsider, period);
 
           let totalRevenue = 0; let totalCOGS = 0; let totalExpenses = 0;
           let transactionsToday = 0; let defectivesToday = 0;
@@ -1364,13 +1371,7 @@ export const useInventoryStore = create<InventoryState>()(
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         
-        const periodFilteredBills = billsToConsider.filter(bill => {
-          const billDate = new Date(bill.date);
-          if (period === 'daily') return isToday(billDate);
-          if (period === 'weekly') return isThisWeek(billDate, { weekStartsOn: 1 });
-          if (period === 'monthly') return isThisMonth(billDate);
-          return false;
-        });
+        const periodFilteredBills = filterBillsByPeriod(billsToConsider, period);
 
         const productFinancials: Record<string, { name: string; revenue: number; cogs: number; profit: number }> = {};
         periodFilteredBills.forEach(bill => {

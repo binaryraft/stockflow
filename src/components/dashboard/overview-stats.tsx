@@ -55,11 +55,13 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     daily: "Today's",
     weekly: "This Week's",
     monthly: "This Month's",
+    yearly: "This Year's",
   };
   const periodDescriptionMap: Record<TimePeriod, string> = {
     daily: `transactions today`,
     weekly: `transactions this week`,
     monthly: `transactions this month`,
+    yearly: `transactions this year`,
   };
 
 

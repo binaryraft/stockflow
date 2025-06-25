@@ -291,7 +291,7 @@ export interface BalanceSheetSummary {
   retainedEarnings: number;
 }
 
-export type TimePeriod = 'daily' | 'weekly' | 'monthly';
+export type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface ProductRevenueData {
   name: string;
