@@ -22,8 +22,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Store, User, BillMode } from '@/types';
-import { Separator } from '@/components/ui/separator';
-import { Building, MapPin, Mail, Phone, KeyRound, Briefcase, ShoppingBag, Send, RotateCcw } from 'lucide-react';
+import { Separator } from '../ui/separator';
+import { Building, MapPin, Mail, Phone, KeyRound, Briefcase, ShoppingBag, Send, RotateCcw, User as UserIcon } from 'lucide-react';
 
 const billModeSchema = z.enum(['sell', 'buy', 'return']);
 
