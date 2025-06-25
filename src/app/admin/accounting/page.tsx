@@ -4,7 +4,7 @@
 import React, { useState, Suspense } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet } from 'lucide-react';
+import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet, Scale, PrinterIcon } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,6 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { AccountsReceivableCard } from '@/components/accounting/AccountsReceivableCard';
 import { AccountsPayableCard } from '@/components/accounting/AccountsPayableCard';
 import { CashFlowStatement } from '@/components/accounting/CashFlowStatement';
+import { BalanceSheet } from '@/components/accounting/BalanceSheet';
 
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'all' | 'custom';
@@ -91,27 +92,34 @@ function AccountingPageContent() {
                 </PopoverContent>
             </Popover>
         )}
+        <Button variant="outline" onClick={() => window.print()} className="h-9">
+            <PrinterIcon className="mr-2 h-4 w-4" /> Print Report
+        </Button>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6" id="accounting-reports-container">
       <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
       <Tabs defaultValue="pnl" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 md:w-auto md:grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4 md:w-auto md:grid-cols-4">
           <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
-          <TabsTrigger value="gst" className="gap-2"><FileText size={16}/>GST Report</TabsTrigger>
           <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
+          <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16}/>Balance Sheet</TabsTrigger>
+          <TabsTrigger value="gst" className="gap-2"><FileText size={16}/>GST Report</TabsTrigger>
         </TabsList>
         <TabsContent value="pnl" className="mt-6">
           <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
-        <TabsContent value="gst" className="mt-6">
-          <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
-        </TabsContent>
         <TabsContent value="cashflow" className="mt-6">
           <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} />
+        </TabsContent>
+        <TabsContent value="balance-sheet" className="mt-6">
+          <BalanceSheet />
+        </TabsContent>
+        <TabsContent value="gst" className="mt-6">
+          <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
         </TabsContent>
       </Tabs>
 

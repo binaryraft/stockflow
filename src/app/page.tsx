@@ -16,8 +16,9 @@ import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
+import { StoreSelectorEmbedded } from '@/components/auth/StoreSelectorEmbedded';
 
-type UIMode = 'landing' | 'adminLogin' | 'adminSignup';
+type UIMode = 'landing' | 'adminLogin' | 'adminSignup' | 'storeSelector';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -66,13 +67,10 @@ export default function HomePage() {
 
   const showAdminLogin = () => setUiMode('adminLogin');
   const showAdminSignup = () => setUiMode('adminSignup');
+  const showStoreSelector = () => setUiMode('storeSelector');
   const hideAuthFormsAndRecheck = () => {
     setUiMode('landing');
     setIsRedirecting(true); 
-  };
-
-  const handleStoreLoginClick = () => {
-    router.push('/storeportal');
   };
 
 
@@ -99,9 +97,9 @@ export default function HomePage() {
     <div className="flex flex-col min-h-screen bg-background">
       {uiMode === 'landing' && (
         <>
-          <LandingHeader onAdminLoginClick={showAdminLogin} onStoreLoginClick={handleStoreLoginClick} />
+          <LandingHeader onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelector} />
           <main className="flex-grow">
-            <HeroSection onAdminLoginClick={showAdminLogin} onStoreLoginClick={handleStoreLoginClick} />
+            <HeroSection onAdminLoginClick={showAdminLogin} onStoreSelectClick={showStoreSelector} />
             <FeaturesSection />
             <PricingSectionLanding />
             <OtherSection />
@@ -126,6 +124,12 @@ export default function HomePage() {
           onCancel={() => setUiMode('landing')}
           onSwitchToLogin={showAdminLogin}
         />
+      )}
+
+      {uiMode === 'storeSelector' && (
+          <StoreSelectorEmbedded
+            onCancel={() => setUiMode('landing')}
+          />
       )}
     </div>
   );

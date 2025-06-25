@@ -246,3 +246,26 @@ html {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #accounting-reports-container, #accounting-reports-container * {
+    visibility: visible;
+  }
+  #accounting-reports-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .page-title-for-print { /* Custom class to show page title */
+     visibility: visible;
+  }
+}
