@@ -1,4 +1,3 @@
-
 export interface ProductOption {
   id: string;
   value: string;
@@ -221,4 +220,14 @@ export interface Customer {
   // totalSpend: number;
   // totalReturns: number;
   // preferredProducts: Array<{ productId: string, productName: string, count: number }>;
+}
+
+export interface DateRangeReportSummary {
+  totalRevenue: number;
+  totalCOGS: number;
+  grossProfit: number;
+  totalExpenses: number;
+  netProfit: number;
+  totalBills: number;
+  totalItemsSold: number;
 }

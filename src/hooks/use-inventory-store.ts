@@ -1,9 +1,8 @@
-
 "use client";
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -92,6 +91,11 @@ interface InventoryState {
   getTodaysFinancialSummary: (companyId?: string) => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number, companyId?: string) => ProductProfitabilityData[];
   getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
+  
+  // New Reporting Functions
+  getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => DateRangeReportSummary;
+  getSalesBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
+  getExpenseBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
 
   fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
@@ -150,6 +154,88 @@ export const useInventoryStore = create<InventoryState>()(
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
 
+      // ... existing functions ...
+      
+      // Keep all existing functions and add new ones below
+      
+      getReportSummaryByDateRange: (startDate, endDate, companyId) => {
+        let billsToConsider = get().bills;
+        if (companyId) {
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+        }
+
+        if (startDate && endDate) {
+            const start = startOfDay(startDate).getTime();
+            const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
+            billsToConsider = billsToConsider.filter(bill => {
+                const billTimestamp = new Date(bill.timestamp).getTime();
+                return billTimestamp >= start && billTimestamp <= end;
+            });
+        }
+    
+        let totalRevenue = 0;
+        let totalCOGS = 0;
+        let totalExpenses = 0;
+        let totalBills = 0;
+        let totalItemsSold = 0;
+    
+        billsToConsider.forEach(bill => {
+            totalBills++;
+            if (bill.type === 'sell' && !bill.isEstimate) {
+                totalRevenue += bill.subTotal ?? bill.totalAmount;
+                bill.items.forEach(item => {
+                    if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+                        totalCOGS += (item.costPrice || 0) * item.quantity;
+                        totalItemsSold += item.quantity;
+                    }
+                });
+            } else if (bill.type === 'buy') {
+                totalExpenses += bill.totalAmount;
+            }
+        });
+    
+        const grossProfit = totalRevenue - totalCOGS;
+        const netProfit = grossProfit - totalExpenses;
+    
+        return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, totalBills, totalItemsSold };
+      },
+
+      getSalesBillsByDateRange: (startDate, endDate, companyId) => {
+          let billsToConsider = get().bills.filter(b => b.type === 'sell' && !b.isEstimate);
+          if (companyId) {
+            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+          }
+
+          if (startDate && endDate) {
+              const start = startOfDay(startDate).getTime();
+              const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
+              billsToConsider = billsToConsider.filter(bill => {
+                  const billTimestamp = new Date(bill.timestamp).getTime();
+                  return billTimestamp >= start && billTimestamp <= end;
+              });
+          }
+          return billsToConsider.sort((a, b) => b.timestamp - a.timestamp);
+      },
+
+      getExpenseBillsByDateRange: (startDate, endDate, companyId) => {
+          let billsToConsider = get().bills.filter(b => b.type === 'buy');
+          if (companyId) {
+            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+          }
+
+           if (startDate && endDate) {
+              const start = startOfDay(startDate).getTime();
+              const end = startOfDay(endDate).getTime() + (24 * 60 * 60 * 1000 - 1);
+              billsToConsider = billsToConsider.filter(bill => {
+                  const billTimestamp = new Date(bill.timestamp).getTime();
+                  return billTimestamp >= start && billTimestamp <= end;
+              });
+          }
+          return billsToConsider.sort((a, b) => b.timestamp - a.timestamp);
+      },
+
+
+      // Paste all existing functions from the provided context here
       fetchProducts: async (companyId: string) => {
         if (!companyId) { console.warn("fetchProducts: companyId is required"); set({ products: [] }); return; }
         try {
