@@ -590,7 +590,10 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ stores: [...state.stores, result.data] }));
             return result.data;
-          } else { console.error("Failed to add store via API:", result.message); toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add store." }); return null; }
+          } else {
+            toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add store." });
+            return null;
+          }
         } catch (error) { console.error("Error adding store via API:", error); return null; }
       },
       updateStore: async (storeId, storeData, companyId) => {
@@ -604,7 +607,10 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ stores: state.stores.map((s) => (s.id === storeId ? result.data : s)) }));
             return result.data;
-          } else { console.error("Failed to update store via API:", result.message); return null; }
+          } else {
+            toast({ variant: "destructive", title: "Update Failed", description: result.message || "Could not update store." });
+            return null;
+          }
         } catch (error) { console.error("Error updating store via API:", error); return null; }
       },
       deleteStore: async (storeId, companyId) => {
@@ -640,8 +646,15 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ staffs: [...state.staffs, result.data] }));
             return result.data;
-          } else { console.error("Failed to add staff via API:", result.message); toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add staff member." }); return null; }
-        } catch (error) { console.error("Error adding staff via API:", error); return null; }
+          } else {
+            toast({ variant: "destructive", title: "Add Failed", description: result.message || "Could not add staff member." });
+            return null;
+          }
+        } catch (error) {
+          console.error("Error adding staff via API:", error);
+          toast({ variant: "destructive", title: "Error", description: "An unexpected network error occurred." });
+          return null;
+        }
       },
       updateStaff: async (staffId, staffData, companyId) => {
         if (!companyId) { console.error("updateStaff: companyId is required"); return null; }
@@ -654,8 +667,15 @@ export const useInventoryStore = create<InventoryState>()(
           if (result.success && result.data) {
             set((state) => ({ staffs: state.staffs.map((s) => (s.id === staffId ? result.data : s)) }));
             return result.data;
-          } else { console.error("Failed to update staff via API:", result.message); return null; }
-        } catch (error) { console.error("Error updating staff via API:", error); return null; }
+          } else {
+            toast({ variant: "destructive", title: "Update Failed", description: result.message || "Could not update staff member." });
+            return null;
+          }
+        } catch (error) {
+          console.error("Error updating staff via API:", error);
+          toast({ variant: "destructive", title: "Update Error", description: "An unexpected network error occurred." });
+          return null;
+        }
       },
       deleteStaff: async (staffId, companyId) => {
         if (!companyId) { console.error("deleteStaff: companyId is required"); return false; }

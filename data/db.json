@@ -97,6 +97,19 @@
       "email": "aSDASDF@ASDF.COM",
       "password": "$2a$10$PYGeEohxRx1jb1N9kQKCyOd61Co/G9teCs8jWcRr/nN1RatbQVBjy",
       "role": "admin"
+    },
+    {
+      "id": "user_emp_b0f58088-aaf6-4fc7-b644-368e8e4c07e1",
+      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+      "name": "gold",
+      "email": "superdaniel@gmail.com",
+      "employeeId": "EMP001_07e1",
+      "password": "$2a$10$AdG31OlfaS..PXT.mlYinebgt4Xi5lqKUgxKQbQ9KioJkOrpz60Dy",
+      "role": "employee",
+      "assignedStoreIds": [
+        "store_3a496249-a994-4f40-9271-7ec7051e2a06"
+      ],
+      "phone": "8525636523"
     }
   ],
   "products": [
@@ -498,6 +511,17 @@
         "senderName": "Main Street Store",
         "text": "Hi Admin, good to be connected!",
         "timestamp": 1678886460000
+      }
+    ],
+    "store_3a496249-a994-4f40-9271-7ec7051e2a06": [
+      {
+        "id": "msg_6e9953cd-a4a1-464e-aea3-2b5471a3b24d",
+        "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
+        "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
+        "senderId": "admin",
+        "senderName": "Admin",
+        "text": "hello dan.",
+        "timestamp": 1750843839850
       }
     ]
   }
