@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -1408,7 +1407,7 @@ export function BillingForm({
                         <span className="text-muted-foreground">Total CGST:</span>
                         <span className="font-medium text-foreground">₹{billTotals.totalCGST.toFixed(2)}</span>
                     </div>
-                    <Separator className="my-1 w-full max-w-xs"/>
+                    <Separator className="my-1.5 w-full max-w-xs"/>
                 </>
              )}
              { mode === 'buy' && (

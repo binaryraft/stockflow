@@ -1,4 +1,3 @@
-
 "use client";
 
 // This component is no longer used for camera-based scanning.
@@ -8,4 +7,3 @@
 export function BarcodeScannerModal() {
   return null;
 }
-    
