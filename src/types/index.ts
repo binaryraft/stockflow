@@ -122,6 +122,7 @@ export interface User {
   password?: string;
   role: 'admin' | 'employee';
   assignedStoreIds?: string[];
+  phone?: string;
 }
 
 export interface Store {
@@ -207,19 +208,14 @@ export interface CurrencyOption {
 }
 
 export interface Customer {
-  id: string; // Can be phone number or a generated UUID
+  id: string;
   companyId: string;
   name?: string;
-  phone?: string; // Primary identifier if names are not unique
+  phone?: string;
   email?: string;
   address?: string;
-  firstSeen: string; // ISO date string
-  lastSeen: string; // ISO date string
-  // Aggregated data (to be computed later)
-  // totalVisits: number;
-  // totalSpend: number;
-  // totalReturns: number;
-  // preferredProducts: Array<{ productId: string, productName: string, count: number }>;
+  firstSeen: string;
+  lastSeen: string;
 }
 
 export interface DateRangeReportSummary {
@@ -230,4 +226,15 @@ export interface DateRangeReportSummary {
   netProfit: number;
   totalBills: number;
   totalItemsSold: number;
+}
+
+export interface ProductAnalytics {
+  totalPurchased: number;
+  totalSold: number;
+  totalReturned: number;
+  totalRevenue: number;
+  totalCostOfGoodsSold: number;
+  grossProfit: number;
+  averageSellPrice: number | null;
+  averageCostPrice: number | null;
 }
