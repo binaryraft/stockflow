@@ -296,7 +296,6 @@ export const useInventoryStore = create<InventoryState>()(
                 } else if (bill.type === 'sell' && !bill.isEstimate) {
                     totalSold += item.quantity;
                     totalRevenue += item.sellPrice * item.quantity;
-                    // costPrice on a sell bill item is the COGS for that sale
                     totalCostOfGoodsSold += (item.costPrice || 0) * item.quantity;
                 } else if (bill.type === 'return') {
                     totalReturned += item.quantity;
@@ -320,7 +319,6 @@ export const useInventoryStore = create<InventoryState>()(
         };
       },
       
-      // Reporting Functions
       getReportSummaryByDateRange: (startDate, endDate, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {
@@ -431,8 +429,6 @@ export const useInventoryStore = create<InventoryState>()(
           };
       },
 
-
-      // Paste all existing functions from the provided context here
       fetchProducts: async (companyId: string) => {
         if (!companyId) { console.warn("fetchProducts: companyId is required"); set({ products: [] }); return; }
         try {
@@ -1044,7 +1040,10 @@ export const useInventoryStore = create<InventoryState>()(
 
         billsToConsider.forEach(bill => {
           const billDate = new Date(bill.date);
-          if (!billDate || !isWithinInterval(billDate, {start: startOfDay(subDays(new Date(), days -1)), end: startOfDay(new Date()) } ) ) return;
+          const endOfRange = startOfDay(new Date());
+          const startOfRange = startOfDay(subDays(new Date(), days-1));
+          
+          if (!billDate || !isWithinInterval(startOfDay(billDate), {start: startOfRange, end: endOfRange } ) ) return;
 
           const billDateStr = format(startOfDay(billDate), 'MMM d');
           if (dailyDataMap[billDateStr]) {

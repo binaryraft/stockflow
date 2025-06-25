@@ -258,3 +258,18 @@ export interface MonthlyProductFinancials {
   cogs: number;
   profit: number;
 }
+
+export interface ExpenseBillWithCoverage extends Bill {
+  totalCost: number;
+  potentialRevenue: number;
+  coverageStatus: 'Covered' | 'Uncovered';
+}
+
+export interface ExpenseSummary {
+  totalCoveredExpenseValue: number;
+  totalUncoveredExpenseValue: number;
+  totalPotentialProfitOnCoveredExpenses: number;
+  totalOutstandingCostOnUncoveredExpenses: number;
+  coveredBillCount: number;
+  uncoveredBillCount: number;
+}
