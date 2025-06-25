@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
-import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, getMonth, getYear } from 'date-fns';
+import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
@@ -35,11 +35,21 @@ import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
-  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
-  if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-blue-500 text-blue-50 hover:bg-blue-600 dark:bg-blue-600 dark:text-blue-50 dark:hover:bg-blue-700', name: 'Estimate', titleColor: 'text-blue-600 dark:text-blue-500' };
-  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
-  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
-  return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return', titleColor: 'text-amber-600 dark:text-amber-500' };
+  
+  if (billType === 'buy') {
+    return { icon: <ShoppingBag />, className: 'border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20', name: 'Expense', titleColor: 'text-destructive' };
+  }
+  if (billType === 'sell' && isEstimate) {
+    return { icon: <Send />, className: 'bg-accent text-accent-foreground hover:bg-accent/90', name: 'Estimate', titleColor: 'text-accent' };
+  }
+  if (billType === 'sell') {
+    return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
+  }
+  if (isDefectiveReturn) {
+    return { icon: <AlertTriangle />, className: 'bg-warning text-warning-foreground hover:bg-warning/90', name: 'Return (Defective)', titleColor: 'text-warning' };
+  }
+  // Default return
+  return { icon: <RotateCcw />, className: 'bg-warning text-warning-foreground hover:bg-warning/90', name: 'Return', titleColor: 'text-warning' };
 };
 
 const getBillTypeName = (bill: Bill): string => {
@@ -79,7 +89,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     updateBillNonCriticalDetails: updateBillDetailsInStore,
     products: allProductsStore,
     fetchBills,
-    companyId: currentCompanyIdFromHook, // Use this for clarity
+    companyId: currentCompanyId,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -90,7 +100,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
       products: state.products,
       fetchBills: state.fetchBills,
-      companyId: state.userProfile.dataMode === 'global' ? localStorage.getItem('companyId') : "comp_default_001" // Ensure companyId is available
+      companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null,
     })
   );
   const { toast } = useToast();
@@ -105,15 +115,6 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   type BillTypeFilter = 'all' | BillMode | 'estimate'; 
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
-  const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const companyIdFromStorage = localStorage.getItem('companyId');
-    if (companyIdFromStorage) {
-      setCurrentCompanyId(companyIdFromStorage);
-    }
-  }, []);
-
 
   useEffect(() => {
     if (currentCompanyId) {
@@ -204,8 +205,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
     if (sortConfig !== null) {
         processBills.sort((a, b) => {
-        let valA: string | number | undefined | null = a[sortConfig.key as keyof Omit<Bill, 'id'>]; // Type assertion
-        let valB: string | number | undefined | null = b[sortConfig.key as keyof Omit<Bill, 'id'>]; // Type assertion
+        let valA: string | number | undefined | null = a[sortConfig.key as keyof Omit<Bill, 'id'>];
+        let valB: string | number | undefined | null = b[sortConfig.key as keyof Omit<Bill, 'id'>];
 
         if (sortConfig.key === 'id') {
           valA = a.id; valB = b.id;
@@ -340,7 +341,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                 Bill Details {selectedBill.type === 'sell' && selectedBill.isEstimate && "(Estimate)"}
               </DialogTitle>
               <DialogDescription>
-                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-secondary">{selectedBill.id}</span>)
+                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-muted-foreground">{selectedBill.id}</span>)
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="max-h-[65vh] p-1 -mx-1">
@@ -383,7 +384,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                       <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
                       <div>
                           <p className="text-xs text-muted-foreground">Bill ID</p>
-                          <p className="font-mono text-sm text-secondary">{selectedBill.id}</p>
+                          <p className="font-mono text-sm text-muted-foreground">{selectedBill.id}</p>
                       </div>
                       <div>
                           <p className="text-xs text-muted-foreground">Date & Time</p>
@@ -667,14 +668,14 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                             </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHead>
+                                <AlertDialogHead>
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
                                 This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
                                 Stock levels will NOT be automatically readjusted.
                                 </AlertDialogDesc>
-                            </AlertDialogHead>
-                            <AlertDialogFoot>
+                                </AlertDialogHead>
+                                <AlertDialogFoot>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                 onClick={() => {
@@ -685,7 +686,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 >
                                 Delete Bill
                                 </AlertDialogAction>
-                            </AlertDialogFoot>
+                                </AlertDialogFoot>
                             </AlertDialogContent>
                         </AlertDialog>
                     </>
@@ -720,14 +721,12 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         </Select>
       </div>
 
-
-      <div className="border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
+      {/* Desktop Table View */}
+      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="py-2 px-3 w-[90px]">
-                Date / ID
-              </TableHead>
+              <TableHead className="py-2 px-3 w-[90px] md:w-[120px]">Date / ID</TableHead>
               <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 w-[150px]"> 
                 Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
@@ -751,18 +750,22 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedBills.length > 0 ? (
+            {isLoading ? (
+                <TableRow>
+                    <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Loading bills...</TableCell>
+                </TableRow>
+            ) : filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
                 const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
                 const billDate = new Date(bill.date);
                 return (
                 <TableRow key={bill.id}>
-                  <TableCell className="py-2 px-3 w-[90px]">
+                  <TableCell className="py-2 px-3 w-[90px] md:w-[120px]">
                     <div className="flex flex-col items-start leading-tight">
                       <span className="text-xl font-bold text-primary">{getDate(billDate)}</span>
                       <span className="text-xs text-muted-foreground">{format(billDate, 'MMM yyyy')}</span>
-                       <span className="text-xs text-muted-foreground font-mono mt-0.5 opacity-80">{bill.id.slice(-6)}</span>
                        <span className="text-xs text-muted-foreground mt-0.5">{format(billDate, 'p')}</span>
+                       <span className="text-xs text-muted-foreground font-mono mt-0.5 opacity-80">{bill.id.slice(-6)}</span>
                     </div>
                   </TableCell>
                   <TableCell className="py-3 px-4 w-[150px]">
@@ -861,13 +864,131 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center py-3 px-4">
-                  {isLoading ? "Loading bills..." : "No bills found for the selected filters."}
+                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                  No bills found for the selected filters.
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="flex justify-center items-center py-10"><p className="text-muted-foreground">Loading bills...</p></div>
+        ) : filteredAndSortedBills.length > 0 ? (
+          filteredAndSortedBills.map((bill) => {
+            const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
+            const billDate = new Date(bill.date);
+            return (
+              <Card key={bill.id} className="shadow-md border-t-2 border-t-primary overflow-hidden">
+                <CardHeader className="p-4 flex flex-row items-start justify-between bg-muted/30">
+                  <div>
+                    <CardTitle className={cn("text-md flex items-center gap-1.5", billDisplayInfo.titleColor)}>
+                      {React.cloneElement(billDisplayInfo.icon, { className: "h-4 w-4" })}
+                      {billDisplayInfo.name}
+                    </CardTitle>
+                    <CardDescription className="text-xs font-mono text-muted-foreground mt-1">
+                      ID: {bill.id}
+                    </CardDescription>
+                  </div>
+                  <div className="text-right text-xs">
+                     <p className="font-medium">{format(billDate, 'MMM d, yyyy')}</p>
+                     <p className="text-muted-foreground">{format(billDate, 'p')}</p>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 space-y-1.5 text-sm">
+                  {bill.vendorOrCustomerName && (
+                    <div className="flex justify-between">
+                        <span className="text-muted-foreground">Party:</span> 
+                        <span className="font-medium truncate text-right">{bill.vendorOrCustomerName}</span>
+                    </div>
+                  )}
+                  {bill.customerPhone && (
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Phone:</span> 
+                        <span className="font-medium text-right">{bill.customerPhone}</span>
+                    </div>
+                  )}
+                  {bill.storeName && (
+                     <div className="flex justify-between">
+                        <span className="text-muted-foreground">Store:</span> 
+                        <span className="font-medium text-right">{bill.storeName}</span>
+                    </div>
+                  )}
+                   <div className="flex justify-between">
+                        <span className="text-muted-foreground">Items:</span> 
+                        <span className="font-medium text-right">{bill.items.length}</span>
+                    </div>
+                  {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate && (
+                    <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Payment:</span>
+                        <Badge 
+                            className={cn(
+                                "capitalize text-xs py-0.5 px-1.5", 
+                                bill.paymentStatus === 'paid' 
+                                ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600" 
+                                : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
+                            )}
+                        >
+                            {bill.paymentStatus}
+                        </Badge>
+                    </div>
+                  )}
+                </CardContent>
+                <CardFooter className="p-4 bg-muted/30 flex justify-between items-center">
+                  <p className="text-lg font-bold">
+                    <span className={cn(billDisplayInfo.titleColor === 'text-destructive' ? 'text-destructive' : 'text-primary')}>
+                      ₹{bill.totalAmount.toFixed(2)}
+                    </span>
+                  </p>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="h-8 w-8 p-0">
+                        <span className="sr-only">Open menu</span>
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem onClick={() => handleViewBill(bill)}>
+                          <Eye className="mr-2 h-4 w-4" /> View / Edit Details
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
+                          <Printer className="mr-2 h-4 w-4" /> Print Bill
+                        </DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHead>
+                                <AlertDialogTit>Are you sure?</AlertDialogTit>
+                                <AlertDialogDesc>
+                                    This action cannot be undone. This will permanently delete bill ID: {bill.id}.
+                                    Stock levels will NOT be automatically readjusted.
+                                </AlertDialogDesc>
+                                </AlertDialogHead>
+                                <AlertDialogFoot>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => { handleDeleteBillClick(bill.id, bill.id); setIsViewDialogOpen(false); }} className="bg-destructive hover:bg-destructive/90">
+                                    Delete Bill
+                                </AlertDialogAction>
+                                </AlertDialogFoot>
+                            </AlertDialogContent>
+                        </AlertDialog>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </CardFooter>
+              </Card>
+            );
+          })
+        ) : (
+          <p className="text-center text-muted-foreground py-10">No bills found for the selected filters.</p>
+        )}
       </div>
     </>
   );

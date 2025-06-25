@@ -28,6 +28,8 @@ body {
     --accent-foreground: 0 0% 100%;
     --destructive: 0 75% 55%;
     --destructive-foreground: 0 0% 98%;
+    --warning: 45 90% 55%;
+    --warning-foreground: 45 85% 10%;
     --border: 220 15% 88%;
     --input-background: 0 0% 100%;
     --input-border: 220 15% 80%;
@@ -57,6 +59,8 @@ body {
     --accent-foreground: 210 100% 10%;
     --destructive: 0 70% 60%;
     --destructive-foreground: 0 0% 98%;
+    --warning: 45 90% 60%;
+    --warning-foreground: 45 85% 10%;
     --border: 224 71.4% 25%;
     --input-background: 224 71.4% 18%;
     --input-border: 224 71.4% 30%;
@@ -245,4 +249,10 @@ html {
 @keyframes page-fade-in {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
 }

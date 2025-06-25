@@ -45,6 +45,10 @@ export default {
   				DEFAULT: 'hsl(var(--destructive))',
   				foreground: 'hsl(var(--destructive-foreground))'
   			},
+        warning: {
+          DEFAULT: 'hsl(var(--warning))',
+          foreground: 'hsl(var(--warning-foreground))'
+        },
   			border: 'hsl(var(--border))',
   			input: { // Changed to allow 'input-background' and 'input-border'
           DEFAULT: 'hsl(var(--input-border))', // Default input now refers to border
