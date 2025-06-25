@@ -21,17 +21,6 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { format } from 'date-fns';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { v4 as uuidv4 } from 'uuid';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -361,28 +350,6 @@ interface ProductFormProps {
   searchParams?: { [key: string]: string | string[] | undefined };
 }
 
-function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
-    const item = bill.items.find(i => i.productId === productId);
-    const quantity = item ? item.quantity : 0;
-    
-    if (bill.type === 'sell') {
-        return { quantity, label: 'Sold', colorClass: 'bg-primary text-primary-foreground hover:bg-primary/90' };
-    } else if (bill.type === 'buy') {
-        return { quantity, label: 'Purchased', colorClass: 'bg-destructive text-destructive-foreground hover:bg-destructive/90' };
-    } else if (bill.type === 'return') {
-        const isDefectiveReturn = item?.isDefective;
-        return { 
-            quantity, 
-            label: isDefectiveReturn ? 'Def. Return' : 'Restock Return', 
-            colorClass: isDefectiveReturn 
-                ? 'bg-amber-500 text-amber-950 dark:bg-amber-600 dark:text-amber-50' 
-                : 'bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600' 
-        };
-    }
-    return { quantity, label: 'Qty', colorClass: 'bg-muted text-muted-foreground' };
-}
-
-
 export function ProductForm({ initialData: initialProductProp, searchParams: routeSearchParamsProp }: ProductFormProps) {
   const { 
     addProduct: addProductToStore, 
@@ -398,7 +365,6 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const nextSearchParams = useNextSearchParams(); 
   
   const [hasMounted, setHasMounted] = useState(false);
-  const [productBills, setProductBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(false); 
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
@@ -477,7 +443,6 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
             value: ac.value,
         })) || [],
       };
-      setProductBills(getBillsForProduct(initialData.id));
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
       defaults = {
         name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
@@ -491,7 +456,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     formReset(defaults); 
     setTimeout(() => setFocus('name'), 50);
 
-  }, [hasMounted, currentCompanyId, initialData, isEditing, routeSearchParamsProp, formReset, setFocus, getBillsForProduct, getSkuDetails]);
+  }, [hasMounted, currentCompanyId, initialData, isEditing, routeSearchParamsProp, formReset, setFocus, getSkuDetails]);
 
 
   const onSubmit = async (data: ProductFormData) => {
@@ -572,284 +537,169 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     <div className="space-y-6">
       <FormProvider {...form}>
         <form onSubmit={handleSubmit(onSubmit)}>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column for Main Form */}
-            <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>General Information</CardTitle>
-                  <CardDescription>Basic details for your product.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="name">Product Name*</Label>
-                    <Input id="name" {...register("name")} placeholder="Enter product name" />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="category">Category</Label>
-                    <Controller
-                      name="category"
-                      control={control}
-                      render={({ field }) => (
-                        <CategorySearchInput
-                          id="category"
-                          value={field.value || ''}
-                          onValueChange={(value) => field.onChange(value)}
-                          onCategorySelect={(categoryName) => field.onChange(categoryName)}
-                          placeholder="Type or select category"
-                        />
-                      )}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                    <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
-                  </div>
-                </CardContent>
-              </Card>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>General Information</CardTitle>
+                <CardDescription>Basic details for your product.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="name">Product Name*</Label>
+                  <Input id="name" {...register("name")} placeholder="Enter product name" />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="category">Category</Label>
+                  <Controller
+                    name="category"
+                    control={control}
+                    render={({ field }) => (
+                      <CategorySearchInput
+                        id="category"
+                        value={field.value || ''}
+                        onValueChange={(value) => field.onChange(value)}
+                        onCategorySelect={(categoryName) => field.onChange(categoryName)}
+                        placeholder="Type or select category"
+                      />
+                    )}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                  <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description">Description</Label>
+                  <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Inventory & Pricing</CardTitle>
-                  <CardDescription>Manage stock tracking and pricing for this product.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex items-center space-x-3 pt-2 pb-2">
-                    <Controller
-                      name="trackQuantity"
-                      control={control}
-                      render={({ field }) => (
-                        <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                      )}
-                    />
-                    <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
-                  </div>
-                  
-                  {trackQuantityValue ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Inventory & Pricing</CardTitle>
+                <CardDescription>Manage stock tracking and pricing for this product.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center space-x-3 pt-2 pb-2">
+                  <Controller
+                    name="trackQuantity"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
+                    )}
+                  />
+                  <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
+                </div>
+                
+                {trackQuantityValue ? (
+                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                        <span>
+                            For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills, not here.
+                        </span>
+                    </div>
+                ) : (
+                  !hasVariants && (
+                    <>
                       <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                           <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
                           <span>
-                              For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills, not here.
+                              For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
                           </span>
                       </div>
-                  ) : (
-                    !hasVariants && (
-                      <>
-                        <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                            <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                            <span>
-                                For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
-                            </span>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                            <div className="space-y-1.5">
-                                <Label htmlFor="costPrice">Cost Price</Label>
-                                <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
-                                {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label htmlFor="sellPrice">Sell Price</Label>
-                                <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
-                                {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
-                            </div>
-                        </div>
-                      </>
-                    )
-                  )}
-                  
-                  {!trackQuantityValue && hasVariants && (
-                      <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                          <span>
-                              For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
-                          </span>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                          <div className="space-y-1.5">
+                              <Label htmlFor="costPrice">Cost Price</Label>
+                              <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
+                              {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
+                          </div>
+                          <div className="space-y-1.5">
+                              <Label htmlFor="sellPrice">Sell Price</Label>
+                              <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
+                              {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
+                          </div>
                       </div>
-                  )}
-                </CardContent>
-              </Card>
+                    </>
+                  )
+                )}
+                
+                {!trackQuantityValue && hasVariants && (
+                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
+                        <span>
+                            For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
+                        </span>
+                    </div>
+                )}
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Tax & Additional Settings</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-3 pt-2">
-                    <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="sgstRate">SGST Rate (%)</Label>
-                        <Input id="sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
-                        {errors.sgstRate && <p className="text-sm text-destructive mt-1">{errors.sgstRate.message}</p>}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="cgstRate">CGST Rate (%)</Label>
-                        <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
-                        {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
-                      </div>
+            <Card>
+              <CardHeader>
+                <CardTitle>Tax & Additional Settings</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3 pt-2">
+                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="sgstRate">SGST Rate (%)</Label>
+                      <Input id="sgstRate" type="number" step="0.01" {...register("sgstRate")} placeholder="e.g., 9 for 9%" />
+                      {errors.sgstRate && <p className="text-sm text-destructive mt-1">{errors.sgstRate.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cgstRate">CGST Rate (%)</Label>
+                      <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                      {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                    <Input id="expiryDate" type="date" {...register("expiryDate")} />
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>
+                  <Input id="expiryDate" type="date" {...register("expiryDate")} />
+                </div>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle>Variants</CardTitle>
-                  <CardDescription>Define product variants like color or size. Maximum of 2 types.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
-                  {variantFields.map((variantField, variantIndex) => (
-                    <VariantFormSection
-                      key={variantField.id}
-                      variantIndex={variantIndex}
-                      removeVariant={removeVariant}
-                    />
-                  ))}
-                  {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
-                </CardContent>
-                {variantFields.length < 2 && (
-                  <CardFooter>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
-                    >
-                      <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
-                    </Button>
-                  </CardFooter>
-                )}
-              </Card>
-            </div>
-
-            {/* Right Column for History & Actions */}
-            <div className="lg:col-span-1 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="flex flex-col gap-3">
-                  <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
-                    {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+            <Card>
+              <CardHeader>
+                <CardTitle>Variants</CardTitle>
+                <CardDescription>Define product variants like color or size. Maximum of 2 types.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {errors.variants?.root && <p className="text-sm text-destructive mt-1">{errors.variants.root.message}</p>}
+                {variantFields.map((variantField, variantIndex) => (
+                  <VariantFormSection
+                    key={variantField.id}
+                    variantIndex={variantIndex}
+                    removeVariant={removeVariant}
+                  />
+                ))}
+                {errors.variants && typeof errors.variants.message === 'string' && <p className="text-sm text-destructive mt-1">{errors.variants.message}</p>}
+              </CardContent>
+              {variantFields.length < 2 && (
+                <CardFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
                   </Button>
-                  <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
-                    Cancel
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {isEditing && initialData && (
-                <Accordion type="single" collapsible className="w-full space-y-6">
-                   <Card>
-                    <AccordionItem value="stock-details" className="border-b-0">
-                      <AccordionTrigger className="p-4 hover:no-underline">
-                        <CardHeader className="p-0">
-                          <CardTitle>Purchase Batches & Stock</CardTitle>
-                          <CardDescription>View stock layers for each variant.</CardDescription>
-                        </CardHeader>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-6 pb-4">
-                        {initialData.productSKUs.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No purchase batches (stock layers) found.</p>
-                        ) : (
-                          <div className="space-y-4">
-                            {initialData.productSKUs.map(sku => {
-                              const skuDetails = getSkuDetails(sku); 
-                              return (
-                                <Card key={sku.id} className="bg-tertiary shadow-inner">
-                                  <CardHeader className="pb-2 pt-3 px-4">
-                                    <CardTitle className="text-base text-primary">
-                                      {sku.skuIdentifier || "Default"}
-                                    </CardTitle>
-                                    <CardDescription>Current Stock: {skuDetails.totalStock ?? (initialData.trackQuantity ? '0' : 'N/A')}</CardDescription>
-                                  </CardHeader>
-                                  <CardContent className="px-4 pb-3">
-                                    {sku.stockLayers.length > 0 && (
-                                      <Table className="text-xs">
-                                        <TableHeader>
-                                          <TableRow>
-                                            <TableHead>Purchased</TableHead>
-                                            <TableHead className="text-right">Qty</TableHead>
-                                            <TableHead className="text-right">Cost</TableHead>
-                                            <TableHead className="text-right">Sell</TableHead>
-                                          </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                          {sku.stockLayers.map(layer => (
-                                            <TableRow key={layer.id}>
-                                              <TableCell>{format(new Date(layer.purchaseDate), 'MMM d, yy')}</TableCell>
-                                              <TableCell className="text-right">{layer.quantity.toFixed(2)}</TableCell>
-                                              <TableCell className="text-right">₹{layer.costPrice.toFixed(2)}</TableCell>
-                                              <TableCell className="text-right">₹{layer.sellPrice.toFixed(2)}</TableCell>
-                                            </TableRow>
-                                          ))}
-                                        </TableBody>
-                                      </Table>
-                                    )}
-                                  </CardContent>
-                                </Card>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                   </Card>
-                   <Card>
-                    <AccordionItem value="transaction-history" className="border-b-0">
-                      <AccordionTrigger className="p-4 hover:no-underline">
-                        <CardHeader className="p-0">
-                          <CardTitle>Transaction History</CardTitle>
-                          <CardDescription>View all bills involving this product.</CardDescription>
-                        </CardHeader>
-                      </AccordionTrigger>
-                      <AccordionContent className="px-6 pb-4">
-                        {productBills.length === 0 ? (
-                          <p className="text-sm text-muted-foreground">No bill history found for this product.</p>
-                        ) : (
-                          <Table className="text-xs">
-                              <TableHeader>
-                                  <TableRow>
-                                      <TableHead>Bill ID</TableHead>
-                                      <TableHead>Date</TableHead>
-                                      <TableHead>Type</TableHead>
-                                      <TableHead className="text-right">Qty</TableHead>
-                                  </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                  {productBills.map(bill => {
-                                  if (!initialData) return null;
-                                  const transactionInfo = getQuantityAndContextualInfoInBill(bill, initialData.id);
-                                  return (
-                                      <TableRow key={bill.id}>
-                                          <TableCell className="font-mono text-muted-foreground">{bill.id}</TableCell>
-                                          <TableCell>{format(new Date(bill.date), 'PP p')}</TableCell>
-                                          <TableCell>
-                                          <Badge variant="outline" className={cn("capitalize text-xs", transactionInfo.colorClass)}>{transactionInfo.label}</Badge>
-                                          </TableCell>
-                                          <TableCell className="text-right font-semibold">
-                                          {transactionInfo.quantity.toFixed(2)}
-                                          </TableCell>
-                                      </TableRow>
-                                  );
-                                  })}
-                              </TableBody>
-                          </Table>
-                        )}
-                      </AccordionContent>
-                    </AccordionItem>
-                   </Card>
-                </Accordion>
+                </CardFooter>
               )}
+            </Card>
+
+            <div className="flex justify-end gap-3 pt-4">
+                <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
+                    Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
+                    {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+                </Button>
             </div>
           </div>
         </form>
