@@ -165,5 +165,3 @@ export default function AdminStoreChatPage() {
     </div>
   );
 }
-
-    

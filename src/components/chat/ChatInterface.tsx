@@ -131,5 +131,3 @@ export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatI
     </div>
   );
 }
-
-    

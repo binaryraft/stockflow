@@ -1,4 +1,7 @@
 
+// This is a declaration file, it should not contain implementation details.
+// It is used for providing type information for the project.
+
 export interface ProductOption {
   id: string;
   value: string;
