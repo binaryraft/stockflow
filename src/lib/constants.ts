@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare, Contact, BarChartHorizontal } from 'lucide-react';
+import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare, Contact, BarChartHorizontal, BookOpen } from 'lucide-react';
 import type { SubscriptionPlan, CurrencyOption } from '@/types';
 
 export interface NavLink {
@@ -12,7 +12,7 @@ export interface NavLink {
 export const NAV_LINKS: NavLink[] = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/billing', label: 'Billing', icon: DollarSign },
-  { href: '/admin/reports', label: 'Reports', icon: BarChartHorizontal },
+  { href: '/admin/accounting', label: 'Accounting', icon: BookOpen },
   { href: '/admin/products', label: 'Products', icon: Package },
   { href: '/admin/customers', label: 'Customers', icon: Contact },
   { href: '/admin/staff', label: 'Staff', icon: Users },

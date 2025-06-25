@@ -226,6 +226,9 @@ export interface DateRangeReportSummary {
   netProfit: number;
   totalBills: number;
   totalItemsSold: number;
+  totalSGST: number;
+  totalCGST: number;
+  totalTax: number;
 }
 
 export interface ProductAnalytics {
