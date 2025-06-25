@@ -659,14 +659,14 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                             </Button>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
-                            <AlertDialogHead>
+                                <AlertDialogHead>
                                 <AlertDialogTit>Are you sure?</AlertDialogTit>
                                 <AlertDialogDesc>
                                 This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
                                 Stock levels will NOT be automatically readjusted.
                                 </AlertDialogDesc>
-                            </AlertDialogHead>
-                            <AlertDialogFoot>
+                                </AlertDialogHead>
+                                <AlertDialogFoot>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                 onClick={() => {
@@ -677,7 +677,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                 >
                                 Delete Bill
                                 </AlertDialogAction>
-                            </AlertDialogFoot>
+                                </AlertDialogFoot>
                             </AlertDialogContent>
                         </AlertDialog>
                     </>

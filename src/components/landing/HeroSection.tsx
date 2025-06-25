@@ -12,12 +12,12 @@ import { cn } from '@/lib/utils';
 
 interface HeroSectionProps {
   onAdminLoginClick: () => void;
-  onStoreSelectClick: () => void;
+  onStoreLoginClick: () => void;
 }
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; // Ensure this constant is defined
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; 
 
-export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSectionProps) {
+export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectionProps) {
   const router = useRouter();
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -96,7 +96,7 @@ export function HeroSection({ onAdminLoginClick, onStoreSelectClick }: HeroSecti
             variant="outline"
             size="lg"
             className="shadow-md hover:shadow-lg transition-all-fast border-secondary/50 hover:border-secondary text-secondary hover:bg-secondary/10 px-12 py-7 text-xl rounded-xl group transform hover:scale-105 focus:scale-105 focus:ring-4 focus:ring-secondary/30"
-            onClick={onStoreSelectClick}
+            onClick={onStoreLoginClick}
           >
             <Building className="mr-3 h-6 w-6" /> Store Terminal
             <ArrowRight className="ml-2.5 h-5 w-5 text-secondary/70 group-hover:translate-x-1 transition-transform-fast" />

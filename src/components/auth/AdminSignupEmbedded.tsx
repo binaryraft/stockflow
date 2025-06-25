@@ -24,7 +24,7 @@ const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin }: AdminSignupEmbeddedProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { fetchCompanyProfile } = useInventoryStore(); // Added
+  const { fetchCompanyProfile } = useInventoryStore(); 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -74,10 +74,9 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
             localStorage.setItem('userName', data.user.name || 'Admin');
             localStorage.setItem('userRole', data.user.role || 'admin');
             localStorage.setItem('companyId', data.user.companyId);
-            // Fetch company profile after successful signup
             await fetchCompanyProfile(data.user.companyId);
         }
-        onSignupSuccess(); // Callback will handle UI switch and HomePage will redirect
+        onSignupSuccess(); 
       } else {
         toast({ variant: "destructive", title: "Signup Failed", description: data.message || "Could not create account." });
       }
@@ -122,7 +121,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
           <CardTitle className="text-2xl">Create Admin Account</CardTitle>
           <CardDescription>Set up your company and admin profile.</CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSignup}>
           <CardContent className="space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="signup-company-name">

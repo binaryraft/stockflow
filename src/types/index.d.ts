@@ -293,5 +293,3 @@ export interface BalanceSheetSummary {
 
 // Ensure Staff type is defined for clarity, although it's a subset of User
 export type Staff = User & { role: 'employee' };
-
-    
