@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -93,6 +93,7 @@ interface InventoryState {
   getTopProfitableProducts: (limit: number, companyId?: string) => ProductProfitabilityData[];
   getProductAnalytics: (productId: string) => ProductAnalytics;
   getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
+  getProductFinancialsByMonth: (productId: string) => MonthlyProductFinancials[];
   
   // New Reporting Functions
   getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => DateRangeReportSummary;
@@ -157,6 +158,36 @@ export const useInventoryStore = create<InventoryState>()(
       stores: [],
       userProfile: { ...defaultUserProfile },
       messagesByStore: {},
+      
+      getProductFinancialsByMonth: (productId: string): MonthlyProductFinancials[] => {
+        const bills = get().bills.filter(b => b.items.some(i => i.productId === productId));
+        const monthlyData: Record<string, { revenue: number; cogs: number }> = {};
+      
+        bills.forEach(bill => {
+          if (bill.type === 'sell' && !bill.isEstimate) {
+            const monthKey = format(new Date(bill.date), 'MMM yyyy');
+            if (!monthlyData[monthKey]) {
+              monthlyData[monthKey] = { revenue: 0, cogs: 0 };
+            }
+            
+            bill.items.forEach(item => {
+              if (item.productId === productId) {
+                monthlyData[monthKey].revenue += item.sellPrice * item.quantity;
+                monthlyData[monthKey].cogs += (item.costPrice || 0) * item.quantity;
+              }
+            });
+          }
+        });
+      
+        const sortedKeys = Object.keys(monthlyData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+        
+        return sortedKeys.map(key => ({
+          month: key,
+          revenue: monthlyData[key].revenue,
+          cogs: monthlyData[key].cogs,
+          profit: monthlyData[key].revenue - monthlyData[key].cogs,
+        }));
+      },
       
       getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
         const { companyId, startDate, endDate } = params || {};
@@ -331,7 +362,7 @@ export const useInventoryStore = create<InventoryState>()(
         });
     
         const grossProfit = totalRevenue - totalCOGS;
-        const netProfit = grossProfit - totalExpenses;
+        const netProfit = grossProfit - totalExpenses; 
         const totalTax = totalSGST + totalCGST;
     
         return { totalRevenue, totalCOGS, grossProfit, totalExpenses, netProfit, totalBills, totalItemsSold, totalSGST, totalCGST, totalTax };

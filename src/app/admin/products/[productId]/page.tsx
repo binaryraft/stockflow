@@ -17,7 +17,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/utils';
-import { ProductPerformanceChart } from '@/components/products/ProductPerformanceChart';
+import { ProductFinancialsChart } from '@/components/products/ProductFinancialsChart';
 import { ProductSummaryCard } from '@/components/products/ProductSummaryCard';
 import { StockLevelsCard } from '@/components/products/StockLevelsCard';
 
@@ -140,79 +140,90 @@ export default function ProductDetailsPage() {
           </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <ProductPerformanceChart analytics={analytics} currencySymbol={currencySymbol} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="shadow-lg h-full">
+            <CardHeader>
+              <CardTitle>Monthly Financials</CardTitle>
+              <CardDescription>
+                Revenue, Cost of Goods Sold (COGS), and Profit over the last 12 months.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="h-[350px] pb-4">
+              <ProductFinancialsChart productId={product.id} />
+            </CardContent>
+          </Card>
         </div>
-        <div className="lg:col-span-1">
+        <div className="lg:col-span-1 flex flex-col gap-6">
           <ProductSummaryCard analytics={analytics} currencySymbol={currencySymbol} />
+          <StockLevelsCard product={product} />
         </div>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <StockLevelsCard product={product} />
-        <ProductEditCard product={product} />
-      </div>
-
-
-      <Card className="shadow-md">
-          <CardHeader>
-            <CardTitle className="text-lg">Transaction History</CardTitle>
-             <CardDescription>A detailed list of all bills involving this product.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="border rounded-lg overflow-hidden">
-             <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Bill ID</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="text-right">Quantity</TableHead>
-                    <TableHead className="text-right">Price/Unit</TableHead>
-                    <TableHead className="text-right">Total</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {purchaseHistory.length > 0 ? (
-                    purchaseHistory.map(bill => {
-                        const item = bill.items.find(i => i.productId === product.id);
-                        if (!item) return null;
-                        
-                        const transactionInfo = getQuantityAndContextualInfoInBill(bill, product.id);
-                        const pricePerUnit = bill.type === 'buy' ? item.costPrice : item.sellPrice;
-                        const lineTotal = pricePerUnit * item.quantity;
-
-                        return (
-                        <TableRow key={bill.id}>
-                        <TableCell className="text-xs">{format(new Date(bill.date), 'PP p')}</TableCell>
-                        <TableCell className="font-mono text-xs">{bill.id}</TableCell>
-                        <TableCell>
-                            <Badge
-                                variant={'outline'}
-                                className={transactionInfo.colorClass}
-                            >
-                                {transactionInfo.label}
-                            </Badge>
-                        </TableCell>
-                        <TableCell className="text-right font-medium">{item.quantity.toFixed(2)}</TableCell>
-                        <TableCell className="text-right">{currencySymbol}{pricePerUnit.toFixed(2)}</TableCell>
-                        <TableCell className="text-right font-semibold">{currencySymbol}{lineTotal.toFixed(2)}</TableCell>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+           <Card className="shadow-md h-full">
+              <CardHeader>
+                <CardTitle className="text-lg">Transaction History</CardTitle>
+                 <CardDescription>A detailed list of all bills involving this product.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="border rounded-lg overflow-hidden max-h-[500px]">
+                 <Table>
+                    <TableHeader>
+                        <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Bill ID</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead className="text-right">Quantity</TableHead>
+                        <TableHead className="text-right">Price/Unit</TableHead>
+                        <TableHead className="text-right">Total</TableHead>
                         </TableRow>
-                    )})
-                    ) : (
-                    <TableRow>
-                        <TableCell colSpan={6} className="h-24 text-center">
-                        No transaction history found for this product.
-                        </TableCell>
-                    </TableRow>
-                    )}
-                </TableBody>
-            </Table>
-            </div>
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                        {purchaseHistory.length > 0 ? (
+                        purchaseHistory.map(bill => {
+                            const item = bill.items.find(i => i.productId === product.id);
+                            if (!item) return null;
+                            
+                            const transactionInfo = getQuantityAndContextualInfoInBill(bill, product.id);
+                            const pricePerUnit = bill.type === 'buy' ? item.costPrice : item.sellPrice;
+                            const lineTotal = pricePerUnit * item.quantity;
 
+                            return (
+                            <TableRow key={bill.id}>
+                            <TableCell className="text-xs">{format(new Date(bill.date), 'PP p')}</TableCell>
+                            <TableCell className="font-mono text-xs">{bill.id}</TableCell>
+                            <TableCell>
+                                <Badge
+                                    variant={'outline'}
+                                    className={transactionInfo.colorClass}
+                                >
+                                    {transactionInfo.label}
+                                </Badge>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">{item.quantity.toFixed(2)}</TableCell>
+                            <TableCell className="text-right">{currencySymbol}{pricePerUnit.toFixed(2)}</TableCell>
+                            <TableCell className="text-right font-semibold">{currencySymbol}{lineTotal.toFixed(2)}</TableCell>
+                            </TableRow>
+                        )})
+                        ) : (
+                        <TableRow>
+                            <TableCell colSpan={6} className="h-24 text-center">
+                            No transaction history found for this product.
+                            </TableCell>
+                        </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+                </div>
+              </CardContent>
+            </Card>
+        </div>
+         <div className="lg:col-span-1">
+          <ProductEditCard product={product} />
+        </div>
+      </div>
     </div>
   );
 }

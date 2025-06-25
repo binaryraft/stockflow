@@ -251,3 +251,10 @@ export interface AccountsPayableSummary {
   totalPayable: number;
   unpaidBills: Bill[];
 }
+
+export interface MonthlyProductFinancials {
+  month: string;
+  revenue: number;
+  cogs: number;
+  profit: number;
+}
