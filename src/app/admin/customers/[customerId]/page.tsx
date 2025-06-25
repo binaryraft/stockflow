@@ -70,7 +70,7 @@ export default function CustomerDetailsPage() {
         const matchesPhone = customer.phone && bill.customerPhone === customer.phone;
         const matchesName = customer.name && bill.vendorOrCustomerName === customer.name;
         // If phone exists, it's the primary key. If not, fallback to name.
-        return customer.phone ? matchesPhone : matchesName;
+        return customer.phone ? matchesPhone : (matchesName && !bill.customerPhone);
     }).sort((a,b) => b.timestamp - a.timestamp);
   }, [customer, bills]);
 
@@ -260,5 +260,7 @@ export default function CustomerDetailsPage() {
     </div>
   );
 }
+
+    
 
     

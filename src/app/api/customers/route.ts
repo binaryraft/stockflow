@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     db.bills.forEach(bill => {
       if (bill.companyId === companyId && (bill.type === 'sell' || bill.type === 'return')) {
-        const customerKey = bill.customerPhone || bill.vendorOrCustomerName?.toLowerCase() || `unknown_${bill.id}`;
+        const customerKey = bill.customerPhone || (bill.vendorOrCustomerName?.trim().toLowerCase() || `unknown_${bill.id}`);
         
         if (customerKey.startsWith('unknown_') && !bill.vendorOrCustomerName && !bill.customerPhone) {
             return; // Skip bills with no customer identifiers
@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     // Deduplicate if necessary (e.g., if an explicit customer matches a derived one)
     const finalCustomersMap = new Map<string, Customer>();
     allCompanyCustomers.forEach(cust => {
-        const key = cust.phone || cust.name?.toLowerCase() || cust.id;
+        const key = cust.phone || cust.name?.trim().toLowerCase() || cust.id;
         if (!finalCustomersMap.has(key) || (finalCustomersMap.get(key) && !finalCustomersMap.get(key)?.name && cust.name)) {
              finalCustomersMap.set(key, cust);
         } else {
@@ -102,3 +102,5 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   return NextResponse.json({ success: false, message: "Adding new customers directly is not yet implemented." }, { status: 501 });
 }
+
+    

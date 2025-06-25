@@ -1,5 +1,4 @@
 
-
 // This is a declaration file, it should not contain implementation details.
 // It is used for providing type information for the project.
 
@@ -294,3 +293,5 @@ export interface BalanceSheetSummary {
 
 // Ensure Staff type is defined for clarity, although it's a subset of User
 export type Staff = User & { role: 'employee' };
+
+    

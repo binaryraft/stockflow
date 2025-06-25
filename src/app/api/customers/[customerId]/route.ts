@@ -33,11 +33,16 @@ export async function GET(req: NextRequest, { params }: { params: { customerId: 
       const customersMap = new Map<string, Customer>();
       db.bills.forEach(bill => {
         if (bill.companyId === companyId && (bill.type === 'sell' || bill.type === 'return')) {
-          const currentCustomerKey = bill.customerPhone || bill.vendorOrCustomerName?.toLowerCase() || `unknown_${bill.id}`;
+          const customerKey = bill.customerPhone || bill.vendorOrCustomerName?.trim().toLowerCase() || `unknown_${bill.id}`;
           const currentId = bill.customerPhone || `cust_${bill.id}`; // Approximate ID from bill
-
-          if (currentId === customerId || bill.customerPhone === customerId || (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase() === customerId.toLowerCase() && !bill.customerPhone)) {
-            let tempCustomer = customersMap.get(currentCustomerKey);
+          
+          let potentialMatch = false;
+          if (currentId === customerId) potentialMatch = true;
+          else if (bill.customerPhone === customerId) potentialMatch = true;
+          else if (bill.vendorOrCustomerName && bill.vendorOrCustomerName.trim().toLowerCase() === customerId.toLowerCase() && !bill.customerPhone) potentialMatch = true;
+          
+          if(potentialMatch) {
+            let tempCustomer = customersMap.get(customerKey);
             const billDate = new Date(bill.date).toISOString();
             if (!tempCustomer) {
               tempCustomer = {
@@ -53,7 +58,7 @@ export async function GET(req: NextRequest, { params }: { params: { customerId: 
               if (new Date(billDate) > new Date(tempCustomer.lastSeen)) tempCustomer.lastSeen = billDate;
               if (!tempCustomer.name && bill.vendorOrCustomerName) tempCustomer.name = bill.vendorOrCustomerName;
             }
-            customersMap.set(currentCustomerKey, tempCustomer);
+            customersMap.set(customerKey, tempCustomer);
           }
         }
       });
@@ -61,10 +66,9 @@ export async function GET(req: NextRequest, { params }: { params: { customerId: 
       // For simplicity, take the first one if derived.
       const derivedCustomers = Array.from(customersMap.values());
       if (derivedCustomers.length > 0) {
-          // Find the best match if customerId was not phone
           customer = derivedCustomers.find(c => c.id === customerId) || 
                      derivedCustomers.find(c => c.phone === customerId) || 
-                     derivedCustomers.find(c => c.name?.toLowerCase() === customerId.toLowerCase());
+                     derivedCustomers.find(c => c.name?.trim().toLowerCase() === customerId.toLowerCase());
       }
     }
 
@@ -91,3 +95,5 @@ export async function PUT(req: NextRequest, { params }: { params: { customerId: 
 export async function DELETE(req: NextRequest, { params }: { params: { customerId: string } }) {
  return NextResponse.json({ success: false, message: "Deleting customers is not yet implemented." }, { status: 501 });
 }
+
+    

@@ -31,7 +31,7 @@ export function CustomersTable() {
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortConfig, setSortConfig] = useState<{ key: SortableCustomerColumns; direction: 'ascending' | 'descending' } | null>({ key: 'name', direction: 'ascending' });
+  const [sortConfig, setSortConfig] = useState<{ key: SortableCustomerColumns; direction: 'ascending' | 'descending' } | null>({ key: 'lastSeen', direction: 'descending' });
 
   const filteredAndSortedCustomers = useMemo(() => {
     let sortableCustomers = [...allCustomers];
@@ -50,14 +50,12 @@ export function CustomersTable() {
         const valB = b[sortConfig.key] || ''; // Default to empty string for undefined values
         
         let comparison = 0;
-        if (typeof valA === 'string' && typeof valB === 'string') {
-          if (sortConfig.key === 'firstSeen' || sortConfig.key === 'lastSeen') {
-            comparison = new Date(valA).getTime() - new Date(valB).getTime();
-          } else {
-            comparison = valA.localeCompare(valB);
-          }
+        if (sortConfig.key === 'firstSeen' || sortConfig.key === 'lastSeen') {
+          comparison = new Date(valB).getTime() - new Date(valA).getTime();
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
         }
-        return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
+        return sortConfig.direction === 'ascending' ? comparison * -1 : comparison;
       });
     } else {
         // Default sort by lastSeen descending, then name ascending
@@ -162,7 +160,7 @@ export function CustomersTable() {
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">
-                  No customers found.
+                  No customers found. They are added automatically when you create a sales bill with a name or phone number.
                 </TableCell>
               </TableRow>
             )}
@@ -172,3 +170,5 @@ export function CustomersTable() {
     </>
   );
 }
+
+    
