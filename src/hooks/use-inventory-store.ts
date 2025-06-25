@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary } from '@/types';
+import type { Product, Bill, BillItem, Category, ProductVariant as ProductVariantType, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, isToday, startOfMonth, endOfMonth, startOfYear, endOfYear, isThisWeek, isThisMonth, isThisYear, isWithinInterval } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -91,6 +91,7 @@ interface InventoryState {
   getOverallFinancialSummary: (companyId?: string) => FinancialSummary;
   getTodaysFinancialSummary: (companyId?: string) => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number, companyId?: string) => ProductProfitabilityData[];
+  getProductAnalytics: (productId: string) => ProductAnalytics;
   getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
   
   // New Reporting Functions
@@ -229,7 +230,62 @@ export const useInventoryStore = create<InventoryState>()(
         }).sort((a, b) => a.productName.localeCompare(b.productName));
       },
 
-      // ... existing functions ...
+      getProductAnalytics: (productId: string): ProductAnalytics => {
+        const { bills, products } = get();
+        const product = products.find(p => p.id === productId);
+        if (!product) {
+            return {
+                totalPurchased: 0,
+                totalSold: 0,
+                totalReturned: 0,
+                totalRevenue: 0,
+                totalCostOfGoodsSold: 0,
+                grossProfit: 0,
+                averageSellPrice: null,
+                averageCostPrice: null,
+            };
+        }
+
+        let totalPurchased = 0;
+        let totalSold = 0;
+        let totalReturned = 0;
+        let totalRevenue = 0;
+        let totalCostOfGoodsSold = 0;
+
+        const productBills = bills.filter(bill => bill.items.some(item => item.productId === productId));
+
+        productBills.forEach(bill => {
+            bill.items.forEach(item => {
+                if (item.productId !== productId) return;
+
+                if (bill.type === 'buy') {
+                    totalPurchased += item.quantity;
+                } else if (bill.type === 'sell' && !bill.isEstimate) {
+                    totalSold += item.quantity;
+                    totalRevenue += item.sellPrice * item.quantity;
+                    // costPrice on a sell bill item is the COGS for that sale
+                    totalCostOfGoodsSold += (item.costPrice || 0) * item.quantity;
+                } else if (bill.type === 'return') {
+                    totalReturned += item.quantity;
+                }
+            });
+        });
+        
+        const grossProfit = totalRevenue - totalCostOfGoodsSold;
+        const averageSellPrice = totalSold > 0 ? totalRevenue / totalSold : null;
+        const averageCostPrice = totalSold > 0 ? totalCostOfGoodsSold / totalSold : null;
+
+        return {
+            totalPurchased,
+            totalSold,
+            totalReturned,
+            totalRevenue,
+            totalCostOfGoodsSold,
+            grossProfit,
+            averageSellPrice,
+            averageCostPrice,
+        };
+      },
       
       // Keep all existing functions and add new ones below
       
