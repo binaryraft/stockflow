@@ -6,10 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { DollarSign, TrendingUp, TrendingDown, BarChart, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { FinancialSummary } from '@/types';
+import type { FinancialSummary, TimePeriod } from '@/types';
 import { getCurrencySymbol } from '@/lib/utils';
 
-export function OverallFinancialSummaryStats() {
+interface OverallFinancialSummaryStatsProps {
+  period: TimePeriod;
+}
+
+export function OverallFinancialSummaryStats({ period }: OverallFinancialSummaryStatsProps) {
   const getSummary = useInventoryStore((state) => state.getOverallFinancialSummary);
   const userProfile = useInventoryStore((state) => state.userProfile);
   const [summary, setSummary] = useState<FinancialSummary | null>(null);
@@ -23,9 +27,19 @@ export function OverallFinancialSummaryStats() {
 
   useEffect(() => {
     if (hasMounted) {
-      setSummary(getSummary());
+      setSummary(getSummary(period));
     }
-  }, [hasMounted, getSummary]);
+  }, [hasMounted, getSummary, period]);
+
+  const periodTextMap: Record<TimePeriod, string> = {
+    daily: "Last 7 Days",
+    weekly: "Last 4 Weeks",
+    monthly: "Last 12 Months",
+  };
+
+  const cardTitle = `Financial Summary (${periodTextMap[period]})`;
+  const cardDescription = `Financial performance metrics for the ${periodTextMap[period].toLowerCase()}.`;
+
 
   if (!hasMounted || !summary) {
     return (
@@ -33,9 +47,9 @@ export function OverallFinancialSummaryStats() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-primary">
             <BarChart className="h-5 w-5" />
-            Overall Financial Summary
+            {cardTitle}
           </CardTitle>
-          <CardDescription>All-time financial performance metrics.</CardDescription>
+          <CardDescription>{cardDescription}</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">Loading financial summary...</p>
@@ -57,12 +71,12 @@ export function OverallFinancialSummaryStats() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-primary">
            <BarChart className="h-5 w-5" />
-          Overall Financial Summary
+           {cardTitle}
         </CardTitle>
-        <CardDescription>All-time financial performance metrics.</CardDescription>
+        <CardDescription>{cardDescription}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
           {summaryItems.map(item => (
             <div key={item.label} className="p-3 bg-tertiary rounded-md shadow-sm border border-border/50">
               <div className="flex items-center gap-2 mb-1">

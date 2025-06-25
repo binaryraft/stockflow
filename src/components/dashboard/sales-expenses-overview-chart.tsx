@@ -8,6 +8,7 @@ import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/u
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { getCurrencySymbol } from '@/lib/utils';
+import type { TimePeriod } from '@/types';
 
 const chartConfig = {
   sales: {
@@ -26,7 +27,7 @@ interface DailyData {
   expenses: number;
 }
 
-export function SalesExpensesOverviewChart() {
+export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
   const getDailySalesAndExpenses = useInventoryStore((state) => state.getDailySalesAndExpenses);
   const userProfile = useInventoryStore((state) => state.userProfile);
   const [chartData, setChartData] = useState<DailyData[]>([]);
@@ -39,17 +40,17 @@ export function SalesExpensesOverviewChart() {
 
   useEffect(() => {
     setIsLoading(true);
-    const data = getDailySalesAndExpenses(7); 
+    const data = getDailySalesAndExpenses(period); 
     setChartData(data);
     setIsLoading(false);
-  }, [getDailySalesAndExpenses]);
+  }, [getDailySalesAndExpenses, period]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><p>Loading chart data...</p></div>;
   }
 
   if (chartData.length === 0) {
-    return <div className="flex items-center justify-center h-full"><p>No sales or expense data available for the last 7 days.</p></div>;
+    return <div className="flex items-center justify-center h-full"><p>No sales or expense data available for the selected period.</p></div>;
   }
 
   return (

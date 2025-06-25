@@ -291,5 +291,13 @@ export interface BalanceSheetSummary {
   retainedEarnings: number;
 }
 
+export type TimePeriod = 'daily' | 'weekly' | 'monthly';
+
+export interface ProductRevenueData {
+  name: string;
+  revenue: number;
+  quantity: number;
+}
+
 // Ensure Staff type is defined for clarity, although it's a subset of User
 export type Staff = User & { role: 'employee' };

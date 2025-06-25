@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContaine
 import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/utils';
+import type { TimePeriod } from '@/types';
 
 interface ProductFinancialData {
   name: string; 
@@ -58,7 +59,7 @@ const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: an
   return null;
 };
 
-export function TopProfitableProductsChart() {
+export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
   const getTopProfitableProducts = useInventoryStore((state) => state.getTopProfitableProducts);
   const userProfile = useInventoryStore((state) => state.userProfile);
   const [chartData, setChartData] = useState<ProductFinancialData[]>([]);
@@ -71,17 +72,17 @@ export function TopProfitableProductsChart() {
 
   useEffect(() => {
     setIsLoading(true);
-    const data = getTopProfitableProducts(5); 
+    const data = getTopProfitableProducts(5, period); 
     setChartData(data);
     setIsLoading(false);
-  }, [getTopProfitableProducts]);
+  }, [getTopProfitableProducts, period]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><p>Loading chart data...</p></div>;
   }
   
   if (chartData.length === 0) {
-    return <div className="flex items-center justify-center h-full"><p>No profit data available for products.</p></div>;
+    return <div className="flex items-center justify-center h-full"><p>No profit data available for products in this period.</p></div>;
   }
 
   const formattedChartData = chartData

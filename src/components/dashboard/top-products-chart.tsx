@@ -4,9 +4,10 @@
 import React, { useEffect, useState } from 'react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ChartConfig, ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrencySymbol } from '@/lib/utils';
+import type { TimePeriod, ProductRevenueData } from '@/types';
 
 const chartConfig = {
   revenue: {
@@ -15,12 +16,27 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-interface ProductRevenueData {
-  name: string;
-  revenue: number;
-}
 
-export function TopProductsChart() {
+const CustomTooltip = ({ active, payload, label, currencySymbol }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    return (
+      <div className="p-3 bg-background border border-border rounded-lg shadow-lg text-xs">
+        <p className="font-bold mb-2 text-sm text-foreground">{data.name}</p>
+        <p className="text-muted-foreground">
+          Revenue: <span className="font-semibold text-foreground">{currencySymbol}{data.revenue.toFixed(2)}</span>
+        </p>
+        <p className="text-muted-foreground">
+          Quantity Sold: <span className="font-semibold text-foreground">{data.quantity}</span>
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
+
+
+export function TopProductsChart({ period }: { period: TimePeriod }) {
   const getTopSellingProductsByRevenue = useInventoryStore((state) => state.getTopSellingProductsByRevenue);
   const userProfile = useInventoryStore((state) => state.userProfile);
   const [chartData, setChartData] = useState<ProductRevenueData[]>([]);
@@ -33,17 +49,17 @@ export function TopProductsChart() {
 
   useEffect(() => {
     setIsLoading(true);
-    const data = getTopSellingProductsByRevenue(5); 
+    const data = getTopSellingProductsByRevenue(5, period); 
     setChartData(data);
     setIsLoading(false);
-  }, [getTopSellingProductsByRevenue]);
+  }, [getTopSellingProductsByRevenue, period]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center h-full"><p>Loading chart data...</p></div>;
   }
   
   if (chartData.length === 0) {
-    return <div className="flex items-center justify-center h-full"><p>No product sales data available.</p></div>;
+    return <div className="flex items-center justify-center h-full"><p>No product sales data available for this period.</p></div>;
   }
 
   return (
@@ -77,10 +93,7 @@ export function TopProductsChart() {
         />
         <Tooltip 
           cursor={{ fill: 'hsl(var(--muted))' }} 
-          content={<ChartTooltipContent 
-            indicator="dot"
-             formatter={(value) => `${currencySymbol}${Number(value).toFixed(2)}`}
-          />}
+          content={<CustomTooltip currencySymbol={currencySymbol} />}
         />
         <Bar dataKey="revenue" fill={chartConfig.revenue.color} radius={4} barSize={30}/>
       </BarChart>

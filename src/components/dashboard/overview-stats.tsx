@@ -7,7 +7,7 @@ import { StatCard } from './stat-card';
 import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive, TrendingUp, Contact } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { TodaysFinancialSummary } from '@/types'; 
+import type { TodaysFinancialSummary, TimePeriod } from '@/types'; 
 import { getCurrencySymbol } from '@/lib/utils';
 
 const LOW_STOCK_THRESHOLD = 5;
@@ -23,17 +23,17 @@ interface DailyStats {
   grossProfitToday: string; 
 }
 
-export function OverviewStats() {
+export function OverviewStats({ period }: { period: TimePeriod }) {
   const { 
     products, 
     getLowStockProductCount, 
-    getTodaysFinancialSummary,
+    getPeriodFinancialSummary,
     userProfile,
     getAllCustomers
   } = useInventoryStore((state) => ({
     products: state.products,
     getLowStockProductCount: state.getLowStockProductCount,
-    getTodaysFinancialSummary: state.getTodaysFinancialSummary,
+    getPeriodFinancialSummary: state.getPeriodFinancialSummary,
     userProfile: state.userProfile,
     getAllCustomers: state.getAllCustomers,
   }));
@@ -51,6 +51,18 @@ export function OverviewStats() {
   const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
+  const periodTextMap: Record<TimePeriod, string> = {
+    daily: "Today's",
+    weekly: "This Week's",
+    monthly: "This Month's",
+  };
+  const periodDescriptionMap: Record<TimePeriod, string> = {
+    daily: `transactions today`,
+    weekly: `transactions this week`,
+    monthly: `transactions this month`,
+  };
+
+
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
@@ -58,7 +70,7 @@ export function OverviewStats() {
   useEffect(() => {
     setIsLoading(true);
     
-    const todaysFinancials = getTodaysFinancialSummary();
+    const periodFinancials = getPeriodFinancialSummary(period);
     const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
     const totalCustomers = getAllCustomers().length;
 
@@ -70,27 +82,27 @@ export function OverviewStats() {
     setStats({
       totalProducts: totalTrackedProducts,
       totalCustomers: totalCustomers,
-      salesToday: `${currencySymbol}${todaysFinancials.totalRevenue.toFixed(2)}`,
-      purchasesToday: `${currencySymbol}${todaysFinancials.totalExpenses.toFixed(2)}`,
-      transactionsToday: todaysFinancials.transactionsToday,
-      defectivesToday: todaysFinancials.defectivesToday,
+      salesToday: `${currencySymbol}${periodFinancials.totalRevenue.toFixed(2)}`,
+      purchasesToday: `${currencySymbol}${periodFinancials.totalExpenses.toFixed(2)}`,
+      transactionsToday: periodFinancials.transactionsToday,
+      defectivesToday: periodFinancials.defectivesToday,
       lowStockCount: lowStock,
-      grossProfitToday: `${currencySymbol}${todaysFinancials.grossProfit.toFixed(2)}`,
+      grossProfitToday: `${currencySymbol}${periodFinancials.grossProfit.toFixed(2)}`,
     });
     setIsLoading(false);
-  }, [products, getLowStockProductCount, getTodaysFinancialSummary, currencySymbol, getAllCustomers]);
+  }, [products, getLowStockProductCount, getPeriodFinancialSummary, currencySymbol, getAllCustomers, period]);
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatCard
-        title="Today's Sales"
+        title={`${periodTextMap[period]} Sales`}
         value={stats.salesToday}
         icon={DollarSign}
-        description={`${stats.transactionsToday} transactions today`}
+        description={`${stats.transactionsToday} ${periodDescriptionMap[period]}`}
         isLoading={isLoading}
       />
        <StatCard
-        title="Today's Gross Profit"
+        title={`${periodTextMap[period]} Gross Profit`}
         value={stats.grossProfitToday}
         icon={TrendingUp}
         description="Sales minus Cost of Goods Sold"
@@ -98,24 +110,10 @@ export function OverviewStats() {
         valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}
       />
       <StatCard
-        title="Today's Purchases"
+        title={`${periodTextMap[period]} Purchases`}
         value={stats.purchasesToday}
         icon={ShoppingCart}
-        description="Total cost of purchases today"
-        isLoading={isLoading}
-      />
-       <StatCard
-        title="Total Customers"
-        value={stats.totalCustomers}
-        icon={Contact}
-        description="Unique customers in records"
-        isLoading={isLoading}
-      />
-       <StatCard
-        title="Total Products"
-        value={stats.totalProducts}
-        icon={Package}
-        description="Number of distinct tracked products"
+        description={`Total cost of purchases`}
         isLoading={isLoading}
       />
       <StatCard
@@ -125,14 +123,6 @@ export function OverviewStats() {
         description={`Products below ${LOW_STOCK_THRESHOLD} units`}
         isLoading={isLoading}
         valueClassName={stats.lowStockCount > 0 ? "text-destructive" : undefined}
-      />
-      <StatCard
-        title="Defectives Today"
-        value={stats.defectivesToday}
-        icon={AlertTriangle}
-        description="Items marked defective in returns"
-        isLoading={isLoading}
-        valueClassName={stats.defectivesToday > 0 ? "text-amber-600 dark:text-amber-500" : undefined}
       />
     </div>
   );

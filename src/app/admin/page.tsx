@@ -6,11 +6,11 @@ import { OverviewStats } from '@/components/dashboard/overview-stats';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, PackageSearch, DollarSign, ShoppingBag, Send, RotateCcw, Users, Building, BarChart3, TrendingUp, TrendingDown, ListChecks, BarChartHorizontal } from 'lucide-react';
+import { PlusCircle, PackageSearch, DollarSign, ShoppingBag, Send, RotateCcw, Users, Building, BarChart3, TrendingUp, TrendingDown, ListChecks, BarChartHorizontal, History } from 'lucide-react';
 import { SalesExpensesOverviewChart } from '@/components/dashboard/sales-expenses-overview-chart';
 import { TopProductsChart } from '@/components/dashboard/top-products-chart';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import type { Bill } from '@/types';
+import type { Bill, TimePeriod } from '@/types';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ExpenseTrackerCard } from '@/components/dashboard/expense-tracker-card';
@@ -18,6 +18,7 @@ import { ExpenseSummaryStats } from '@/components/dashboard/expense-summary-stat
 import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFinancialSummaryStats'; 
 import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart'; 
 import { getCurrencySymbol } from '@/lib/utils';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
@@ -34,6 +35,7 @@ export default function DashboardPage() {
   const [hasMounted, setHasMounted] = useState(false);
   const [recentBills, setRecentBills] = useState<Bill[]>([]);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
+  const [timePeriod, setTimePeriod] = useState<TimePeriod>('daily');
 
   useEffect(() => {
     setHasMounted(true);
@@ -48,23 +50,34 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-8 page-transition">
-      <PageTitle title="Admin Dashboard" />
+      <PageTitle 
+        title="Admin Dashboard" 
+        actions={
+          <Tabs defaultValue={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)} className="w-full md:w-auto">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="daily">Daily</TabsTrigger>
+              <TabsTrigger value="weekly">Weekly</TabsTrigger>
+              <TabsTrigger value="monthly">Monthly</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        }
+      />
       
-      <OverviewStats />
+      <OverviewStats period={timePeriod} />
 
-      <OverallFinancialSummaryStats /> 
+      <OverallFinancialSummaryStats period={timePeriod} /> 
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="card-hover-effect">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />
-                Sales & Expenses (Last 7 Days)
+                Sales & Expenses
             </CardTitle>
-            <CardDescription>Daily overview of sales and expenses.</CardDescription>
+            <CardDescription>Overview of sales and expenses for the selected period.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] pt-4">
-            <SalesExpensesOverviewChart />
+            <SalesExpensesOverviewChart period={timePeriod} />
           </CardContent>
         </Card>
         <Card className="card-hover-effect">
@@ -73,10 +86,10 @@ export default function DashboardPage() {
                 <TrendingUp className="h-5 w-5 text-primary" />
                 Top Selling Products/SKUs
             </CardTitle>
-            <CardDescription>Products/SKUs generating the most revenue (last 30 days).</CardDescription>
+            <CardDescription>Products/SKUs generating the most revenue for the period.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] pt-4">
-            <TopProductsChart />
+            <TopProductsChart period={timePeriod} />
           </CardContent>
         </Card>
       </div>
@@ -87,10 +100,10 @@ export default function DashboardPage() {
               <ListChecks className="h-5 w-5 text-primary" /> 
               Top Profitable Products (Revenue vs. Cost)
           </CardTitle>
-          <CardDescription>Comparison of total revenue and total cost for top profitable products/SKUs (all time).</CardDescription>
+          <CardDescription>Comparison of revenue and cost for top profitable products/SKUs for the period.</CardDescription>
         </CardHeader>
         <CardContent className="h-[350px] md:h-[300px] pt-4">
-          <TopProfitableProductsChart />
+          <TopProfitableProductsChart period={timePeriod} />
         </CardContent>
       </Card>
       
@@ -129,10 +142,10 @@ export default function DashboardPage() {
         <Card className="card-hover-effect">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <BarChartHorizontal className="h-5 w-5 text-primary" />
+              <History className="h-5 w-5 text-primary" />
               Recent Activity
             </CardTitle>
-            <CardDescription>Latest bills processed.</CardDescription>
+            <CardDescription>Latest 5 bills processed.</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             {!hasMounted || recentBills.length === 0 ? (

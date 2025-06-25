@@ -281,5 +281,20 @@ export interface CashFlowSummary {
   netCashFlow: number;
 }
 
+export interface BalanceSheetSummary {
+  inventoryValue: number;
+  accountsReceivable: number;
+  accountsPayable: number;
+  retainedEarnings: number;
+}
+
+export type TimePeriod = 'daily' | 'weekly' | 'monthly';
+
+export interface ProductRevenueData {
+  name: string;
+  revenue: number;
+  quantity: number;
+}
+
 // Ensure Staff type is defined for clarity, although it's a subset of User
 export type Staff = User & { role: 'employee' };
