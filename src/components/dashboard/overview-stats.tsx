@@ -70,13 +70,14 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
   useEffect(() => {
     setIsLoading(true);
     
-    const periodFinancials = getPeriodFinancialSummary(period);
+    const companyId = localStorage.getItem('companyId') || undefined;
+    const periodFinancials = getPeriodFinancialSummary(period, companyId);
     const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
-    const totalCustomers = getAllCustomers().length;
+    const totalCustomers = getAllCustomers(companyId).length;
 
     let lowStock = 0;
     if (typeof getLowStockProductCount === 'function') {
-      lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD);
+      lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD, companyId);
     }
 
     setStats({
