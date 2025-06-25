@@ -4,7 +4,7 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; 
 import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon, ChevronDown } from 'lucide-react';
-import { NAV_LINKS, APP_NAME } from '@/lib/constants';
+import { NAV_LINK_GROUPS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { Package2 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
@@ -122,7 +122,7 @@ export function HeaderMain() {
                 </SheetTitle>
               </SheetHeader>
               <nav className="grid gap-2 text-base font-medium p-4">
-                {userRole === 'admin' && NAV_LINKS.map(link => (
+                {userRole === 'admin' && NAV_LINK_GROUPS.flatMap(group => group.links).map(link => (
                     <Link
                         key={link.href}
                         href={link.href}
@@ -195,5 +195,3 @@ export function HeaderMain() {
     </header>
   );
 }
-
-    
