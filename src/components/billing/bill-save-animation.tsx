@@ -19,7 +19,7 @@ export function BillSaveAnimation({ show, billMode, isEstimate, onClose }: BillS
     if (show) {
       timer = setTimeout(() => {
         onClose();
-      }, 2500); // Animation duration
+      }, 1200); // Animation duration (Faster)
     }
     return () => clearTimeout(timer);
   }, [show, onClose]);
@@ -30,22 +30,22 @@ export function BillSaveAnimation({ show, billMode, isEstimate, onClose }: BillS
 
   let IconComponent = CheckCircle2;
   let text = "Saved!";
-  let iconColor = "text-green-500"; 
+  let iconColor = "text-green-600";
 
   if (billMode === 'sell') {
     if (isEstimate) {
       IconComponent = FileText;
       text = "Estimate Saved!";
-      iconColor = "text-blue-500"; // Blue for estimate
+      iconColor = "text-blue-500";
     } else {
       IconComponent = Send;
       text = "Sales Bill Saved!";
-      iconColor = "text-primary"; 
+      iconColor = "text-green-600"; 
     }
   } else if (billMode === 'buy') {
     IconComponent = ShoppingBag;
     text = "Expense Bill Saved!";
-    iconColor = "text-destructive"; 
+    iconColor = "text-red-600"; 
   } else if (billMode === 'return') {
     IconComponent = RotateCcw;
     text = "Return Entry Saved!";

@@ -10,9 +10,9 @@ import { getCurrencySymbol } from '@/lib/utils';
 import type { MonthlyProductFinancials } from '@/types';
 
 const chartConfig = {
-  revenue: { label: "Revenue", color: "hsl(var(--primary))" },
-  cogs: { label: "Cost", color: "hsl(var(--destructive))" },
-  profit: { label: "Profit", color: "hsl(var(--chart-2))" }, 
+  revenue: { label: "Revenue", color: "hsl(142.1 76.2% 36.3%)" }, // Green
+  cogs: { label: "Cost", color: "hsl(0 72.2% 50.6%)" }, // Red
+  profit: { label: "Profit", color: "hsl(221.2 83.2% 53.3%)" }, // Blue
 } satisfies ChartConfig;
 
 const CustomTooltip = ({ active, payload, label, currencySymbol }: any) => {
@@ -26,7 +26,7 @@ const CustomTooltip = ({ active, payload, label, currencySymbol }: any) => {
               <span style={{display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color, marginRight: '6px'}}></span>
               <span className="text-muted-foreground capitalize">{entry.name}:</span>
             </span>
-            <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-destructive' : (entry.dataKey === 'profit' ? 'text-green-600' : 'text-primary'))}>
+            <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-red-600' : (entry.dataKey === 'profit' ? 'text-blue-600' : 'text-green-600'))}>
               {currencySymbol}{Number(entry.value).toFixed(2)}
             </span>
           </div>

@@ -12,11 +12,11 @@ import { getCurrencySymbol } from '@/lib/utils';
 const chartConfig = {
   sales: {
     label: "Sales",
-    color: "hsl(var(--primary))",
+    color: "hsl(142.1 76.2% 36.3%)", // Green
   },
   expenses: {
     label: "Expenses",
-    color: "hsl(var(--destructive))",
+    color: "hsl(0 72.2% 50.6%)", // Red
   },
 } satisfies ChartConfig;
 
@@ -93,10 +93,10 @@ export function SalesExpensesOverviewChart() {
         <Line
           dataKey="sales"
           type="monotone"
-          stroke={chartConfig.sales.color}
+          stroke="var(--color-sales)"
           strokeWidth={2}
           dot={{
-            fill: chartConfig.sales.color,
+            fill: "var(--color-sales)",
           }}
           activeDot={{
             r: 6,
@@ -105,10 +105,10 @@ export function SalesExpensesOverviewChart() {
         <Line
           dataKey="expenses"
           type="monotone"
-          stroke={chartConfig.expenses.color}
+          stroke="var(--color-expenses)"
           strokeWidth={2}
           dot={{
-            fill: chartConfig.expenses.color,
+            fill: "var(--color-expenses)",
           }}
           activeDot={{
             r: 6,

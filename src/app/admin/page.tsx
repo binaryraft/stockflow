@@ -1,3 +1,4 @@
+
 "use client";
 import React, { useState, useEffect } from 'react';
 import { PageTitle } from '@/components/common/page-title';
@@ -20,8 +21,8 @@ import { getCurrencySymbol } from '@/lib/utils';
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
-    if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-destructive-foreground bg-destructive', name: 'Expense' };
-    if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-primary-foreground bg-primary', name: 'Sales' };
+    if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Expense' };
+    if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-green-50 bg-green-600', name: 'Sales' };
     if (isDefectiveReturn) return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return (Defective)' };
     return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return' };
 };
@@ -139,6 +140,7 @@ export default function DashboardPage() {
             ) : (
               recentBills.map(bill => {
                 const displayInfo = getBillTypeIconAndColor(bill.type, bill.items.some(i => i.isDefective));
+                const amountColor = bill.type === 'buy' ? 'text-red-600' : 'text-green-600';
                 return (
                   <div key={bill.id} className="flex items-center justify-between text-sm p-3 rounded-lg bg-tertiary shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
@@ -153,7 +155,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                        <span className={cn("font-semibold", displayInfo.colorClass.includes('destructive') ? 'text-destructive' : 'text-primary')}>{currencySymbol}{bill.totalAmount.toFixed(2)}</span>
+                        <span className={cn("font-semibold", amountColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</span>
                         <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'PP p')}</span>
                     </div>
                   </div>

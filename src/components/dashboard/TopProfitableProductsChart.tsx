@@ -17,11 +17,11 @@ interface ProductFinancialData {
 const chartConfig = {
   revenue: {
     label: "Revenue",
-    color: "hsl(var(--primary))", 
+    color: "hsl(142.1 76.2% 36.3%)", // Green
   },
   cogs: {
     label: "Cost",
-    color: "hsl(var(--destructive))",
+    color: "hsl(0 72.2% 50.6%)", // Red
   },
 } satisfies ChartConfig;
 
@@ -41,7 +41,7 @@ const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: an
               <span style={{display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color, marginRight: '6px'}}></span>
               <span className="text-muted-foreground">{entry.dataKey === 'cogs' ? 'Total Cost (COGS)' : 'Total Revenue'}:</span>
             </span>
-            <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-destructive' : 'text-primary')}>
+            <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-red-600' : 'text-green-600')}>
               {currencySymbol}{Number(entry.value).toFixed(2)}
             </span>
           </div>

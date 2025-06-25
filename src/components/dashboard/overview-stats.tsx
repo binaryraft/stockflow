@@ -95,7 +95,7 @@ export function OverviewStats() {
         icon={TrendingUp}
         description="Sales minus Cost of Goods Sold"
         isLoading={isLoading}
-        valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-primary" : "text-destructive"}
+        valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}
       />
       <StatCard
         title="Today's Purchases"

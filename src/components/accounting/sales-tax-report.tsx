@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import type { Bill } from '@/types';
 import { Separator } from '../ui/separator';
 import { TrendingUp, TrendingDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface GstReportProps {
   startDate?: Date;
@@ -34,11 +35,14 @@ const TaxReportTable: React.FC<{
     }, { subTotal: 0, totalSGST: 0, totalCGST: 0, totalAmount: 0 });
   }, [bills]);
 
+  const titleColor = type === 'sales' ? 'text-green-600' : 'text-destructive';
+  const headerIcon = type === 'sales' ? <TrendingUp className={titleColor} /> : <TrendingDown className={titleColor} />;
+
   return (
     <Card className="shadow-md">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-            {type === 'sales' ? <TrendingUp className="text-primary"/> : <TrendingDown className="text-destructive"/>}
+        <CardTitle className={cn("flex items-center gap-2", titleColor)}>
+            {headerIcon}
             {title}
         </CardTitle>
         <CardDescription>{description}</CardDescription>
@@ -70,7 +74,7 @@ const TaxReportTable: React.FC<{
                     <TableCell className="text-right">{currencySymbol}{(bill.totalSGST || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right">{currencySymbol}{(bill.totalCGST || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-right font-medium">{currencySymbol}{totalTaxOnBill.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-semibold", titleColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
                   </TableRow>
                 );
               }) : (
@@ -86,7 +90,7 @@ const TaxReportTable: React.FC<{
                 <TableCell className="text-right">{currencySymbol}{totals.totalSGST.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{currencySymbol}{totals.totalCGST.toFixed(2)}</TableCell>
                 <TableCell className="text-right">{currencySymbol}{(totals.totalSGST + totals.totalCGST).toFixed(2)}</TableCell>
-                <TableCell className="text-right text-primary">{currencySymbol}{totals.totalAmount.toFixed(2)}</TableCell>
+                <TableCell className={cn("text-right", titleColor)}>{currencySymbol}{totals.totalAmount.toFixed(2)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
@@ -160,7 +164,7 @@ export function GstReport({ startDate, endDate }: GstReportProps) {
             <Separator className="my-2" />
             <div className="flex justify-between items-center font-bold text-xl p-4 rounded-md bg-tertiary">
                 <span>Net GST Payable (A - B)</span>
-                <span className={netGstPayable >= 0 ? "text-primary" : "text-destructive"}>
+                <span className={netGstPayable >= 0 ? "text-green-600" : "text-destructive"}>
                     {currencySymbol}{netGstPayable.toFixed(2)}
                 </span>
             </div>

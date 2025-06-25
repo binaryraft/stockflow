@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo } from 'react';
@@ -55,8 +56,8 @@ export function ProfitLossStatement({ startDate, endDate }: ProfitLossStatementP
 
           {/* Gross Profit */}
           <div className="flex justify-between items-center font-bold text-lg">
-            <span className="text-primary">Gross Profit</span>
-            <span className="text-primary">{formatValue(summary.grossProfit)}</span>
+            <span className="text-foreground">Gross Profit</span>
+            <span className={cn(summary.grossProfit >= 0 ? "text-green-600" : "text-destructive")}>{formatValue(summary.grossProfit)}</span>
           </div>
 
           <Separator className="my-4"/>
