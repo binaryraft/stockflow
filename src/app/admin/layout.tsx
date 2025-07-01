@@ -7,6 +7,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { AppBlocker } from '@/components/layout/AppBlocker';
+import type { PaymentStatus } from '@/types';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -19,11 +21,12 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { fetchCompanyProfile } = useInventoryStore();
+  const { fetchCompanyProfile, userProfile } = useInventoryStore();
 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [blockReason, setBlockReason] = useState<'pending' | 'expired' | null>(null);
 
   useEffect(() => {
     setHasMounted(true);
@@ -35,37 +38,53 @@ export default function AdminLayout({
   }, []);
 
   useEffect(() => {
-    if (!hasMounted) {
-      return;
-    }
+    if (!hasMounted) return;
 
-    setIsLoadingAuth(true);
-    const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-    const userRole = localStorage.getItem('userRole');
-    const companyId = localStorage.getItem('companyId');
+    const checkAuthAndSubscription = async () => {
+      setIsLoadingAuth(true);
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      const userRole = localStorage.getItem('userRole');
+      const companyId = localStorage.getItem('companyId');
 
-    if (token && userRole === ADMIN_ROLE && companyId) {
-      setIsAuthenticated(true);
-      fetchCompanyProfile(companyId).catch(err => {
-        console.error("AdminLayout: Failed to fetch company profile on auth check:", err);
-      });
-    } else {
-      setIsAuthenticated(false);
-      localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
-      localStorage.removeItem('userId');
-      localStorage.removeItem('userName');
-      localStorage.removeItem('userRole');
-      localStorage.removeItem('companyId');
-      localStorage.removeItem('assignedStoreIds');
-      Object.keys(sessionStorage).forEach(key => {
-        if (key.startsWith('authenticatedStore_') || key === 'lastAuthenticatedStoreId') {
-          sessionStorage.removeItem(key);
+      if (token && userRole === ADMIN_ROLE && companyId) {
+        setIsAuthenticated(true);
+        const companyProfile = await fetchCompanyProfile(companyId);
+        
+        if (companyProfile) {
+          if (companyProfile.paymentStatus === 'pending') {
+            setBlockReason('pending');
+          } else if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
+            setBlockReason('expired');
+          } else {
+            setBlockReason(null);
+          }
+        } else {
+          // If profile fails to load, maybe default to blocked or redirect
+          console.error("AdminLayout: Failed to fetch company profile for auth check.");
+          setBlockReason('expired'); // Block if we can't verify subscription
         }
-      });
-      router.replace('/');
-    }
-    setIsLoadingAuth(false);
+      } else {
+        setIsAuthenticated(false);
+        // Clear all session/local storage on logout/auth failure
+        localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+        localStorage.removeItem('userId');
+        localStorage.removeItem('userName');
+        localStorage.removeItem('userRole');
+        localStorage.removeItem('companyId');
+        localStorage.removeItem('assignedStoreIds');
+        Object.keys(sessionStorage).forEach(key => {
+          if (key.startsWith('authenticatedStore_') || key === 'lastAuthenticatedStoreId') {
+            sessionStorage.removeItem(key);
+          }
+        });
+        router.replace('/');
+      }
+      setIsLoadingAuth(false);
+    };
+
+    checkAuthAndSubscription();
   }, [router, hasMounted, fetchCompanyProfile, pathname]);
+
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
@@ -86,11 +105,15 @@ export default function AdminLayout({
   }
 
   if (isLoadingAuth) {
-    return loadingScreen("Checking authentication...");
+    return loadingScreen("Checking authentication & subscription...");
   }
 
   if (!isAuthenticated) {
-    return null;
+    return null; // Redirect is handled in useEffect
+  }
+  
+  if (blockReason) {
+    return <AppBlocker reason={blockReason} />;
   }
 
   return <AppShell>{children}</AppShell>;

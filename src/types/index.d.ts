@@ -1,4 +1,3 @@
-
 // This is a declaration file, it should not contain implementation details.
 // It is used for providing type information for the project.
 
@@ -101,6 +100,9 @@ export interface Category {
   companyId: string;
 }
 
+export type SubscriptionType = 'monthly' | 'yearly';
+export type PaymentStatus = 'pending' | 'paid';
+
 export interface Company {
   id: string;
   name: string;
@@ -115,6 +117,10 @@ export interface Company {
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
   currency?: string;
+  subscriptionType?: SubscriptionType;
+  paymentStatus?: PaymentStatus;
+  subscriptionStartDate?: string | null;
+  subscriptionExpiryDate?: string | null;
 }
 
 export interface User {
@@ -165,6 +171,8 @@ export interface UserProfile {
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
   companyCurrency?: string;
+  paymentStatus?: PaymentStatus;
+  subscriptionExpiryDate?: string | null;
 }
 
 export interface ChatMessage {

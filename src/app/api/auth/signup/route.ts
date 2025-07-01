@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { readDB, writeDB } from '@/lib/db-access';
-import type { User, Company } from '@/types';
+import type { User, Company, SubscriptionType } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SUBSCRIPTION_PLAN_IDS, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 import bcrypt from 'bcryptjs';
@@ -14,11 +14,11 @@ export async function POST(req: NextRequest) {
   console.log(`${routeNamePrefix} Received signup request.`);
   try {
     const body = await req.json();
-    const { companyName, adminName, email, password } = body;
+    const { companyName, adminName, email, password, planId, subscriptionType } = body;
 
-    if (!companyName || !adminName || !email || !password) {
-      console.warn(`${routeNamePrefix} Missing required fields for signup. Required: companyName, adminName, email, password.`);
-      return NextResponse.json({ success: false, message: 'All fields (Company Name, Admin Name, Email, Password) are required.' }, { status: 400 });
+    if (!companyName || !adminName || !email || !password || !planId || !subscriptionType) {
+      console.warn(`${routeNamePrefix} Missing required fields for signup.`);
+      return NextResponse.json({ success: false, message: 'All fields, including plan and billing cycle, are required.' }, { status: 400 });
     }
     if (password.length < 6) {
       console.warn(`${routeNamePrefix} Password too short for email: ${email}.`);
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       id: newCompanyId,
       name: companyName.trim(),
       token: `TOKEN_${uuidv4().toUpperCase()}`,
-      activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.STARTER,
+      activeSubscriptionId: planId,
       logoUrl: '',
       slogan: '',
       phone: '',
@@ -52,9 +52,13 @@ export async function POST(req: NextRequest) {
       defaultSalesPaymentStatus: 'paid',
       defaultPurchasePaymentStatus: 'paid',
       currency: DEFAULT_CURRENCY_CODE,
+      subscriptionType: subscriptionType as SubscriptionType,
+      paymentStatus: 'pending',
+      subscriptionStartDate: null,
+      subscriptionExpiryDate: null,
     };
     db.companies.push(newCompany);
-    console.log(`${routeNamePrefix} New company created: ${newCompany.name} (ID: ${newCompanyId}).`);
+    console.log(`${routeNamePrefix} New company created: ${newCompany.name} (ID: ${newCompanyId}). Payment status: PENDING.`);
 
     const hashedPassword = bcrypt.hashSync(password, SALT_ROUNDS);
     const newAdminUser: User = {
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error) {
     console.error(`${routeNamePrefix} Critical error during signup process:`, error);
-    const message = error instanceof Error ? error.message : 'An unexpected internal server error occurred during signup.';
+    const message = error instanceof Error ? error.message : 'An unexpected internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
   }
 }

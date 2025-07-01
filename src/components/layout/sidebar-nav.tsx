@@ -96,7 +96,7 @@ export function SidebarNav() {
                       asChild
                       size="default"
                       isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
-                      tooltip={link.label}
+                      tooltip={isDisabledBySubscription ? 'Upgrade to access this feature' : link.label}
                       aria-disabled={isDisabledBySubscription}
                       className={cn(
                         "h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold",
@@ -104,7 +104,7 @@ export function SidebarNav() {
                       )}
                     >
                       <Link
-                        href={link.href} 
+                        href={isDisabledBySubscription ? "#" : link.href}
                         className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")} 
                         onClick={(e) => { if (isDisabledBySubscription) e.preventDefault(); }}
                       >
@@ -116,16 +116,7 @@ export function SidebarNav() {
 
                   return (
                     <SidebarMenuItem key={link.href}>
-                      {(isDisabledBySubscription && sidebarState === 'expanded') ? (
-                        <Tooltip delayDuration={100}>
-                          <TooltipTrigger asChild>{menuItemContent}</TooltipTrigger>
-                          <TooltipContent side="right" align="start" className="ml-2">
-                            <p>Upgrade to access this feature.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      ) : (
-                        menuItemContent
-                      )}
+                      {menuItemContent}
                     </SidebarMenuItem>
                   );
                 })}

@@ -13,7 +13,11 @@
       "defaultBillNotes": "Thank you for your business!",
       "defaultSalesPaymentStatus": "paid",
       "defaultPurchasePaymentStatus": "paid",
-      "currency": "INR"
+      "currency": "INR",
+      "subscriptionType": "yearly",
+      "paymentStatus": "paid",
+      "subscriptionStartDate": "2024-01-01T00:00:00.000Z",
+      "subscriptionExpiryDate": "2099-12-31T23:59:59.000Z"
     },
     {
       "id": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7",
@@ -28,7 +32,11 @@
       "defaultBillNotes": "",
       "defaultSalesPaymentStatus": "paid",
       "defaultPurchasePaymentStatus": "unpaid",
-      "currency": "INR"
+      "currency": "INR",
+      "subscriptionType": "monthly",
+      "paymentStatus": "pending",
+      "subscriptionStartDate": null,
+      "subscriptionExpiryDate": null
     },
     {
       "id": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
@@ -43,7 +51,11 @@
       "defaultBillNotes": "Thank you for your business!",
       "defaultSalesPaymentStatus": "paid",
       "defaultPurchasePaymentStatus": "paid",
-      "currency": "INR"
+      "currency": "INR",
+      "subscriptionType": "yearly",
+      "paymentStatus": "paid",
+      "subscriptionStartDate": "2024-01-01T00:00:00.000Z",
+      "subscriptionExpiryDate": "2099-12-31T23:59:59.000Z"
     }
   ],
   "users": [
@@ -112,417 +124,11 @@
       "phone": "8525636523"
     }
   ],
-  "products": [
-    {
-      "id": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
-      "name": "gold",
-      "category": "",
-      "trackQuantity": false,
-      "sku": "GOLD-MAIN-SKU",
-      "expiryDate": "",
-      "imageUrl": "https://placehold.co/100x100.png?text=gold&font=roboto",
-      "description": "",
-      "variants": [
-        {
-          "id": "variant-39185bfe-e36a-4d40-9aea-46acb9e3e4cc-0",
-          "name": "Color",
-          "options": [
-            {
-              "id": "option-508374f2-64f8-40e2-b59a-f903d4846907-0-0",
-              "value": "White"
-            },
-            {
-              "id": "option-03202f94-0b2e-4ed3-af5f-559d21c39d16-0-1",
-              "value": "Black"
-            }
-          ]
-        },
-        {
-          "id": "variant-a352b8e4-c40b-4ce0-8259-52e73deb7af5-1",
-          "name": "Size",
-          "options": [
-            {
-              "id": "option-41ae3683-bcb9-47a5-bfac-2b6f8bbb186b-1-0",
-              "value": "M"
-            },
-            {
-              "id": "option-9d590fb7-b106-4e63-90cc-fbbae33d77d5-1-1",
-              "value": "L"
-            }
-          ]
-        }
-      ],
-      "productSKUs": [
-        {
-          "id": "992c81a1-f951-464d-b0b9-ce838836c08c",
-          "optionValues": {},
-          "skuIdentifier": "gold",
-          "stockLayers": [
-            {
-              "id": "f0c8b564-8c0c-41e8-9372-62b509a02096",
-              "purchaseBillId": "202506200435544_23c64e",
-              "purchaseDate": "2025-06-20T04:35:54.491Z",
-              "initialQuantity": 50,
-              "quantity": 0,
-              "costPrice": 10,
-              "sellPrice": 20,
-              "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06"
-            }
-          ]
-        }
-      ],
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
-      "sgstRate": 0,
-      "cgstRate": 0,
-      "additionalChargeDefinitions": [
-        {
-          "id": "98df3337-4856-479e-baa5-a6c2bb5f5750",
-          "name": "Packing",
-          "type": "fixed",
-          "value": 50
-        },
-        {
-          "id": "399bbb8d-36ea-4582-8368-855c26841a59",
-          "name": "delivery",
-          "type": "percentage",
-          "value": 20
-        }
-      ]
-    },
-    {
-      "name": "dan",
-      "category": "",
-      "trackQuantity": true,
-      "sku": "",
-      "expiryDate": "",
-      "description": "",
-      "variants": [],
-      "sgstRate": 9,
-      "cgstRate": 9,
-      "additionalChargeDefinitions": [],
-      "id": "c227e6d0-0bc8-40c5-907f-42c88136b303",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
-      "imageUrl": "https://placehold.co/100x100.png?text=dan&font=roboto",
-      "productSKUs": [
-        {
-          "id": "444dab2d-df94-443a-b87a-75d7442e01ce",
-          "optionValues": {},
-          "skuIdentifier": "dan",
-          "stockLayers": [
-            {
-              "id": "2520c73d-39e0-4ab9-a318-973a0cfe611e",
-              "purchaseBillId": "2506251",
-              "purchaseDate": "2025-06-25T04:20:51.740Z",
-              "initialQuantity": 20,
-              "quantity": 0,
-              "costPrice": 50,
-              "sellPrice": 150,
-              "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06"
-            }
-          ]
-        }
-      ]
-    }
-  ],
-  "bills": [
-    {
-      "id": "202506200435544_23c64e",
-      "type": "buy",
-      "date": "2025-06-20T04:35:54.491Z",
-      "timestamp": 1750394154491,
-      "vendorOrCustomerName": "Gold Supplier Inc.",
-      "customerPhone": null,
-      "items": [
-        {
-          "id": "056ace72-8e4d-406c-9b21-08ab96005401",
-          "productId": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
-          "productName": "gold",
-          "quantity": 50,
-          "costPrice": 10,
-          "sellPrice": 20,
-          "isDefective": false,
-          "selectedVariantOptions": {},
-          "sgstAmount": 0,
-          "cgstAmount": 0,
-          "isAdditionalCharge": false,
-          "sourceChargeDefinitionId": null
-        }
-      ],
-      "subTotal": 500,
-      "totalSGST": 0,
-      "totalCGST": 0,
-      "totalAmount": 500,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "billedByStaffId": "user_admin_44669c5a-6d65-4f1c-98ea-f875a54c6aee",
-      "billedByStaffName": "danie",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    },
-    {
-      "id": "202506200553424_e7182e",
-      "type": "sell",
-      "date": "2025-06-20T05:53:42.458Z",
-      "timestamp": 1750398822458,
-      "items": [
-        {
-          "id": "7dfb7daf-e78b-4ab2-bace-bb14992e61f1",
-          "productId": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
-          "productName": "gold",
-          "quantity": 20,
-          "costPrice": 10,
-          "sellPrice": 20,
-          "sgstAmount": 0,
-          "cgstAmount": 0,
-          "isAdditionalCharge": false
-        }
-      ],
-      "subTotal": 400,
-      "totalSGST": 0,
-      "totalCGST": 0,
-      "totalAmount": 400,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    },
-    {
-      "id": "202506200554125_2d16dc",
-      "type": "sell",
-      "date": "2025-06-20T05:54:12.507Z",
-      "timestamp": 1750398852507,
-      "items": [
-        {
-          "id": "a1490a73-22d9-44bd-b69a-574cdf066228",
-          "productId": "eceb122b-2f07-471d-b3b7-6382e1f5e010",
-          "productName": "gold",
-          "quantity": 30,
-          "costPrice": 10,
-          "sellPrice": 20,
-          "sgstAmount": 0,
-          "cgstAmount": 0,
-          "isAdditionalCharge": false
-        }
-      ],
-      "subTotal": 600,
-      "totalSGST": 0,
-      "totalCGST": 0,
-      "totalAmount": 600,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    },
-    {
-      "id": "2506251",
-      "type": "buy",
-      "date": "2025-06-25T04:20:51.740Z",
-      "timestamp": 1750825251740,
-      "items": [
-        {
-          "id": "f29618e8-bc66-467e-989a-c7ad0121bf1d",
-          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
-          "productName": "dan",
-          "quantity": 20,
-          "costPrice": 50,
-          "sellPrice": 150,
-          "sgstAmount": 90,
-          "cgstAmount": 90,
-          "isAdditionalCharge": false
-        }
-      ],
-      "subTotal": 1000,
-      "totalSGST": 90,
-      "totalCGST": 90,
-      "totalAmount": 1180,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    },
-    {
-      "id": "2506252",
-      "type": "sell",
-      "date": "2025-06-25T04:21:13.648Z",
-      "timestamp": 1750825273648,
-      "items": [
-        {
-          "id": "4944e606-984f-4a25-a16b-5ebf8561605d",
-          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
-          "productName": "dan",
-          "quantity": 10,
-          "costPrice": 50,
-          "sellPrice": 150,
-          "sgstAmount": 135,
-          "cgstAmount": 135,
-          "isAdditionalCharge": false
-        }
-      ],
-      "subTotal": 1500,
-      "totalSGST": 135,
-      "totalCGST": 135,
-      "totalAmount": 1770,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    },
-    {
-      "id": "2506253",
-      "type": "sell",
-      "date": "2025-06-25T04:21:24.156Z",
-      "timestamp": 1750825284156,
-      "items": [
-        {
-          "id": "335e534b-01d8-4b76-be54-8d57f2346a65",
-          "productId": "c227e6d0-0bc8-40c5-907f-42c88136b303",
-          "productName": "dan",
-          "quantity": 10,
-          "costPrice": 50,
-          "sellPrice": 150,
-          "sgstAmount": 135,
-          "cgstAmount": 135,
-          "isAdditionalCharge": false
-        }
-      ],
-      "subTotal": 1500,
-      "totalSGST": 135,
-      "totalCGST": 135,
-      "totalAmount": 1770,
-      "isEstimate": false,
-      "notes": "Thank you for your business!",
-      "paymentStatus": "paid",
-      "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "storeName": "gold",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f"
-    }
-  ],
-  "categories": [
-    {
-      "id": "cat_default_electronics",
-      "name": "Electronics",
-      "companyId": "comp_default_001"
-    },
-    {
-      "id": "cat_default_groceries",
-      "name": "Groceries",
-      "companyId": "comp_default_001"
-    },
-    {
-      "id": "cat_daniel_food",
-      "name": "Food Items",
-      "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7"
-    }
-  ],
+  "products": [],
+  "bills": [],
+  "categories": [],
   "customers": [],
   "staffs": [],
-  "stores": [
-    {
-      "id": "store_main_001",
-      "companyId": "comp_default_001",
-      "name": "Main Street Store",
-      "location": "123 Main St, Anytown",
-      "phone": "555-0101",
-      "email": "main@stockflow.app",
-      "passkey": "storePassMain",
-      "allowedStaffIds": [
-        "user_emp_001",
-        "user_emp_002"
-      ],
-      "allowedOperations": [
-        "sell",
-        "return",
-        "buy"
-      ]
-    },
-    {
-      "id": "store_branch_002",
-      "companyId": "comp_default_001",
-      "name": "Elm Avenue Branch",
-      "location": "456 Elm Ave, Anytown",
-      "phone": "555-0102",
-      "email": "elm@stockflow.app",
-      "passkey": "storePassElm",
-      "allowedStaffIds": [
-        "user_emp_001"
-      ],
-      "allowedOperations": [
-        "sell",
-        "return"
-      ]
-    },
-    {
-      "id": "store_3c37b782-0a30-4c48-b663-3cd6a8aa51fb",
-      "companyId": "comp_0c0dafbe-e3e7-428f-8fb6-67f5bbc162e7",
-      "name": "gold",
-      "location": "apelley",
-      "email": "asdasdsushi@shs.com",
-      "phone": "8606821125",
-      "passkey": "25252525",
-      "allowedStaffIds": [],
-      "allowedOperations": [
-        "sell",
-        "buy",
-        "return"
-      ]
-    },
-    {
-      "id": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-      "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
-      "name": "gold",
-      "location": "apelley",
-      "email": "asdf@gasdf.com",
-      "phone": "8606821125",
-      "passkey": "1111",
-      "allowedStaffIds": [],
-      "allowedOperations": [
-        "sell",
-        "buy",
-        "return"
-      ]
-    }
-  ],
-  "messagesByStore": {
-    "store_main_001": [
-      {
-        "id": "msg_1",
-        "storeId": "store_main_001",
-        "companyId": "comp_default_001",
-        "senderId": "admin",
-        "senderName": "Admin",
-        "text": "Welcome to the Main Street Store chat!",
-        "timestamp": 1678886400000
-      },
-      {
-        "id": "msg_2",
-        "storeId": "store_main_001",
-        "companyId": "comp_default_001",
-        "senderId": "store_main_001",
-        "senderName": "Main Street Store",
-        "text": "Hi Admin, good to be connected!",
-        "timestamp": 1678886460000
-      }
-    ],
-    "store_3a496249-a994-4f40-9271-7ec7051e2a06": [
-      {
-        "id": "msg_6e9953cd-a4a1-464e-aea3-2b5471a3b24d",
-        "storeId": "store_3a496249-a994-4f40-9271-7ec7051e2a06",
-        "companyId": "comp_98df66a0-bba9-49e2-8d70-6c3882ade01f",
-        "senderId": "admin",
-        "senderName": "Admin",
-        "text": "hello dan.",
-        "timestamp": 1750843839850
-      }
-    ]
-  }
+  "stores": [],
+  "messagesByStore": {}
 }

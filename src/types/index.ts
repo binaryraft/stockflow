@@ -98,6 +98,9 @@ export interface Category {
   companyId: string;
 }
 
+export type SubscriptionType = 'monthly' | 'yearly';
+export type PaymentStatus = 'pending' | 'paid';
+
 export interface Company {
   id: string;
   name: string;
@@ -112,6 +115,10 @@ export interface Company {
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
   currency?: string;
+  subscriptionType?: SubscriptionType;
+  paymentStatus?: PaymentStatus;
+  subscriptionStartDate?: string | null;
+  subscriptionExpiryDate?: string | null;
 }
 
 export interface User {
@@ -162,6 +169,8 @@ export interface UserProfile {
   defaultSalesPaymentStatus?: 'paid' | 'unpaid';
   defaultPurchasePaymentStatus?: 'paid' | 'unpaid';
   companyCurrency?: string;
+  paymentStatus?: PaymentStatus;
+  subscriptionExpiryDate?: string | null;
 }
 
 export interface ChatMessage {
@@ -288,7 +297,7 @@ export interface BalanceSheetSummary {
   retainedEarnings: number;
 }
 
-export type TimePeriod = 'daily' | 'weekly' | 'monthly';
+export type TimePeriod = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface ProductRevenueData {
   name: string;
