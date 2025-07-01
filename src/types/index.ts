@@ -117,6 +117,7 @@ export interface Company {
   currency?: string;
   subscriptionType?: SubscriptionType;
   paymentStatus?: PaymentStatus;
+  creationDate?: string;
   subscriptionStartDate?: string | null;
   subscriptionExpiryDate?: string | null;
 }

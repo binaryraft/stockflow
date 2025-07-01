@@ -64,7 +64,16 @@ export function CustomerList() {
             </tr>
           </thead>
           <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
-            {customers.map(({ company, admin }) => (
+            {customers.map(({ company, admin }) => {
+              const creationDate = company.creationDate ? parseISO(company.creationDate) : null;
+              let trialEndDate: Date | null = null;
+              if (creationDate) {
+                  trialEndDate = new Date(creationDate);
+                  trialEndDate.setDate(trialEndDate.getDate() + 7);
+              }
+              const isTrialActive = trialEndDate && new Date() < trialEndDate;
+
+              return (
               <tr key={company.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm font-medium text-gray-900 dark:text-white">{company.name}</div>
@@ -75,12 +84,28 @@ export function CustomerList() {
                   <div className="text-sm text-gray-500 capitalize">{company.subscriptionType}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <Badge className={cn(company.paymentStatus === 'paid' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')}>
-                    {company.paymentStatus}
-                  </Badge>
-                  <div className="text-xs text-gray-500 mt-1">
-                    Expires: {company.subscriptionExpiryDate ? format(parseISO(company.subscriptionExpiryDate), 'PP') : 'N/A'}
-                  </div>
+                    {company.paymentStatus === 'paid' ? (
+                        <>
+                            <Badge className="bg-green-100 text-green-800">Paid</Badge>
+                            <div className="text-xs text-gray-500 mt-1">
+                                Expires: {company.subscriptionExpiryDate ? format(parseISO(company.subscriptionExpiryDate), 'PP') : 'N/A'}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {isTrialActive ? (
+                                <Badge className="bg-blue-100 text-blue-800">7-Day Trial</Badge>
+                            ) : (
+                                <Badge className="bg-yellow-100 text-yellow-800">Payment Pending</Badge>
+                            )}
+                            <div className="text-xs text-gray-500 mt-1">
+                                {isTrialActive ? `Trial Ends: ${format(trialEndDate!, 'PP')}` : 'Trial Expired'}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">
+                                Signed up: {creationDate ? format(creationDate, 'PP') : 'N/A'}
+                            </div>
+                        </>
+                    )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   {company.paymentStatus === 'pending' ? (
@@ -97,7 +122,7 @@ export function CustomerList() {
                   )}
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>

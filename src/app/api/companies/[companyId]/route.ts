@@ -59,7 +59,7 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
       return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
     }
 
-    const { id, token, ...updateableData } = companyDataToUpdate;
+    const { id, token, creationDate, ...updateableData } = companyDataToUpdate;
 
     if (updateableData.name !== undefined && (typeof updateableData.name !== 'string' || updateableData.name.trim() === '')) {
         console.warn(`${routeNamePrefix} Company name cannot be empty if provided for update.`);

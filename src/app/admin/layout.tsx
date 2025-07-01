@@ -51,12 +51,30 @@ export default function AdminLayout({
         const companyProfile = await fetchCompanyProfile(companyId);
         
         if (companyProfile) {
-          if (companyProfile.paymentStatus === 'pending') {
-            setBlockReason('pending');
-          } else if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
-            setBlockReason('expired');
+          if (companyProfile.paymentStatus === 'paid') {
+            if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
+              setBlockReason('expired');
+            } else {
+              setBlockReason(null);
+            }
+          } else if (companyProfile.paymentStatus === 'pending') {
+            if (companyProfile.creationDate) {
+              const creationDate = new Date(companyProfile.creationDate);
+              const trialEndDate = new Date(creationDate);
+              trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
+
+              if (new Date() < trialEndDate) {
+                setBlockReason(null); // Still in trial period
+              } else {
+                setBlockReason('pending'); // Trial expired, payment pending
+              }
+            } else {
+              // Legacy user with no creation date, default to payment pending
+              setBlockReason('pending');
+            }
           } else {
-            setBlockReason(null);
+            // Unrecognized payment status, block for safety
+            setBlockReason('expired');
           }
         } else {
           // If profile fails to load, maybe default to blocked or redirect

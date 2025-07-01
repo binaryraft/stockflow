@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
       currency: DEFAULT_CURRENCY_CODE,
       subscriptionType: subscriptionType as SubscriptionType,
       paymentStatus: 'pending',
+      creationDate: new Date().toISOString(),
       subscriptionStartDate: null,
       subscriptionExpiryDate: null,
     };
