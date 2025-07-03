@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import {v4 as uuidv4} from 'uuid';
 
 const BillItemSchema = z.object({
