@@ -34,6 +34,7 @@ export type BillExtractOutput = z.infer<typeof BillExtractOutputSchema>;
 const extractBillItemsPrompt = ai.definePrompt(
   {
     name: 'extractBillItemsPrompt',
+    model: 'googleai/gemini-2.0-flash',
     input: { schema: BillExtractInputSchema },
     output: { schema: BillExtractOutputSchema },
     prompt: `You are an expert data extraction agent specializing in reading invoices and bills. Your task is to analyze the provided image of a bill and extract all line items into a structured JSON format.
