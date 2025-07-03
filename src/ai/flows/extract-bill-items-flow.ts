@@ -10,10 +10,8 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-import {v4 as uuidv4} from 'uuid';
 
 const BillItemSchema = z.object({
-  id: z.string().default(() => uuidv4()),
   productName: z.string().describe("The full name of the product or service, including any variants (e.g., 'T-Shirt - Red, Medium')."),
   quantity: z.number().describe("The quantity of the item purchased."),
   price: z.number().describe("The price PER UNIT of the item."),
