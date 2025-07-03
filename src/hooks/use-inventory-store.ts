@@ -279,7 +279,7 @@ export const useInventoryStore = create<InventoryState>()(
         }));
       },
       
-      getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => { 
+      getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }): ProductLedgerEntry[] => {
         const { companyId, startDate, endDate } = params || {};
         let productsToConsider = get().products.filter(p => !p.isArchived);
         let billsToConsider = get().bills; 
@@ -923,15 +923,21 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       fetchCompanyProfile: async (companyId: string): Promise<Company | null> => {
-        if (!companyId) { console.warn("fetchCompanyProfile: companyId is required"); set({userProfile: defaultUserProfile}); return null; }
+        if (!companyId) {
+          console.warn("fetchCompanyProfile: companyId is required");
+          set({ userProfile: { ...defaultUserProfile, dataMode: 'local' } });
+          return null;
+        }
         try {
           const response = await fetch(`/api/companies/${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch company profile: ${response.statusText}`);
           const result = await response.json();
           if (result.success && result.data) {
             const companyData = result.data as Company;
-            set((state) => ({ userProfile: {
-                ...state.userProfile, // preserve existing state like dataMode
+            // Update the userProfile in the store with the latest fetched data
+            set((state) => ({ 
+              userProfile: {
+                ...state.userProfile,
                 companyName: companyData.name,
                 companyLogoUrl: companyData.logoUrl,
                 companySlogan: companyData.slogan,
@@ -943,17 +949,19 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus,
                 defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
                 companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE,
+                paymentStatus: companyData.paymentStatus,
+                subscriptionExpiryDate: companyData.subscriptionExpiryDate,
                 dataMode: 'global',
-            }}));
-            return companyData;
-          } else { 
-            console.error("Failed to fetch company profile or data format incorrect:", result.message); 
-            set({userProfile: {...defaultUserProfile, dataMode: 'local'} }); 
-            return null;
+              }
+            }));
+            return companyData; // Return the full company data as before
+          } else {
+            throw new Error(result.message || "API returned success: false but no message.");
           }
-        } catch (error) { 
-          console.error("Error fetching company profile:", error); 
-          set({userProfile: {...defaultUserProfile, dataMode: 'local'} }); 
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+          console.error("Critical error in fetchCompanyProfile:", errorMessage);
+          set({ userProfile: { ...defaultUserProfile, dataMode: 'local' } });
           return null;
         }
       },
@@ -1500,3 +1508,5 @@ if (typeof window !== 'undefined') {
       console.warn("No companyId found in localStorage. Initial data fetch skipped. User may need to login/signup.");
   }
 }
+
+    

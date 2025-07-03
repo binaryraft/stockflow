@@ -1,14 +1,14 @@
-
 "use client";
 
 import { AppShell } from '@/components/layout/app-shell';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { AppBlocker } from '@/components/layout/AppBlocker';
 import type { PaymentStatus } from '@/types';
+import { useToast } from '@/hooks/use-toast';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -21,7 +21,8 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { fetchCompanyProfile, userProfile } = useInventoryStore();
+  const { fetchCompanyProfile } = useInventoryStore();
+  const { toast } = useToast();
 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -37,6 +38,30 @@ export default function AdminLayout({
     }
   }, []);
 
+  const handleLogout = useCallback((reason: 'auth' | 'fetch_error') => {
+    if (reason === 'fetch_error') {
+      toast({
+        variant: "destructive",
+        title: "Session Error",
+        description: "Could not load company profile. Logging out for security.",
+      });
+    }
+    // Full logout logic
+    localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('companyId');
+    localStorage.removeItem('assignedStoreIds');
+    Object.keys(sessionStorage).forEach(key => {
+      if (key.startsWith('authenticatedStore_') || key === 'lastAuthenticatedStoreId') {
+        sessionStorage.removeItem(key);
+      }
+    });
+    router.replace('/');
+  }, [router, toast]);
+
+
   useEffect(() => {
     if (!hasMounted) return;
 
@@ -47,10 +72,10 @@ export default function AdminLayout({
       const companyId = localStorage.getItem('companyId');
 
       if (token && userRole === ADMIN_ROLE && companyId) {
-        setIsAuthenticated(true);
         const companyProfile = await fetchCompanyProfile(companyId);
         
         if (companyProfile) {
+          setIsAuthenticated(true); // Set authenticated only if profile fetch succeeds
           if (companyProfile.paymentStatus === 'paid') {
             if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
               setBlockReason('expired');
@@ -69,39 +94,25 @@ export default function AdminLayout({
                 setBlockReason('pending'); // Trial expired, payment pending
               }
             } else {
-              // Legacy user with no creation date, default to payment pending
               setBlockReason('pending');
             }
           } else {
-            // Unrecognized payment status, block for safety
             setBlockReason('expired');
           }
         } else {
-          // If profile fails to load, maybe default to blocked or redirect
-          console.error("AdminLayout: Failed to fetch company profile for auth check.");
-          setBlockReason('expired'); // Block if we can't verify subscription
+          console.error("AdminLayout: Failed to fetch company profile for auth check. Logging out.");
+          setIsAuthenticated(false);
+          handleLogout('fetch_error');
         }
       } else {
         setIsAuthenticated(false);
-        // Clear all session/local storage on logout/auth failure
-        localStorage.removeItem(SHARED_AUTH_TOKEN_KEY);
-        localStorage.removeItem('userId');
-        localStorage.removeItem('userName');
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('companyId');
-        localStorage.removeItem('assignedStoreIds');
-        Object.keys(sessionStorage).forEach(key => {
-          if (key.startsWith('authenticatedStore_') || key === 'lastAuthenticatedStoreId') {
-            sessionStorage.removeItem(key);
-          }
-        });
-        router.replace('/');
+        handleLogout('auth');
       }
       setIsLoadingAuth(false);
     };
 
     checkAuthAndSubscription();
-  }, [router, hasMounted, fetchCompanyProfile, pathname]);
+  }, [router, hasMounted, fetchCompanyProfile, pathname, handleLogout]);
 
 
   const loadingScreen = (message: string) => (
@@ -127,7 +138,7 @@ export default function AdminLayout({
   }
 
   if (!isAuthenticated) {
-    return null; // Redirect is handled in useEffect
+    return null; // Redirect is handled in useEffect via handleLogout
   }
   
   if (blockReason) {
