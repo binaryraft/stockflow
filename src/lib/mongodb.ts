@@ -6,10 +6,6 @@ dotenv.config();
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB_NAME = process.env.MONGODB_DB_NAME || 'stockflow';
 
-if (!MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env');
-}
-
 /**
  * Global is used here to maintain a cached connection across hot reloads
  * in development. This is not user-facing code.
@@ -21,6 +17,10 @@ if (!cached) {
 }
 
 export async function connectToDatabase(): Promise<{ db: Db }> {
+  if (!MONGODB_URI) {
+    throw new Error('Please define the MONGODB_URI environment variable inside .env');
+  }
+
   if (cached.conn) {
     return cached.conn;
   }
