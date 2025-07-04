@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { AppBlocker } from '@/components/layout/AppBlocker';
+import { CompanyRecoveryDialog } from '@/components/auth/CompanyRecoveryDialog';
 import type { PaymentStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -28,6 +29,7 @@ export default function AdminLayout({
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [blockReason, setBlockReason] = useState<'pending' | 'expired' | null>(null);
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -61,59 +63,58 @@ export default function AdminLayout({
     router.replace('/');
   }, [router, toast]);
 
+  const checkAuthAndSubscription = useCallback(async () => {
+    setIsLoadingAuth(true);
+    setShowRecoveryDialog(false);
+    const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+    const userRole = localStorage.getItem('userRole');
+    const companyId = localStorage.getItem('companyId');
 
-  useEffect(() => {
-    if (!hasMounted) return;
+    if (token && userRole === ADMIN_ROLE && companyId) {
+      const companyProfile = await fetchCompanyProfile(companyId);
+      
+      if (companyProfile) {
+        setIsAuthenticated(true);
+        if (companyProfile.paymentStatus === 'paid') {
+          if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
+            setBlockReason('expired');
+          } else {
+            setBlockReason(null);
+          }
+        } else if (companyProfile.paymentStatus === 'pending') {
+          if (companyProfile.creationDate) {
+            const creationDate = new Date(companyProfile.creationDate);
+            const trialEndDate = new Date(creationDate);
+            trialEndDate.setDate(trialEndDate.getDate() + 7);
 
-    const checkAuthAndSubscription = async () => {
-      setIsLoadingAuth(true);
-      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
-      const userRole = localStorage.getItem('userRole');
-      const companyId = localStorage.getItem('companyId');
-
-      if (token && userRole === ADMIN_ROLE && companyId) {
-        const companyProfile = await fetchCompanyProfile(companyId);
-        
-        if (companyProfile) {
-          setIsAuthenticated(true); // Set authenticated only if profile fetch succeeds
-          if (companyProfile.paymentStatus === 'paid') {
-            if (companyProfile.subscriptionExpiryDate && new Date(companyProfile.subscriptionExpiryDate) < new Date()) {
-              setBlockReason('expired');
-            } else {
+            if (new Date() < trialEndDate) {
               setBlockReason(null);
-            }
-          } else if (companyProfile.paymentStatus === 'pending') {
-            if (companyProfile.creationDate) {
-              const creationDate = new Date(companyProfile.creationDate);
-              const trialEndDate = new Date(creationDate);
-              trialEndDate.setDate(trialEndDate.getDate() + 7); // 7-day trial
-
-              if (new Date() < trialEndDate) {
-                setBlockReason(null); // Still in trial period
-              } else {
-                setBlockReason('pending'); // Trial expired, payment pending
-              }
             } else {
               setBlockReason('pending');
             }
           } else {
-            setBlockReason('expired');
+            setBlockReason('pending');
           }
         } else {
-          console.error("AdminLayout: Failed to fetch company profile for auth check. Logging out.");
-          setIsAuthenticated(false);
-          handleLogout('fetch_error');
+          setBlockReason('expired');
         }
       } else {
+        console.error("AdminLayout: Failed to fetch company profile for auth check. Showing recovery dialog.");
         setIsAuthenticated(false);
-        handleLogout('auth');
+        setShowRecoveryDialog(true);
       }
-      setIsLoadingAuth(false);
-    };
+    } else {
+      setIsAuthenticated(false);
+      handleLogout('auth');
+    }
+    setIsLoadingAuth(false);
+  }, [fetchCompanyProfile, handleLogout]);
 
-    checkAuthAndSubscription();
-  }, [router, hasMounted, fetchCompanyProfile, pathname, handleLogout]);
-
+  useEffect(() => {
+    if (hasMounted) {
+      checkAuthAndSubscription();
+    }
+  }, [hasMounted, checkAuthAndSubscription]);
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
@@ -132,17 +133,21 @@ export default function AdminLayout({
   if (!hasMounted) {
     return loadingScreen("Initializing Admin Portal...");
   }
+  
+  if (showRecoveryDialog) {
+    return <CompanyRecoveryDialog isOpen={true} onOpenChange={setShowRecoveryDialog} onSuccess={checkAuthAndSubscription} />;
+  }
 
   if (isLoadingAuth) {
     return loadingScreen("Checking authentication & subscription...");
   }
-
-  if (!isAuthenticated) {
-    return null; // Redirect is handled in useEffect via handleLogout
-  }
   
   if (blockReason) {
     return <AppBlocker reason={blockReason} />;
+  }
+
+  if (!isAuthenticated && !showRecoveryDialog) {
+     return null;
   }
 
   return <AppShell>{children}</AppShell>;
