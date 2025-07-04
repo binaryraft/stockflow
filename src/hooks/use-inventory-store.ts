@@ -115,7 +115,7 @@ interface InventoryState {
   getPeriodFinancialSummary: (period: TimePeriod, companyId?: string) => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number, period: TimePeriod, companyId?: string) => ProductRevenueData[];
   getProductAnalytics: (productId: string) => ProductAnalytics;
-  getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
+  getProductLedgerSummary: (params: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
   getProductFinancialsByMonth: (productId: string) => MonthlyProductFinancials[];
   getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => DateRangeReportSummary;
   getSalesBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
@@ -133,6 +133,8 @@ const defaultUserProfile: UserProfile = {
   defaultSalesPaymentStatus: 'paid', defaultPurchasePaymentStatus: 'paid',
   companyCurrency: DEFAULT_CURRENCY_CODE,
   dataMode: 'local', 
+  paymentStatus: 'pending',
+  subscriptionExpiryDate: null,
 };
 // #endregion
 
@@ -1056,6 +1058,9 @@ export const useInventoryStore = create<InventoryState>()(
     {
       name: 'stockflow-app-storage',
       storage: createJSONStorage(() => localStorage),
+      version: 2, // Increment version to discard old state
     }
   )
 );
+
+    
