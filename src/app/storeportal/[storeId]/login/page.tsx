@@ -1,46 +1,40 @@
 
-"use client";
+// This file is deprecated. New path is /storeportal.
+// This component performs a server-side redirect to the unified login page,
+// passing the storeId as a query parameter.
 
-import { useEffect } from 'react';
-import { useRouter, useParams, useSearchParams as useNextSearchParams } from 'next/navigation';
-import { APP_NAME } from '@/lib/constants';
-import Image from 'next/image';
-import { Loader2 } from 'lucide-react';
+import { redirect } from 'next/navigation';
+import type { Metadata } from 'next';
 
-export default function DeprecatedStoreSpecificLoginPage() {
-  const router = useRouter();
-  const params = useParams();
-  const nextSearchParams = useNextSearchParams();
-  const storeId = params.storeId as string;
+export const metadata: Metadata = {
+  title: 'Redirecting...',
+};
 
-  useEffect(() => {
-    const newUrl = new URL('/storeportal', window.location.origin);
-    if (storeId) {
-      newUrl.searchParams.set('storeId', storeId);
+export default function DeprecatedStoreSpecificLoginPage({
+  params,
+  searchParams,
+}: {
+  params: { storeId: string };
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const { storeId } = params;
+  
+  // Construct a new URLSearchParams object to preserve existing query params and add new ones.
+  const newSearchParams = new URLSearchParams();
+
+  // Add storeId to the new search params
+  if (storeId) {
+    newSearchParams.set('storeId', storeId);
+  }
+
+  // Preserve other query params like companyId if they exist
+  for (const key in searchParams) {
+    const value = searchParams[key];
+    if (value && key !== 'storeId') { // Avoid duplicating storeId if it's somehow in searchParams
+      newSearchParams.set(key, Array.isArray(value) ? value[0] : value);
     }
-    // Preserve other query params if needed, e.g., companyId if it was ever passed here
-    const companyId = nextSearchParams.get('companyId');
-    if (companyId) {
-        newUrl.searchParams.set('companyId', companyId);
-    }
-    
-    router.replace(newUrl.toString());
-  }, [router, storeId, nextSearchParams]);
+  }
 
-  return (
-    <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
-      <Image
-        src="https://placehold.co/128x128.png"
-        alt={`${APP_NAME} Logo`}
-        width={64}
-        height={64}
-        className="mb-3 rounded-lg shadow-md animate-pulse"
-        data-ai-hint="logo company"
-      />
-      <div className="flex items-center gap-2 text-lg text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <span>Redirecting to Store Login...</span>
-      </div>
-    </div>
-  );
+  // Perform the redirect to the unified store portal login page
+  redirect(`/storeportal?${newSearchParams.toString()}`);
 }
