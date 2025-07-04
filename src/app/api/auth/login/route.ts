@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { readDB } from '@/lib/db-access';
+import { connectToDatabase } from '@/lib/mongodb';
 import type { User, Store } from '@/types';
 import bcrypt from 'bcryptjs';
 
@@ -10,6 +10,7 @@ const routeNamePrefix = "[API_AUTH_LOGIN /api/auth/login]";
 export async function POST(req: NextRequest) {
   console.log(`${routeNamePrefix} Received login request.`);
   try {
+    const { db } = await connectToDatabase();
     const body = await req.json();
     const { loginType, email, password, employeeId, companyId, storeId, storePasskey } = body;
 
@@ -18,16 +19,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Login type is required.' }, { status: 400 });
     }
 
-    const db = await readDB();
-    let authenticatedUser: User | undefined = undefined;
-    let authenticatedStore: Store | undefined = undefined;
+    let authenticatedUser: User | null = null;
+    let authenticatedStore: Store | null = null;
 
     if (loginType === 'admin') {
       if (!email || !password) {
         console.warn(`${routeNamePrefix} Email and password are required for admin login.`);
         return NextResponse.json({ success: false, message: 'Email and password are required for admin login.' }, { status: 400 });
       }
-      const userToVerify = db.users.find(u => u.role === 'admin' && u.email?.toLowerCase() === email.toLowerCase());
+      const userToVerify = await db.collection<User>('users').findOne({ role: 'admin', email: email.toLowerCase() });
       if (userToVerify) {
         console.log(`${routeNamePrefix} Admin user found by email: ${email}. Attempting password verification.`);
         if (userToVerify.password && bcrypt.compareSync(password, userToVerify.password)) {
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
         console.warn(`${routeNamePrefix} Employee ID, password, and company context are required for employee login.`);
         return NextResponse.json({ success: false, message: 'Employee ID, password, and company context are required for employee login.' }, { status: 400 });
       }
-      const userToVerify = db.users.find(u => u.role === 'employee' && u.employeeId === employeeId && u.companyId === companyId);
+      const userToVerify = await db.collection<User>('users').findOne({ role: 'employee', employeeId: employeeId, companyId: companyId });
       if (userToVerify) {
         console.log(`${routeNamePrefix} Employee found: ID ${employeeId} for company ${companyId}. Attempting password verification.`);
         if (userToVerify.password && bcrypt.compareSync(password, userToVerify.password)) {
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
         console.warn(`${routeNamePrefix} Company ID, Store ID, and Store Passkey are required for store terminal login.`);
         return NextResponse.json({ success: false, message: 'Company ID, Store ID, and Store Passkey are required for store terminal login.' }, { status: 400 });
       }
-      authenticatedStore = db.stores.find(s => s.companyId === companyId && s.id === storeId && s.passkey === storePasskey);
+      authenticatedStore = await db.collection<Store>('stores').findOne({ companyId: companyId, id: storeId, passkey: storePasskey });
       if (authenticatedStore) {
         console.log(`${routeNamePrefix} Store terminal ${storeId} for company ${companyId} authenticated successfully.`);
         return NextResponse.json({

@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { readDB, writeDB } from '@/lib/db-access';
+import { connectToDatabase } from '@/lib/mongodb';
 import type { User, Company, SubscriptionType } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SUBSCRIPTION_PLAN_IDS, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
@@ -13,6 +13,7 @@ const routeNamePrefix = "[API_AUTH_SIGNUP /api/auth/signup]";
 export async function POST(req: NextRequest) {
   console.log(`${routeNamePrefix} Received signup request.`);
   try {
+    const { db } = await connectToDatabase();
     const body = await req.json();
     const { companyName, adminName, email, password, planId, subscriptionType } = body;
 
@@ -29,9 +30,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Please enter a valid email address.' }, { status: 400 });
     }
 
-    const db = await readDB();
-
-    const existingAdmin = db.users.find(u => u.email?.toLowerCase() === email.toLowerCase() && u.role === 'admin');
+    const existingAdmin = await db.collection<User>('users').findOne({ email: email.toLowerCase(), role: 'admin' });
     if (existingAdmin) {
       console.warn(`${routeNamePrefix} Signup attempt with existing admin email: ${email}.`);
       return NextResponse.json({ success: false, message: 'An admin account with this email already exists.' }, { status: 409 });
@@ -58,7 +57,7 @@ export async function POST(req: NextRequest) {
       subscriptionStartDate: null,
       subscriptionExpiryDate: null,
     };
-    db.companies.push(newCompany);
+    await db.collection<Company>('companies').insertOne(newCompany);
     console.log(`${routeNamePrefix} New company created: ${newCompany.name} (ID: ${newCompanyId}). Payment status: PENDING.`);
 
     const hashedPassword = bcrypt.hashSync(password, SALT_ROUNDS);
@@ -70,11 +69,8 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       role: 'admin',
     };
-    db.users.push(newAdminUser);
+    await db.collection<User>('users').insertOne(newAdminUser);
     console.log(`${routeNamePrefix} New admin user created: ${newAdminUser.name} (Email: ${newAdminUser.email}) for company ${newCompanyId}.`);
-
-    await writeDB(db);
-    console.log(`${routeNamePrefix} Database updated successfully with new company and admin user.`);
     
     const { password: _, ...userWithoutPassword } = newAdminUser;
 

@@ -1,13 +1,20 @@
 
 'use server';
 
-import { readDB, writeDB } from '@/lib/db-access';
+import { connectToDatabase } from '@/lib/mongodb';
 import type { Company, SubscriptionType, User } from '@/types';
-import { add, sub } from 'date-fns';
+import { add } from 'date-fns';
+import dotenv from 'dotenv';
 
-const HANDLER_PASSWORD = 'admin1212';
+dotenv.config();
+
+const HANDLER_PASSWORD = process.env.HANDLER_PASSWORD;
 
 export async function verifyPassword(password: string): Promise<{ success: boolean; error?: string }> {
+  if (!HANDLER_PASSWORD) {
+    console.error("HANDLER_PASSWORD environment variable is not set.");
+    return { success: false, error: 'Server configuration error.' };
+  }
   if (password === HANDLER_PASSWORD) {
     return { success: true };
   }
@@ -15,42 +22,47 @@ export async function verifyPassword(password: string): Promise<{ success: boole
 }
 
 export async function getCustomers(): Promise<{ company: Company; admin: User | null }[]> {
-  const db = await readDB();
-  return db.companies.map(company => {
-    const admin = db.users.find(u => u.companyId === company.id && u.role === 'admin') || null;
+  const { db } = await connectToDatabase();
+  const companies = await db.collection<Company>('companies').find().sort({ paymentStatus: 1, name: 1 }).toArray();
+  
+  const results = await Promise.all(companies.map(async (company) => {
+    const admin = await db.collection<User>('users').findOne({ companyId: company.id, role: 'admin' });
     return { company, admin };
-  }).sort((a,b) => (a.company.paymentStatus === 'pending' ? -1 : 1)); // Show pending first
+  }));
+
+  return results;
 }
 
 export async function markAsPaid(companyId: string, subscriptionType: SubscriptionType): Promise<{ success: boolean; error?: string }> {
-  const db = await readDB();
-  const companyIndex = db.companies.findIndex(c => c.id === companyId);
-
-  if (companyIndex === -1) {
-    return { success: false, error: 'Company not found.' };
-  }
-
-  const company = db.companies[companyIndex];
-  const now = new Date();
-  
-  const expiryDate = subscriptionType === 'yearly'
-    ? add(now, { years: 1 })
-    : add(now, { months: 1 });
-  
-  // To be safe, set expiry to the end of the day
-  expiryDate.setHours(23, 59, 59, 999);
-
-  company.paymentStatus = 'paid';
-  company.subscriptionStartDate = now.toISOString();
-  company.subscriptionExpiryDate = expiryDate.toISOString();
-
-  db.companies[companyIndex] = company;
-
   try {
-    await writeDB(db);
+    const { db } = await connectToDatabase();
+    const now = new Date();
+    
+    const expiryDate = subscriptionType === 'yearly'
+      ? add(now, { years: 1 })
+      : add(now, { months: 1 });
+    
+    expiryDate.setHours(23, 59, 59, 999);
+
+    const result = await db.collection<Company>('companies').updateOne(
+      { id: companyId },
+      { 
+        $set: { 
+          paymentStatus: 'paid',
+          subscriptionStartDate: now.toISOString(),
+          subscriptionExpiryDate: expiryDate.toISOString(),
+        } 
+      }
+    );
+
+    if (result.matchedCount === 0) {
+      return { success: false, error: 'Company not found.' };
+    }
+
     return { success: true };
   } catch (e) {
-    console.error("Failed to write DB in markAsPaid:", e);
-    return { success: false, error: 'Failed to save update to database.' };
+    console.error("Failed to update company in markAsPaid:", e);
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return { success: false, error: `Failed to save update to database: ${message}` };
   }
 }
