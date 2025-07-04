@@ -136,21 +136,23 @@ const defaultUserProfile: UserProfile = {
   paymentStatus: 'pending',
   subscriptionExpiryDate: null,
 };
+
+const storeInitialState = {
+  products: [],
+  bills: [],
+  categories: [],
+  customers: [],
+  staffs: [],
+  stores: [],
+  userProfile: { ...defaultUserProfile },
+  messagesByStore: {},
+};
 // #endregion
 
 export const useInventoryStore = create<InventoryState>()(
   persist(
     (set, get) => ({
-      // #region State Properties
-      products: [],
-      bills: [],
-      categories: [],
-      customers: [],
-      staffs: [],
-      stores: [],
-      userProfile: { ...defaultUserProfile },
-      messagesByStore: {},
-      // #endregion
+      ...storeInitialState,
 
       // #region API-Driven Actions
       // --- Product Actions ---
@@ -1058,9 +1060,16 @@ export const useInventoryStore = create<InventoryState>()(
     {
       name: 'stockflow-app-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 2, // Increment version to discard old state
+      version: 3, // Incremented version to handle state changes
+      migrate: (persistedState: unknown, version: number) => {
+        if (version < 3) {
+          // If the stored version is old, discard it and return the initial state.
+          // This will prevent any migration errors for users with an outdated storage format.
+          console.warn("Zustand store version mismatch. Discarding old state.");
+          return storeInitialState;
+        }
+        return persistedState as InventoryState;
+      },
     }
   )
 );
-
-    
