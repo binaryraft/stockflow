@@ -39,7 +39,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Step 2 state
-  const [selectedPlanId, setSelectedPlanId] = useState<string>(SUBSCRIPTION_PLAN_IDS.STARTER);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>(SUBSCRIPTION_PLAN_IDS.GROWTH);
   const [subscriptionType, setSubscriptionType] = useState<SubscriptionType>('monthly');
 
   const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1 && p.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY);
@@ -141,38 +141,79 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   );
 
   const renderStep2 = () => (
-    <Card className="w-full max-w-2xl shadow-xl border-t-4 border-t-primary">
+    <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-primary">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Choose Your Plan (2/2)</CardTitle>
         <CardDescription>Select a plan and billing cycle to get started.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {plansToShow.map(plan => (
-            <div key={plan.id} onClick={() => setSelectedPlanId(plan.id)}
-              className={cn("p-4 border-2 rounded-lg cursor-pointer transition-all", selectedPlanId === plan.id ? 'border-primary ring-2 ring-primary/50 bg-primary/5' : 'border-border hover:border-primary/50')}>
-              <div className="flex justify-between items-center">
-                <h3 className="font-bold text-lg">{plan.name}</h3>
-                {selectedPlanId === plan.id && <CheckCircle className="h-5 w-5 text-primary" />}
-              </div>
-              <p className="text-2xl font-bold mt-2">₹{plan.price}<span className="text-sm font-normal text-muted-foreground">{plan.priceSuffix}</span></p>
-              <ul className="text-xs text-muted-foreground space-y-1 mt-3">
-                {plan.features.map(f => <li key={f} className="flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-green-500" /> {f}</li>)}
-              </ul>
-            </div>
-          ))}
-        </div>
-        <RadioGroup value={subscriptionType} onValueChange={(v) => setSubscriptionType(v as SubscriptionType)} className="flex items-center justify-center gap-4 pt-4">
-          <Label htmlFor="monthly-cycle" className={cn("p-3 border rounded-md flex items-center gap-2 cursor-pointer transition-all", subscriptionType === 'monthly' && 'border-primary bg-primary/5')}>
-            <RadioGroupItem value="monthly" id="monthly-cycle" /> <Calendar className="h-4 w-4 mr-1"/> Monthly
-          </Label>
-          <Label htmlFor="yearly-cycle" className={cn("p-3 border rounded-md flex items-center gap-2 cursor-pointer transition-all", subscriptionType === 'yearly' && 'border-primary bg-primary/5')}>
-            <RadioGroupItem value="yearly" id="yearly-cycle" /> <Calendar className="h-4 w-4 mr-1"/> Yearly (2 months free)
-          </Label>
+        <RadioGroup
+          value={selectedPlanId}
+          onValueChange={setSelectedPlanId}
+          className="grid grid-cols-1 gap-4"
+        >
+          {plansToShow.map(plan => {
+            const isSelected = selectedPlanId === plan.id;
+            return (
+              <Label
+                key={plan.id}
+                htmlFor={plan.id}
+                className={cn(
+                  "flex flex-col md:flex-row items-start md:items-center gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all",
+                  isSelected
+                    ? "border-primary bg-primary/5 shadow-md"
+                    : "border-border hover:border-muted-foreground/50"
+                )}
+              >
+                <RadioGroupItem value={plan.id} id={plan.id} className="h-5 w-5 mt-1 md:mt-0" />
+                <div className="flex-1">
+                  <div className="flex flex-col md:flex-row justify-between md:items-center">
+                    <h3 className="font-bold text-lg text-foreground">{plan.name}</h3>
+                    <p className="text-lg font-bold text-primary">
+                      ₹{plan.price}
+                      <span className="text-sm font-normal text-muted-foreground">{plan.priceSuffix}</span>
+                    </p>
+                  </div>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {
+                      plan.id === SUBSCRIPTION_PLAN_IDS.STARTER ? "Perfect for new businesses getting started." :
+                      plan.id === SUBSCRIPTION_PLAN_IDS.GROWTH ? "Ideal for growing businesses needing more capacity." :
+                      "For established businesses scaling operations."
+                    }
+                  </p>
+                </div>
+              </Label>
+            )
+          })}
         </RadioGroup>
+
+        <div className="pt-4 border-t">
+          <Label className="font-semibold text-center block mb-3">Select Billing Cycle</Label>
+          <RadioGroup 
+            value={subscriptionType} 
+            onValueChange={(v) => setSubscriptionType(v as SubscriptionType)} 
+            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+          >
+            <Label htmlFor="monthly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'monthly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
+              <RadioGroupItem value="monthly" id="monthly-cycle" />
+              <div className="flex flex-col items-center">
+                <span className="font-medium">Monthly</span>
+                <span className="text-xs text-muted-foreground">Billed every month</span>
+              </div>
+            </Label>
+            <Label htmlFor="yearly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'yearly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
+              <RadioGroupItem value="yearly" id="yearly-cycle" />
+              <div className="flex flex-col items-center">
+                 <span className="font-medium">Yearly</span>
+                 <span className="text-xs text-primary">Save 15%</span>
+              </div>
+            </Label>
+          </RadioGroup>
+        </div>
+        
         <div className="text-center p-3 bg-tertiary rounded-md text-sm text-tertiary-foreground">
           <p className="font-semibold">Manual Payment Process</p>
-          <p className="text-xs">After registration, your account will be pending. Our team will contact you to complete the payment. Your account will be activated upon confirmation.</p>
+          <p className="text-xs">After registration, your account is pending. Our team will contact you to complete the payment.</p>
         </div>
       </CardContent>
       <CardFooter className="flex justify-between">
@@ -208,3 +249,4 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
     </div>
   );
 }
+
