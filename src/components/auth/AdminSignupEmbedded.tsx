@@ -43,7 +43,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   const [selectedPlanId, setSelectedPlanId] = useState<string>(SUBSCRIPTION_PLAN_IDS.GROWTH);
   const [subscriptionType, setSubscriptionType] = useState<SubscriptionType>('monthly');
 
-  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1 && p.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY);
+  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1);
 
   useEffect(() => {
     setHasMounted(true);
@@ -180,6 +180,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                                     </div>
                                     <p className="text-sm text-muted-foreground mt-1">
                                         {
+                                            plan.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY ? "For single users needing core billing and inventory, without staff/store features." :
                                             plan.id === SUBSCRIPTION_PLAN_IDS.STARTER ? "Perfect for new businesses getting started." :
                                             plan.id === SUBSCRIPTION_PLAN_IDS.GROWTH ? "Ideal for growing businesses needing more capacity." :
                                             "For established businesses scaling operations."

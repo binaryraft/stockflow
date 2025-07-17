@@ -1,3 +1,4 @@
+
 import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, Package, DollarSign, Users, Building, User as UserIcon, Settings as SettingsIcon, MessageSquare, Contact, BarChartHorizontal, BookOpen } from 'lucide-react';
 import type { SubscriptionPlan, CurrencyOption } from '@/types';
@@ -60,11 +61,11 @@ export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow
 
 
 export const SUBSCRIPTION_PLAN_IDS = {
+  ADMIN_ONLY: 'plan_admin_only_basic',
   STARTER: 'plan_starter',
   GROWTH: 'plan_growth',
   PRO: 'plan_pro',
   ENTERPRISE: 'plan_enterprise_contact',
-  ADMIN_ONLY: 'plan_admin_only_basic',
 };
 
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [

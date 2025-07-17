@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 
 export function PricingSectionLanding() {
   const popularPlanId = SUBSCRIPTION_PLANS.find(p => p.isPopular)?.id || SUBSCRIPTION_PLANS[1]?.id;
-  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1 && p.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY);
+  const plansToShow = SUBSCRIPTION_PLANS.filter(p => p.price !== -1);
 
   return (
     <section id="pricing" className="section-padding bg-tertiary dark:bg-background">
@@ -52,7 +52,8 @@ export function PricingSectionLanding() {
                   <span className="text-base text-muted-foreground ml-1.5">{plan.priceSuffix}</span>
                 </div>
                 <CardDescription className="text-sm text-muted-foreground h-12 pt-2">
-                  {plan.name === 'Starter' ? "Perfect for new businesses and solo entrepreneurs ready to organize." : 
+                  {plan.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY ? "For single users needing core features without staff/store management." :
+                   plan.name === 'Starter' ? "Perfect for new businesses and solo entrepreneurs ready to organize." : 
                    plan.name === 'Growth' ? "Ideal for growing businesses needing more capacity and robust features." :
                    "For established businesses aiming to scale operations efficiently." }
                 </CardDescription>
@@ -93,5 +94,3 @@ export function PricingSectionLanding() {
     </section>
   );
 }
-
-    

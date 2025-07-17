@@ -25,7 +25,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 type SortableStaffColumns = keyof Pick<Staff, 'name' | 'email' | 'phone'>;
 
 export function StaffTable() {
-  const { staffs, deleteStaff, getAllStores, canAddStaff, getActiveSubscriptionPlan } = useInventoryStore();
+  const { staffs, deleteStaff, getAllStores, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
   const { toast } = useToast();
   
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);

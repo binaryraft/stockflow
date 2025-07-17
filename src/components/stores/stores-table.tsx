@@ -213,8 +213,8 @@ export function StoresTable() {
                         </DropdownMenuItem>
                         <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <DropdownMenuItem
-                                  onSelect={(e) => e.preventDefault()}
+                                <DropdownMenuItem 
+                                  onSelect={(e) => e.preventDefault()} 
                                   className="text-destructive focus:text-destructive focus:bg-destructive/10"
                                   disabled={isAdminOnlyPlan}
                                 >
