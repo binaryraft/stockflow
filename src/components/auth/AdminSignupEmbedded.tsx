@@ -105,49 +105,51 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   };
   
   const renderStep1 = () => (
-    <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Create Admin Account (1/2)</CardTitle>
-        <CardDescription>Set up your company and admin profile.</CardDescription>
-      </CardHeader>
-      <form onSubmit={handleStep1Submit}>
-        <CardContent className="space-y-3">
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-company-name"><Building className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Company Name*</Label>
-              <Input id="signup-company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Your Company LLC" required disabled={isSubmitting} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-admin-name"><UserIcon className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Your Name (Admin)*</Label>
-              <Input id="signup-admin-name" type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="John Doe" required disabled={isSubmitting} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-email"><Mail className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Admin Email*</Label>
-              <Input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@yourcompany.com" required disabled={isSubmitting} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-password"><KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password* (min. 6 characters)</Label>
-              <Input id="signup-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Choose a strong password" required minLength={6} disabled={isSubmitting} />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="signup-confirm-password"><KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Confirm Password*</Label>
-              <Input id="signup-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required minLength={6} disabled={isSubmitting} />
-            </div>
-        </CardContent>
-        <CardFooter className="flex-col gap-3">
-          <Button type="submit" className="w-full">Next: Choose Plan <ArrowRight className="ml-2 h-4 w-4"/></Button>
-          <Button variant="link" size="sm" onClick={onSwitchToLogin} className="text-xs">Already have an account? Login</Button>
-        </CardFooter>
-      </form>
-    </Card>
+    <div className="w-full flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Create Admin Account (1/2)</CardTitle>
+          <CardDescription>Set up your company and admin profile.</CardDescription>
+        </CardHeader>
+        <form onSubmit={handleStep1Submit}>
+          <CardContent className="space-y-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-company-name"><Building className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Company Name*</Label>
+                <Input id="signup-company-name" type="text" value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Your Company LLC" required disabled={isSubmitting} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-admin-name"><UserIcon className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Your Name (Admin)*</Label>
+                <Input id="signup-admin-name" type="text" value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="John Doe" required disabled={isSubmitting} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-email"><Mail className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Admin Email*</Label>
+                <Input id="signup-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="admin@yourcompany.com" required disabled={isSubmitting} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-password"><KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password* (min. 6 characters)</Label>
+                <Input id="signup-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Choose a strong password" required minLength={6} disabled={isSubmitting} />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="signup-confirm-password"><KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Confirm Password*</Label>
+                <Input id="signup-confirm-password" type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required minLength={6} disabled={isSubmitting} />
+              </div>
+          </CardContent>
+          <CardFooter className="flex-col gap-3">
+            <Button type="submit" className="w-full">Next: Choose Plan <ArrowRight className="ml-2 h-4 w-4"/></Button>
+            <Button variant="link" size="sm" onClick={onSwitchToLogin} className="text-xs">Already have an account? Login</Button>
+          </CardFooter>
+        </form>
+      </Card>
+    </div>
   );
 
   const renderStep2 = () => (
-    <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-primary flex flex-col max-h-[90vh]">
-        <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Choose Your Plan (2/2)</CardTitle>
-            <CardDescription>Select a plan and billing cycle to get started.</CardDescription>
-        </CardHeader>
-        <ScrollArea className="flex-grow">
+    <div className="w-full flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-primary flex flex-col">
+            <CardHeader className="text-center">
+                <CardTitle className="text-2xl">Choose Your Plan (2/2)</CardTitle>
+                <CardDescription>Select a plan and billing cycle to get started.</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-6">
                 <RadioGroup
                     value={selectedPlanId}
@@ -218,15 +220,15 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
                     <p className="text-xs">After registration, your account is pending. Our team will contact you to complete the payment.</p>
                 </div>
             </CardContent>
-        </ScrollArea>
-        <CardFooter className="flex justify-between border-t pt-6">
-            <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
-            <Button onClick={handleFinalSignup} disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-                Complete Signup
-            </Button>
-        </CardFooter>
-    </Card>
+            <CardFooter className="flex justify-between border-t pt-6">
+                <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
+                <Button onClick={handleFinalSignup} disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                    Complete Signup
+                </Button>
+            </CardFooter>
+        </Card>
+    </div>
   );
 
   if (!hasMounted) {
@@ -239,16 +241,17 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/90 backdrop-blur-sm">
-       <div className="absolute top-4 right-4">
+    <div className="fixed inset-0 z-50 flex flex-col items-start justify-start p-4 bg-background/90 backdrop-blur-sm overflow-y-auto">
+      <div className="absolute top-4 right-4 z-10">
         <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Close signup"><XCircle className="h-6 w-6 text-muted-foreground hover:text-foreground" /></Button>
       </div>
-      <div className="flex flex-col items-center mb-6">
+      <div className="w-full flex flex-col items-center pt-8 pb-6">
         <Image src="https://placehold.co/128x128.png" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" data-ai-hint="logo company" />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Admin & Company Registration</p>
       </div>
       {step === 1 ? renderStep1() : renderStep2()}
+      <div className="w-full h-8 flex-shrink-0"></div>
     </div>
   );
 }
