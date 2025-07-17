@@ -39,21 +39,23 @@ export function LandingHeader({ onAdminLoginClick, onStoreLoginClick }: LandingH
         </nav>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <Button 
-            variant="outline" 
-            size="default" 
-            onClick={onStoreLoginClick}
-            className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg shadow-sm hover:shadow-md"
-          >
-            <StoreIcon className="mr-2 h-4 w-4" /> Store Login
-          </Button>
-          <Button 
-            size="default" 
-            onClick={onAdminLoginClick} 
-            className="bg-primary hover:bg-primary/85 text-primary-foreground transition-all-fast rounded-lg shadow-md hover:shadow-lg"
-          >
-            <LogIn className="mr-2 h-4 w-4" /> Admin Login
-          </Button>
+          <div className="hidden sm:flex items-center gap-3">
+             <Button 
+                variant="outline" 
+                size="default" 
+                onClick={onStoreLoginClick}
+                className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg shadow-sm hover:shadow-md"
+             >
+                <StoreIcon className="mr-2 h-4 w-4" /> Store Login
+             </Button>
+             <Button 
+                size="default" 
+                onClick={onAdminLoginClick} 
+                className="bg-primary hover:bg-primary/85 text-primary-foreground transition-all-fast rounded-lg shadow-md hover:shadow-lg"
+             >
+                <LogIn className="mr-2 h-4 w-4" /> Admin Login
+             </Button>
+          </div>
         </div>
       </div>
     </header>

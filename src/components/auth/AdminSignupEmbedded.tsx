@@ -15,6 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { SubscriptionType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface AdminSignupEmbeddedProps {
   onSignupSuccess: () => void;
@@ -141,88 +142,90 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   );
 
   const renderStep2 = () => (
-    <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-primary">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Choose Your Plan (2/2)</CardTitle>
-        <CardDescription>Select a plan and billing cycle to get started.</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <RadioGroup
-          value={selectedPlanId}
-          onValueChange={setSelectedPlanId}
-          className="grid grid-cols-1 gap-4"
-        >
-          {plansToShow.map(plan => {
-            const isSelected = selectedPlanId === plan.id;
-            return (
-              <Label
-                key={plan.id}
-                htmlFor={plan.id}
-                className={cn(
-                  "flex flex-col md:flex-row items-start md:items-center gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all",
-                  isSelected
-                    ? "border-primary bg-primary/5 shadow-md"
-                    : "border-border hover:border-muted-foreground/50"
-                )}
-              >
-                <RadioGroupItem value={plan.id} id={plan.id} className="h-5 w-5 mt-1 md:mt-0" />
-                <div className="flex-1">
-                  <div className="flex flex-col md:flex-row justify-between md:items-center">
-                    <h3 className="font-bold text-lg text-foreground">{plan.name}</h3>
-                    <p className="text-lg font-bold text-primary">
-                      ₹{plan.price}
-                      <span className="text-sm font-normal text-muted-foreground">{plan.priceSuffix}</span>
-                    </p>
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {
-                      plan.id === SUBSCRIPTION_PLAN_IDS.STARTER ? "Perfect for new businesses getting started." :
-                      plan.id === SUBSCRIPTION_PLAN_IDS.GROWTH ? "Ideal for growing businesses needing more capacity." :
-                      "For established businesses scaling operations."
-                    }
-                  </p>
-                </div>
-              </Label>
-            )
-          })}
-        </RadioGroup>
+    <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-primary flex flex-col max-h-[90vh]">
+        <CardHeader className="text-center">
+            <CardTitle className="text-2xl">Choose Your Plan (2/2)</CardTitle>
+            <CardDescription>Select a plan and billing cycle to get started.</CardDescription>
+        </CardHeader>
+        <ScrollArea className="flex-grow">
+            <CardContent className="space-y-6">
+                <RadioGroup
+                    value={selectedPlanId}
+                    onValueChange={setSelectedPlanId}
+                    className="grid grid-cols-1 gap-4"
+                >
+                    {plansToShow.map(plan => {
+                        const isSelected = selectedPlanId === plan.id;
+                        return (
+                            <Label
+                                key={plan.id}
+                                htmlFor={plan.id}
+                                className={cn(
+                                    "flex flex-col md:flex-row items-start md:items-center gap-4 rounded-lg border-2 p-4 cursor-pointer transition-all",
+                                    isSelected
+                                        ? "border-primary bg-primary/5 shadow-md"
+                                        : "border-border hover:border-muted-foreground/50"
+                                )}
+                            >
+                                <RadioGroupItem value={plan.id} id={plan.id} className="h-5 w-5 mt-1 md:mt-0 shrink-0" />
+                                <div className="flex-1">
+                                    <div className="flex flex-col md:flex-row justify-between md:items-center">
+                                        <h3 className="font-bold text-lg text-foreground">{plan.name}</h3>
+                                        <p className="text-lg font-bold text-primary">
+                                            ₹{plan.price}
+                                            <span className="text-sm font-normal text-muted-foreground">{plan.priceSuffix}</span>
+                                        </p>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground mt-1">
+                                        {
+                                            plan.id === SUBSCRIPTION_PLAN_IDS.STARTER ? "Perfect for new businesses getting started." :
+                                            plan.id === SUBSCRIPTION_PLAN_IDS.GROWTH ? "Ideal for growing businesses needing more capacity." :
+                                            "For established businesses scaling operations."
+                                        }
+                                    </p>
+                                </div>
+                            </Label>
+                        )
+                    })}
+                </RadioGroup>
 
-        <div className="pt-4 border-t">
-          <Label className="font-semibold text-center block mb-3">Select Billing Cycle</Label>
-          <RadioGroup 
-            value={subscriptionType} 
-            onValueChange={(v) => setSubscriptionType(v as SubscriptionType)} 
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-          >
-            <Label htmlFor="monthly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'monthly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
-              <RadioGroupItem value="monthly" id="monthly-cycle" />
-              <div className="flex flex-col items-center">
-                <span className="font-medium">Monthly</span>
-                <span className="text-xs text-muted-foreground">Billed every month</span>
-              </div>
-            </Label>
-            <Label htmlFor="yearly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'yearly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
-              <RadioGroupItem value="yearly" id="yearly-cycle" />
-              <div className="flex flex-col items-center">
-                 <span className="font-medium">Yearly</span>
-                 <span className="text-xs text-primary">Save 15%</span>
-              </div>
-            </Label>
-          </RadioGroup>
-        </div>
-        
-        <div className="text-center p-3 bg-tertiary rounded-md text-sm text-tertiary-foreground">
-          <p className="font-semibold">Manual Payment Process</p>
-          <p className="text-xs">After registration, your account is pending. Our team will contact you to complete the payment.</p>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
-        <Button onClick={handleFinalSignup} disabled={isSubmitting}>
-          {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
-          Complete Signup
-        </Button>
-      </CardFooter>
+                <div className="pt-4 border-t">
+                    <Label className="font-semibold text-center block mb-3">Select Billing Cycle</Label>
+                    <RadioGroup
+                        value={subscriptionType}
+                        onValueChange={(v) => setSubscriptionType(v as SubscriptionType)}
+                        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                    >
+                        <Label htmlFor="monthly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'monthly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
+                            <RadioGroupItem value="monthly" id="monthly-cycle" />
+                            <div className="flex flex-col items-center">
+                                <span className="font-medium">Monthly</span>
+                                <span className="text-xs text-muted-foreground">Billed every month</span>
+                            </div>
+                        </Label>
+                        <Label htmlFor="yearly-cycle" className={cn("text-center p-4 border rounded-md flex items-center justify-center gap-2 cursor-pointer transition-all", subscriptionType === 'yearly' && 'border-primary bg-primary/5 ring-1 ring-primary')}>
+                            <RadioGroupItem value="yearly" id="yearly-cycle" />
+                            <div className="flex flex-col items-center">
+                                <span className="font-medium">Yearly</span>
+                                <span className="text-xs text-primary">Save 15%</span>
+                            </div>
+                        </Label>
+                    </RadioGroup>
+                </div>
+
+                <div className="text-center p-3 bg-tertiary rounded-md text-sm text-tertiary-foreground">
+                    <p className="font-semibold">Manual Payment Process</p>
+                    <p className="text-xs">After registration, your account is pending. Our team will contact you to complete the payment.</p>
+                </div>
+            </CardContent>
+        </ScrollArea>
+        <CardFooter className="flex justify-between border-t pt-6">
+            <Button variant="outline" onClick={() => setStep(1)} disabled={isSubmitting}>Back</Button>
+            <Button onClick={handleFinalSignup} disabled={isSubmitting}>
+                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <UserPlus className="mr-2 h-4 w-4" />}
+                Complete Signup
+            </Button>
+        </CardFooter>
     </Card>
   );
 
@@ -249,4 +252,3 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
     </div>
   );
 }
-
