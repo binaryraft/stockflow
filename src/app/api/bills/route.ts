@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
 import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company, User, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { format, isToday } from 'date-fns';
+import { format, startOfDay } from 'date-fns';
 import { Collection } from 'mongodb';
 
 const routeNamePrefix = "[API_BILLS_COLLECTION /api/bills]";
@@ -57,7 +57,8 @@ export async function POST(req: NextRequest) {
     }
 
     const productsCollection = db.collection<Product>('products');
-    let productsToUpdate: Product[] = await productsCollection.find({ companyId: companyId }).toArray();
+    const productIds = itemsData.map((item: any) => item.productId).filter((id: string) => !id.startsWith('SERVICE_ITEM_') && !id.startsWith('CHARGE_ITEM_'));
+    const productsToUpdate: Product[] = await productsCollection.find({ id: { $in: productIds }, companyId: companyId }).toArray();
     
     const currentDate = new Date();
     const datePrefix = format(currentDate, 'ddMMyy');
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
         date: { $gte: startOfDay(currentDate).toISOString() }
     });
     const newBillNumber = billsTodayCount + 1;
-    const newBillId = `${datePrefix}${newBillNumber}`;
+    const newBillId = `${datePrefix}${newBillNumber.toString().padStart(4, '0')}`;
     
     let processedBillItems: BillItem[] = [];
     let billSubTotal = 0;
@@ -77,10 +78,11 @@ export async function POST(req: NextRequest) {
       const isServiceOrCharge = item.productId.startsWith('SERVICE_ITEM_') || item.productId.startsWith('CHARGE_ITEM_');
       const productIndex = !isServiceOrCharge ? productsToUpdate.findIndex(p => p.id === item.productId) : -1;
       
-      if (!isServiceOrCharge && productIndex === -1) {
+      const product = productIndex !== -1 ? productsToUpdate[productIndex] : null;
+
+      if (!isServiceOrCharge && !product) {
         return NextResponse.json({ success: false, message: `Product with ID ${item.productId} not found.` }, { status: 404 });
       }
-      const product = productIndex !== -1 ? productsToUpdate[productIndex] : null;
 
       let sku: ProductSKU | undefined;
       if (product && item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
@@ -141,7 +143,8 @@ export async function POST(req: NextRequest) {
         itemCgstAmount = (preTaxValue * (product.cgstRate || 0)) / 100;
       }
       
-      billSubTotal += billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity;
+      const preTaxLineTotal = billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity;
+      billSubTotal += preTaxLineTotal;
       billTotalSGST += itemSgstAmount;
       billTotalCGST += itemCgstAmount;
       

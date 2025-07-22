@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import type { Product, AdditionalChargeDefinition } from '@/types';
+import type { Product, AdditionalChargeDefinition, ProductSKU } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 const routeNamePrefix = "[API_PRODUCTS_SINGLE /api/products/[productId]]";
@@ -37,15 +37,29 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
       return NextResponse.json({ success: false, message: 'Company ID, Product ID, and data are required.' }, { status: 400 });
     }
     
-    // You might want more sophisticated update logic here, for now, we'll do a simple replacement
-    const { id, ...updateableData } = productData;
+    const existingProduct = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
+    if (!existingProduct) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
+
+    const { costPriceForNonTracked, sellPriceForNonTracked, ...updateableData } = productData;
+
+    // Handle price updates for non-tracked, single-SKU products
+    if (productData.trackQuantity === false && (!productData.variants || productData.variants.length === 0)) {
+        let skuToUpdate = existingProduct.productSKUs[0];
+        if (skuToUpdate) {
+            if (costPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].costPrice = costPriceForNonTracked;
+            if (sellPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].sellPrice = sellPriceForNonTracked;
+            updateableData.productSKUs = [skuToUpdate];
+        }
+    }
+    
+    const { id, ...dataToSet } = updateableData;
 
     const result = await db.collection<Product>('products').updateOne(
       { id: productId, companyId: companyId },
-      { $set: updateableData }
+      { $set: dataToSet }
     );
 
-    if (result.matchedCount === 0) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
+    if (result.matchedCount === 0) return NextResponse.json({ success: false, message: 'Product not found during update operation.' }, { status: 404 });
 
     const updatedProduct = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
     return NextResponse.json({ success: true, data: updatedProduct });

@@ -417,9 +417,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
 
     if (isEditing && initialData) {
       const currentTrackQuantity = initialData.trackQuantity;
-      const defaultSkuForNonVariant = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
-        ? getSkuDetails(initialData.productSKUs[0]) 
+      const defaultSku = (!initialData.variants || initialData.variants.length === 0) && initialData.productSKUs.length > 0
+        ? initialData.productSKUs[0]
         : undefined;
+      const defaultSkuDetails = getSkuDetails(defaultSku);
 
       defaults = {
         name: initialData.name,
@@ -427,8 +428,8 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         category: initialData.category || '',
         trackQuantity: currentTrackQuantity,
         sku: initialData.sku || '',
-        costPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.averageCostPrice === 'number') ? defaultSkuForNonVariant.averageCostPrice : undefined,
-        sellPrice: (!currentTrackQuantity && defaultSkuForNonVariant && typeof defaultSkuForNonVariant.currentSellPrice === 'number') ? defaultSkuForNonVariant.currentSellPrice : undefined,
+        costPrice: !currentTrackQuantity ? defaultSkuDetails.averageCostPrice ?? undefined : undefined,
+        sellPrice: !currentTrackQuantity ? defaultSkuDetails.currentSellPrice ?? undefined : undefined,
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         sgstRate: initialData.sgstRate,
         cgstRate: initialData.cgstRate,
@@ -691,6 +692,16 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                   </Button>
                 </CardFooter>
               )}
+            </Card>
+
+             <Card>
+              <CardHeader>
+                 <CardTitle>Additional Charges</CardTitle>
+                 <CardDescription>Define fixed or percentage-based charges automatically added when this product is sold.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <AdditionalChargesFormSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus} />
+              </CardContent>
             </Card>
 
             <div className="flex justify-end gap-3 pt-4">
