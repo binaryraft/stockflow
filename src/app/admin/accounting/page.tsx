@@ -1,10 +1,10 @@
 
 "use client";
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, Suspense, useMemo } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet, Scale, PrinterIcon } from 'lucide-react';
+import { BookOpen, CalendarDays, Loader2, FileText, BarChart2, Wallet, Scale, PrinterIcon, Building } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 import { subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, format, startOfQuarter, endOfQuarter, subQuarters, getYear } from 'date-fns';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -22,7 +22,7 @@ import { CashFlowStatement } from '@/components/accounting/CashFlowStatement';
 import { BalanceSheet } from '@/components/accounting/BalanceSheet';
 import { generateReportPrintContent, triggerPrint } from '@/lib/print-utils';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-
+import type { Store } from '@/types';
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'thisFY' | 'lastFY' | 'all' | 'custom';
 type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
@@ -73,8 +73,14 @@ function AccountingPageContent() {
   const [timePeriodPreset, setTimePeriodPreset] = useState<TimePeriodPreset>('thisMonth');
   const [dateRange, setDateRange] = useState<DateRange | undefined>(getDatesFromPreset('thisMonth'));
   const [activeTab, setActiveTab] = useState<AccountingTab>('pnl');
-  const userProfile = useInventoryStore(state => state.userProfile);
-
+  const { userProfile, getAllStores } = useInventoryStore(state => ({
+    userProfile: state.userProfile,
+    getAllStores: state.getAllStores,
+  }));
+  
+  const stores = useMemo(() => getAllStores(), [getAllStores]);
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  
   const handlePresetChange = (preset: TimePeriodPreset) => {
     setTimePeriodPreset(preset);
     if (preset !== 'custom') {
@@ -103,6 +109,9 @@ function AccountingPageContent() {
         default: reportTitle = 'Accounting Report';
     }
 
+    const storeName = selectedStoreId === 'all' ? 'All Stores' : stores.find(s => s.id === selectedStoreId)?.name || '';
+    reportTitle += ` (${storeName})`;
+
     const printContent = generateReportPrintContent(reportContentEl.innerHTML, reportTitle, userProfile);
     triggerPrint(printContent);
   };
@@ -110,6 +119,19 @@ function AccountingPageContent() {
 
   const pageActions = (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
+        {stores.length > 0 && (
+          <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+            <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+              <SelectValue placeholder="Select Store" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all"><Building className="mr-2 h-4 w-4 inline-block" />All Stores</SelectItem>
+              {stores.map(store => (
+                <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
         <Select value={timePeriodPreset} onValueChange={(value) => handlePresetChange(value as TimePeriodPreset)}>
             <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
                 <SelectValue placeholder="Filter by time" />
@@ -163,22 +185,22 @@ function AccountingPageContent() {
         </TabsList>
         <div id="pnl-report-content">
             <TabsContent value="pnl" className="mt-6">
-                <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} />
+                <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
             </TabsContent>
         </div>
          <div id="cashflow-report-content">
             <TabsContent value="cashflow" className="mt-6">
-                <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} />
+                <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
             </TabsContent>
         </div>
         <div id="balance-sheet-report-content">
             <TabsContent value="balance-sheet" className="mt-6">
-                <BalanceSheet />
+                <BalanceSheet storeId={selectedStoreId} />
             </TabsContent>
         </div>
         <div id="gst-report-content">
             <TabsContent value="gst" className="mt-6">
-                 <GstReport startDate={dateRange?.from} endDate={dateRange?.to} />
+                 <GstReport startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId}/>
             </TabsContent>
         </div>
       </Tabs>
@@ -195,8 +217,8 @@ function AccountingPageContent() {
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 mt-4 no-print">
-        <AccountsReceivableCard />
-        <AccountsPayableCard />
+        <AccountsReceivableCard storeId={selectedStoreId} />
+        <AccountsPayableCard storeId={selectedStoreId} />
       </div>
 
     </div>

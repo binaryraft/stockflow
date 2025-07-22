@@ -11,9 +11,10 @@ import { Separator } from '@/components/ui/separator';
 interface ProfitLossStatementProps {
   startDate?: Date;
   endDate?: Date;
+  storeId?: string;
 }
 
-export function ProfitLossStatement({ startDate, endDate }: ProfitLossStatementProps) {
+export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossStatementProps) {
   const { getReportSummaryByDateRange, userProfile } = useInventoryStore(state => ({
     getReportSummaryByDateRange: state.getReportSummaryByDateRange,
     userProfile: state.userProfile
@@ -21,8 +22,8 @@ export function ProfitLossStatement({ startDate, endDate }: ProfitLossStatementP
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const summary = useMemo(() => {
-    return getReportSummaryByDateRange(startDate, endDate, companyId);
-  }, [startDate, endDate, companyId, getReportSummaryByDateRange]);
+    return getReportSummaryByDateRange(startDate, endDate, companyId, storeId);
+  }, [startDate, endDate, companyId, storeId, getReportSummaryByDateRange]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 

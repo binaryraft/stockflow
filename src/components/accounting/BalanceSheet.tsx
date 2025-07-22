@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Coins, HandCoins, Landmark, AlertTriangle } from 'lucide-react';
 
-export function BalanceSheet() {
+export function BalanceSheet({ storeId }: { storeId?: string }) {
   const { getBalanceSheetSummary, userProfile } = useInventoryStore(state => ({
     getBalanceSheetSummary: state.getBalanceSheetSummary,
     userProfile: state.userProfile
@@ -17,8 +17,8 @@ export function BalanceSheet() {
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const summary = useMemo(() => {
-    return getBalanceSheetSummary(companyId);
-  }, [companyId, getBalanceSheetSummary]);
+    return getBalanceSheetSummary(companyId, storeId);
+  }, [companyId, storeId, getBalanceSheetSummary]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 

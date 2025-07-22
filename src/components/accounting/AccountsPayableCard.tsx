@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { ArrowRight, TrendingDown } from 'lucide-react';
 
-export function AccountsPayableCard() {
+export function AccountsPayableCard({ storeId }: { storeId?: string }) {
   const { getAccountsPayableSummary, userProfile } = useInventoryStore(state => ({
     getAccountsPayableSummary: state.getAccountsPayableSummary,
     userProfile: state.userProfile,
@@ -19,8 +19,8 @@ export function AccountsPayableCard() {
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const { totalPayable, unpaidBills } = useMemo(() => {
-    return getAccountsPayableSummary(companyId);
-  }, [companyId, getAccountsPayableSummary]);
+    return getAccountsPayableSummary(companyId, storeId);
+  }, [companyId, storeId, getAccountsPayableSummary]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
   const topUnpaidBills = unpaidBills.slice(0, 5);

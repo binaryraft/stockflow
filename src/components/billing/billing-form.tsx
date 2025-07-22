@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -782,7 +783,9 @@ export function BillingForm({
     let finalStoreId: string | undefined = undefined;
     if (isAdminContext) {
         const planId = activePlan?.id;
-        if (planId === SUBSCRIPTION_PLAN_IDS.STARTER) {
+        if (planId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY) {
+            finalStoreId = undefined; // No store needed for this plan
+        } else if (planId === SUBSCRIPTION_PLAN_IDS.STARTER) {
             if (allStores.length === 1) finalStoreId = allStores[0].id;
             else {
                 toast({ variant: "destructive", title: "Store Required", description: "Please add your store in Store Management before creating bills on the Starter plan."});
@@ -826,7 +829,7 @@ export function BillingForm({
         setPendingBillPayload(currentBillPayload);
         setIsVerifyEmployeeDialogOpen(true);
     } else if (isAdminContext) {
-        if (!finalStoreId && activePlan && activePlan.maxStores > 0) {
+        if (activePlan?.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && !finalStoreId && activePlan && activePlan.maxStores > 0) {
             toast({ variant: "destructive", title: "Store Required", description: "A store context is required to save this bill for your plan."});
             return;
         }
@@ -941,6 +944,7 @@ export function BillingForm({
   const showAdminStoreSelector = isAdminContext &&
                                activePlan &&
                                activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER &&
+                               activePlan.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY &&
                                allStores.length > 1;
 
   const currentUrlMode = searchParamsHook.get('mode') as BillMode | null;
@@ -1446,7 +1450,7 @@ export function BillingForm({
             <Button
               onClick={handleSaveBill}
               className="flex-1"
-              disabled={currentBillItems.length === 0 || isVerifyEmployeeDialogOpen || (isAdminContext && allStores.length === 0 && activePlan && activePlan.maxStores > 0)}
+              disabled={currentBillItems.length === 0 || isVerifyEmployeeDialogOpen || (isAdminContext && activePlan?.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && allStores.length === 0 && activePlan && activePlan.maxStores > 0)}
             >
               <Save className="mr-2 h-4 w-4" /> Save Bill
             </Button>

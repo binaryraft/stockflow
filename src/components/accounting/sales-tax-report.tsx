@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 interface GstReportProps {
   startDate?: Date;
   endDate?: Date;
+  storeId?: string;
 }
 
 const TaxReportTable: React.FC<{
@@ -101,7 +102,7 @@ const TaxReportTable: React.FC<{
 };
 
 
-export function GstReport({ startDate, endDate }: GstReportProps) {
+export function GstReport({ startDate, endDate, storeId }: GstReportProps) {
   const { getSalesBillsByDateRange, getExpenseBillsByDateRange, userProfile } = useInventoryStore(state => ({
     getSalesBillsByDateRange: state.getSalesBillsByDateRange,
     getExpenseBillsByDateRange: state.getExpenseBillsByDateRange,
@@ -110,12 +111,12 @@ export function GstReport({ startDate, endDate }: GstReportProps) {
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const salesBills = useMemo(() => {
-    return getSalesBillsByDateRange(startDate, endDate, companyId);
-  }, [startDate, endDate, companyId, getSalesBillsByDateRange]);
+    return getSalesBillsByDateRange(startDate, endDate, companyId, storeId);
+  }, [startDate, endDate, companyId, storeId, getSalesBillsByDateRange]);
 
   const expenseBills = useMemo(() => {
-    return getExpenseBillsByDateRange(startDate, endDate, companyId);
-  }, [startDate, endDate, companyId, getExpenseBillsByDateRange]);
+    return getExpenseBillsByDateRange(startDate, endDate, companyId, storeId);
+  }, [startDate, endDate, companyId, storeId, getExpenseBillsByDateRange]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 

@@ -11,7 +11,7 @@ import { format } from 'date-fns';
 import Link from 'next/link';
 import { ArrowRight, TrendingUp } from 'lucide-react';
 
-export function AccountsReceivableCard() {
+export function AccountsReceivableCard({ storeId }: { storeId?: string }) {
   const { getAccountsReceivableSummary, userProfile } = useInventoryStore(state => ({
     getAccountsReceivableSummary: state.getAccountsReceivableSummary,
     userProfile: state.userProfile,
@@ -19,8 +19,8 @@ export function AccountsReceivableCard() {
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const { totalReceivable, unpaidInvoices } = useMemo(() => {
-    return getAccountsReceivableSummary(companyId);
-  }, [companyId, getAccountsReceivableSummary]);
+    return getAccountsReceivableSummary(companyId, storeId);
+  }, [companyId, storeId, getAccountsReceivableSummary]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
   const topUnpaidInvoices = unpaidInvoices.slice(0, 5);

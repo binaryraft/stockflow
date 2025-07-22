@@ -11,9 +11,10 @@ import { Separator } from '@/components/ui/separator';
 interface CashFlowStatementProps {
   startDate?: Date;
   endDate?: Date;
+  storeId?: string;
 }
 
-export function CashFlowStatement({ startDate, endDate }: CashFlowStatementProps) {
+export function CashFlowStatement({ startDate, endDate, storeId }: CashFlowStatementProps) {
   const { getCashFlowSummaryByDateRange, userProfile } = useInventoryStore(state => ({
     getCashFlowSummaryByDateRange: state.getCashFlowSummaryByDateRange,
     userProfile: state.userProfile
@@ -21,8 +22,8 @@ export function CashFlowStatement({ startDate, endDate }: CashFlowStatementProps
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const summary = useMemo(() => {
-    return getCashFlowSummaryByDateRange(startDate, endDate, companyId);
-  }, [startDate, endDate, companyId, getCashFlowSummaryByDateRange]);
+    return getCashFlowSummaryByDateRange(startDate, endDate, companyId, storeId);
+  }, [startDate, endDate, companyId, storeId, getCashFlowSummaryByDateRange]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
