@@ -20,6 +20,11 @@ const robotoMono = Roboto_Mono({
 export const metadata: Metadata = {
   title: `${APP_NAME} - Inventory Management & Billing`,
   description: 'Modern inventory management and billing solution for businesses of all sizes.',
+  icons: {
+    icon: '/logo.svg',
+    shortcut: '/logo.svg',
+    apple: '/logo.svg',
+  },
 };
 
 export default function RootLayout({

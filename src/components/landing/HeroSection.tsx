@@ -15,7 +15,7 @@ interface HeroSectionProps {
   onStoreLoginClick: () => void;
 }
 
-const SHARED_AUTH_TOKEN_KEY = "appAuthToken"; 
+const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
 export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectionProps) {
   const router = useRouter();
@@ -40,21 +40,21 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
   };
 
   if (!hasMounted) {
-      return (
-          <section className="relative section-padding bg-gradient-to-br from-primary/5 via-background to-background/0 overflow-hidden min-h-[70vh] flex items-center">
-              <div className="section-container text-center">
-                  <div className="animate-pulse">
-                      <div className="h-36 w-36 bg-muted rounded-3xl mx-auto mb-10 shadow-2xl"></div>
-                      <div className="h-16 bg-muted rounded-lg w-4/5 mx-auto mb-8"></div>
-                      <div className="h-12 bg-muted rounded-lg w-3/5 mx-auto mb-12"></div>
-                      <div className="flex flex-col sm:flex-row justify-center gap-5 md:gap-8">
-                          <div className="h-16 bg-muted rounded-xl w-72"></div>
-                          <div className="h-16 bg-muted rounded-xl w-72"></div>
-                      </div>
-                  </div>
-              </div>
-          </section>
-      );
+    return (
+      <section className="relative section-padding bg-gradient-to-br from-primary/5 via-background to-background/0 overflow-hidden min-h-[70vh] flex items-center">
+        <div className="section-container text-center">
+          <div className="animate-pulse">
+            <div className="h-36 w-36 bg-muted rounded-3xl mx-auto mb-10 shadow-2xl"></div>
+            <div className="h-16 bg-muted rounded-lg w-4/5 mx-auto mb-8"></div>
+            <div className="h-12 bg-muted rounded-lg w-3/5 mx-auto mb-12"></div>
+            <div className="flex flex-col sm:flex-row justify-center gap-5 md:gap-8">
+              <div className="h-16 bg-muted rounded-xl w-72"></div>
+              <div className="h-16 bg-muted rounded-xl w-72"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
   }
 
   return (
@@ -67,12 +67,11 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
         <div className="flex flex-col items-center mb-12 md:mb-16">
           <div className="animate-fadeInDown delay-100 mb-10 transform transition-transform duration-500 hover:scale-105">
             <Image
-              src="https://placehold.co/160x160.png"
+              src="/logo.svg"
               alt={`${APP_NAME} Logo`}
               width={160}
               height={160}
-              className="rounded-3xl shadow-2xl border-4 border-card/80"
-              data-ai-hint="modern tech logo"
+              className="rounded-3xl shadow-2xl border-4 border-card/80 bg-background"
               priority
             />
           </div>

@@ -49,12 +49,12 @@ export default function HomePage() {
       } else {
         if (lastAuthStoreId) sessionStorage.removeItem('lastAuthenticatedStoreId');
         Object.keys(sessionStorage).forEach(key => {
-            if (key.startsWith('authenticatedStore_')) {
-                sessionStorage.removeItem(key);
-            }
+          if (key.startsWith('authenticatedStore_')) {
+            sessionStorage.removeItem(key);
+          }
         });
       }
-      
+
       setIsRedirecting(false);
 
       if (!redirected && uiMode !== 'adminLogin' && uiMode !== 'adminSignup') {
@@ -68,7 +68,7 @@ export default function HomePage() {
   const showAdminSignup = () => setUiMode('adminSignup');
   const hideAuthFormsAndRecheck = () => {
     setUiMode('landing');
-    setIsRedirecting(true); 
+    setIsRedirecting(true);
   };
 
 
@@ -76,16 +76,15 @@ export default function HomePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image
-          src="https://placehold.co/128x128.png"
+          src="/logo.svg"
           alt={`${APP_NAME} Logo`}
           width={80}
           height={80}
-          className="mb-6 rounded-xl shadow-lg animate-pulse"
-          data-ai-hint="logo company"
+          className="mb-6 animate-pulse"
         />
-         <div className="flex items-center gap-2 text-lg text-muted-foreground">
-            <Loader2 className="h-6 w-6 animate-spin" />
-            <span>Loading Application...</span>
+        <div className="flex items-center gap-2 text-lg text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading Application...</span>
         </div>
       </div>
     );
