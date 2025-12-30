@@ -7,7 +7,26 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "electron": "electron ./electron/main.js",
+    "dist": "npm run build && electron-builder"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.stockflow.app",
+    "productName": "StockFlow",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "electron/**/*",
+      ".next/**/*",
+      "public/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist_electron"
+    }
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.0",
@@ -67,6 +86,8 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/uuid": "^9.0.8",
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12",
     "postcss": "^8",
     "tailwindcss": "^3.4.1",
     "typescript": "^5"
