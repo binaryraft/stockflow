@@ -57,28 +57,74 @@ export async function POST(req: NextRequest) {
         console.warn(`${routeNamePrefix} No employee found with ID: ${employeeId} for company ${companyId}.`);
       }
     } else if (loginType === 'store') {
-      if (!companyId || !storeId || !storePasskey) {
-        console.warn(`${routeNamePrefix} Company ID, Store ID, and Store Passkey are required for store terminal login.`);
-        return NextResponse.json({ success: false, message: 'Company ID, Store ID, and Store Passkey are required for store terminal login.' }, { status: 400 });
+      const { storeAccessCode, employeeId, employeePasskey } = body;
+
+      if (!storeAccessCode || !employeeId || !employeePasskey) {
+        console.warn(`${routeNamePrefix} Store Access Code, Employee ID, and Password are required.`);
+        return NextResponse.json({ success: false, message: 'Store Access Code, Employee ID, and Password are required.' }, { status: 400 });
       }
-      authenticatedStore = await db.collection<Store>('stores').findOne({ companyId: companyId, id: storeId, passkey: storePasskey });
-      if (authenticatedStore) {
-        console.log(`${routeNamePrefix} Store terminal ${storeId} for company ${companyId} authenticated successfully.`);
-        return NextResponse.json({
-          success: true,
-          message: `Store terminal for ${authenticatedStore.name} authenticated.`,
-          store: {
-            id: authenticatedStore.id,
-            name: authenticatedStore.name,
-            companyId: authenticatedStore.companyId,
-            location: authenticatedStore.location,
-            allowedOperations: authenticatedStore.allowedOperations,
-          }
-        });
-      } else {
-        console.warn(`${routeNamePrefix} Store terminal login failed for storeId: ${storeId}, companyId: ${companyId}. Invalid store credentials.`);
-        return NextResponse.json({ success: false, message: 'Invalid store credentials.' }, { status: 401 });
+
+      // 1. Find the Store by Access Code (Global Unique 6-digit)
+      authenticatedStore = await db.collection<Store>('stores').findOne({ accessCode: storeAccessCode });
+
+      if (!authenticatedStore) {
+        console.warn(`${routeNamePrefix} Store not found with Access Code: ${storeAccessCode}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Store Access Code.' }, { status: 404 });
       }
+
+      // 2. Find the Employee in the same company
+      const employee = await db.collection<User>('users').findOne({
+        role: 'employee',
+        employeeId: employeeId,
+        companyId: authenticatedStore.companyId
+      });
+
+      if (!employee) {
+        console.warn(`${routeNamePrefix} Employee ${employeeId} not found in company ${authenticatedStore.companyId}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Employee ID.' }, { status: 401 });
+      }
+
+      // 3. Authenticate Employee (Passkey/Password)
+      // Check if employee has password and it matches
+      if (!employee.password || !bcrypt.compareSync(employeePasskey, employee.password)) {
+        console.warn(`${routeNamePrefix} Invalid passkey for employee ${employeeId}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Employee Passkey.' }, { status: 401 });
+      }
+
+      // 4. Authorization: Check if Employee is allowed in this store
+      // Logic: If allowedStaffIds is defined and not empty, user MUST be in it.
+      // If allowedStaffIds is empty, we might allow all? Or allow none?
+      // Default is strictly allowed list.
+      // However, typical business logic: if list is empty, maybe only Admin/Owner? But `employee` role implies restricted.
+      // Let's assume strict: Must be in allowedStaffIds.
+
+      const isAllowed = authenticatedStore.allowedStaffIds && authenticatedStore.allowedStaffIds.includes(employee.id);
+
+      if (!isAllowed) {
+        console.warn(`${routeNamePrefix} Employee ${employee.name} (${employee.id}) not authorized for store ${authenticatedStore.name}.`);
+        return NextResponse.json({ success: false, message: 'You are not authorized to access this store terminal.' }, { status: 403 });
+      }
+
+      console.log(`${routeNamePrefix} Store terminal ${authenticatedStore.id} authenticated by employee ${employee.id}.`);
+
+      // Return success with store details
+      return NextResponse.json({
+        success: true,
+        message: `Welcome, ${employee.name}. Terminal Authenticated.`,
+        store: {
+          id: authenticatedStore.id,
+          name: authenticatedStore.name,
+          companyId: authenticatedStore.companyId,
+          location: authenticatedStore.location,
+          allowedOperations: authenticatedStore.allowedOperations,
+        },
+        user: {
+          id: employee.id,
+          name: employee.name,
+          role: employee.role
+        }
+      });
+
     } else {
       console.warn(`${routeNamePrefix} Invalid login type: ${loginType}.`);
       return NextResponse.json({ success: false, message: 'Invalid login type specified.' }, { status: 400 });

@@ -81,8 +81,8 @@ export function StoreFormDialog({
       if (companyIdFromStorage) setCurrentCompanyId(companyIdFromStorage);
       else {
         console.error("StoreFormDialog: Company ID not found in localStorage.");
-        toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage stores."});
-        onOpenChange(false); 
+        toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage stores." });
+        onOpenChange(false);
         return;
       }
       if (editingStore) {
@@ -117,10 +117,10 @@ export function StoreFormDialog({
       toast({ variant: "destructive", title: "Validation Error", description: "Passkey is required for new stores." });
       return;
     }
-    const success = editingStore 
-      ? await updateStore(editingStore.id, storePayload, currentCompanyId) 
+    const success = editingStore
+      ? await updateStore(editingStore.id, storePayload, currentCompanyId)
       : await addStore(storePayload as Omit<Store, 'id' | 'companyId'>, currentCompanyId);
-      
+
     if (success) {
       toast({ title: `Store ${editingStore ? 'Updated' : 'Added'}`, description: `${data.name}'s details have been saved.` });
       onFormSubmit();
@@ -133,7 +133,7 @@ export function StoreFormDialog({
       <DialogContent className="sm:max-w-xl flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl">
-            <Building className="h-6 w-6 text-primary"/>
+            <Building className="h-6 w-6 text-primary" />
             {editingStore ? 'Edit Store' : 'Add New Store'}
           </DialogTitle>
           <DialogDescription>Fill in the store details. Fields marked with * are required.</DialogDescription>
@@ -142,40 +142,49 @@ export function StoreFormDialog({
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6">
               <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14}/>Store Name*</Label>
-                    <Input id="name" {...register("name")} />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14}/>Location*</Label>
-                    <Input id="location" {...register("location")} />
-                    {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14}/>Email Address*</Label>
-                      <Input id="email" type="email" {...register("email")} />
-                      {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14}/>Phone Number*</Label>
-                      <Input id="phone" type="tel" {...register("phone")} />
-                      {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
+                {editingStore && editingStore.accessCode && (
+                  <div className="p-3 mb-4 bg-primary/10 border border-primary/20 rounded-md">
+                    <Label className="text-xs text-primary font-bold uppercase tracking-wider block mb-1">Store Access Code</Label>
+                    <div className="flex items-center gap-2">
+                      <code className="text-2xl font-mono font-bold text-primary tracking-[0.2em]">{editingStore.accessCode}</code>
+                      <span className="text-xs text-muted-foreground ml-auto">(Use this for Terminal Login)</span>
                     </div>
                   </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14} />Store Name*</Label>
+                  <Input id="name" {...register("name")} />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location*</Label>
+                  <Input id="location" {...register("location")} />
+                  {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14} />Email Address*</Label>
+                    <Input id="email" type="email" {...register("email")} />
+                    {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14} />Phone Number*</Label>
+                    <Input id="phone" type="tel" {...register("phone")} />
+                    {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                  </div>
+                </div>
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-4">
-                  <h4 className="text-sm font-semibold text-muted-foreground">SECURITY</h4>
-                  <div className="space-y-2">
-                    <Label htmlFor="passkey" className="flex items-center gap-1.5"><KeyRound size={14}/>Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
-                    <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"}/>
-                    {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
-                  </div>
+                <h4 className="text-sm font-semibold text-muted-foreground">SECURITY</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="passkey" className="flex items-center gap-1.5"><KeyRound size={14} />Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
+                  <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"} />
+                  {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
+                </div>
               </div>
 
               <Separator />
@@ -183,7 +192,7 @@ export function StoreFormDialog({
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-muted-foreground">PERMISSIONS</h4>
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Briefcase size={14}/>Allowed Operations*</Label>
+                  <Label className="flex items-center gap-1.5"><Briefcase size={14} />Allowed Operations*</Label>
                   <p className="text-xs text-muted-foreground -mt-1">Select which transaction types are permitted at this store terminal.</p>
                   <div className="space-y-2 pt-1">
                     {operationOptions.map((op) => (
@@ -192,9 +201,9 @@ export function StoreFormDialog({
                           const currentOps = selectedOperations;
                           if (checked) setValue('allowedOperations', [...currentOps, op.id]);
                           else if (currentOps.length > 1) setValue('allowedOperations', currentOps.filter(id => id !== op.id));
-                          else toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed."});
-                        }}/>
-                        <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm flex items-center gap-1.5"><op.icon size={16}/>{op.label}</Label>
+                          else toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed." });
+                        }} />
+                        <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm flex items-center gap-1.5"><op.icon size={16} />{op.label}</Label>
                       </div>
                     ))}
                   </div>
@@ -202,7 +211,7 @@ export function StoreFormDialog({
                 </div>
                 {allStaff.length > 0 && (
                   <div className="space-y-2 pt-2">
-                    <Label className="flex items-center gap-1.5"><UserIcon size={14}/>Allowed Staff (Optional)</Label>
+                    <Label className="flex items-center gap-1.5"><UserIcon size={14} />Allowed Staff (Optional)</Label>
                     <p className="text-xs text-muted-foreground -mt-1">Select specific staff members allowed to access this store. If none are selected, any assigned staff can access it.</p>
                     <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
                       <div className="space-y-2">
@@ -211,7 +220,7 @@ export function StoreFormDialog({
                             <Checkbox id={`staff-${staff.id}`} checked={selectedStaffIds.includes(staff.id)} onCheckedChange={(checked) => {
                               const currentIds = selectedStaffIds;
                               setValue('allowedStaffIds', checked ? [...currentIds, staff.id] : currentIds.filter(id => id !== staff.id));
-                            }}/>
+                            }} />
                             <Label htmlFor={`staff-${staff.id}`} className="font-normal text-sm">{staff.name} <span className="text-xs text-muted-foreground">({staff.email})</span></Label>
                           </div>
                         ))}

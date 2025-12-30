@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     if (!companyId || !storeData || !storeData.name || !storeData.location || !storeData.passkey || !storeData.email || !storeData.phone) {
       return NextResponse.json({ success: false, message: 'Complete store data and Company ID are required.' }, { status: 400 });
     }
-    
+
     const company = await db.collection<Company>('companies').findOne({ id: companyId });
     if (!company) return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
 
@@ -42,6 +42,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: `Store limit reached for your current plan.` }, { status: 403 });
     }
 
+    // Generate a unique 6-digit access code
+    let accessCode = '';
+    let isUnique = false;
+    let attempts = 0;
+    while (!isUnique && attempts < 10) {
+      accessCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const existing = await db.collection<Store>('stores').findOne({ accessCode });
+      if (!existing) isUnique = true;
+      attempts++;
+    }
+
     const newStore: Store = {
       id: `store_${uuidv4()}`,
       companyId: companyId,
@@ -49,7 +60,8 @@ export async function POST(req: NextRequest) {
       location: storeData.location.trim(),
       email: storeData.email.toLowerCase(),
       phone: storeData.phone.trim(),
-      passkey: storeData.passkey,
+      accessCode: accessCode,
+      passkey: storeData.passkey, // Keeping generic passkey as fallback/admin key if needed, or just legacy
       allowedStaffIds: Array.isArray(storeData.allowedStaffIds) ? storeData.allowedStaffIds : [],
       allowedOperations: storeData.allowedOperations,
     };

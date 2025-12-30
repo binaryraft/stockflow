@@ -30,7 +30,7 @@ export function StoreLoginPageClient() {
     const queryStoreId = searchParams.get('storeId');
     const queryCompanyId = searchParams.get('companyId');
     if (queryStoreId) setStoreIdInput(queryStoreId);
-    if (queryCompanyId) setCompanyIdInput(queryCompanyId);
+    // Removed companyId pre-fill as it conflicts with Employee ID field usage
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,7 +38,7 @@ export function StoreLoginPageClient() {
     if (!hasMounted) return;
 
     if (!companyIdInput.trim() || !storeIdInput.trim() || !passkey.trim()) {
-      toast({ variant: "destructive", title: "Login Failed", description: "Company ID, Store ID, and Passkey are required." });
+      toast({ variant: "destructive", title: "Login Failed", description: "Store Access Code, Employee ID, and Password are required." });
       return;
     }
     if (passkey.length < 4) {
@@ -54,9 +54,9 @@ export function StoreLoginPageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           loginType: 'store',
-          companyId: companyIdInput.trim(),
-          storeId: storeIdInput.trim(),
-          storePasskey: passkey,
+          storeAccessCode: storeIdInput.trim(),
+          employeeId: companyIdInput.trim(), // We repurposed this state variable for Employee ID
+          employeePasskey: passkey,
         }),
       });
 
@@ -102,44 +102,56 @@ export function StoreLoginPageClient() {
       </div>
       <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Store Login</CardTitle>
-          <CardDescription>Enter your store's credentials to proceed.</CardDescription>
+          <CardTitle className="text-2xl">Terminal Login</CardTitle>
+          <CardDescription>Enter unique store code and your staff credentials.</CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="companyId" className="flex items-center">
-                <Fingerprint className="mr-2 h-4 w-4 text-muted-foreground" /> Company ID*
+              <Label htmlFor="storeAccessCode" className="flex items-center">
+                <Building className="mr-2 h-4 w-4 text-muted-foreground" /> Store Access Code (6-digit)*
               </Label>
               <Input
-                id="companyId"
-                type="text"
-                value={companyIdInput}
-                onChange={(e) => setCompanyIdInput(e.target.value)}
-                required
-                placeholder="Enter Company ID"
-                className="h-11"
-                disabled={isSubmitting}
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="storeId" className="flex items-center">
-                <Building className="mr-2 h-4 w-4 text-muted-foreground" /> Store ID*
-              </Label>
-              <Input
-                id="storeId"
+                id="storeAccessCode"
                 type="text"
                 value={storeIdInput}
                 onChange={(e) => setStoreIdInput(e.target.value)}
                 required
-                placeholder="Enter Store ID"
+                placeholder="Ex: 123456"
+                className="h-11 font-mono tracking-widest text-center text-lg"
+                maxLength={6}
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Staff verification</span>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="employeeId" className="flex items-center">
+                <Fingerprint className="mr-2 h-4 w-4 text-muted-foreground" /> Employee ID*
+              </Label>
+              <Input
+                id="employeeId"
+                type="text"
+                value={companyIdInput} // Reusing state variable name but for Employee ID
+                onChange={(e) => setCompanyIdInput(e.target.value)}
+                required
+                placeholder="Enter your Employee ID"
                 className="h-11"
                 disabled={isSubmitting}
               />
             </div>
+
             <div className="space-y-1.5">
               <Label htmlFor="passkey" className="flex items-center">
-                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Store Passkey* (min. 4 characters)
+                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Employee Passkey*
               </Label>
               <Input
                 id="passkey"
@@ -147,7 +159,7 @@ export function StoreLoginPageClient() {
                 value={passkey}
                 onChange={(e) => setPasskey(e.target.value)}
                 required
-                placeholder="Enter store passkey"
+                placeholder="Enter your password"
                 className="h-11"
                 disabled={isSubmitting}
               />

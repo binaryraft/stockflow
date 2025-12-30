@@ -149,6 +149,7 @@ export interface Store {
   location: string;
   phone: string;
   email: string;
+  accessCode: string;
   passkey: string;
   allowedStaffIds: string[];
   allowedOperations: BillMode[];
