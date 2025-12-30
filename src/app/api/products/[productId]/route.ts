@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { productId: s
     const product = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
 
     if (!product) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
-    
+
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
@@ -36,7 +36,7 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     if (!companyId || !productData || !productId) {
       return NextResponse.json({ success: false, message: 'Company ID, Product ID, and data are required.' }, { status: 400 });
     }
-    
+
     const existingProduct = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
     if (!existingProduct) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
 
@@ -44,14 +44,25 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
 
     // Handle price updates for non-tracked, single-SKU products
     if (productData.trackQuantity === false && (!productData.variants || productData.variants.length === 0)) {
-        let skuToUpdate = existingProduct.productSKUs[0];
-        if (skuToUpdate) {
-            if (costPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].costPrice = costPriceForNonTracked;
-            if (sellPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].sellPrice = sellPriceForNonTracked;
-            updateableData.productSKUs = [skuToUpdate];
+      let skuToUpdate = existingProduct.productSKUs[0];
+      if (skuToUpdate) {
+        if (!skuToUpdate.stockLayers || skuToUpdate.stockLayers.length === 0) {
+          skuToUpdate.stockLayers = [{
+            id: uuidv4(),
+            purchaseBillId: 'STANDARD_PRICE_LAYER',
+            purchaseDate: new Date().toISOString(),
+            initialQuantity: 1000,
+            quantity: 1000,
+            costPrice: 0,
+            sellPrice: 0
+          }];
         }
+        if (costPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].costPrice = costPriceForNonTracked;
+        if (sellPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].sellPrice = sellPriceForNonTracked;
+        updateableData.productSKUs = [skuToUpdate];
+      }
     }
-    
+
     const { id, ...dataToSet } = updateableData;
 
     const result = await db.collection<Product>('products').updateOne(
