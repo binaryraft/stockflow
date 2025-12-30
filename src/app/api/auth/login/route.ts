@@ -57,11 +57,11 @@ export async function POST(req: NextRequest) {
         console.warn(`${routeNamePrefix} No employee found with ID: ${employeeId} for company ${companyId}.`);
       }
     } else if (loginType === 'store') {
-      const { storeAccessCode, employeeId, employeePasskey } = body;
+      const { companyId, storeAccessCode, employeeId, employeePasskey } = body;
 
-      if (!storeAccessCode || !employeeId || !employeePasskey) {
-        console.warn(`${routeNamePrefix} Store Access Code, Employee ID, and Password are required.`);
-        return NextResponse.json({ success: false, message: 'Store Access Code, Employee ID, and Password are required.' }, { status: 400 });
+      if (!companyId || !storeAccessCode || !employeeId || !employeePasskey) {
+        console.warn(`${routeNamePrefix} Company ID, Store Access Code, Employee ID, and Password are required.`);
+        return NextResponse.json({ success: false, message: 'Company ID, Store Access Code, Employee ID, and Password are required.' }, { status: 400 });
       }
 
       // 1. Find the Store by Access Code (Global Unique 6-digit)
@@ -70,6 +70,12 @@ export async function POST(req: NextRequest) {
       if (!authenticatedStore) {
         console.warn(`${routeNamePrefix} Store not found with Access Code: ${storeAccessCode}.`);
         return NextResponse.json({ success: false, message: 'Invalid Store Access Code.' }, { status: 404 });
+      }
+
+      // 2. Verify Company ID matches
+      if (authenticatedStore.companyId !== companyId) {
+        console.warn(`${routeNamePrefix} Company ID mismatch for store ${authenticatedStore.id}. Expected ${authenticatedStore.companyId}, got ${companyId}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Company ID for this store.' }, { status: 401 });
       }
 
       // 2. Find the Employee in the same company

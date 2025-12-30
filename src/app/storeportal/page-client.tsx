@@ -20,6 +20,7 @@ export function StoreLoginPageClient() {
 
   const [companyIdInput, setCompanyIdInput] = useState('');
   const [storeIdInput, setStoreIdInput] = useState('');
+  const [employeeIdInput, setEmployeeIdInput] = useState('');
   const [passkey, setPasskey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
@@ -37,12 +38,12 @@ export function StoreLoginPageClient() {
     e.preventDefault();
     if (!hasMounted) return;
 
-    if (!companyIdInput.trim() || !storeIdInput.trim() || !passkey.trim()) {
-      toast({ variant: "destructive", title: "Login Failed", description: "Store Access Code, Employee ID, and Password are required." });
+    if (!companyIdInput.trim() || !storeIdInput.trim() || !employeeIdInput.trim() || !passkey.trim()) {
+      toast({ variant: "destructive", title: "Login Failed", description: "Company ID, Store Access Code, Employee ID, and Password are required." });
       return;
     }
-    if (passkey.length < 4) {
-      toast({ variant: "destructive", title: "Login Failed", description: "Passkey must be at least 4 characters." });
+    if (storeIdInput.trim().length !== 6) {
+      toast({ variant: "destructive", title: "Login Failed", description: "Store Access Code must be 6 digits." });
       return;
     }
 
@@ -54,8 +55,9 @@ export function StoreLoginPageClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           loginType: 'store',
+          companyId: companyIdInput.trim(),
           storeAccessCode: storeIdInput.trim(),
-          employeeId: companyIdInput.trim(), // We repurposed this state variable for Employee ID
+          employeeId: employeeIdInput.trim(),
           employeePasskey: passkey,
         }),
       });
@@ -108,8 +110,24 @@ export function StoreLoginPageClient() {
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
+              <Label htmlFor="companyId" className="flex items-center">
+                <Fingerprint className="mr-2 h-4 w-4 text-muted-foreground" /> Company ID*
+              </Label>
+              <Input
+                id="companyId"
+                type="text"
+                value={companyIdInput}
+                onChange={(e) => setCompanyIdInput(e.target.value)}
+                required
+                placeholder="Enter Company ID"
+                className="h-11"
+                disabled={isSubmitting}
+              />
+            </div>
+
+            <div className="space-y-1.5">
               <Label htmlFor="storeAccessCode" className="flex items-center">
-                <Building className="mr-2 h-4 w-4 text-muted-foreground" /> Store Access Code (6-digit)*
+                <Building className="mr-2 h-4 w-4 text-muted-foreground" /> Store Access Code (6 digits)*
               </Label>
               <Input
                 id="storeAccessCode"
@@ -124,7 +142,7 @@ export function StoreLoginPageClient() {
               />
             </div>
 
-            <div className="relative">
+            <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t" />
               </div>
@@ -140,8 +158,8 @@ export function StoreLoginPageClient() {
               <Input
                 id="employeeId"
                 type="text"
-                value={companyIdInput} // Reusing state variable name but for Employee ID
-                onChange={(e) => setCompanyIdInput(e.target.value)}
+                value={employeeIdInput}
+                onChange={(e) => setEmployeeIdInput(e.target.value)}
                 required
                 placeholder="Enter your Employee ID"
                 className="h-11"
@@ -151,7 +169,7 @@ export function StoreLoginPageClient() {
 
             <div className="space-y-1.5">
               <Label htmlFor="passkey" className="flex items-center">
-                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Employee Passkey*
+                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground" /> Employee Passkey (Password)*
               </Label>
               <Input
                 id="passkey"

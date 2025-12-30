@@ -43,9 +43,9 @@ interface StaffFormDialogProps {
   allStores: Store[];
 }
 
-export function StaffFormDialog({ 
-  isOpen, 
-  onOpenChange, 
+export function StaffFormDialog({
+  isOpen,
+  onOpenChange,
   onFormSubmit,
   editingStaff,
   allStores
@@ -56,7 +56,7 @@ export function StaffFormDialog({
     companyId: localStorage.getItem('companyId')
   }));
   const { toast } = useToast();
-  
+
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StaffFormData>({
     resolver: zodResolver(staffFormSchema),
     defaultValues: {
@@ -70,7 +70,7 @@ export function StaffFormDialog({
     if (isOpen) {
       if (editingStaff) {
         reset({
-          name: editingStaff.name, email: editingStaff.email, phone: editingStaff.phone || '', password: '', 
+          name: editingStaff.name, email: editingStaff.email, phone: editingStaff.phone || '', password: '',
           assignedStoreIds: editingStaff.assignedStoreIds || [],
         });
       } else {
@@ -88,20 +88,20 @@ export function StaffFormDialog({
     }
 
     const passwordToSubmit = data.password?.trim();
-    
+
     if (!editingStaff && (!passwordToSubmit || passwordToSubmit.length < 6)) {
-        toast({ variant: "destructive", title: "Validation Error", description: "A password of at least 6 characters is required for new staff." });
-        return;
+      toast({ variant: "destructive", title: "Validation Error", description: "A password of at least 6 characters is required for new staff." });
+      return;
     }
 
     const staffPayload: Partial<User> = {
-        name: data.name, email: data.email, phone: data.phone, assignedStoreIds: data.assignedStoreIds,
+      name: data.name, email: data.email, phone: data.phone, assignedStoreIds: data.assignedStoreIds,
     };
     if (passwordToSubmit) staffPayload.password = passwordToSubmit;
 
-    const success = editingStaff 
-        ? await updateStaff(editingStaff.id, staffPayload, currentCompanyId)
-        : await addStaff(staffPayload as Required<typeof staffPayload>, currentCompanyId);
+    const success = editingStaff
+      ? await updateStaff(editingStaff.id, staffPayload, currentCompanyId)
+      : await addStaff(staffPayload as Required<typeof staffPayload>, currentCompanyId);
 
     if (success) {
       toast({ title: `Staff ${editingStaff ? 'Updated' : 'Added'}`, description: `${data.name}'s details have been saved.` });
@@ -115,8 +115,8 @@ export function StaffFormDialog({
       <DialogContent className="sm:max-w-xl flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
         <DialogHeader className="p-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl">
-             <Briefcase className="h-6 w-6 text-primary"/>
-             {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
+            <Briefcase className="h-6 w-6 text-primary" />
+            {editingStaff ? 'Edit Staff Member' : 'Add New Staff Member'}
           </DialogTitle>
           <DialogDescription>
             Fill in the staff details. Fields marked with * are required.
@@ -126,67 +126,73 @@ export function StaffFormDialog({
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6">
               <div className="space-y-4">
-                 <h4 className="text-sm font-semibold text-muted-foreground">STAFF INFORMATION</h4>
+                <h4 className="text-sm font-semibold text-muted-foreground">STAFF INFORMATION</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-center gap-1.5"><UserIcon size={14} />Full Name*</Label>
+                  <Input id="name" {...register("name")} />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                </div>
+                {editingStaff && editingStaff.employeeId && (
                   <div className="space-y-2">
-                    <Label htmlFor="name" className="flex items-center gap-1.5"><UserIcon size={14}/>Full Name*</Label>
-                    <Input id="name" {...register("name")} />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                    <Label htmlFor="employeeIdDisplay" className="flex items-center gap-1.5 text-muted-foreground"><Briefcase size={14} />Employee ID (System Generated)</Label>
+                    <Input id="employeeIdDisplay" value={editingStaff.employeeId} readOnly disabled className="bg-muted font-mono" />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14}/>Email Address*</Label>
-                    <Input id="email" type="email" {...register("email")} />
-                    {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14}/>Phone Number*</Label>
-                    <Input id="phone" type="tel" {...register("phone")} />
-                    {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
-                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14} />Email Address*</Label>
+                  <Input id="email" type="email" {...register("email")} />
+                  {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14} />Phone Number*</Label>
+                  <Input id="phone" type="tel" {...register("phone")} />
+                  {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                </div>
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-4">
-                 <h4 className="text-sm font-semibold text-muted-foreground">AUTHENTICATION</h4>
-                 <div className="space-y-2">
-                    <Label htmlFor="password" className="flex items-center gap-1.5"><KeyRound size={14}/>Password*{editingStaff ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
-                    <Input id="password" type="password" {...register("password")} placeholder={editingStaff ? "Enter new password to change" : "Min. 6 characters"}/>
-                    {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
-                 </div>
+                <h4 className="text-sm font-semibold text-muted-foreground">AUTHENTICATION</h4>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="flex items-center gap-1.5"><KeyRound size={14} />Password*{editingStaff ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
+                  <Input id="password" type="password" {...register("password")} placeholder={editingStaff ? "Enter new password to change" : "Min. 6 characters"} />
+                  {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
+                </div>
               </div>
 
               {allStores.length > 0 && (
                 <>
-                    <Separator />
-                    <div className="space-y-3">
-                        <h4 className="text-sm font-semibold text-muted-foreground">ASSIGNMENTS</h4>
+                  <Separator />
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-semibold text-muted-foreground">ASSIGNMENTS</h4>
+                    <div className="space-y-2">
+                      <Label className="flex items-center gap-1.5"><Building size={14} />Accessible Stores (Optional)</Label>
+                      <p className="text-xs text-muted-foreground -mt-1">
+                        Select stores this staff member can access.
+                      </p>
+                      <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
                         <div className="space-y-2">
-                        <Label className="flex items-center gap-1.5"><Building size={14}/>Accessible Stores (Optional)</Label>
-                        <p className="text-xs text-muted-foreground -mt-1">
-                            Select stores this staff member can access.
-                        </p>
-                        <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
-                            <div className="space-y-2">
-                            {allStores.map((store) => (
+                          {allStores.map((store) => (
                             <div key={store.id} className="flex items-center space-x-2">
-                                <Checkbox
+                              <Checkbox
                                 id={`store-${store.id}`}
                                 checked={selectedStoreIds.includes(store.id)}
                                 onCheckedChange={(checked) => {
-                                    const currentIds = selectedStoreIds;
-                                    setValue('assignedStoreIds', checked ? [...currentIds, store.id] : currentIds.filter(id => id !== store.id));
+                                  const currentIds = selectedStoreIds;
+                                  setValue('assignedStoreIds', checked ? [...currentIds, store.id] : currentIds.filter(id => id !== store.id));
                                 }}
-                                />
-                                <Label htmlFor={`store-${store.id}`} className="font-normal text-sm">
+                              />
+                              <Label htmlFor={`store-${store.id}`} className="font-normal text-sm">
                                 {store.name} <span className="text-xs text-muted-foreground">({store.location})</span>
-                                </Label>
+                              </Label>
                             </div>
-                            ))}
-                            </div>
-                        </ScrollArea>
-                        {errors.assignedStoreIds && <p className="text-sm text-destructive mt-1">{errors.assignedStoreIds.message}</p>}
+                          ))}
                         </div>
+                      </ScrollArea>
+                      {errors.assignedStoreIds && <p className="text-sm text-destructive mt-1">{errors.assignedStoreIds.message}</p>}
                     </div>
+                  </div>
                 </>
               )}
             </div>

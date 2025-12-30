@@ -27,13 +27,13 @@ type SortableStaffColumns = keyof Pick<Staff, 'name' | 'email' | 'phone'>;
 export function StaffTable() {
   const { staffs, deleteStaff, getAllStores, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
   const { toast } = useToast();
-  
+
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableStaffColumns; direction: 'ascending' | 'descending' } | null>(null);
 
-  const stores = getAllStores(); 
+  const stores = getAllStores();
   const activePlan = getActiveSubscriptionPlan();
   const userCanAddStaff = activePlan ? staffs.length < activePlan.maxEmployees : false; // Recalculate based on activePlan
   const isAdminOnlyPlan = activePlan?.id === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY;
@@ -73,49 +73,49 @@ export function StaffTable() {
   };
 
   const handleOpenEditDialog = (staff: Staff) => {
-     if (isAdminOnlyPlan) {
-      toast({variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade."});
+    if (isAdminOnlyPlan) {
+      toast({ variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade." });
       return;
     }
-    setEditingStaff(staff); 
-    setIsFormDialogOpen(true); 
+    setEditingStaff(staff);
+    setIsFormDialogOpen(true);
   };
 
   const handleDeleteStaff = (staffId: string, staffName: string) => {
     if (isAdminOnlyPlan) {
-      toast({variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade."});
+      toast({ variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade." });
       return;
     }
     const companyId = localStorage.getItem('companyId');
     if (!companyId) {
-      toast({variant: "destructive", title: "Error", description: "Company ID not found."});
+      toast({ variant: "destructive", title: "Error", description: "Company ID not found." });
       return;
     }
     deleteStaff(staffId, companyId);
     toast({ title: "Staff Deleted", description: `${staffName} has been removed.` });
   };
 
-  const onFormDialogSubmit = () => { 
+  const onFormDialogSubmit = () => {
     setIsFormDialogOpen(false);
-    setEditingStaff(null); 
+    setEditingStaff(null);
   };
 
   const addStaffButtonTooltipContent = isAdminOnlyPlan
     ? "Staff management is not available on the Basic Admin plan. Please upgrade."
     : !userCanAddStaff
-    ? `You have reached the maximum of ${activePlan?.maxEmployees} employees for your current plan. Please upgrade.`
-    : "Add New Staff";
+      ? `You have reached the maximum of ${activePlan?.maxEmployees} employees for your current plan. Please upgrade.`
+      : "Add New Staff";
 
 
   return (
     <TooltipProvider>
-      <StaffFormDialog 
-        isOpen={isFormDialogOpen} 
+      <StaffFormDialog
+        isOpen={isFormDialogOpen}
         onOpenChange={(open) => {
-          if (!open) setEditingStaff(null); 
+          if (!open) setEditingStaff(null);
           setIsFormDialogOpen(open);
         }}
-        editingStaff={editingStaff} 
+        editingStaff={editingStaff}
         onFormSubmit={onFormDialogSubmit}
         allStores={stores}
       />
@@ -129,18 +129,18 @@ export function StaffTable() {
         <Tooltip>
           <TooltipTrigger asChild>
             <div className="inline-block">
-              <Button 
-                onClick={() => { 
-                   if (isAdminOnlyPlan) {
-                    toast({variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade."});
+              <Button
+                onClick={() => {
+                  if (isAdminOnlyPlan) {
+                    toast({ variant: "destructive", title: "Feature Locked", description: "Staff management is not available on the Basic Admin plan. Please upgrade." });
                     return;
                   }
-                  if(!userCanAddStaff) {
-                    toast({variant: "destructive", title: "Limit Reached", description: `Cannot add more staff. Max ${activePlan?.maxEmployees} allowed on current plan.`});
+                  if (!userCanAddStaff) {
+                    toast({ variant: "destructive", title: "Limit Reached", description: `Cannot add more staff. Max ${activePlan?.maxEmployees} allowed on current plan.` });
                     return;
                   }
-                  setEditingStaff(null); 
-                  setIsFormDialogOpen(true); 
+                  setEditingStaff(null);
+                  setIsFormDialogOpen(true);
                 }}
                 disabled={!userCanAddStaff || isAdminOnlyPlan}
                 aria-disabled={!userCanAddStaff || isAdminOnlyPlan}
@@ -169,6 +169,7 @@ export function StaffTable() {
               <TableHead onClick={() => requestSort('phone')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
+              <TableHead className="py-3 px-4">Emp ID</TableHead>
               <TableHead className="py-3 px-4">Accessible Stores</TableHead>
               <TableHead className="text-right py-3 px-4">Actions</TableHead>
             </TableRow>
@@ -180,9 +181,10 @@ export function StaffTable() {
                   <TableCell className="font-medium py-3 px-4">{staff.name}</TableCell>
                   <TableCell className="py-3 px-4">{staff.email}</TableCell>
                   <TableCell className="py-3 px-4">{staff.phone}</TableCell>
+                  <TableCell className="py-3 px-4 font-mono text-xs bg-muted/30 rounded-full px-2">{staff.employeeId || 'N/A'}</TableCell>
                   <TableCell className="py-3 px-4 text-xs">
-                    {(staff.assignedStoreIds || []).length === 0 
-                      ? <span className="text-muted-foreground">All Stores</span> 
+                    {(staff.assignedStoreIds || []).length === 0
+                      ? <span className="text-muted-foreground">All Stores</span>
                       : staff.assignedStoreIds?.map(storeId => stores.find(s => s.id === storeId)?.name || 'Unknown Store').join(', ')
                     }
                   </TableCell>
@@ -196,33 +198,33 @@ export function StaffTable() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleOpenEditDialog(staff)} disabled={isAdminOnlyPlan}>
+                        <DropdownMenuItem onClick={() => handleOpenEditDialog(staff as Staff)} disabled={isAdminOnlyPlan}>
                           <Edit3 className="mr-2 h-4 w-4" /> Edit
                         </DropdownMenuItem>
                         <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                <DropdownMenuItem 
-                                  onSelect={(e) => e.preventDefault()} 
-                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                  disabled={isAdminOnlyPlan}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the staff member "{staff.name}".
-                                </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteStaff(staff.id, staff.name)} className="bg-destructive hover:bg-destructive/90">
-                                    Delete
-                                </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
+                          <AlertDialogTrigger asChild>
+                            <DropdownMenuItem
+                              onSelect={(e) => e.preventDefault()}
+                              className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                              disabled={isAdminOnlyPlan}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the staff member "{staff.name}".
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction onClick={() => handleDeleteStaff(staff.id, staff.name)} className="bg-destructive hover:bg-destructive/90">
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
                         </AlertDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -231,7 +233,7 @@ export function StaffTable() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center">
+                <TableCell colSpan={6} className="h-24 text-center">
                   No staff found. {isAdminOnlyPlan && "Staff management is not available on your current plan."}
                 </TableCell>
               </TableRow>
