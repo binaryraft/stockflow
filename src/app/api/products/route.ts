@@ -58,6 +58,33 @@ export async function POST(req: NextRequest) {
         skuIdentifier: productData.name,
         stockLayers: [],
       });
+    } else {
+      // Generate all possible SKU combinations from variants
+      const generateCombinations = (variants: ProductVariant[]): Record<string, string>[] => {
+        if (variants.length === 0) return [{}];
+        const firstVariant = variants[0];
+        const restCombinations = generateCombinations(variants.slice(1));
+        const combinations: Record<string, string>[] = [];
+        
+        firstVariant.options.forEach(option => {
+            restCombinations.forEach(combination => {
+                combinations.push({
+                    [firstVariant.name]: option.value,
+                    ...combination
+                });
+            });
+        });
+        return combinations;
+      };
+
+      const combinations = generateCombinations(productData.variants);
+      
+      newProduct.productSKUs = combinations.map(combination => ({
+        id: generateId(),
+        optionValues: combination,
+        skuIdentifier: `${newProduct.name} (${Object.values(combination).join(' - ')})`,
+        stockLayers: []
+      }));
     }
 
     await db.collection<Product>('products').insertOne(newProduct);
