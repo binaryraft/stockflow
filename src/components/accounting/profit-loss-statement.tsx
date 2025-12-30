@@ -22,7 +22,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
   const summary = useMemo(() => {
-    return getReportSummaryByDateRange(startDate, endDate, companyId, storeId);
+    return getReportSummaryByDateRange(startDate, endDate, companyId || undefined, storeId);
   }, [startDate, endDate, companyId, storeId, getReportSummaryByDateRange]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
@@ -42,9 +42,23 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
       <CardContent>
         <div className="space-y-4 text-sm">
           {/* Revenue Section */}
-          <div className="flex justify-between items-center">
-            <span className="font-semibold text-foreground">Total Revenue from Sales</span>
-            <span className="font-medium text-foreground">{formatValue(summary.totalRevenue)}</span>
+          {/* Revenue Section */}
+          <div className="space-y-2 mb-4">
+            <div className="flex justify-between items-center">
+              <span className="text-foreground">Revenue from Product Sales</span>
+              <span className="text-foreground">{formatValue(summary.totalRevenue - (summary.totalAdditionalCharges || 0))}</span>
+            </div>
+            {(summary.totalAdditionalCharges || 0) > 0 && (
+              <div className="flex justify-between items-center">
+                <span className="pl-4 text-emerald-600 dark:text-emerald-400">Additional Charges (Profit)</span>
+                <span className="text-emerald-600 dark:text-emerald-400">{formatValue(summary.totalAdditionalCharges || 0)}</span>
+              </div>
+            )}
+            <Separator className="my-2" />
+            <div className="flex justify-between items-center font-semibold">
+              <span className="text-foreground">Total Revenue</span>
+              <span className="text-foreground">{formatValue(summary.totalRevenue)}</span>
+            </div>
           </div>
 
           {/* COGS Section */}
@@ -52,7 +66,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
             <span className="text-muted-foreground pl-4">Less: Cost of Goods Sold (COGS)</span>
             <span className="text-muted-foreground">({formatValue(summary.totalCOGS)})</span>
           </div>
-          
+
           <Separator />
 
           {/* Gross Profit */}
@@ -61,7 +75,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
             <span className={cn(summary.grossProfit >= 0 ? "text-green-600" : "text-destructive")}>{formatValue(summary.grossProfit)}</span>
           </div>
 
-          <Separator className="my-4"/>
+          <Separator className="my-4" />
 
           {/* Expenses Section */}
           <div className="flex justify-between items-center">

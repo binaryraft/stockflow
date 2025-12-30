@@ -77,7 +77,7 @@ export function StoresTable() {
 
   const handleOpenEditDialog = (store: Store) => {
     if (isAdminOnlyPlan) {
-      toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+      toast({ variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade." });
       return;
     }
     setEditingStore(store);
@@ -85,11 +85,16 @@ export function StoresTable() {
   };
 
   const handleDeleteStore = (storeId: string, storeName: string) => {
-     if (isAdminOnlyPlan) {
-      toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+    if (isAdminOnlyPlan) {
+      toast({ variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade." });
       return;
     }
-    deleteStore(storeId);
+    const companyId = localStorage.getItem('companyId') || '';
+    if (!companyId) {
+      toast({ title: "Error", description: "Company ID missing. Please refresh.", variant: "destructive" });
+      return;
+    }
+    deleteStore(storeId, companyId);
     toast({ title: "Store Deleted", description: `${storeName} has been removed.` });
   };
 
@@ -101,8 +106,8 @@ export function StoresTable() {
   const addStoreButtonTooltipContent = isAdminOnlyPlan
     ? "Store management is not available on the Basic Admin plan. Please upgrade."
     : !userCanAddStore
-    ? `You have reached the maximum of ${activePlan?.maxStores} stores for your current plan. Please upgrade.`
-    : "Add New Store";
+      ? `You have reached the maximum of ${activePlan?.maxStores} stores for your current plan. Please upgrade.`
+      : "Add New Store";
 
   return (
     <TooltipProvider>
@@ -129,11 +134,11 @@ export function StoresTable() {
               <Button
                 onClick={() => {
                   if (isAdminOnlyPlan) {
-                    toast({variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade."});
+                    toast({ variant: "destructive", title: "Feature Locked", description: "Store management is not available on the Basic Admin plan. Please upgrade." });
                     return;
                   }
                   if (!userCanAddStore) {
-                     toast({variant: "destructive", title: "Limit Reached", description: `Cannot add more stores. Max ${activePlan?.maxStores} allowed on current plan.`});
+                    toast({ variant: "destructive", title: "Limit Reached", description: `Cannot add more stores. Max ${activePlan?.maxStores} allowed on current plan.` });
                     return;
                   }
                   setEditingStore(null);
@@ -179,68 +184,69 @@ export function StoresTable() {
               filteredAndSortedStores.map((store) => {
                 const allowedStaff = getStaffDetailsByIds(store.allowedStaffIds);
                 return (
-                <TableRow key={store.id}>
-                  <TableCell className="font-medium py-3 px-4">{store.name}</TableCell>
-                  <TableCell className="py-3 px-4">{store.location}</TableCell>
-                  <TableCell className="py-3 px-4">{store.email}</TableCell>
-                  <TableCell className="py-3 px-4">{store.phone}</TableCell>
-                   <TableCell className="py-3 px-4 text-xs">
-                    {store.allowedStaffIds.length === 0
-                      ? <span className="text-muted-foreground">All staff with general access</span>
-                      : allowedStaff.map(staff => staff.name).join(', ') || <span className="text-muted-foreground">None explicitly</span>
-                    }
-                  </TableCell>
-                  <TableCell className="py-3 px-4 text-xs capitalize">
-                    {store.allowedOperations.join(', ')}
-                  </TableCell>
-                  <TableCell className="text-right py-3 px-4">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0" disabled={isAdminOnlyPlan} aria-disabled={isAdminOnlyPlan}>
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                         <DropdownMenuItem asChild>
-                          <Link href={`/storeportal/${store.id}/login`}>
-                            <LogIn className="mr-2 h-4 w-4" /> View Store Terminal
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleOpenEditDialog(store)} disabled={isAdminOnlyPlan}>
-                          <Edit3 className="mr-2 h-4 w-4" /> Edit
-                        </DropdownMenuItem>
-                        <AlertDialog>
+                  <TableRow key={store.id}>
+                    <TableCell className="font-medium py-3 px-4">{store.name}</TableCell>
+                    <TableCell className="py-3 px-4">{store.location}</TableCell>
+                    <TableCell className="py-3 px-4">{store.email}</TableCell>
+                    <TableCell className="py-3 px-4">{store.phone}</TableCell>
+                    <TableCell className="py-3 px-4 text-xs">
+                      {store.allowedStaffIds.length === 0
+                        ? <span className="text-muted-foreground">All staff with general access</span>
+                        : allowedStaff.map(staff => staff.name).join(', ') || <span className="text-muted-foreground">None explicitly</span>
+                      }
+                    </TableCell>
+                    <TableCell className="py-3 px-4 text-xs capitalize">
+                      {store.allowedOperations.join(', ')}
+                    </TableCell>
+                    <TableCell className="text-right py-3 px-4">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0" disabled={isAdminOnlyPlan} aria-disabled={isAdminOnlyPlan}>
+                            <span className="sr-only">Open menu</span>
+                            <MoreHorizontal className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/storeportal/${store.id}/login`}>
+                              <LogIn className="mr-2 h-4 w-4" /> View Store Terminal
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleOpenEditDialog(store)} disabled={isAdminOnlyPlan}>
+                            <Edit3 className="mr-2 h-4 w-4" /> Edit
+                          </DropdownMenuItem>
+                          <AlertDialog>
                             <AlertDialogTrigger asChild>
-                                <DropdownMenuItem 
-                                  onSelect={(e) => e.preventDefault()} 
-                                  className="text-destructive focus:text-destructive focus:bg-destructive/10"
-                                  disabled={isAdminOnlyPlan}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={(e) => e.preventDefault()}
+                                className="text-destructive focus:text-destructive focus:bg-destructive/10"
+                                disabled={isAdminOnlyPlan}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
                             </AlertDialogTrigger>
                             <AlertDialogContent>
-                                <AlertDialogHeader>
+                              <AlertDialogHeader>
                                 <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the store "{store.name}".
+                                  This action cannot be undone. This will permanently delete the store "{store.name}".
                                 </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleDeleteStore(store.id, store.name)} className="bg-destructive hover:bg-destructive/90">
-                                    Delete
+                                  Delete
                                 </AlertDialogAction>
-                                </AlertDialogFooter>
+                              </AlertDialogFooter>
                             </AlertDialogContent>
-                        </AlertDialog>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              )})
+                          </AlertDialog>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="h-24 text-center">

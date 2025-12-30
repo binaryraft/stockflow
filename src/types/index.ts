@@ -248,6 +248,7 @@ export interface DateRangeReportSummary {
   totalSGST: number;
   totalCGST: number;
   totalTax: number;
+  totalAdditionalCharges: number;
 }
 
 export interface ProductAnalytics {
@@ -312,6 +313,8 @@ export interface ProductRevenueData {
   name: string;
   revenue: number;
   quantity: number;
+  cogs?: number;
+  profit?: number;
 }
 
 // Ensure Staff type is defined for clarity, although it's a subset of User

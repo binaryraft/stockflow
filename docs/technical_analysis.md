@@ -92,6 +92,12 @@ StockFlow is a web-based Inventory Management and Point of Sale (POS) system des
 - Tracks "Defective" vs "Good" returns.
 - Auditing via `ProductLedgerEntry`.
 
+### Financial Reporting
+- **Profit & Loss (P&L)**:
+  - **Revenue Breakdown**: Distinguishes between "Product Sales" and "Additional Charges".
+  - **Additional Charges**: Treated as pure profit (Service Revenue), distinct from COGS-related revenue.
+  - **Live Estimates**: Reports support filtering by Store contexts.
+
 ## 5. Deployment
 - Configuration suggests Firebase App Hosting (`apphosting.yaml`).
 - Environment variables required: `MONGODB_URI`, `MONGODB_DB_NAME`.

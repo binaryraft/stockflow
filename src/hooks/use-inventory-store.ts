@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff } from '@/types';
+import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, StockLayer } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, endOfDay, isToday, isThisWeek, isThisMonth, isThisYear, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -31,11 +31,11 @@ interface ExpenseSummary {
 
 interface InventoryState {
   // Core Data Stores
-  products: Product[]; 
+  products: Product[];
   bills: Bill[];
   categories: Category[];
   customers: Customer[];
-  staffs: User[]; 
+  staffs: User[];
   stores: Store[];
   userProfile: UserProfile;
   messagesByStore: Record<string, ChatMessage[]>;
@@ -46,26 +46,26 @@ interface InventoryState {
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
   archiveProduct: (productId: string, companyId: string) => Promise<boolean>;
   unarchiveProduct: (productId: string, companyId: string) => Promise<boolean>;
-  
+
   // Bill Actions
   fetchBills: (companyId: string) => Promise<void>;
   addBill: (billData: any, itemsData: any) => Promise<Bill | null>;
   deleteBill: (billId: string, companyId: string) => Promise<boolean>;
   updateBillNonCriticalDetails: (billId: string, details: { paymentStatus?: Bill['paymentStatus'], notes?: string }, companyId: string) => Promise<Bill | null>;
-  
+
   // Category Actions
   fetchCategories: (companyId: string) => Promise<void>;
   addCategory: (categoryName: string, companyId: string) => Promise<Category | null>;
 
   // Customer Actions
   fetchCustomers: (companyId: string) => Promise<void>;
-  
+
   // Staff Actions
   fetchStaff: (companyId: string) => Promise<void>;
-  addStaff: (staffData: Omit<User, 'id' | 'role' | 'companyId'|'password'> & {password:string}, companyId: string) => Promise<User | null>;
+  addStaff: (staffData: Omit<User, 'id' | 'role' | 'companyId' | 'password'> & { password: string }, companyId: string) => Promise<User | null>;
   updateStaff: (staffId: string, staffData: Partial<Omit<User, 'id' | 'role' | 'companyId'>>, companyId: string) => Promise<User | null>;
   deleteStaff: (staffId: string, companyId: string) => Promise<boolean>;
-  
+
   // Store Actions
   fetchStores: (companyId: string) => Promise<void>;
   addStore: (storeData: Omit<Store, 'id' | 'companyId'>, companyId: string) => Promise<Store | null>;
@@ -74,7 +74,7 @@ interface InventoryState {
 
   // Company Profile Actions
   fetchCompanyProfile: (companyId: string) => Promise<Company | null>;
-  updateUserProfileFields: (data: Partial<Omit<Company, 'id'|'token'>>, companyId: string) => Promise<Company | null>; 
+  updateUserProfileFields: (data: Partial<Omit<Company, 'id' | 'token'>>, companyId: string) => Promise<Company | null>;
 
   // Chat Actions
   fetchMessagesForStore: (storeId: string, companyId: string) => Promise<void>;
@@ -82,13 +82,13 @@ interface InventoryState {
   clearChatForStore: (storeId: string, companyId: string) => Promise<boolean>;
 
   // Simple Getters (Client-side helpers)
-  getProductById: (productId: string) => Product | undefined; 
+  getProductById: (productId: string) => Product | undefined;
   getBillById: (billId: string) => Bill | undefined;
   getStoreById: (storeId: string) => Store | undefined;
-  getStaffById: (staffId: string) => User | undefined; 
+  getStaffById: (staffId: string) => User | undefined;
   getCustomerById: (customerId: string) => Customer | undefined;
   getAllStores: () => Store[];
-  getAllStaff: () => User[]; 
+  getAllStaff: () => User[];
   getAllCustomers: (companyId?: string) => Customer[];
   getSkuIdentifier: (productName: string, optionValues: Record<string, string>) => string;
   getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
@@ -96,15 +96,15 @@ interface InventoryState {
   searchProducts: (searchTerm: string) => Product[];
   searchCategories: (searchTerm: string) => string[];
   getMessagesForStore: (storeId: string) => ChatMessage[];
-  getStaffDetailsByIds: (staffIds: string[]) => User[]; 
-  
+  getStaffDetailsByIds: (staffIds: string[]) => User[];
+
   // Subscription & Permission Getters
   getActiveSubscriptionPlan: () => SubscriptionPlan | undefined;
   canAddStore: () => boolean;
   canAddStaff: () => boolean;
-  
+
   // Analytics & Reporting Getters (Client-side calculations)
-  getLowStockProductCount: (threshold: number, companyId?: string) => number; 
+  getLowStockProductCount: (threshold: number, companyId?: string) => number;
   getRecentBills: (limit: number) => Bill[];
   getBillsForProduct: (productId: string) => Bill[];
   getDailySalesAndExpenses: (period: TimePeriod, companyId?: string) => Array<{ date: string; sales: number; expenses: number }>;
@@ -117,13 +117,13 @@ interface InventoryState {
   getProductAnalytics: (productId: string) => ProductAnalytics;
   getProductLedgerSummary: (params: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
   getProductFinancialsByMonth: (productId: string) => MonthlyProductFinancials[];
-  getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => DateRangeReportSummary;
+  getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string, storeId?: string) => DateRangeReportSummary;
   getSalesBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
   getExpenseBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
-  getAccountsReceivableSummary: (companyId?: string) => AccountsReceivableSummary;
-  getAccountsPayableSummary: (companyId?: string) => AccountsPayableSummary;
-  getCashFlowSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => CashFlowSummary;
-  getBalanceSheetSummary: (companyId?: string) => BalanceSheetSummary;
+  getAccountsReceivableSummary: (companyId?: string, storeId?: string) => AccountsReceivableSummary;
+  getAccountsPayableSummary: (companyId?: string, storeId?: string) => AccountsPayableSummary;
+  getCashFlowSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string, storeId?: string) => CashFlowSummary;
+  getBalanceSheetSummary: (companyId?: string, storeId?: string) => BalanceSheetSummary;
 }
 
 const defaultUserProfile: UserProfile = {
@@ -132,7 +132,7 @@ const defaultUserProfile: UserProfile = {
   defaultBillNotes: 'Thank you for your business!',
   defaultSalesPaymentStatus: 'paid', defaultPurchasePaymentStatus: 'paid',
   companyCurrency: DEFAULT_CURRENCY_CODE,
-  dataMode: 'local', 
+  dataMode: 'local',
   paymentStatus: 'pending',
   subscriptionExpiryDate: null,
 };
@@ -166,7 +166,7 @@ export const useInventoryStore = create<InventoryState>()(
           else { console.error("Failed to fetch products or data format incorrect:", result.message); set({ products: [] }); }
         } catch (error) {
           console.error("Error in fetchProducts:", error);
-          set({products: []});
+          set({ products: [] });
         }
       },
       addProduct: async (productData, companyId) => {
@@ -244,7 +244,7 @@ export const useInventoryStore = create<InventoryState>()(
           else { console.error("Failed to fetch bills or data format incorrect:", result.message); set({ bills: [] }); }
         } catch (error) {
           console.error("Error in fetchBills:", error);
-          set({bills: []});
+          set({ bills: [] });
         }
       },
       addBill: async (billData, itemsData) => {
@@ -256,7 +256,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (!result.success) throw new Error(result.message);
           const newBill = result.data as Bill;
-          set((state) => ({ bills: [newBill, ...state.bills].sort((a,b) => b.timestamp - a.timestamp) }));
+          set((state) => ({ bills: [newBill, ...state.bills].sort((a, b) => b.timestamp - a.timestamp) }));
           get().fetchProducts(billData.companyId); // Refetch products to update stock
           return newBill;
         } catch (error: any) {
@@ -300,159 +300,159 @@ export const useInventoryStore = create<InventoryState>()(
       fetchCategories: async (companyId) => {
         if (!companyId) return console.warn("fetchCategories: companyId is required");
         try {
-            const response = await fetch(`/api/categories?companyId=${companyId}`);
-            if (!response.ok) throw new Error(`Failed to fetch categories: ${response.statusText}`);
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) set({ categories: result.data || [] });
-            else { console.error("Failed to fetch categories or data format incorrect:", result.message); set({ categories: [] }); }
+          const response = await fetch(`/api/categories?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch categories: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) set({ categories: result.data || [] });
+          else { console.error("Failed to fetch categories or data format incorrect:", result.message); set({ categories: [] }); }
         } catch (error) {
-            console.error("Error in fetchCategories:", error);
-            set({categories: []});
+          console.error("Error in fetchCategories:", error);
+          set({ categories: [] });
         }
       },
       addCategory: async (categoryName, companyId) => {
         try {
-            const response = await fetch('/api/categories', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: categoryName, companyId }),
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ categories: [...state.categories, result.data].sort((a,b) => a.name.localeCompare(b.name)) }));
-            return result.data;
+          const response = await fetch('/api/categories', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: categoryName, companyId }),
+          });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ categories: [...state.categories, result.data].sort((a, b) => a.name.localeCompare(b.name)) }));
+          return result.data;
         } catch (error) {
-            console.error("Error adding category:", error);
-            toast({ variant: "destructive", title: "Error", description: `Could not add category.` });
-            return null;
+          console.error("Error adding category:", error);
+          toast({ variant: "destructive", title: "Error", description: `Could not add category.` });
+          return null;
         }
       },
       fetchCustomers: async (companyId) => {
         if (!companyId) return console.warn("fetchCustomers: companyId is required");
         try {
-            const response = await fetch(`/api/customers?companyId=${companyId}`);
-            if (!response.ok) throw new Error(`Failed to fetch customers: ${response.statusText}`);
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) set({ customers: result.data || [] });
-            else { console.error("Failed to fetch customers or data format incorrect:", result.message); set({ customers: [] }); }
+          const response = await fetch(`/api/customers?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch customers: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) set({ customers: result.data || [] });
+          else { console.error("Failed to fetch customers or data format incorrect:", result.message); set({ customers: [] }); }
         } catch (error) {
-            console.error("Error in fetchCustomers:", error);
-            set({customers: []});
+          console.error("Error in fetchCustomers:", error);
+          set({ customers: [] });
         }
       },
       fetchStaff: async (companyId) => {
         if (!companyId) return console.warn("fetchStaff: companyId is required");
         try {
-            const response = await fetch(`/api/staff?companyId=${companyId}`);
-            if (!response.ok) throw new Error(`Failed to fetch staff: ${response.statusText}`);
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) set({ staffs: result.data || [] });
-            else { console.error("Failed to fetch staff or data format incorrect:", result.message); set({ staffs: [] }); }
+          const response = await fetch(`/api/staff?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch staff: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) set({ staffs: result.data || [] });
+          else { console.error("Failed to fetch staff or data format incorrect:", result.message); set({ staffs: [] }); }
         } catch (error) {
-            console.error("Error in fetchStaff:", error);
-            set({staffs: []});
+          console.error("Error in fetchStaff:", error);
+          set({ staffs: [] });
         }
       },
       addStaff: async (staffData, companyId) => {
         try {
-            const response = await fetch('/api/staff', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ staffData, companyId }),
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ staffs: [...state.staffs, result.data] }));
-            return result.data;
+          const response = await fetch('/api/staff', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staffData, companyId }),
+          });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ staffs: [...state.staffs, result.data] }));
+          return result.data;
         } catch (error) {
-            console.error("Error adding staff:", error);
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not add staff member." });
-            return null;
+          console.error("Error adding staff:", error);
+          toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not add staff member." });
+          return null;
         }
       },
       updateStaff: async (staffId, staffData, companyId) => {
         try {
-            const response = await fetch(`/api/staff/${staffId}`, {
-              method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ staffData, companyId }),
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ staffs: state.staffs.map(s => s.id === staffId ? result.data : s) }));
-            return result.data;
+          const response = await fetch(`/api/staff/${staffId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ staffData, companyId }),
+          });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ staffs: state.staffs.map(s => s.id === staffId ? result.data : s) }));
+          return result.data;
         } catch (error) {
-            console.error("Error updating staff:", error);
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not update staff member." });
-            return null;
+          console.error("Error updating staff:", error);
+          toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not update staff member." });
+          return null;
         }
       },
       deleteStaff: async (staffId, companyId) => {
         try {
-            const response = await fetch(`/api/staff/${staffId}?companyId=${companyId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ staffs: state.staffs.filter(s => s.id !== staffId) }));
-            return true;
+          const response = await fetch(`/api/staff/${staffId}?companyId=${companyId}`, { method: 'DELETE' });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ staffs: state.staffs.filter(s => s.id !== staffId) }));
+          return true;
         } catch (error) {
-            console.error("Error deleting staff:", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not delete staff member." });
-            return false;
+          console.error("Error deleting staff:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not delete staff member." });
+          return false;
         }
       },
       fetchStores: async (companyId) => {
         if (!companyId) return console.warn("fetchStores: companyId is required");
         try {
-            const response = await fetch(`/api/stores?companyId=${companyId}`);
-            if (!response.ok) throw new Error(`Failed to fetch stores: ${response.statusText}`);
-            const result = await response.json();
-            if (result.success && Array.isArray(result.data)) set({ stores: result.data || [] });
-            else { console.error("Failed to fetch stores or data format incorrect:", result.message); set({ stores: [] }); }
+          const response = await fetch(`/api/stores?companyId=${companyId}`);
+          if (!response.ok) throw new Error(`Failed to fetch stores: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success && Array.isArray(result.data)) set({ stores: result.data || [] });
+          else { console.error("Failed to fetch stores or data format incorrect:", result.message); set({ stores: [] }); }
         } catch (error) {
-            console.error("Error in fetchStores:", error);
-            set({stores: []});
+          console.error("Error in fetchStores:", error);
+          set({ stores: [] });
         }
       },
       addStore: async (storeData, companyId) => {
         try {
-            const response = await fetch('/api/stores', {
-              method: 'POST', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ storeData, companyId }),
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ stores: [...state.stores, result.data] }));
-            return result.data;
+          const response = await fetch('/api/stores', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ storeData, companyId }),
+          });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ stores: [...state.stores, result.data] }));
+          return result.data;
         } catch (error) {
-            console.error("Error adding store:", error);
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not add store." });
-            return null;
+          console.error("Error adding store:", error);
+          toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not add store." });
+          return null;
         }
       },
       updateStore: async (storeId, storeData, companyId) => {
         try {
-            const response = await fetch(`/api/stores/${storeId}`, {
-              method: 'PUT', headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ storeData, companyId }),
-            });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ stores: state.stores.map(s => s.id === storeId ? result.data : s) }));
-            return result.data;
+          const response = await fetch(`/api/stores/${storeId}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ storeData, companyId }),
+          });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ stores: state.stores.map(s => s.id === storeId ? result.data : s) }));
+          return result.data;
         } catch (error) {
-            console.error("Error updating store:", error);
-            toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not update store." });
-            return null;
+          console.error("Error updating store:", error);
+          toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not update store." });
+          return null;
         }
       },
       deleteStore: async (storeId, companyId) => {
         try {
-            const response = await fetch(`/api/stores/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
-            const result = await response.json();
-            if (!result.success) throw new Error(result.message);
-            set(state => ({ stores: state.stores.filter(s => s.id !== storeId) }));
-            return true;
+          const response = await fetch(`/api/stores/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
+          const result = await response.json();
+          if (!result.success) throw new Error(result.message);
+          set(state => ({ stores: state.stores.filter(s => s.id !== storeId) }));
+          return true;
         } catch (error) {
-            console.error("Error deleting store:", error);
-            toast({ variant: "destructive", title: "Error", description: "Could not delete store." });
-            return false;
+          console.error("Error deleting store:", error);
+          toast({ variant: "destructive", title: "Error", description: "Could not delete store." });
+          return false;
         }
       },
       fetchCompanyProfile: async (companyId) => {
@@ -467,7 +467,7 @@ export const useInventoryStore = create<InventoryState>()(
           const result = await response.json();
           if (result.success && result.data) {
             const companyData = result.data as Company;
-            set((state) => ({ 
+            set((state) => ({
               userProfile: {
                 ...state.userProfile,
                 companyName: companyData.name, companyLogoUrl: companyData.logoUrl, companySlogan: companyData.slogan,
@@ -572,48 +572,48 @@ export const useInventoryStore = create<InventoryState>()(
         const { products, getSkuIdentifier } = get();
         const product = products.find(p => p.productSKUs.some(s => s.id === sku?.id));
         const skuIdentifier = sku?.skuIdentifier || (sku && product ? getSkuIdentifier(product.name, sku.optionValues) : undefined);
-        
+
         if (!sku || !product) return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };
 
         const relevantLayers = targetStoreId ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId) : sku.stockLayers;
 
         if (!product.trackQuantity) {
-            const priceLayer = relevantLayers.length > 0 ? relevantLayers[0] : sku.stockLayers[0];
-            return { totalStock: null, currentSellPrice: priceLayer?.sellPrice ?? null, averageCostPrice: priceLayer?.costPrice ?? null, skuIdentifier };
+          const priceLayer = relevantLayers.length > 0 ? relevantLayers[0] : sku.stockLayers[0];
+          return { totalStock: null, currentSellPrice: priceLayer?.sellPrice ?? null, averageCostPrice: priceLayer?.costPrice ?? null, skuIdentifier };
         }
 
         const totalStock = relevantLayers.reduce((sum, layer) => sum + layer.quantity, 0);
 
         const getPrice = (layers: StockLayer[], priceType: 'sellPrice' | 'costPrice') => {
-            if (totalStock > 0) {
-                const oldestLayer = [...layers].filter(l => l.quantity > 0).sort((a,b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime())[0];
-                return oldestLayer?.[priceType] ?? null;
-            }
-            if (layers.length > 0) {
-                const newestLayer = [...layers].sort((a,b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
-                return newestLayer?.[priceType] ?? null;
-            }
-            return null;
+          if (totalStock > 0) {
+            const oldestLayer = [...layers].filter(l => l.quantity > 0).sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime())[0];
+            return oldestLayer?.[priceType] ?? null;
+          }
+          if (layers.length > 0) {
+            const newestLayer = [...layers].sort((a, b) => new Date(b.purchaseDate).getTime() - new Date(a.purchaseDate).getTime())[0];
+            return newestLayer?.[priceType] ?? null;
+          }
+          return null;
         }
 
         const getAverageCostPrice = () => {
           if (totalStock > 0) {
-              const totalValue = relevantLayers.reduce((sum, layer) => sum + (layer.costPrice * layer.quantity), 0);
-              return totalValue / totalStock;
+            const totalValue = relevantLayers.reduce((sum, layer) => sum + (layer.costPrice * layer.quantity), 0);
+            return totalValue / totalStock;
           }
-           if (relevantLayers.length > 0) {
-             const totalInitialValue = relevantLayers.reduce((sum, layer) => sum + (layer.costPrice * layer.initialQuantity), 0);
-             const totalInitialQty = relevantLayers.reduce((sum, layer) => sum + layer.initialQuantity, 0);
-             return totalInitialQty > 0 ? totalInitialValue / totalInitialQty : null;
-           }
+          if (relevantLayers.length > 0) {
+            const totalInitialValue = relevantLayers.reduce((sum, layer) => sum + (layer.costPrice * layer.initialQuantity), 0);
+            const totalInitialQty = relevantLayers.reduce((sum, layer) => sum + layer.initialQuantity, 0);
+            return totalInitialQty > 0 ? totalInitialValue / totalInitialQty : null;
+          }
           return null;
         }
 
         return {
-            totalStock,
-            currentSellPrice: getPrice(relevantLayers, 'sellPrice'),
-            averageCostPrice: getAverageCostPrice(),
-            skuIdentifier
+          totalStock,
+          currentSellPrice: getPrice(relevantLayers, 'sellPrice'),
+          averageCostPrice: getAverageCostPrice(),
+          skuIdentifier
         };
       },
       findOrCreateProductSKU(productId, optionValues) {
@@ -627,7 +627,7 @@ export const useInventoryStore = create<InventoryState>()(
           const stringifiedSkuOptions = JSON.stringify(Object.entries(s.optionValues || {}).sort());
           return stringifiedSkuOptions === stringifiedTargetOptions;
         });
-        
+
         if (!sku) {
           const newSku: ProductSKU = {
             id: uuidv4(),
@@ -670,7 +670,7 @@ export const useInventoryStore = create<InventoryState>()(
         const plan = get().getActiveSubscriptionPlan();
         return plan ? get().staffs.length < plan.maxEmployees : false;
       },
-      
+
       // --- Analytics & Reporting Getters ---
       getLowStockProductCount: (threshold, companyId) => {
         const products = companyId ? get().products.filter(p => p.companyId === companyId) : get().products;
@@ -687,71 +687,71 @@ export const useInventoryStore = create<InventoryState>()(
       // All other complex getters (`getDailySalesAndExpenses`, `getTopSellingProductsByRevenue`, etc.) are left as is,
       // as they now operate on server-fetched, reliable data. Their internal logic remains the same.
       // A future optimization would be to move these aggregations to dedicated API endpoints.
-      getDailySalesAndExpenses: (period, companyId) => { 
+      getDailySalesAndExpenses: (period, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         const dailyDataMap: Record<string, { sales: number; expenses: number }> = {};
         const now = new Date();
-        
+
         let daysToIterate: number;
         let formatStr: string;
         let groupBy: 'day' | 'week' | 'month' = 'day';
 
-        switch(period) {
+        switch (period) {
           case 'daily': daysToIterate = 7; formatStr = 'MMM d'; groupBy = 'day'; break;
-          case 'weekly': daysToIterate = 28; formatStr = 'MMM d'; groupBy = 'day'; break; 
+          case 'weekly': daysToIterate = 28; formatStr = 'MMM d'; groupBy = 'day'; break;
           case 'monthly': daysToIterate = 365; formatStr = 'MMM yyyy'; groupBy = 'month'; break;
           case 'yearly': daysToIterate = 365; formatStr = 'MMM yyyy'; groupBy = 'month'; break;
           default: daysToIterate = 7; formatStr = 'MMM d'; groupBy = 'day';
         }
-        
+
         const cutoffDate = subDays(now, daysToIterate);
-        
+
         billsToConsider.forEach(bill => {
           const billDate = new Date(bill.date);
-          if(billDate >= cutoffDate) {
-              let dateKey: string;
-              if (groupBy === 'day') {
-                  dateKey = format(billDate, formatStr);
-              } else { // month
-                  dateKey = format(startOfMonth(billDate), formatStr);
-              }
+          if (billDate >= cutoffDate) {
+            let dateKey: string;
+            if (groupBy === 'day') {
+              dateKey = format(billDate, formatStr);
+            } else { // month
+              dateKey = format(startOfMonth(billDate), formatStr);
+            }
 
-              if (!dailyDataMap[dateKey]) dailyDataMap[dateKey] = { sales: 0, expenses: 0 };
+            if (!dailyDataMap[dateKey]) dailyDataMap[dateKey] = { sales: 0, expenses: 0 };
 
-              if (bill.type === 'sell' && !bill.isEstimate) { 
-                  dailyDataMap[dateKey].sales += bill.totalAmount; 
-              } else if (bill.type === 'buy') {
-                  dailyDataMap[dateKey].expenses += bill.totalAmount;
-              }
+            if (bill.type === 'sell' && !bill.isEstimate) {
+              dailyDataMap[dateKey].sales += bill.totalAmount;
+            } else if (bill.type === 'buy') {
+              dailyDataMap[dateKey].expenses += bill.totalAmount;
+            }
           }
         });
-        
-        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        return Object.entries(dailyDataMap).map(([date, data]) => ({ date, ...data })).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
       },
-      getTopSellingProductsByRevenue: (limit, period, companyId) => { 
+      getTopSellingProductsByRevenue: (limit, period, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         const filterBillsByPeriod = (bills: Bill[], period: TimePeriod): Bill[] => {
-            const now = new Date();
-            switch (period) {
-                case 'daily': return bills.filter(bill => isToday(new Date(bill.date)));
-                case 'weekly': return bills.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
-                case 'monthly': return bills.filter(bill => isThisMonth(new Date(bill.date)));
-                case 'yearly': return bills.filter(bill => isThisYear(new Date(bill.date)));
-                default: return bills.filter(bill => isToday(new Date(bill.date)));
-            }
+          const now = new Date();
+          switch (period) {
+            case 'daily': return bills.filter(bill => isToday(new Date(bill.date)));
+            case 'weekly': return bills.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
+            case 'monthly': return bills.filter(bill => isThisMonth(new Date(bill.date)));
+            case 'yearly': return bills.filter(bill => isThisYear(new Date(bill.date)));
+            default: return bills.filter(bill => isToday(new Date(bill.date)));
+          }
         };
         const periodFilteredBills = filterBillsByPeriod(billsToConsider, period);
 
         const productRevenue: Record<string, { name: string; revenue: number; quantity: number }> = {};
 
         periodFilteredBills.forEach(bill => {
-          if (bill.type === 'sell' && !bill.isEstimate) { 
+          if (bill.type === 'sell' && !bill.isEstimate) {
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
               const productNameForItem = item.productName || 'Unknown Product';
@@ -767,7 +767,7 @@ export const useInventoryStore = create<InventoryState>()(
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, limit);
       },
-      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId?: string) => { 
+      getRecentExpenseBillsWithPotentialCoverage: (limit: number, companyId?: string) => {
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -777,19 +777,19 @@ export const useInventoryStore = create<InventoryState>()(
         return expenseBills.slice(0, limit).map(bill => {
           const totalCost = bill.totalAmount;
           const potentialRevenue = bill.items.reduce((acc, item) => {
-             const product = get().getProductById(item.productId);
-             if (product && product.trackQuantity === false) {
-                const defaultSku = product.productSKUs.find(s => Object.keys(s.optionValues).length === 0);
-                const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
-                return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
-             }
-             return acc + ((item.sellPrice ?? 0) * item.quantity);
+            const product = get().getProductById(item.productId);
+            if (product && product.trackQuantity === false) {
+              const defaultSku = product.productSKUs.find(s => Object.keys(s.optionValues).length === 0);
+              const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
+              return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
+            }
+            return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           const coverageStatus = potentialRevenue >= totalCost ? 'Covered' : 'Uncovered';
           return { ...bill, totalCost, potentialRevenue, coverageStatus };
         });
       },
-      getExpenseSummaryStats: (companyId): ExpenseSummary => { 
+      getExpenseSummaryStats: (companyId): ExpenseSummary => {
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
@@ -805,13 +805,13 @@ export const useInventoryStore = create<InventoryState>()(
         expenseBills.forEach(bill => {
           const totalCost = bill.totalAmount;
           const potentialRevenue = bill.items.reduce((acc, item) => {
-             const product = get().getProductById(item.productId);
-             if (product && product.trackQuantity === false) {
-                const defaultSku = product.productSKUs.find(s => Object.keys(s.optionValues).length === 0);
-                const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
-                return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
-             }
-             return acc + ((item.sellPrice ?? 0) * item.quantity);
+            const product = get().getProductById(item.productId);
+            if (product && product.trackQuantity === false) {
+              const defaultSku = product.productSKUs.find(s => Object.keys(s.optionValues).length === 0);
+              const skuDetails = get().getSkuDetails(defaultSku, bill.storeId);
+              return acc + ((skuDetails.currentSellPrice ?? 0) * item.quantity);
+            }
+            return acc + ((item.sellPrice ?? 0) * item.quantity);
           }, 0);
           if (potentialRevenue >= totalCost) {
             totalCoveredExpenseValue += totalCost;
@@ -832,17 +832,17 @@ export const useInventoryStore = create<InventoryState>()(
       getOverallFinancialSummary: (period: TimePeriod, companyId?: string): FinancialSummary => {
         let billsToConsider = get().bills;
         if (companyId) {
-            billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
+          billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         const filterBillsByPeriod = (bills: Bill[], period: TimePeriod): Bill[] => {
-            const now = new Date();
-            switch (period) {
-                case 'daily': return bills.filter(bill => isToday(new Date(bill.date)));
-                case 'weekly': return bills.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
-                case 'monthly': return bills.filter(bill => isThisMonth(new Date(bill.date)));
-                case 'yearly': return bills.filter(bill => isThisYear(new Date(bill.date)));
-                default: return bills;
-            }
+          const now = new Date();
+          switch (period) {
+            case 'daily': return bills.filter(bill => isToday(new Date(bill.date)));
+            case 'weekly': return bills.filter(bill => isThisWeek(new Date(bill.date), { weekStartsOn: 1 }));
+            case 'monthly': return bills.filter(bill => isThisMonth(new Date(bill.date)));
+            case 'yearly': return bills.filter(bill => isThisYear(new Date(bill.date)));
+            default: return bills;
+          }
         };
 
         const filteredBills = filterBillsByPeriod(billsToConsider, period);
@@ -852,16 +852,16 @@ export const useInventoryStore = create<InventoryState>()(
         let totalExpenses = 0;
 
         filteredBills.forEach(bill => {
-            if (bill.type === 'sell' && !bill.isEstimate) {
-                totalRevenue += bill.subTotal ?? bill.totalAmount;
-                bill.items.forEach(item => {
-                    if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
-                    const costForItem = (item.costPrice || 0);
-                    totalCOGS += costForItem * item.quantity;
-                });
-            } else if (bill.type === 'buy') {
-                totalExpenses += bill.totalAmount;
-            }
+          if (bill.type === 'sell' && !bill.isEstimate) {
+            totalRevenue += bill.subTotal ?? bill.totalAmount;
+            bill.items.forEach(item => {
+              if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
+              const costForItem = (item.costPrice || 0);
+              totalCOGS += costForItem * item.quantity;
+            });
+          } else if (bill.type === 'buy') {
+            totalExpenses += bill.totalAmount;
+          }
         });
         const grossProfit = totalRevenue - totalCOGS;
         const netProfit = grossProfit - totalExpenses;
@@ -869,66 +869,67 @@ export const useInventoryStore = create<InventoryState>()(
       },
       getPeriodFinancialSummary: (period, companyId) => {
         const filterBillsByPeriod = (bills: Bill[], p: TimePeriod) => {
-            const now = new Date();
-            switch (p) {
-                case 'daily': return bills.filter(b => isToday(new Date(b.date)));
-                case 'weekly': return bills.filter(b => isThisWeek(new Date(b.date), { weekStartsOn: 1 }));
-                case 'monthly': return bills.filter(b => isThisMonth(new Date(b.date)));
-                case 'yearly': return bills.filter(b => isThisYear(new Date(b.date)));
-                default: return bills;
-            }
+          const now = new Date();
+          switch (p) {
+            case 'daily': return bills.filter(b => isToday(new Date(b.date)));
+            case 'weekly': return bills.filter(b => isThisWeek(new Date(b.date), { weekStartsOn: 1 }));
+            case 'monthly': return bills.filter(b => isThisMonth(new Date(b.date)));
+            case 'yearly': return bills.filter(b => isThisYear(new Date(b.date)));
+            default: return bills;
+          }
         };
         const bills = get().bills.filter(b => !companyId || b.companyId === companyId);
         const filteredBills = filterBillsByPeriod(bills, period);
 
         let totalRevenue = 0, totalCOGS = 0, totalExpenses = 0, transactionsToday = 0, defectivesToday = 0;
         filteredBills.forEach(bill => {
-            transactionsToday++;
-            if (bill.type === 'sell' && !bill.isEstimate) {
-                totalRevenue += bill.subTotal ?? 0;
-                bill.items.forEach(item => { if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) totalCOGS += (item.costPrice || 0) * item.quantity; });
-            } else if (bill.type === 'buy') {
-                totalExpenses += bill.totalAmount;
-            } else if (bill.type === 'return') {
-                bill.items.forEach(item => { if (item.isDefective) defectivesToday += item.quantity; });
-            }
+          transactionsToday++;
+          if (bill.type === 'sell' && !bill.isEstimate) {
+            totalRevenue += bill.subTotal ?? 0;
+            bill.items.forEach(item => { if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) totalCOGS += (item.costPrice || 0) * item.quantity; });
+          } else if (bill.type === 'buy') {
+            totalExpenses += bill.totalAmount;
+          } else if (bill.type === 'return') {
+            bill.items.forEach(item => { if (item.isDefective) defectivesToday += item.quantity; });
+          }
         });
         return { totalRevenue, totalCOGS, grossProfit: totalRevenue - totalCOGS, totalExpenses, transactionsToday, defectivesToday };
       },
-      getTopProfitableProducts: (limit, period, companyId) => { 
+      getTopProfitableProducts: (limit, period, companyId) => {
         let billsToConsider = get().bills;
         if (companyId) {
           billsToConsider = billsToConsider.filter(bill => bill.companyId === companyId);
         }
         const filterBillsByPeriod = (bills: Bill[], p: TimePeriod) => {
-            const now = new Date();
-            switch (p) {
-                case 'daily': return bills.filter(b => isToday(new Date(b.date)));
-                case 'weekly': return bills.filter(b => isThisWeek(new Date(b.date), { weekStartsOn: 1 }));
-                case 'monthly': return bills.filter(b => isThisMonth(new Date(b.date)));
-                case 'yearly': return bills.filter(b => isThisYear(new Date(b.date)));
-                default: return bills;
-            }
+          const now = new Date();
+          switch (p) {
+            case 'daily': return bills.filter(b => isToday(new Date(b.date)));
+            case 'weekly': return bills.filter(b => isThisWeek(new Date(b.date), { weekStartsOn: 1 }));
+            case 'monthly': return bills.filter(b => isThisMonth(new Date(b.date)));
+            case 'yearly': return bills.filter(b => isThisYear(new Date(b.date)));
+            default: return bills;
+          }
         };
-        
+
         const periodFilteredBills = filterBillsByPeriod(billsToConsider, period);
 
-        const productFinancials: Record<string, { name: string; revenue: number; cogs: number; profit: number }> = {};
+        const productFinancials: Record<string, { name: string; revenue: number; cogs: number; profit: number; quantity: number }> = {};
         periodFilteredBills.forEach(bill => {
-          if (bill.type === 'sell' && !bill.isEstimate) { 
+          if (bill.type === 'sell' && !bill.isEstimate) {
             bill.items.forEach(item => {
               if (item.productId.startsWith('SERVICE_ITEM_') || item.isAdditionalCharge) return;
               const skuIdentifier = item.productName;
               if (skuIdentifier && typeof skuIdentifier === 'string') {
                 if (!productFinancials[skuIdentifier]) {
-                  productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0 };
+                  productFinancials[skuIdentifier] = { name: skuIdentifier, revenue: 0, cogs: 0, profit: 0, quantity: 0 };
                 }
                 const itemRevenue = (item.sellPrice || 0) * item.quantity;
-                const itemCogs = (item.costPrice || 0) * item.quantity; 
+                const itemCogs = (item.costPrice || 0) * item.quantity;
 
                 productFinancials[skuIdentifier].revenue += itemRevenue;
                 productFinancials[skuIdentifier].cogs += itemCogs;
                 productFinancials[skuIdentifier].profit += (itemRevenue - itemCogs);
+                productFinancials[skuIdentifier].quantity += item.quantity;
               }
             });
           }
@@ -941,54 +942,54 @@ export const useInventoryStore = create<InventoryState>()(
         const productBills = get().bills.filter(b => b.items.some(i => i.productId === productId));
         let totalPurchased = 0, totalSold = 0, totalReturned = 0, totalRevenue = 0, totalCostOfGoodsSold = 0;
         productBills.forEach(bill => {
-            bill.items.forEach(item => {
-                if (item.productId !== productId) return;
-                if (bill.type === 'buy') totalPurchased += item.quantity;
-                else if (bill.type === 'sell' && !bill.isEstimate) {
-                    totalSold += item.quantity;
-                    totalRevenue += item.sellPrice * item.quantity;
-                    totalCostOfGoodsSold += (item.costPrice || 0) * item.quantity;
-                } else if (bill.type === 'return') totalReturned += item.quantity;
-            });
+          bill.items.forEach(item => {
+            if (item.productId !== productId) return;
+            if (bill.type === 'buy') totalPurchased += item.quantity;
+            else if (bill.type === 'sell' && !bill.isEstimate) {
+              totalSold += item.quantity;
+              totalRevenue += item.sellPrice * item.quantity;
+              totalCostOfGoodsSold += (item.costPrice || 0) * item.quantity;
+            } else if (bill.type === 'return') totalReturned += item.quantity;
+          });
         });
         return {
-            totalPurchased, totalSold, totalReturned, totalRevenue, totalCostOfGoodsSold,
-            grossProfit: totalRevenue - totalCostOfGoodsSold,
-            averageSellPrice: totalSold > 0 ? totalRevenue / totalSold : null,
-            averageCostPrice: totalSold > 0 ? totalCostOfGoodsSold / totalSold : null,
+          totalPurchased, totalSold, totalReturned, totalRevenue, totalCostOfGoodsSold,
+          grossProfit: totalRevenue - totalCostOfGoodsSold,
+          averageSellPrice: totalSold > 0 ? totalRevenue / totalSold : null,
+          averageCostPrice: totalSold > 0 ? totalCostOfGoodsSold / totalSold : null,
         };
       },
       getProductLedgerSummary: (params = {}) => {
         const { companyId, startDate, endDate } = params;
         let productsToConsider = get().products.filter(p => !p.isArchived);
         if (companyId) productsToConsider = productsToConsider.filter(p => p.companyId === companyId);
-        
+
         let billsToConsider = get().bills;
         if (companyId) billsToConsider = billsToConsider.filter(b => b.companyId === companyId);
         if (startDate) billsToConsider = billsToConsider.filter(b => new Date(b.date) >= startDate);
         if (endDate) billsToConsider = billsToConsider.filter(b => new Date(b.date) <= endDate);
-        
-        const ledger: ProductLedgerEntry[] = productsToConsider.map(p => {
-            let totalPurchased = 0, totalSold = 0, totalRestockedReturns = 0, totalDefectiveReturns = 0;
 
-            billsToConsider.forEach(bill => {
-                bill.items.forEach(item => {
-                    if (item.productId === p.id) {
-                        if (bill.type === 'buy') totalPurchased += item.quantity;
-                        else if (bill.type === 'sell' && !bill.isEstimate) totalSold += item.quantity;
-                        else if (bill.type === 'return') {
-                            if (item.isDefective) totalDefectiveReturns += item.quantity;
-                            else totalRestockedReturns += item.quantity;
-                        }
-                    }
-                });
+        const ledger: ProductLedgerEntry[] = productsToConsider.map(p => {
+          let totalPurchased = 0, totalSold = 0, totalRestockedReturns = 0, totalDefectiveReturns = 0;
+
+          billsToConsider.forEach(bill => {
+            bill.items.forEach(item => {
+              if (item.productId === p.id) {
+                if (bill.type === 'buy') totalPurchased += item.quantity;
+                else if (bill.type === 'sell' && !bill.isEstimate) totalSold += item.quantity;
+                else if (bill.type === 'return') {
+                  if (item.isDefective) totalDefectiveReturns += item.quantity;
+                  else totalRestockedReturns += item.quantity;
+                }
+              }
             });
-            const currentStock = p.trackQuantity ? p.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0) : 'N/A';
-            return {
-                productId: p.id, productName: p.name, category: p.category,
-                totalPurchased, totalSold, totalRestockedReturns, totalDefectiveReturns,
-                currentStock,
-            };
+          });
+          const currentStock = p.trackQuantity ? p.productSKUs.reduce((sum, sku) => sum + (get().getSkuDetails(sku).totalStock ?? 0), 0) : 'N/A';
+          return {
+            productId: p.id, productName: p.name, category: p.category,
+            totalPurchased, totalSold, totalRestockedReturns, totalDefectiveReturns,
+            currentStock,
+          };
         });
         return ledger;
       },
@@ -996,34 +997,42 @@ export const useInventoryStore = create<InventoryState>()(
         const productBills = get().bills.filter(b => b.items.some(i => i.productId === productId));
         const monthlyData: Record<string, { revenue: number; cogs: number }> = {};
         productBills.forEach(bill => {
-            if (bill.type !== 'sell' || bill.isEstimate) return;
-            const monthKey = format(new Date(bill.date), 'MMM yyyy');
-            if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, cogs: 0 };
-            bill.items.forEach(item => {
-                if (item.productId === productId) {
-                    monthlyData[monthKey].revenue += item.sellPrice * item.quantity;
-                    monthlyData[monthKey].cogs += (item.costPrice || 0) * item.quantity;
-                }
-            });
+          if (bill.type !== 'sell' || bill.isEstimate) return;
+          const monthKey = format(new Date(bill.date), 'MMM yyyy');
+          if (!monthlyData[monthKey]) monthlyData[monthKey] = { revenue: 0, cogs: 0 };
+          bill.items.forEach(item => {
+            if (item.productId === productId) {
+              monthlyData[monthKey].revenue += item.sellPrice * item.quantity;
+              monthlyData[monthKey].cogs += (item.costPrice || 0) * item.quantity;
+            }
+          });
         });
         const sortedKeys = Object.keys(monthlyData).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
         return sortedKeys.map(key => ({ month: key, revenue: monthlyData[key].revenue, cogs: monthlyData[key].cogs, profit: monthlyData[key].revenue - monthlyData[key].cogs }));
       },
-      getReportSummaryByDateRange: (startDate, endDate, companyId) => {
-        const bills = get().bills.filter(b => (!companyId || b.companyId === companyId) && (!startDate || new Date(b.date) >= startDate) && (!endDate || new Date(b.date) <= endDate));
-        let totalRevenue = 0, totalCOGS = 0, totalExpenses = 0, totalItemsSold = 0, totalSGST = 0, totalCGST = 0;
+      getReportSummaryByDateRange: (startDate, endDate, companyId, storeId) => {
+        const bills = get().bills.filter(b => (!companyId || b.companyId === companyId) && (!storeId || storeId === 'all' || b.storeId === storeId) && (!startDate || new Date(b.date) >= startDate) && (!endDate || new Date(b.date) <= endDate));
+        let totalRevenue = 0, totalCOGS = 0, totalExpenses = 0, totalItemsSold = 0, totalSGST = 0, totalCGST = 0, totalAdditionalCharges = 0;
         bills.forEach(bill => {
-            if (bill.type === 'sell' && !bill.isEstimate) {
-                totalRevenue += bill.subTotal ?? 0;
-                totalSGST += bill.totalSGST ?? 0;
-                totalCGST += bill.totalCGST ?? 0;
-                bill.items.forEach(item => { if (!item.isAdditionalCharge) { totalCOGS += (item.costPrice || 0) * item.quantity; totalItemsSold += item.quantity; } });
-            } else if (bill.type === 'buy') totalExpenses += bill.totalAmount;
+          if (bill.type === 'sell' && !bill.isEstimate) {
+            totalRevenue += bill.subTotal ?? 0;
+            totalSGST += bill.totalSGST ?? 0;
+            totalCGST += bill.totalCGST ?? 0;
+            bill.items.forEach(item => {
+              if (!item.isAdditionalCharge) {
+                totalCOGS += (item.costPrice || 0) * item.quantity;
+                totalItemsSold += item.quantity;
+              } else {
+                totalAdditionalCharges += (item.sellPrice || 0) * item.quantity;
+              }
+            });
+          } else if (bill.type === 'buy') totalExpenses += bill.totalAmount;
         });
         return {
-            totalRevenue, totalCOGS, grossProfit: totalRevenue - totalCOGS, totalExpenses,
-            netProfit: totalRevenue - totalCOGS - totalExpenses, totalBills: bills.length,
-            totalItemsSold, totalSGST, totalCGST, totalTax: totalSGST + totalCGST
+          totalRevenue, totalCOGS, grossProfit: totalRevenue - totalCOGS, totalExpenses,
+          netProfit: totalRevenue - totalCOGS - totalExpenses, totalBills: bills.length,
+          totalItemsSold, totalSGST, totalCGST, totalTax: totalSGST + totalCGST,
+          totalAdditionalCharges
         };
       },
       getSalesBillsByDateRange: (startDate, endDate, companyId) => {
@@ -1032,28 +1041,34 @@ export const useInventoryStore = create<InventoryState>()(
       getExpenseBillsByDateRange: (startDate, endDate, companyId) => {
         return get().bills.filter(b => b.type === 'buy' && (!companyId || b.companyId === companyId) && (!startDate || new Date(b.date) >= startDate) && (!endDate || new Date(b.date) <= endDate));
       },
-      getAccountsReceivableSummary: (companyId) => {
-        const unpaidInvoices = get().bills.filter(b => b.type === 'sell' && !b.isEstimate && b.paymentStatus === 'unpaid' && (!companyId || b.companyId === companyId));
+      getAccountsReceivableSummary: (companyId, storeId) => {
+        const unpaidInvoices = get().bills.filter(b => b.type === 'sell' && !b.isEstimate && b.paymentStatus === 'unpaid' && (!companyId || b.companyId === companyId) && (!storeId || storeId === 'all' || b.storeId === storeId));
         return { totalReceivable: unpaidInvoices.reduce((sum, b) => sum + b.totalAmount, 0), unpaidInvoices };
       },
-      getAccountsPayableSummary: (companyId) => {
-        const unpaidBills = get().bills.filter(b => b.type === 'buy' && b.paymentStatus === 'unpaid' && (!companyId || b.companyId === companyId));
+      getAccountsPayableSummary: (companyId, storeId) => {
+        const unpaidBills = get().bills.filter(b => b.type === 'buy' && b.paymentStatus === 'unpaid' && (!companyId || b.companyId === companyId) && (!storeId || storeId === 'all' || b.storeId === storeId));
         return { totalPayable: unpaidBills.reduce((sum, b) => sum + b.totalAmount, 0), unpaidBills };
       },
-      getCashFlowSummaryByDateRange: (startDate, endDate, companyId) => {
-        const bills = get().bills.filter(b => (!companyId || b.companyId === companyId) && (!startDate || new Date(b.date) >= startDate) && (!endDate || new Date(b.date) <= endDate));
+      getCashFlowSummaryByDateRange: (startDate, endDate, companyId, storeId) => {
+        const bills = get().bills.filter(b => (!companyId || b.companyId === companyId) && (!storeId || storeId === 'all' || b.storeId === storeId) && (!startDate || new Date(b.date) >= startDate) && (!endDate || new Date(b.date) <= endDate));
         const cashInflows = bills.filter(b => b.type === 'sell' && !b.isEstimate && b.paymentStatus === 'paid').reduce((sum, b) => sum + b.totalAmount, 0);
         const cashOutflows = bills.filter(b => b.type === 'buy' && b.paymentStatus === 'paid').reduce((sum, b) => sum + b.totalAmount, 0);
         return { cashInflows, cashOutflows, netCashFlow: cashInflows - cashOutflows };
       },
-      getBalanceSheetSummary: (companyId) => {
-          const { products, getAccountsReceivableSummary, getAccountsPayableSummary, getReportSummaryByDateRange } = get();
-          const prods = companyId ? products.filter(p => p.companyId === companyId) : products;
-          const inventoryValue = prods.reduce((total, p) => total + (p.trackQuantity ? p.productSKUs.reduce((skuSum, sku) => skuSum + sku.stockLayers.reduce((layerSum, l) => layerSum + (l.quantity * l.costPrice), 0), 0) : 0), 0);
-          const { totalReceivable } = getAccountsReceivableSummary(companyId);
-          const { totalPayable } = getAccountsPayableSummary(companyId);
-          const { netProfit: retainedEarnings } = getReportSummaryByDateRange(undefined, undefined, companyId);
-          return { inventoryValue, accountsReceivable: totalReceivable, accountsPayable: totalPayable, retainedEarnings };
+      getBalanceSheetSummary: (companyId, storeId) => {
+        const { products, getAccountsReceivableSummary, getAccountsPayableSummary, getReportSummaryByDateRange } = get();
+        const prods = companyId ? products.filter(p => p.companyId === companyId) : products;
+        const inventoryValue = prods.reduce((total, p) => {
+          if (!p.trackQuantity) return total;
+          return total + p.productSKUs.reduce((skuSum, sku) => {
+            const layers = (!storeId || storeId === 'all') ? sku.stockLayers : sku.stockLayers.filter(l => l.storeId === storeId);
+            return skuSum + layers.reduce((layerSum, l) => layerSum + (l.quantity * l.costPrice), 0);
+          }, 0);
+        }, 0);
+        const { totalReceivable } = getAccountsReceivableSummary(companyId, storeId);
+        const { totalPayable } = getAccountsPayableSummary(companyId, storeId);
+        const { netProfit: retainedEarnings } = getReportSummaryByDateRange(undefined, undefined, companyId, storeId);
+        return { inventoryValue, accountsReceivable: totalReceivable, accountsPayable: totalPayable, retainedEarnings };
       },
       // #endregion
     }),
