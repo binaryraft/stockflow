@@ -9,12 +9,11 @@ function LoadingFallback() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
       <Image
-        src="https://placehold.co/128x128.png"
+        src="/logo.svg"
         alt={`${APP_NAME} Logo`}
         width={64}
         height={64}
-        className="mb-3 rounded-lg shadow-md animate-pulse"
-        data-ai-hint="logo company"
+        className="mb-3 animate-pulse"
       />
       <div className="flex items-center gap-2 text-lg text-muted-foreground">
         <Loader2 className="h-6 w-6 animate-spin" />

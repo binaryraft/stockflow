@@ -91,12 +91,11 @@ export function StoreLoginPageClient() {
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="https://placehold.co/128x128.png"
+          src="/logo.svg"
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}
-          className="mb-3 rounded-lg shadow-md"
-          data-ai-hint="logo company"
+          className="mb-3 animate-pulse"
         />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Store Terminal Access</p>
@@ -123,7 +122,7 @@ export function StoreLoginPageClient() {
                 disabled={isSubmitting}
               />
             </div>
-             <div className="space-y-1.5">
+            <div className="space-y-1.5">
               <Label htmlFor="storeId" className="flex items-center">
                 <Building className="mr-2 h-4 w-4 text-muted-foreground" /> Store ID*
               </Label>
@@ -160,7 +159,7 @@ export function StoreLoginPageClient() {
               {isSubmitting ? 'Verifying...' : 'Access Terminal'}
             </Button>
             <Button variant="link" asChild className="text-xs">
-                <Link href="/">Back to Main Site</Link>
+              <Link href="/">Back to Main Site</Link>
             </Button>
           </CardFooter>
         </form>
