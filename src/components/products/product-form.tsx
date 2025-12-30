@@ -40,7 +40,7 @@ const additionalChargeDefinitionSchema = z.object({
   return true;
 }, {
   message: "Percentage value must be between 0 and 100.",
-  path: ["value"], 
+  path: ["value"],
 });
 
 const productOptionSchema = z.object({
@@ -59,15 +59,19 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
-  sku: z.string().optional(), 
+  sku: z.string().optional(),
   expiryDate: z.string().optional(),
-  costPrice: z.preprocess( 
+  costPrice: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
   ),
-  sellPrice: z.preprocess( 
+  sellPrice: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
+  ),
+  initialStock: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Initial stock must be a number" }).min(0).optional()
   ),
   sgstRate: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
@@ -105,7 +109,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
-      if (currentOptionValue && currentOptionValue.trim() !== '') { 
+      if (currentOptionValue && currentOptionValue.trim() !== '') {
         appendOption({ value: '' });
         setTimeout(() => {
           setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
@@ -113,17 +117,17 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       }
     }
   };
-  
+
   const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-       e.preventDefault();
-       if (optionFields.length === 0) {
-         appendOption({ value: '' });
-         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-       } else {
-         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-       }
-     }
+      e.preventDefault();
+      if (optionFields.length === 0) {
+        appendOption({ value: '' });
+        setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+      } else {
+        setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+      }
+    }
   }
 
   return (
@@ -131,14 +135,14 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-base font-medium text-primary">Variant Type {variantIndex + 1}</Label>
         <TooltipProvider>
-            <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant Type">
-                        <Trash2 className="h-4 w-4 text-destructive"/>
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent><p>Remove this variant type (e.g., Color, Size)</p></TooltipContent>
-            </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant Type">
+                <Trash2 className="h-4 w-4 text-destructive" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Remove this variant type (e.g., Color, Size)</p></TooltipContent>
+          </Tooltip>
         </TooltipProvider>
       </div>
       <Input
@@ -149,7 +153,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       />
       {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
 
-      <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant Type ${variantIndex+1}`}</Label>
+      <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant Type ${variantIndex + 1}`}</Label>
       <div className="space-y-2">
         {optionFields.map((optionValueField, optionIndex) => (
           <div key={optionValueField.id} className="flex items-center gap-2">
@@ -160,12 +164,12 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
             />
             {optionFields.length > 1 && (
-               <TooltipProvider>
+              <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
-                          <Trash2 className="h-3 w-3 text-destructive"/>
-                      </Button>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
+                      <Trash2 className="h-3 w-3 text-destructive" />
+                    </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>Remove this option value</p></TooltipContent>
                 </Tooltip>
@@ -174,7 +178,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
           </div>
         ))}
         {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.options?.root?.message}</p>}
-         {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
+        {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i: number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
       </div>
       <Button
         type="button"
@@ -196,9 +200,9 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
 
 interface AdditionalChargesFormSectionProps {
-  control: any; 
-  register: any; 
-  errors: any; 
+  control: any;
+  register: any;
+  errors: any;
   watch: any;
   setValue: any;
   setFocus: any;
@@ -218,12 +222,12 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
   };
 
   const handleChargeValueEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-     if (e.key === 'Enter') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
       const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
-      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
-        append({ name: "", type: "fixed", value: undefined }); 
+      if (index === fields.length - 1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
+        append({ name: "", type: "fixed", value: undefined });
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
     }
@@ -233,7 +237,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <Label className="text-lg font-semibold text-primary flex items-center gap-2">
-          <DollarSign size={20}/> Additional Charges (Optional)
+          <DollarSign size={20} /> Additional Charges (Optional)
         </Label>
         <Button
           type="button"
@@ -250,78 +254,78 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
       {fields.map((field, index) => {
         const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
         return (
-        <Card key={field.id} className="p-4 bg-tertiary/50 shadow-sm">
-          <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-4 items-start">
-            <div className="space-y-1.5">
-              <Label htmlFor={`additionalChargeDefinitions.${index}.name`}>Charge Name*</Label>
-              <Input
-                {...register(`additionalChargeDefinitions.${index}.name`)}
-                id={`additionalChargeDefinitions.${index}.name`}
-                placeholder="e.g., Making Charge"
-                onKeyDown={(e) => handleChargeNameEnter(e, index)}
-              />
-              {errors.additionalChargeDefinitions?.[index]?.name && (
-                <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].name.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Charge Type*</Label>
-                <Controller
-                    control={control}
-                    name={`additionalChargeDefinitions.${index}.type`}
-                    render={({ field: { onChange, value } }) => (
-                        <RadioGroup
-                            defaultValue="fixed"
-                            value={value}
-                            onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
-                            className="flex items-center gap-3 h-10"
-                        >
-                            <div className="flex items-center space-x-1.5">
-                                <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}-form`} />
-                                <Label htmlFor={`ac-type-fixed-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'fixed' && "text-primary font-semibold")}>
-                                  <HandCoins className={cn("mr-1.5 h-4 w-4", value === 'fixed' ? "text-primary" : "text-muted-foreground")} /> Fixed
-                                </Label>
-                            </div>
-                            <div className="flex items-center space-x-1.5">
-                                <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}-form`} />
-                                <Label htmlFor={`ac-type-percentage-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'percentage' && "text-primary font-semibold")}>
-                                   <BadgePercent className={cn("mr-1.5 h-4 w-4", value === 'percentage' ? "text-primary" : "text-muted-foreground")} /> Percentage
-                                </Label>
-                            </div>
-                        </RadioGroup>
-                    )}
+          <Card key={field.id} className="p-4 bg-tertiary/50 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-4 items-start">
+              <div className="space-y-1.5">
+                <Label htmlFor={`additionalChargeDefinitions.${index}.name`}>Charge Name*</Label>
+                <Input
+                  {...register(`additionalChargeDefinitions.${index}.name`)}
+                  id={`additionalChargeDefinitions.${index}.name`}
+                  placeholder="e.g., Making Charge"
+                  onKeyDown={(e) => handleChargeNameEnter(e, index)}
                 />
-            </div>
-            
-            <div className="flex items-end gap-2 md:col-span-2">
-                 <div className="space-y-1.5 flex-grow">
-                    <Label htmlFor={`additionalChargeDefinitions.${index}.value`}>
+                {errors.additionalChargeDefinitions?.[index]?.name && (
+                  <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].name.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Charge Type*</Label>
+                <Controller
+                  control={control}
+                  name={`additionalChargeDefinitions.${index}.type`}
+                  render={({ field: { onChange, value } }) => (
+                    <RadioGroup
+                      defaultValue="fixed"
+                      value={value}
+                      onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
+                      className="flex items-center gap-3 h-10"
+                    >
+                      <div className="flex items-center space-x-1.5">
+                        <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}-form`} />
+                        <Label htmlFor={`ac-type-fixed-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'fixed' && "text-primary font-semibold")}>
+                          <HandCoins className={cn("mr-1.5 h-4 w-4", value === 'fixed' ? "text-primary" : "text-muted-foreground")} /> Fixed
+                        </Label>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
+                        <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}-form`} />
+                        <Label htmlFor={`ac-type-percentage-${index}-form`} className={cn("text-sm cursor-pointer flex items-center", value === 'percentage' && "text-primary font-semibold")}>
+                          <BadgePercent className={cn("mr-1.5 h-4 w-4", value === 'percentage' ? "text-primary" : "text-muted-foreground")} /> Percentage
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  )}
+                />
+              </div>
+
+              <div className="flex items-end gap-2 md:col-span-2">
+                <div className="space-y-1.5 flex-grow">
+                  <Label htmlFor={`additionalChargeDefinitions.${index}.value`}>
                     {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
-                    </Label>
-                    <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                            {chargeType === 'fixed' ? 
-                                <HandCoins className={cn("h-4 w-4", chargeType === 'fixed' ? "text-primary/70" : "text-muted-foreground")} /> :
-                                <BadgePercent className={cn("h-4 w-4", chargeType === 'percentage' ? "text-primary/70" : "text-muted-foreground")} />
-                            }
-                        </div>
-                        <Input
-                            {...register(`additionalChargeDefinitions.${index}.value`)}
-                            id={`additionalChargeDefinitions.${index}.value`}
-                            type="number"
-                            step={chargeType === 'fixed' ? "0.01" : "0.1"}
-                            placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
-                            className="pl-10"
-                            onKeyDown={(e) => handleChargeValueEnter(e, index)}
-                        />
+                  </Label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      {chargeType === 'fixed' ?
+                        <HandCoins className={cn("h-4 w-4", chargeType === 'fixed' ? "text-primary/70" : "text-muted-foreground")} /> :
+                        <BadgePercent className={cn("h-4 w-4", chargeType === 'percentage' ? "text-primary/70" : "text-muted-foreground")} />
+                      }
                     </div>
-                    {errors.additionalChargeDefinitions?.[index]?.value && (
-                        <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].value.message}</p>
-                    )}
-                    {errors.additionalChargeDefinitions?.[index]?.type && (
-                        <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].type.message}</p>
-                    )}
+                    <Input
+                      {...register(`additionalChargeDefinitions.${index}.value`)}
+                      id={`additionalChargeDefinitions.${index}.value`}
+                      type="number"
+                      step={chargeType === 'fixed' ? "0.01" : "0.1"}
+                      placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
+                      className="pl-10"
+                      onKeyDown={(e) => handleChargeValueEnter(e, index)}
+                    />
+                  </div>
+                  {errors.additionalChargeDefinitions?.[index]?.value && (
+                    <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].value.message}</p>
+                  )}
+                  {errors.additionalChargeDefinitions?.[index]?.type && (
+                    <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions[index].type.message}</p>
+                  )}
                 </div>
                 <TooltipProvider>
                   <Tooltip>
@@ -333,10 +337,11 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
                     <TooltipContent><p>Remove this charge definition</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
+              </div>
             </div>
-          </div>
-        </Card>
-      )})}
+          </Card>
+        )
+      })}
       {errors.additionalChargeDefinitions?.root && (
         <p className="text-sm text-destructive mt-1">{errors.additionalChargeDefinitions.root.message}</p>
       )}
@@ -351,21 +356,21 @@ interface ProductFormProps {
 }
 
 export function ProductForm({ initialData: initialProductProp, searchParams: routeSearchParamsProp }: ProductFormProps) {
-  const { 
-    addProduct: addProductToStore, 
-    updateProduct: updateProductInStore, 
+  const {
+    addProduct: addProductToStore,
+    updateProduct: updateProductInStore,
     fetchCategories,
     categories,
-    addCategory: addCategoryToStore, 
+    addCategory: addCategoryToStore,
     getBillsForProduct, getSkuDetails,
   } = useInventoryStore();
 
   const { toast } = useToast();
   const router = useRouter();
-  const nextSearchParams = useNextSearchParams(); 
-  
+  const nextSearchParams = useNextSearchParams();
+
   const [hasMounted, setHasMounted] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); 
+  const [isLoading, setIsLoading] = useState(false);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
 
@@ -400,7 +405,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
       fetchCategories(storedCompanyId);
     } else {
       console.error("ProductForm: Company ID not found in localStorage.");
-      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage products."});
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot manage products." });
     }
   }, [toast, fetchCategories]);
 
@@ -410,7 +415,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
 
     let defaults: ProductFormData = {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
-      costPrice: undefined, sellPrice: undefined,
+      costPrice: undefined, sellPrice: undefined, initialStock: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     };
@@ -438,10 +443,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
           options: v.options.map(o => ({ id: o.id, value: o.value }))
         })) || [],
         additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({
-            id: ac.id || uuidv4(),
-            name: ac.name,
-            type: ac.type || 'fixed',
-            value: ac.value,
+          id: ac.id || uuidv4(),
+          name: ac.name,
+          type: ac.type || 'fixed',
+          value: ac.value,
         })) || [],
       };
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
@@ -452,9 +457,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
         expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
         additionalChargeDefinitions: [],
+        initialStock: undefined
       };
     }
-    formReset(defaults); 
+    formReset(defaults);
     setTimeout(() => setFocus('name'), 50);
 
   }, [hasMounted, currentCompanyId, initialData, isEditing, routeSearchParamsProp, formReset, setFocus, getSkuDetails]);
@@ -462,7 +468,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
 
   const onSubmit = async (data: ProductFormData) => {
     if (!currentCompanyId) {
-      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot save product."});
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing. Cannot save product." });
       return;
     }
     setIsLoading(true);
@@ -476,23 +482,26 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
       sgstRate: data.sgstRate, cgstRate: data.cgstRate,
       variants: (data.variants || []).map(v_form => ({
-          id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          name: v_form.name,
-          options: v_form.options.map(opt_form => ({
-            id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-            value: opt_form.value
-          }))
+        id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        name: v_form.name,
+        options: v_form.options.map(opt_form => ({
+          id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+          value: opt_form.value
+        }))
       })),
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
-          id: ac.id || uuidv4(), name: ac.name, type: ac.type || 'fixed', value: ac.value
-        })),
+        id: ac.id || uuidv4(), name: ac.name, type: ac.type || 'fixed', value: ac.value
+      })),
+      initialStock: data.initialStock,
+      costPrice: data.costPrice,
+      sellPrice: data.sellPrice
     };
-    
+
     if (!data.trackQuantity && (!productPayload.variants || productPayload.variants.length === 0)) {
-        productPayload.costPriceForNonTracked = data.costPrice;
-        productPayload.sellPriceForNonTracked = data.sellPrice;
+      productPayload.costPriceForNonTracked = data.costPrice;
+      productPayload.sellPriceForNonTracked = data.sellPrice;
     }
-    
+
     let savedProduct: Product | null = null;
 
     if (isEditing && initialData) {
@@ -513,21 +522,21 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     setIsLoading(false);
 
     if (savedProduct) {
-        const returnToParam = nextSearchParams.get('returnTo');
-        if (returnToParam) {
-          const isNewProductFlow = !isEditing;
-          const finalReturnUrl = isNewProductFlow 
-            ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProduct.id}`
-            : decodeURIComponent(returnToParam);
-          router.push(finalReturnUrl);
-        } else {
-          router.push('/admin/products');
-        }
+      const returnToParam = nextSearchParams.get('returnTo');
+      if (returnToParam) {
+        const isNewProductFlow = !isEditing;
+        const finalReturnUrl = isNewProductFlow
+          ? `${decodeURIComponent(returnToParam)}&newlyAddedProductId=${savedProduct.id}`
+          : decodeURIComponent(returnToParam);
+        router.push(finalReturnUrl);
+      } else {
+        router.push('/admin/products');
+      }
     }
   };
 
   if (!hasMounted && isEditing) {
-     return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
+    return <div className="flex-1 flex items-center justify-center p-6">Loading product form...</div>;
   }
   if (!currentCompanyId && hasMounted) {
     return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID is missing. Cannot load product form.</div>;
@@ -572,7 +581,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4}/>
+                  <Textarea id="description" {...register("description")} placeholder="Enter detailed product description..." rows={4} />
                 </div>
               </CardContent>
             </Card>
@@ -593,46 +602,66 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                   />
                   <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
                 </div>
-                
+
                 {trackQuantityValue ? (
-                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                        <span>
-                            For quantity-tracked products, cost and sell prices for specific purchase batches are established via Expense Bills, not here.
-                        </span>
+                  !hasVariants && (
+                    <div className="space-y-4 border rounded-md p-4 bg-tertiary/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <PackageSearch className="h-5 w-5 text-primary" />
+                        <h4 className="font-semibold text-sm">Initial Stock Entry (Optional)</h4>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        You can add starting stock now. This will create an initial purchase record.
+                      </p>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="initialStock">Initial Quantity</Label>
+                          <Input id="initialStock" type="number" {...register("initialStock")} placeholder="0" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="costPrice">Unit Cost Price</Label>
+                          <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="sellPrice">Unit Sell Price</Label>
+                          <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                        </div>
+                      </div>
+                      {errors.initialStock && <p className="text-sm text-destructive">{errors.initialStock.message}</p>}
                     </div>
+                  )
                 ) : (
                   !hasVariants && (
                     <>
                       <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                          <span>
-                              For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
-                          </span>
+                        <Info size={20} className="shrink-0 mt-0.5 text-primary" />
+                        <span>
+                          For non-tracked items (like services or digital goods without variants), set their standard cost and sell price below.
+                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-                          <div className="space-y-1.5">
-                              <Label htmlFor="costPrice">Cost Price</Label>
-                              <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00"/>
-                              {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
-                          </div>
-                          <div className="space-y-1.5">
-                              <Label htmlFor="sellPrice">Sell Price</Label>
-                              <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00"/>
-                              {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
-                          </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="costPrice">Cost Price</Label>
+                          <Input id="costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                          {errors.costPrice && <p className="text-sm text-destructive mt-1">{errors.costPrice.message}</p>}
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="sellPrice">Sell Price</Label>
+                          <Input id="sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                          {errors.sellPrice && <p className="text-sm text-destructive mt-1">{errors.sellPrice.message}</p>}
+                        </div>
                       </div>
                     </>
                   )
                 )}
-                
+
                 {!trackQuantityValue && hasVariants && (
-                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                        <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                        <span>
-                            For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
-                        </span>
-                    </div>
+                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
+                    <Info size={20} className="shrink-0 mt-0.5 text-primary" />
+                    <span>
+                      For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
+                    </span>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -643,7 +672,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3 pt-2">
-                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18} />Tax Rates (%)</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
                       <Label htmlFor="sgstRate">SGST Rate (%)</Label>
@@ -686,31 +715,31 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                    onClick={() => appendVariant({ name: "", options: [{ value: "" }] })}
                   >
-                    <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Variant Type
                   </Button>
                 </CardFooter>
               )}
             </Card>
 
-             <Card>
+            <Card>
               <CardHeader>
-                 <CardTitle>Additional Charges</CardTitle>
-                 <CardDescription>Define fixed or percentage-based charges automatically added when this product is sold.</CardDescription>
+                <CardTitle>Additional Charges</CardTitle>
+                <CardDescription>Define fixed or percentage-based charges automatically added when this product is sold.</CardDescription>
               </CardHeader>
               <CardContent>
-                  <AdditionalChargesFormSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus} />
+                <AdditionalChargesFormSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus} />
               </CardContent>
             </Card>
 
             <div className="flex justify-end gap-3 pt-4">
-                <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
-                    Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
-                    {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
-                </Button>
+              <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
+                {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+              </Button>
             </div>
           </div>
         </form>
