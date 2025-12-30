@@ -2,7 +2,7 @@
 "use client";
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
 import { CreditCard, LogOut, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
@@ -35,12 +35,11 @@ export function AppBlocker({ reason }: AppBlockerProps) {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="https://placehold.co/128x128.png"
+          src="/logo.svg"
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}
-          className="mb-3 rounded-lg shadow-md"
-          data-ai-hint="logo company"
+          className="mb-3 animate-pulse"
         />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
       </div>

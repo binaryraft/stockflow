@@ -72,7 +72,7 @@ export default function AdminLayout({
 
     if (token && userRole === ADMIN_ROLE && companyId) {
       const companyProfile = await fetchCompanyProfile(companyId);
-      
+
       if (companyProfile) {
         setIsAuthenticated(true);
         if (companyProfile.paymentStatus === 'paid') {
@@ -119,12 +119,11 @@ export default function AdminLayout({
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
       <Image
-        src="https://placehold.co/128x128.png"
+        src="/logo.svg"
         alt={`${APP_NAME} Logo`}
         width={80}
         height={80}
-        className="mb-6 rounded-xl shadow-lg animate-pulse"
-        data-ai-hint="logo company"
+        className="mb-6 animate-pulse"
       />
       <p className="text-lg text-muted-foreground">{message}</p>
     </div>
@@ -133,7 +132,7 @@ export default function AdminLayout({
   if (!hasMounted) {
     return loadingScreen("Initializing Admin Portal...");
   }
-  
+
   if (showRecoveryDialog) {
     return <CompanyRecoveryDialog isOpen={true} onOpenChange={setShowRecoveryDialog} onSuccess={checkAuthAndSubscription} />;
   }
@@ -141,13 +140,13 @@ export default function AdminLayout({
   if (isLoadingAuth) {
     return loadingScreen("Checking authentication & subscription...");
   }
-  
+
   if (blockReason) {
     return <AppBlocker reason={blockReason} />;
   }
 
   if (!isAuthenticated && !showRecoveryDialog) {
-     return null;
+    return null;
   }
 
   return <AppShell>{children}</AppShell>;
