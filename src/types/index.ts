@@ -49,6 +49,7 @@ export interface Product {
   companyId: string;
   sgstRate?: number;
   cgstRate?: number;
+  igstRate?: number;
   additionalChargeDefinitions?: AdditionalChargeDefinition[];
   isArchived?: boolean;
 }
@@ -66,6 +67,10 @@ export interface BillItem {
   selectedVariantOptions?: Record<string, string>;
   sgstAmount?: number;
   cgstAmount?: number;
+  igstAmount?: number;
+  discountValue?: number;
+  discountType?: 'amount' | 'percentage';
+  discountAmount?: number;
   isAdditionalCharge?: boolean;
   sourceChargeDefinitionId?: string;
 }
@@ -81,6 +86,9 @@ export interface Bill {
   subTotal?: number;
   totalSGST?: number;
   totalCGST?: number;
+  totalIGST?: number;
+  totalDiscount?: number;
+  taxType?: 'intra-state' | 'inter-state';
   totalAmount: number;
   isEstimate?: boolean;
   notes?: string;

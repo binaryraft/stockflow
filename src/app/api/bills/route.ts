@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     if (!companyId) {
       return NextResponse.json({ success: false, message: 'Company ID is required.' }, { status: 400 });
     }
-    
+
     const companyBills = await db.collection<Bill>('bills')
       .find({ companyId: companyId })
       .sort({ timestamp: -1 })
@@ -41,8 +41,8 @@ export async function POST(req: NextRequest) {
     const { db } = await connectToDatabase();
     const body = await req.json();
     const { billData, itemsData } = body;
-    
-    const { companyId, storeId, type: billType, isEstimate, billedByStaffId } = billData;
+
+    const { companyId, storeId, type: billType, isEstimate, billedByStaffId, taxType } = billData;
 
     if (!companyId || !billType || !itemsData || !Array.isArray(itemsData) || itemsData.length === 0) {
       return NextResponse.json({ success: false, message: 'Company ID, bill type, and at least one item are required.' }, { status: 400 });
@@ -59,25 +59,27 @@ export async function POST(req: NextRequest) {
     const productsCollection = db.collection<Product>('products');
     const productIds = itemsData.map((item: any) => item.productId).filter((id: string) => !id.startsWith('SERVICE_ITEM_') && !id.startsWith('CHARGE_ITEM_'));
     const productsToUpdate: Product[] = await productsCollection.find({ id: { $in: productIds }, companyId: companyId }).toArray();
-    
+
     const currentDate = new Date();
     const datePrefix = format(currentDate, 'ddMMyy');
-    const billsTodayCount = await db.collection<Bill>('bills').countDocuments({ 
-        companyId: companyId, 
-        date: { $gte: startOfDay(currentDate).toISOString() }
+    const billsTodayCount = await db.collection<Bill>('bills').countDocuments({
+      companyId: companyId,
+      date: { $gte: startOfDay(currentDate).toISOString() }
     });
     const newBillNumber = billsTodayCount + 1;
     const newBillId = `${datePrefix}${newBillNumber.toString().padStart(4, '0')}`;
-    
+
     let processedBillItems: BillItem[] = [];
     let billSubTotal = 0;
     let billTotalSGST = 0;
     let billTotalCGST = 0;
+    let billTotalIGST = 0;
+    let billTotalDiscount = 0;
 
     for (const item of itemsData) {
       const isServiceOrCharge = item.productId.startsWith('SERVICE_ITEM_') || item.productId.startsWith('CHARGE_ITEM_');
       const productIndex = !isServiceOrCharge ? productsToUpdate.findIndex(p => p.id === item.productId) : -1;
-      
+
       const product = productIndex !== -1 ? productsToUpdate[productIndex] : null;
 
       if (!isServiceOrCharge && !product) {
@@ -91,68 +93,101 @@ export async function POST(req: NextRequest) {
       } else if (product) {
         sku = product.productSKUs.find(s => Object.keys(s.optionValues || {}).length === 0) || product.productSKUs[0];
       }
-      
+
       const itemProductNameForBill = sku?.skuIdentifier || product?.name || item.productName || "Service/Charge";
       let itemCostPrice = item.costPrice || 0;
       let itemSellPrice = item.sellPrice || 0;
-      
+
       if (billType === 'sell' && !isEstimate && product && sku) {
-          if (product.trackQuantity) {
-              let quantityToSell = item.quantity;
-              let costOfGoodsSoldThisItem = 0;
-              const relevantLayers = (sku?.stockLayers || [])
-                  .filter(l => (l.storeId === storeId || !l.storeId || storeId === undefined) && l.quantity > 0)
-                  .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
-              if (relevantLayers.reduce((sum, l) => sum + l.quantity, 0) < quantityToSell) {
-                  return NextResponse.json({ success: false, message: `Insufficient stock for ${itemProductNameForBill}.` }, { status: 400 });
-              }
-              for (const layer of relevantLayers) {
-                  if (quantityToSell <= 0) break;
-                  const sellFromThisLayer = Math.min(quantityToSell, layer.quantity);
-                  costOfGoodsSoldThisItem += sellFromThisLayer * layer.costPrice;
-                  layer.quantity -= sellFromThisLayer;
-                  quantityToSell -= sellFromThisLayer;
-              }
-              itemCostPrice = item.quantity > 0 ? costOfGoodsSoldThisItem / item.quantity : 0;
+        if (product.trackQuantity) {
+          let quantityToSell = item.quantity;
+          let costOfGoodsSoldThisItem = 0;
+          const relevantLayers = (sku?.stockLayers || [])
+            .filter(l => (l.storeId === storeId || !l.storeId || storeId === undefined) && l.quantity > 0)
+            .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+          if (relevantLayers.reduce((sum, l) => sum + l.quantity, 0) < quantityToSell) {
+            return NextResponse.json({ success: false, message: `Insufficient stock for ${itemProductNameForBill}.` }, { status: 400 });
           }
+          for (const layer of relevantLayers) {
+            if (quantityToSell <= 0) break;
+            const sellFromThisLayer = Math.min(quantityToSell, layer.quantity);
+            costOfGoodsSoldThisItem += sellFromThisLayer * layer.costPrice;
+            layer.quantity -= sellFromThisLayer;
+            quantityToSell -= sellFromThisLayer;
+          }
+          itemCostPrice = item.quantity > 0 ? costOfGoodsSoldThisItem / item.quantity : 0;
+        }
       } else if (billType === 'buy' && product && sku) {
-          if (product.trackQuantity) {
-              const newLayer: StockLayer = {
-                  id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
-                  initialQuantity: item.quantity, quantity: item.quantity,
-                  costPrice: itemCostPrice, sellPrice: itemSellPrice, storeId: storeId,
-              };
-              sku.stockLayers.push(newLayer);
-          }
+        if (product.trackQuantity) {
+          const newLayer: StockLayer = {
+            id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
+            initialQuantity: item.quantity, quantity: item.quantity,
+            costPrice: itemCostPrice, sellPrice: itemSellPrice, storeId: storeId,
+          };
+          sku.stockLayers.push(newLayer);
+        }
       } else if (billType === 'return' && product && sku) {
-          itemCostPrice = item.costPrice || sku?.stockLayers.find(sl => sl.quantity > 0)?.costPrice || 0;
-          if (product.trackQuantity && !item.isDefective) {
-              const returnLayer: StockLayer = {
-                  id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
-                  initialQuantity: item.quantity, quantity: item.quantity,
-                  costPrice: itemCostPrice, sellPrice: itemSellPrice, storeId: storeId,
-              };
-              sku.stockLayers.push(returnLayer);
+        itemCostPrice = item.costPrice || sku?.stockLayers.find(sl => sl.quantity > 0)?.costPrice || 0;
+        if (product.trackQuantity && !item.isDefective) {
+          const returnLayer: StockLayer = {
+            id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
+            initialQuantity: item.quantity, quantity: item.quantity,
+            costPrice: itemCostPrice, sellPrice: itemSellPrice, storeId: storeId,
+          };
+          sku.stockLayers.push(returnLayer);
+        }
+      }
+
+      let itemSgstAmount = 0, itemCgstAmount = 0, itemIgstAmount = 0;
+      let itemDiscountAmount = 0;
+
+      if (!isServiceOrCharge) {
+        if ((billType === 'sell' || billType === 'return')) {
+          if (item.discountValue && item.discountValue > 0) {
+            if (item.discountType === 'percentage') {
+              itemDiscountAmount = ((itemSellPrice * item.quantity) * item.discountValue) / 100;
+            } else {
+              itemDiscountAmount = item.discountValue * item.quantity;
+            }
           }
+        }
       }
-      
-      let itemSgstAmount = 0, itemCgstAmount = 0;
+
       if (!isEstimate && product && !isServiceOrCharge) {
-        const preTaxValue = billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity;
-        itemSgstAmount = (preTaxValue * (product.sgstRate || 0)) / 100;
-        itemCgstAmount = (preTaxValue * (product.cgstRate || 0)) / 100;
+        const rawLineTotal = billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity;
+        const taxableValue = Math.max(0, rawLineTotal - itemDiscountAmount);
+
+        if (taxType === 'inter-state') {
+          const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+          itemIgstAmount = (taxableValue * rate) / 100;
+        } else {
+          itemSgstAmount = (taxableValue * (product.sgstRate || 0)) / 100;
+          itemCgstAmount = (taxableValue * (product.cgstRate || 0)) / 100;
+        }
+      } else if (!isEstimate && isServiceOrCharge && billType === 'sell') {
+        // Basic tax logic for services if they had rates, but currently assuming 0 or explicit charges.
+        // Charges usually have tax? Assuming no tax on charges for now unless product definition has it.
+        // If it's a "CHARGE_ITEM", we just take sellPrice.
       }
-      
-      const preTaxLineTotal = billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity;
+
+      const preTaxLineTotal = (billType === 'buy' ? itemCostPrice * item.quantity : itemSellPrice * item.quantity);
+      // Note: subTotal usually represents the sum of prices * quantity (Gross), or Net?
+      // Standard: SubTotal is sum of (Price * Qty). Discount is separate line or subtracted from Grand Total.
+      // But tax is calculated on Net.
+      // Let's keep billSubTotal as Gross (Price * Qty).
+
       billSubTotal += preTaxLineTotal;
+      billTotalDiscount += itemDiscountAmount;
       billTotalSGST += itemSgstAmount;
       billTotalCGST += itemCgstAmount;
-      
+      billTotalIGST += itemIgstAmount;
+
       processedBillItems.push({
         id: uuidv4(), productId: product?.id || item.productId, productName: itemProductNameForBill,
         quantity: item.quantity, costPrice: itemCostPrice, sellPrice: itemSellPrice,
         isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
-        sgstAmount: itemSgstAmount, cgstAmount: itemCgstAmount,
+        sgstAmount: itemSgstAmount, cgstAmount: itemCgstAmount, igstAmount: itemIgstAmount,
+        discountValue: item.discountValue, discountType: item.discountType, discountAmount: itemDiscountAmount,
         isAdditionalCharge: item.isAdditionalCharge, sourceChargeDefinitionId: item.sourceChargeDefinitionId,
       });
     }
@@ -163,17 +198,19 @@ export async function POST(req: NextRequest) {
     const newBill: Bill = {
       id: newBillId, type: billType, date: currentDate.toISOString(), timestamp: currentDate.getTime(),
       vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
-      items: processedBillItems, subTotal: billSubTotal, totalSGST: isEstimate ? 0 : billTotalSGST, 
-      totalCGST: isEstimate ? 0 : billTotalCGST, totalAmount: isEstimate ? billSubTotal : (billSubTotal + billTotalSGST + billTotalCGST),
+      items: processedBillItems, subTotal: billSubTotal, totalSGST: isEstimate ? 0 : billTotalSGST,
+      totalCGST: isEstimate ? 0 : billTotalCGST, totalIGST: isEstimate ? 0 : billTotalIGST,
+      totalDiscount: billTotalDiscount,
+      totalAmount: isEstimate ? (billSubTotal - billTotalDiscount) : ((billSubTotal - billTotalDiscount) + billTotalSGST + billTotalCGST + billTotalIGST),
       isEstimate: !!isEstimate, notes: billData.notes || company.defaultBillNotes || '',
-      paymentStatus: billData.paymentStatus, billedByStaffId: staffUser?.id, 
-      billedByStaffName: staffUser?.name, storeId: storeDetails?.id, storeName: storeDetails?.name, 
-      companyId: companyId,
+      paymentStatus: billData.paymentStatus, billedByStaffId: staffUser?.id,
+      billedByStaffName: staffUser?.name, storeId: storeDetails?.id, storeName: storeDetails?.name,
+      companyId: companyId, taxType: taxType,
     };
 
     await db.collection<Bill>('bills').insertOne(newBill);
     for (const product of productsToUpdate) {
-        await productsCollection.updateOne({ id: product.id }, { $set: { productSKUs: product.productSKUs } });
+      await productsCollection.updateOne({ id: product.id }, { $set: { productSKUs: product.productSKUs } });
     }
 
     console.log(`${routeLogName} New bill (ID: ${newBillId}) created successfully for company ${companyId}.`);

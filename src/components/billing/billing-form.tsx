@@ -37,9 +37,10 @@ type PendingBillPayload = {
   customerPhone?: string;
   notes?: string;
   paymentStatus?: 'paid' | 'unpaid';
-  items: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'>[];
+  items: Omit<BillItem, 'id' | 'productName' | 'sgstAmount' | 'cgstAmount'>[];
   storeIdForBill?: string;
   isEstimate?: boolean;
+  taxType?: 'intra-state' | 'inter-state';
 };
 
 interface BillingFormProps {
@@ -112,6 +113,7 @@ export function BillingForm({
   const [notes, setNotes] = useState('');
   const [isPaid, setIsPaid] = useState(true);
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
+  const [taxType, setTaxType] = useState<'intra-state' | 'inter-state'>('intra-state');
 
   const [productNotFoundHint, setProductNotFoundHint] = useState('');
   const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
@@ -222,6 +224,7 @@ export function BillingForm({
     resetFormFields(true);
     setPendingBillPayload(null);
     setBillToPotentiallyPrint(null);
+    setTaxType('intra-state');
   }, [resetFormFields, userProfile, mode]);
 
 
@@ -250,15 +253,15 @@ export function BillingForm({
       if (mode === 'sell' || mode === 'return') {
         setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
       } else if (mode === 'buy') {
-          setCostPrice('');
-          setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
+        setCostPrice('');
+        setSellPrice(details.currentSellPrice !== null ? details.currentSellPrice.toString() : '');
       }
     } else if (currentProductForSelection && !skuToUse) {
-        setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
-        setIsDisplayingLayerStock(false);
-        setCurrentSkuSellPrice(null);
-        setSellPrice('');
-        if (mode === 'buy') setCostPrice('');
+      setCurrentSkuStock(currentProductForSelection.trackQuantity ? 0 : null);
+      setIsDisplayingLayerStock(false);
+      setCurrentSkuSellPrice(null);
+      setSellPrice('');
+      if (mode === 'buy') setCostPrice('');
     } else {
       setCurrentSkuStock(null);
       setIsDisplayingLayerStock(false);
@@ -274,28 +277,28 @@ export function BillingForm({
     setCurrentProductForSelection(product);
 
     if (sku) {
-        const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
-        setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
-        setSelectedVariantOptions(sku.optionValues || {});
+      const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
+      setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
+      setSelectedVariantOptions(sku.optionValues || {});
 
-        if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
-            setCurrentSkuStock(layer.quantity);
-            setIsDisplayingLayerStock(true);
-            setCurrentSkuSellPrice(layer.sellPrice);
-            setSellPrice(layer.sellPrice.toString());
-        } else {
-            setCurrentSkuStock(product.trackQuantity ? skuDetailsToUse.totalStock : null);
-            setIsDisplayingLayerStock(false);
-            setCurrentSkuSellPrice(skuDetailsToUse.currentSellPrice);
-            setSellPrice(skuDetailsToUse.currentSellPrice !== null ? skuDetailsToUse.currentSellPrice.toString() : '');
-        }
-        if (mode === 'buy') {
-            setCostPrice('');
-        }
+      if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
+        setCurrentSkuStock(layer.quantity);
+        setIsDisplayingLayerStock(true);
+        setCurrentSkuSellPrice(layer.sellPrice);
+        setSellPrice(layer.sellPrice.toString());
+      } else {
+        setCurrentSkuStock(product.trackQuantity ? skuDetailsToUse.totalStock : null);
+        setIsDisplayingLayerStock(false);
+        setCurrentSkuSellPrice(skuDetailsToUse.currentSellPrice);
+        setSellPrice(skuDetailsToUse.currentSellPrice !== null ? skuDetailsToUse.currentSellPrice.toString() : '');
+      }
+      if (mode === 'buy') {
+        setCostPrice('');
+      }
     } else {
-        setProductNameQuery(product.name);
-        setSelectedVariantOptions({});
-        updateSkuDisplayInfo(undefined);
+      setProductNameQuery(product.name);
+      setSelectedVariantOptions({});
+      updateSkuDisplayInfo(undefined);
     }
 
     setProductNotFoundHint('');
@@ -303,15 +306,15 @@ export function BillingForm({
     if (product.variants && product.variants.length > 0 && (!sku || Object.keys(sku.optionValues || {}).length < product.variants.length)) {
       const firstUnselectedVariant = product.variants.find(v => !(selectedVariantOptions[v.name]));
       if (firstUnselectedVariant) {
-          setTimeout(() => {
-            setVariantDropdownOpenState({ [firstUnselectedVariant.id]: true });
-            variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
-          }, 50);
+        setTimeout(() => {
+          setVariantDropdownOpenState({ [firstUnselectedVariant.id]: true });
+          variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
+        }, 50);
       } else if (Object.keys(selectedVariantOptions).length === product.variants.length) {
-          setTimeout(() => {
-            quantityInputRef.current?.focus();
-            quantityInputRef.current?.select();
-          }, 50);
+        setTimeout(() => {
+          quantityInputRef.current?.focus();
+          quantityInputRef.current?.select();
+        }, 50);
       }
     } else {
       setTimeout(() => {
@@ -331,13 +334,13 @@ export function BillingForm({
         const skuToSelect = product.productSKUs.length > 0 ? product.productSKUs[0] : undefined;
         const skuDetails = getSkuDetails(skuToSelect, finalStoreIdForSkuDetails);
         const suggestionForNewProduct: ProductSearchSuggestion = {
-            product,
-            sku: skuToSelect || { id: product.id + '_default_new_bill', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
-            displayInfo: {
-                name: skuDetails.skuIdentifier || product.name,
-                stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-                price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
-            }
+          product,
+          sku: skuToSelect || { id: product.id + '_default_new_bill', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
+          displayInfo: {
+            name: skuDetails.skuIdentifier || product.name,
+            stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
+            price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+          }
         };
         handleProductSelectFromSearch(suggestionForNewProduct);
       }
@@ -349,36 +352,36 @@ export function BillingForm({
 
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
-        const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
-        if (firstOpenVariantId) {
-            const firstVariantRef = variantSelectRefs.current[firstOpenVariantId];
-             setTimeout(() => {
-                const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
-                (elToFocus as HTMLElement)?.focus();
-            }, 100);
-        }
+      const firstOpenVariantId = Object.keys(variantDropdownOpenState).find(id => variantDropdownOpenState[id]);
+      if (firstOpenVariantId) {
+        const firstVariantRef = variantSelectRefs.current[firstOpenVariantId];
+        setTimeout(() => {
+          const elToFocus = firstVariantRef?.current || document.getElementById(`variant-select-${firstOpenVariantId}-trigger`);
+          (elToFocus as HTMLElement)?.focus();
+        }, 100);
+      }
     }
   }, [currentProductForSelection?.variants, variantDropdownOpenState]);
 
   useEffect(() => {
     if (currentProductForSelection?.variants && currentProductForSelection.variants.length > 0) {
-        const allVariantsSelected = currentProductForSelection.variants.every(
-          (v) => selectedVariantOptions[v.name]
-        );
+      const allVariantsSelected = currentProductForSelection.variants.every(
+        (v) => selectedVariantOptions[v.name]
+      );
 
-        if (allVariantsSelected) {
-          const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
-          if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
-              const currentSku = currentProductForSelection.productSKUs.find(sku =>
-                JSON.stringify(Object.entries(sku.optionValues || {}).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
-              );
-              updateSkuDisplayInfo(currentSku);
-              setTimeout(() => {
-                  quantityInputRef.current?.focus();
-                  quantityInputRef.current?.select();
-              }, 50);
-          }
+      if (allVariantsSelected) {
+        const lastVariantId = currentProductForSelection.variants[currentProductForSelection.variants.length - 1].id;
+        if (!variantDropdownOpenState[lastVariantId] && document.activeElement?.id !== quantityInputRef.current?.id) {
+          const currentSku = currentProductForSelection.productSKUs.find(sku =>
+            JSON.stringify(Object.entries(sku.optionValues || {}).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())
+          );
+          updateSkuDisplayInfo(currentSku);
+          setTimeout(() => {
+            quantityInputRef.current?.focus();
+            quantityInputRef.current?.select();
+          }, 50);
         }
+      }
     }
   }, [selectedVariantOptions, currentProductForSelection, updateSkuDisplayInfo, variantDropdownOpenState]);
 
@@ -404,7 +407,7 @@ export function BillingForm({
         toast({ variant: "destructive", title: "Variant Selection Required", description: "Please select options for all product variants." });
         const firstUnselectedVariant = product.variants.find(v => !selectedVariantOptions[v.name]);
         if (firstUnselectedVariant) {
-            setTimeout(() => setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true })), 50);
+          setTimeout(() => setVariantDropdownOpenState(prev => ({ ...prev, [firstUnselectedVariant.id]: true })), 50);
         }
         return;
       }
@@ -414,44 +417,45 @@ export function BillingForm({
     const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts);
 
     if (!targetSkuFromStore) {
-        toast({ variant: "destructive", title: "SKU Error", description: "Could not identify or create the product variant. Please re-select." });
-        return;
+      toast({ variant: "destructive", title: "SKU Error", description: "Could not identify or create the product variant. Please re-select." });
+      return;
     }
     const skuDetails = getSkuDetails(targetSkuFromStore, finalStoreIdForSkuDetails);
     const itemProductNameForBill = skuDetails?.skuIdentifier || getSkuIdentifier(product.name, selectedOpts) || product.name;
 
     if (mode === 'buy' && product.trackQuantity === false) {
-      toast({ variant: "destructive", title: "Invalid Action", description: "Non-tracked items/services cannot be added to Expense bills."});
+      toast({ variant: "destructive", title: "Invalid Action", description: "Non-tracked items/services cannot be added to Expense bills." });
       resetFormFields(true);
       return;
     }
 
     if ((mode === 'sell' || (mode === 'return' && !returnItemIsDefective)) && product.trackQuantity) {
-        const stockToCheck = isDisplayingLayerStock && currentSkuStock !== null && mode === 'sell'
-                           ? currentSkuStock
-                           : (skuDetails.totalStock ?? 0);
+      const stockToCheck = isDisplayingLayerStock && currentSkuStock !== null && mode === 'sell'
+        ? currentSkuStock
+        : (skuDetails.totalStock ?? 0);
 
-        if (stockToCheck < currentQuantity) {
-          toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store.` });
-          return;
-        }
+      if (stockToCheck < currentQuantity) {
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store.` });
+        return;
+      }
     }
 
     let itemCostPrice: number;
     let itemSellPriceForBill: number;
     let itemSgstAmount: number | undefined = 0;
     let itemCgstAmount: number | undefined = 0;
+    let itemIgstAmount: number | undefined = 0;
 
     if (mode === 'buy') {
       itemCostPrice = parseFloat(costPrice.toString()) || 0;
       itemSellPriceForBill = parseFloat(sellPrice.toString()) || 0;
       if (itemCostPrice <= 0 && currentQuantity > 0 && product.trackQuantity) {
-        toast({ variant: "destructive", title: "Invalid Cost Price", description: "Cost Price must be greater than 0 for tracked purchases."});
+        toast({ variant: "destructive", title: "Invalid Cost Price", description: "Cost Price must be greater than 0 for tracked purchases." });
         costPriceInputRef.current?.focus();
         return;
       }
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && product.trackQuantity && itemCostPrice > 0) {
-        toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for purchased batch must be greater than 0."});
+        toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for purchased batch must be greater than 0." });
         sellPriceBatchInputRef.current?.focus();
         return;
       }
@@ -464,26 +468,36 @@ export function BillingForm({
         itemCostPrice = 0;
       }
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
-        toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0."});
+        toast({ variant: "destructive", title: "Invalid Sell Price", description: "Sell price for products must be greater than 0." });
         return;
       }
       if (!isEstimateMode && !product.id?.startsWith('SERVICE_ITEM_')) {
         const itemSubTotal = itemSellPriceForBill * currentQuantity;
-        itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
-        itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
+        if (taxType === 'intra-state') {
+          itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
+          itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
+        } else {
+          const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+          itemIgstAmount = (itemSubTotal * rate) / 100;
+        }
       }
 
     } else {
       itemSellPriceForBill = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0;
       itemCostPrice = skuDetails.averageCostPrice ?? 0;
       if (itemSellPriceForBill <= 0 && currentQuantity > 0 && !product.id?.startsWith('SERVICE_ITEM_')) {
-        toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0."});
+        toast({ variant: "destructive", title: "Invalid Return Price", description: "Return price must be greater than 0." });
         return;
       }
       if (!product.id?.startsWith('SERVICE_ITEM_')) {
         const itemSubTotal = itemSellPriceForBill * currentQuantity;
-        itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
-        itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
+        if (taxType === 'intra-state') {
+          itemSgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
+          itemCgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
+        } else {
+          const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+          itemIgstAmount = (itemSubTotal * rate) / 100;
+        }
       }
     }
 
@@ -494,32 +508,34 @@ export function BillingForm({
       selectedVariantOptions: (product.variants && product.variants.length > 0) ? { ...selectedVariantOptions } : undefined,
       sgstAmount: itemSgstAmount,
       cgstAmount: itemCgstAmount,
+      igstAmount: itemIgstAmount,
       isAdditionalCharge: false,
     };
     const itemsToAdd = [newItem];
 
     if (product.additionalChargeDefinitions && product.additionalChargeDefinitions.length > 0 && (mode === 'sell' || mode === 'return')) {
-        product.additionalChargeDefinitions.forEach(charge => {
-            let chargeValue = 0;
-            if (charge.type === 'fixed') {
-                chargeValue = charge.value;
-            } else if (charge.type === 'percentage') {
-                chargeValue = ((itemSellPriceForBill * currentQuantity) * charge.value) / 100;
-            }
+      product.additionalChargeDefinitions.forEach(charge => {
+        let chargeValue = 0;
+        if (charge.type === 'fixed') {
+          chargeValue = charge.value;
+        } else if (charge.type === 'percentage') {
+          chargeValue = ((itemSellPriceForBill * currentQuantity) * charge.value) / 100;
+        }
 
-            itemsToAdd.push({
-                id: uuidv4(),
-                productId: `CHARGE_ITEM_${charge.id}`,
-                productName: charge.name,
-                quantity: 1,
-                costPrice: 0,
-                sellPrice: chargeValue,
-                isAdditionalCharge: true,
-                sourceChargeDefinitionId: charge.id,
-                sgstAmount: 0,
-                cgstAmount: 0,
-            });
+        itemsToAdd.push({
+          id: uuidv4(),
+          productId: `CHARGE_ITEM_${charge.id}`,
+          productName: charge.name,
+          quantity: 1,
+          costPrice: 0,
+          sellPrice: chargeValue,
+          isAdditionalCharge: true,
+          sourceChargeDefinitionId: charge.id,
+          sgstAmount: 0,
+          cgstAmount: 0,
+          igstAmount: 0,
         });
+      });
     }
 
 
@@ -578,18 +594,18 @@ export function BillingForm({
 
   const handleProductNameSubmit = (inputValue: string) => {
     if (productNotFoundHint && inputValue.trim() !== '' && inputValue.toLowerCase() === productNotFoundHint.toLowerCase()) {
-        const billingFormPreFill = {
-            name: inputValue,
-            quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
-            costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
-            sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
-        };
-        setNewProductDialogInitialValues(billingFormPreFill);
-        setIsNewProductDialogOpen(true);
-        setProductNotFoundHint('');
-        resetFormFields(true); // Reset fields after deciding to open dialog
+      const billingFormPreFill = {
+        name: inputValue,
+        quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
+        costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
+        sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
+      };
+      setNewProductDialogInitialValues(billingFormPreFill);
+      setIsNewProductDialogOpen(true);
+      setProductNotFoundHint('');
+      resetFormFields(true); // Reset fields after deciding to open dialog
     } else {
-        findAndPopulateProductByBarcode(inputValue);
+      findAndPopulateProductByBarcode(inputValue);
     }
   };
 
@@ -622,7 +638,7 @@ export function BillingForm({
           if (currentProductForSelection && currentProductForSelection.id === updatedProduct.id) {
             setCurrentProductForSelection(updatedProduct);
             setProductNameQuery(updatedProduct.name);
-            const skuToUse = updatedProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || updatedProduct.productSKUs[0] || {id: updatedProduct.id + '_temp', optionValues:{}, stockLayers:[], skuIdentifier: updatedProduct.name};
+            const skuToUse = updatedProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || updatedProduct.productSKUs[0] || { id: updatedProduct.id + '_temp', optionValues: {}, stockLayers: [], skuIdentifier: updatedProduct.name };
             updateSkuDisplayInfo(skuToUse);
           }
         } else {
@@ -640,7 +656,7 @@ export function BillingForm({
 
 
   const handleEnterNavigation = (currentField: 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
-     if (currentField === 'quantity') {
+    if (currentField === 'quantity') {
       if (mode === 'buy') {
         costPriceInputRef.current?.focus();
         costPriceInputRef.current?.select();
@@ -662,18 +678,47 @@ export function BillingForm({
     }
   };
 
+  const calculateItemTax = (item: BillItem, currentQuantity: number, currentSellPrice: number, currentDiscountValue: number = 0, currentDiscountType: 'amount' | 'percentage' = 'amount') => {
+    const product = getProductById(item.productId);
+    const subTotal = currentSellPrice * currentQuantity;
+    let discountAmount = 0;
+    if (currentDiscountValue > 0) {
+      if (currentDiscountType === 'percentage') {
+        discountAmount = (subTotal * currentDiscountValue) / 100;
+      } else {
+        // Treat fixed amount as per-unit discount
+        discountAmount = currentDiscountValue * currentQuantity;
+      }
+    }
+    const taxableValue = Math.max(0, subTotal - discountAmount);
+
+    let sgst = 0, cgst = 0, igst = 0;
+    if (product) {
+      if (taxType === 'intra-state') {
+        sgst = (taxableValue * (product.sgstRate || 0)) / 100;
+        cgst = (taxableValue * (product.cgstRate || 0)) / 100;
+      } else {
+        // Use igstRate if available, otherwise sum of sgst+cgst
+        const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+        igst = (taxableValue * rate) / 100;
+      }
+    }
+    return { sgst, cgst, igst, discountAmount };
+  };
+
   const updateBillItemQuantity = (itemId: string, newQuantity: number) => {
     setCurrentBillItems(prevItems =>
       prevItems.map(item => {
         if (item.id === itemId) {
-          let updatedItem = { ...item, quantity: Math.max(0, newQuantity) };
+          const qty = Math.max(0, newQuantity);
+          let updatedItem = { ...item, quantity: qty };
+
           if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
-            const product = getProductById(item.productId);
-            if (product) {
-              const itemSubTotal = updatedItem.sellPrice * updatedItem.quantity;
-              updatedItem.sgstAmount = (itemSubTotal * (product.sgstRate || 0)) / 100;
-              updatedItem.cgstAmount = (itemSubTotal * (product.cgstRate || 0)) / 100;
-            }
+            const { sgst, cgst, igst, discountAmount } = calculateItemTax(updatedItem, qty, updatedItem.sellPrice, updatedItem.discountValue, updatedItem.discountType);
+            updatedItem.sgstAmount = sgst;
+            updatedItem.cgstAmount = cgst;
+            updatedItem.igstAmount = igst;
+            updatedItem.discountAmount = discountAmount;
           }
           return updatedItem;
         }
@@ -681,6 +726,57 @@ export function BillingForm({
       }).filter(item => item.quantity > 0 || item.isAdditionalCharge)
     );
   };
+
+  const updateBillItemDiscount = (itemId: string, value: number, type: 'amount' | 'percentage') => {
+    setCurrentBillItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          let updatedItem = { ...item, discountValue: value, discountType: type };
+          if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+            const { sgst, cgst, igst, discountAmount } = calculateItemTax(updatedItem, updatedItem.quantity, updatedItem.sellPrice, value, type);
+            updatedItem.sgstAmount = sgst;
+            updatedItem.cgstAmount = cgst;
+            updatedItem.igstAmount = igst;
+            updatedItem.discountAmount = discountAmount;
+          }
+          return updatedItem;
+        }
+        return item;
+      })
+    );
+  };
+
+  // Recalculate taxes when taxMode changes
+  useEffect(() => {
+    setCurrentBillItems(prevItems => prevItems.map(item => {
+      if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+        const product = getProductById(item.productId);
+        if (!product) return item;
+
+        const subTotal = item.sellPrice * item.quantity;
+        let discountAmount = 0; // Usage of saved discount amount is unsafe if logic changes, recalculate
+        if (item.discountValue && item.discountValue > 0) {
+          if (item.discountType === 'percentage') discountAmount = (subTotal * item.discountValue) / 100;
+          else discountAmount = item.discountValue * item.quantity;
+        }
+
+        const taxableValue = Math.max(0, subTotal - discountAmount);
+        let sgst = 0, cgst = 0, igst = 0;
+
+        if (taxType === 'intra-state') {
+          sgst = (taxableValue * (product.sgstRate || 0)) / 100;
+          cgst = (taxableValue * (product.cgstRate || 0)) / 100;
+          igst = 0;
+        } else {
+          const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+          igst = (taxableValue * rate) / 100;
+          sgst = 0; cgst = 0;
+        }
+        return { ...item, sgstAmount: sgst, cgstAmount: cgst, igstAmount: igst, discountAmount };
+      }
+      return item;
+    }));
+  }, [taxType, mode, isEstimateMode, getProductById]);
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
     if (mode !== 'buy') return;
@@ -707,29 +803,41 @@ export function BillingForm({
       if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
         totalSGST += item.sgstAmount || 0;
         totalCGST += item.cgstAmount || 0;
+        // IGST is not in original code, adding it
       }
     });
 
     let grandTotal;
+    let totalIGST = 0;
+    let totalDiscount = 0;
+
     if (mode === 'buy') {
-        subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
-        grandTotal = subTotal;
-        totalSGST = 0; totalCGST = 0;
+      subTotal = currentBillItems.reduce((acc, item) => acc + (item.costPrice * item.quantity), 0);
+      grandTotal = subTotal;
+      totalSGST = 0; totalCGST = 0; totalIGST = 0;
     } else if ((mode === 'sell' || mode === 'return')) {
-        if (isEstimateMode) {
-            grandTotal = subTotal;
-            totalSGST = 0;
-            totalCGST = 0;
-        } else {
-            grandTotal = subTotal + totalSGST + totalCGST;
-        }
+      // Subtotal in Sell mode should usually be Pre-Tax, Pre-Discount?
+      // Usually Subtotal = Sum of (Qty * Price).
+      // Discount is subtracted. Tax is added.
+      subTotal = currentBillItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0);
+      totalDiscount = currentBillItems.reduce((acc, item) => acc + (item.discountAmount || 0), 0);
+      totalSGST = currentBillItems.reduce((acc, item) => acc + (item.sgstAmount || 0), 0);
+      totalCGST = currentBillItems.reduce((acc, item) => acc + (item.cgstAmount || 0), 0);
+      totalIGST = currentBillItems.reduce((acc, item) => acc + (item.igstAmount || 0), 0);
+
+      if (isEstimateMode) {
+        grandTotal = subTotal - totalDiscount; // Estimates might show discount but no tax
+        totalSGST = 0; totalCGST = 0; totalIGST = 0;
+      } else {
+        grandTotal = (subTotal - totalDiscount) + totalSGST + totalCGST + totalIGST;
+      }
     } else {
-        grandTotal = subTotal;
+      grandTotal = subTotal;
     }
-    return { subTotal, totalSGST, totalCGST, grandTotal };
+    return { subTotal, totalSGST, totalCGST, totalIGST, totalDiscount, grandTotal };
   };
 
-  const billTotals = useMemo(calculateBillTotals, [currentBillItems, mode, isEstimateMode]);
+  const billTotals = useMemo(calculateBillTotals, [currentBillItems, mode, isEstimateMode, taxType]);
 
   const startSaveProcess = async (staffId: string, billPayloadToSave: PendingBillPayload) => {
     if (!billPayloadToSave) {
@@ -744,7 +852,8 @@ export function BillingForm({
           storeId: billPayloadToSave.storeIdForBill,
           companyId: companyId,
           isEstimate: billPayloadToSave.isEstimate,
-          ... (({ billType, items, storeIdForBill, isEstimate, ...otherData }) => otherData)(billPayloadToSave)
+          taxType: billPayloadToSave.taxType,
+          ... (({ billType, items, storeIdForBill, isEstimate, taxType, ...otherData }) => otherData)(billPayloadToSave)
         },
         billPayloadToSave.items
       );
@@ -763,13 +872,13 @@ export function BillingForm({
   const handleConfirmPrint = (print: boolean) => {
     setIsPrintConfirmDialogOpen(false);
     if (print && billToPotentiallyPrint) {
-        const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
-        triggerPrint(printContent);
+      const printContent = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
+      triggerPrint(printContent);
     }
     if (billToPotentiallyPrint) {
-        setLastSavedBillMode(billToPotentiallyPrint.type);
-        setLastSavedBillIsEstimate(billToPotentiallyPrint.isEstimate || false);
-        setIsSavingAnimationVisible(true);
+      setLastSavedBillMode(billToPotentiallyPrint.type);
+      setLastSavedBillIsEstimate(billToPotentiallyPrint.isEstimate || false);
+      setIsSavingAnimationVisible(true);
     }
     setBillToPotentiallyPrint(null);
   };
@@ -782,37 +891,39 @@ export function BillingForm({
 
     let finalStoreId: string | undefined = undefined;
     if (isAdminContext) {
-        const planId = activePlan?.id;
-        if (planId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY) {
-            finalStoreId = undefined; // No store needed for this plan
-        } else if (planId === SUBSCRIPTION_PLAN_IDS.STARTER) {
-            if (allStores.length === 1) finalStoreId = allStores[0].id;
-            else {
-                toast({ variant: "destructive", title: "Store Required", description: "Please add your store in Store Management before creating bills on the Starter plan."});
-                return;
-            }
-        } else {
-            if (allStores.length === 0) {
-                 toast({ variant: "destructive", title: "No Stores Configured", description: "Please add stores in Store Management before creating bills." });
-                 return;
-            }
-            if (!selectedStoreIdForAdmin) {
-                toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
-                return;
-            }
-            finalStoreId = selectedStoreIdForAdmin;
+      const planId = activePlan?.id;
+      if (planId === SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY) {
+        finalStoreId = undefined; // No store needed for this plan
+      } else if (planId === SUBSCRIPTION_PLAN_IDS.STARTER) {
+        if (allStores.length === 1) finalStoreId = allStores[0].id;
+        else {
+          toast({ variant: "destructive", title: "Store Required", description: "Please add your store in Store Management before creating bills on the Starter plan." });
+          return;
         }
+      } else {
+        if (allStores.length === 0) {
+          toast({ variant: "destructive", title: "No Stores Configured", description: "Please add stores in Store Management before creating bills." });
+          return;
+        }
+        if (!selectedStoreIdForAdmin) {
+          toast({ variant: "destructive", title: "Store Not Selected", description: "Please select a store for this bill." });
+          return;
+        }
+        finalStoreId = selectedStoreIdForAdmin;
+      }
     } else {
       finalStoreId = storeIdFromProp;
     }
 
-    const billItemsForStore: Omit<BillItem, 'id'|'productName'|'sgstAmount'|'cgstAmount'>[] = currentBillItems.map(item => ({
+    const billItemsForStore: Omit<BillItem, 'id' | 'productName' | 'sgstAmount' | 'cgstAmount' | 'igstAmount'>[] = currentBillItems.map(item => ({
       productId: item.productId, quantity: item.quantity,
       costPrice: item.costPrice || 0,
       sellPrice: item.sellPrice || 0,
       isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
       isAdditionalCharge: item.isAdditionalCharge,
       sourceChargeDefinitionId: item.sourceChargeDefinitionId,
+      discountValue: item.discountValue,
+      discountType: item.discountType,
     }));
 
     const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
@@ -823,17 +934,18 @@ export function BillingForm({
       paymentStatus: billPaymentStatus, items: billItemsForStore,
       storeIdForBill: finalStoreId,
       isEstimate: mode === 'sell' ? isEstimateMode : undefined,
+      taxType: taxType,
     };
 
     if (!isAdminContext && storeIdFromProp) {
-        setPendingBillPayload(currentBillPayload);
-        setIsVerifyEmployeeDialogOpen(true);
+      setPendingBillPayload(currentBillPayload);
+      setIsVerifyEmployeeDialogOpen(true);
     } else if (isAdminContext) {
-        if (activePlan?.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && !finalStoreId && activePlan && activePlan.maxStores > 0) {
-            toast({ variant: "destructive", title: "Store Required", description: "A store context is required to save this bill for your plan."});
-            return;
-        }
-        startSaveProcess('admin_self_billed', currentBillPayload);
+      if (activePlan?.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY && !finalStoreId && activePlan && activePlan.maxStores > 0) {
+        toast({ variant: "destructive", title: "Store Required", description: "A store context is required to save this bill for your plan." });
+        return;
+      }
+      startSaveProcess('admin_self_billed', currentBillPayload);
     }
   };
 
@@ -842,7 +954,7 @@ export function BillingForm({
     if (pendingBillPayload) {
       startSaveProcess(staff.id, pendingBillPayload);
     } else {
-        toast({ variant: "destructive", title: "Error", description: "Billing data was unexpectedly cleared. Please try saving again." });
+      toast({ variant: "destructive", title: "Error", description: "Billing data was unexpectedly cleared. Please try saving again." });
     }
     setPendingBillPayload(null);
   };
@@ -856,34 +968,34 @@ export function BillingForm({
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParamsHook.get('mode');
       const basePath = '/admin/billing';
-       if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
-       } else {
-         router.push(basePath);
-       }
+      if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
+      } else {
+        router.push(basePath);
+      }
     }
   };
 
   const handleModeChange = (newModeString: string) => {
     const newMode = newModeString as BillMode;
     if (allowedModes && allowedModes.length > 0 && !allowedModes.includes(newMode)) {
-        toast({variant: "destructive", title: "Mode Not Allowed", description: `This terminal is not configured for ${newMode} operations.`});
-        return;
+      toast({ variant: "destructive", title: "Mode Not Allowed", description: `This terminal is not configured for ${newMode} operations.` });
+      return;
     }
 
     if (newMode !== mode) {
-        resetFullForm();
-        setMode(newMode);
-        const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
-        router.push(`${basePath}?mode=${newMode}`, { scroll: false });
+      resetFullForm();
+      setMode(newMode);
+      const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
+      router.push(`${basePath}?mode=${newMode}`, { scroll: false });
     }
   };
 
   const handleEditProductClick = () => {
     if (currentProductForSelection) {
-        const params = new URLSearchParams();
-        const currentBillingUrl = `${pathname}?${searchParamsHook.toString()}`;
-        params.set('returnTo', encodeURIComponent(currentBillingUrl));
-        router.push(`/admin/products/${currentProductForSelection.id}?${params.toString()}`);
+      const params = new URLSearchParams();
+      const currentBillingUrl = `${pathname}?${searchParamsHook.toString()}`;
+      params.set('returnTo', encodeURIComponent(currentBillingUrl));
+      router.push(`/admin/products/${currentProductForSelection.id}?${params.toString()}`);
     }
   };
 
@@ -891,7 +1003,7 @@ export function BillingForm({
     setIsNewProductDialogOpen(false);
     const skuToSelect = newProduct.productSKUs.length > 0 ? newProduct.productSKUs[0] : undefined;
     const skuDetails = getSkuDetails(skuToSelect, finalStoreIdForSkuDetails);
-     const suggestion: ProductSearchSuggestion = {
+    const suggestion: ProductSearchSuggestion = {
       product: newProduct,
       sku: skuToSelect || { id: newProduct.id + '_default_dialog_add', optionValues: {}, stockLayers: [], skuIdentifier: newProduct.name },
       displayInfo: {
@@ -913,6 +1025,7 @@ export function BillingForm({
     const amount = parseFloat(serviceAmount.toString());
     let sgstAmount: number | undefined = 0;
     let cgstAmount: number | undefined = 0;
+    let igstAmount: number | undefined = 0;
 
     const serviceItem: BillItem = {
       id: uuidv4(),
@@ -925,6 +1038,7 @@ export function BillingForm({
       selectedVariantOptions: undefined,
       sgstAmount,
       cgstAmount,
+      igstAmount,
       isAdditionalCharge: false,
     };
 
@@ -942,10 +1056,10 @@ export function BillingForm({
   };
 
   const showAdminStoreSelector = isAdminContext &&
-                               activePlan &&
-                               activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER &&
-                               activePlan.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY &&
-                               allStores.length > 1;
+    activePlan &&
+    activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER &&
+    activePlan.id !== SUBSCRIPTION_PLAN_IDS.ADMIN_ONLY &&
+    allStores.length > 1;
 
   const currentUrlMode = searchParamsHook.get('mode') as BillMode | null;
 
@@ -958,7 +1072,7 @@ export function BillingForm({
         isEstimate={lastSavedBillIsEstimate}
         onClose={handleAnimationClose}
       />
-       <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
+      <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Bill Saved Successfully!</AlertDialogTitle>
@@ -986,10 +1100,10 @@ export function BillingForm({
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
           onOpenChange={(open) => {
-              if(!open && isVerifyEmployeeDialogOpen) {
-                  setPendingBillPayload(null);
-              }
-              setIsVerifyEmployeeDialogOpen(open);
+            if (!open && isVerifyEmployeeDialogOpen) {
+              setPendingBillPayload(null);
+            }
+            setIsVerifyEmployeeDialogOpen(open);
           }}
           storeId={storeIdFromProp}
           onAuthenticated={handleEmployeeVerifiedForBill}
@@ -1009,17 +1123,17 @@ export function BillingForm({
           <TabsList className="grid w-full grid-cols-3 gap-1 h-11">
             {displayModes.includes('sell') && (
               <TabsTrigger value="sell" className={cn("flex items-center gap-2 text-sm px-4 py-2.5", activeModeConfig.sell.color)}>
-                <activeModeConfig.sell.icon size={18}/>{activeModeConfig.sell.label}
+                <activeModeConfig.sell.icon size={18} />{activeModeConfig.sell.label}
               </TabsTrigger>
             )}
             {displayModes.includes('buy') && (
               <TabsTrigger value="buy" className={cn("flex items-center gap-2 text-sm px-4 py-2.5", activeModeConfig.buy.color)}>
-                <activeModeConfig.buy.icon size={18}/>{activeModeConfig.buy.label}
+                <activeModeConfig.buy.icon size={18} />{activeModeConfig.buy.label}
               </TabsTrigger>
             )}
             {displayModes.includes('return') && (
               <TabsTrigger value="return" className={cn("flex items-center gap-2 text-sm px-4 py-2.5", activeModeConfig.return.color)}>
-                <activeModeConfig.return.icon size={18}/>{activeModeConfig.return.label}
+                <activeModeConfig.return.icon size={18} />{activeModeConfig.return.label}
               </TabsTrigger>
             )}
           </TabsList>
@@ -1029,52 +1143,61 @@ export function BillingForm({
       <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
           {showAdminStoreSelector && (
-              <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
-                <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium text-primary">
-                    <Building size={18} /> Store for this Bill
-                </Label>
-                <Select value={selectedStoreIdForAdmin || ""} onValueChange={setSelectedStoreIdForAdmin}>
-                    <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
-                        <SelectValue placeholder="Select a store..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        {allStores.map(store => (
-                            <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
-                 {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length > 1 && !selectedStoreIdForAdmin && (
-                    <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>
-                 )}
-              </div>
+            <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
+              <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium text-primary">
+                <Building size={18} /> Store for this Bill
+              </Label>
+              <Select value={selectedStoreIdForAdmin || ""} onValueChange={setSelectedStoreIdForAdmin}>
+                <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
+                  <SelectValue placeholder="Select a store..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {allStores.map(store => (
+                    <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length > 1 && !selectedStoreIdForAdmin && (
+                <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>
+              )}
+            </div>
           )}
           {isAdminContext && activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
-             <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-                No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
-             </p>
+            <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
+              No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
+            </p>
           )}
           {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
-             <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-                No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
-             </p>
+            <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
+              No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
+            </p>
           )}
 
           {mode === 'sell' && (
             <div className="flex items-center space-x-2 pt-2 pb-2 justify-end">
-                <Label htmlFor="estimateMode" className="font-medium text-primary">Estimate Mode</Label>
-                <Switch
-                    id="estimateMode"
-                    checked={isEstimateMode}
-                    onCheckedChange={setIsEstimateMode}
-                    className="data-[state=checked]:bg-primary"
-                />
+              {/* Tax Type Switch */}
+              {mode === 'sell' && !isEstimateMode && (
+                <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md border text-sm">
+                  <Switch
+                    id="tax-mode"
+                    checked={taxType === 'inter-state'}
+                    onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
+                  />
+                  <Label htmlFor="tax-mode">Inter-state (IGST)</Label>
+                </div>
+              )}
+
+              <div className="flex items-center space-x-2">
+                <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
+                <Label htmlFor="estimate-mode">Estimate/Quotation</Label>
+              </div>
             </div>
           )}
 
 
           <div className="space-y-4 pb-4 border-b border-dashed">
             <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
-                <Settings2 size={20} className="text-muted-foreground"/> Add Item / Product
+              <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
             </h3>
             <div className={cn(
               "grid gap-4 items-baseline",
@@ -1088,14 +1211,14 @@ export function BillingForm({
                     inputRef={productNameInputRef}
                     value={productNameQuery}
                     onValueChange={(v) => {
-                        setProductNameQuery(v);
-                        if (!v) {
-                            setCurrentProductForSelection(null);
-                            setSelectedVariantOptions({});
-                            setProductNotFoundHint('');
-                            updateSkuDisplayInfo(undefined);
-                            setIsDisplayingLayerStock(false);
-                        }
+                      setProductNameQuery(v);
+                      if (!v) {
+                        setCurrentProductForSelection(null);
+                        setSelectedVariantOptions({});
+                        setProductNotFoundHint('');
+                        updateSkuDisplayInfo(undefined);
+                        setIsDisplayingLayerStock(false);
+                      }
                     }}
                     onProductSelect={handleProductSelectFromSearch}
                     onEnterWithoutSelection={handleProductNameSubmit}
@@ -1106,12 +1229,12 @@ export function BillingForm({
                   />
                   <TooltipProvider>
                     <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={handleBarcodeIconClick} className="shrink-0" aria-label="Scan Hardware Barcode">
-                                <BarcodeIconLucide className="h-5 w-5 text-primary" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>{currentProductForSelection ? `Update Barcode for ${currentProductForSelection.name}` : "Scan Barcode to Add Item"}</p></TooltipContent>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleBarcodeIconClick} className="shrink-0" aria-label="Scan Hardware Barcode">
+                          <BarcodeIconLucide className="h-5 w-5 text-primary" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>{currentProductForSelection ? `Update Barcode for ${currentProductForSelection.name}` : "Scan Barcode to Add Item"}</p></TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (
@@ -1127,7 +1250,7 @@ export function BillingForm({
                     </TooltipProvider>
                   )}
                 </div>
-                {isLoadingProductSearch && <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Loader2 className="h-3 w-3 animate-spin"/> Searching...</div>}
+                {isLoadingProductSearch && <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Loader2 className="h-3 w-3 animate-spin" /> Searching...</div>}
                 {currentProductForSelection && (
                   <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
                     <span>Selected: {getSkuDetails(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())), finalStoreIdForSkuDetails)?.skuIdentifier || currentProductForSelection.name}</span>
@@ -1142,18 +1265,18 @@ export function BillingForm({
                         {currentProductForSelection.trackQuantity && (isDisplayingLayerStock && mode === 'sell' ? "" : " (from oldest batch)")}
                       </span>
                     )}
-                     {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && !currentProductForSelection.id?.startsWith('SERVICE_ITEM_') && (
-                        <span className="block text-primary/80">
-                            Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%
-                        </span>
-                     )}
+                    {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && !currentProductForSelection.id?.startsWith('SERVICE_ITEM_') && (
+                      <span className="block text-primary/80">
+                        Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%
+                      </span>
+                    )}
                   </div>
                 )}
                 {productNotFoundHint && productNameQuery.toLowerCase() === productNotFoundHint.toLowerCase() && (
-                    <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
-                        <Info size={16} className="text-accent shrink-0" />
-                        Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter again to add it as a new product.
-                    </div>
+                  <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
+                    <Info size={16} className="text-accent shrink-0" />
+                    Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter again to add it as a new product.
+                  </div>
                 )}
               </div>
 
@@ -1204,17 +1327,17 @@ export function BillingForm({
                 </>
               )}
 
-               <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add
-               </Button>
+              <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add
+              </Button>
             </div>
 
             {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
               <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
                 {currentProductForSelection.variants.map((variant, index) => {
-                   if (!variantSelectRefs.current[variant.id]) {
-                      variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
-                    }
+                  if (!variantSelectRefs.current[variant.id]) {
+                    variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
+                  }
                   return (
                     <div key={variant.id} className="space-y-1.5">
                       <Label htmlFor={`variant-select-${variant.id}-trigger`}>{variant.name}</Label>
@@ -1225,45 +1348,45 @@ export function BillingForm({
                         }}
                         value={selectedVariantOptions[variant.name] || ""}
                         onValueChange={(value) => {
-                            setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
+                          setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
+                          setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
 
-                            const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
-                            if (currentIndex < currentProductForSelection!.variants!.length - 1) {
-                                const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                                setTimeout(() => {
-                                  setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                                  variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                }, 50);
-                            } else {
-                                setTimeout(() => {
-                                   quantityInputRef.current?.focus();
-                                   quantityInputRef.current?.select();
-                                }, 50);
-                            }
+                          const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
+                          if (currentIndex < currentProductForSelection!.variants!.length - 1) {
+                            const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
+                            setTimeout(() => {
+                              setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
+                              variantSelectRefs.current[nextVariantId]?.current?.focus();
+                            }, 50);
+                          } else {
+                            setTimeout(() => {
+                              quantityInputRef.current?.focus();
+                              quantityInputRef.current?.select();
+                            }, 50);
+                          }
                         }}
                       >
                         <SelectTrigger
                           id={`variant-select-${variant.id}-trigger`}
                           ref={variantSelectRefs.current[variant.id]}
                           className="w-full select-trigger-class"
-                           onKeyDown={(e) => {
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) {
-                                e.preventDefault();
-                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
+                              e.preventDefault();
+                              setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
                             } else if (e.key === 'Tab' && !e.shiftKey) {
-                                if (index < currentProductForSelection!.variants!.length -1) {
-                                    e.preventDefault();
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
-                                    const nextVariantId = currentProductForSelection!.variants![index + 1].id;
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
-                                    variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                } else if (index === currentProductForSelection!.variants!.length -1) {
-                                    e.preventDefault();
-                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
-                                    quantityInputRef.current?.focus();
-                                    quantityInputRef.current?.select();
-                                }
+                              if (index < currentProductForSelection!.variants!.length - 1) {
+                                e.preventDefault();
+                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                const nextVariantId = currentProductForSelection!.variants![index + 1].id;
+                                setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
+                                variantSelectRefs.current[nextVariantId]?.current?.focus();
+                              } else if (index === currentProductForSelection!.variants!.length - 1) {
+                                e.preventDefault();
+                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                quantityInputRef.current?.focus();
+                                quantityInputRef.current?.select();
+                              }
                             }
                           }}
                         >
@@ -1278,7 +1401,8 @@ export function BillingForm({
                         </SelectContent>
                       </Select>
                     </div>
-                  )})}
+                  )
+                })}
               </div>
             )}
 
@@ -1295,32 +1419,32 @@ export function BillingForm({
           </div>
 
           <div className="flex-grow overflow-hidden">
-            {currentBillItems.length > 0 && <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} />}
-            <ScrollArea className="flex-1 -mx-6 px-6 h-[200px] md:h-auto md:max-h-[300px]">
-              {currentBillItems.length === 0 ? (
-                <p className="text-muted-foreground text-center py-8">No items in the bill yet.</p>
-              ) : (
-                <div className="space-y-0">
-                  {currentBillItems.map((item) => (
-                    <BillItemRow
-                      key={item.id}
-                      item={item}
-                      mode={mode}
-                      isEstimateMode={isEstimateMode}
-                      onQuantityChange={updateBillItemQuantity}
-                      onPriceChange={updateBillItemPrice}
-                      onRemoveItem={removeBillItem}
-                    />
-                  ))}
-                </div>
-              )}
+            <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
+            <ScrollArea className="flex-1 max-h-[calc(100vh-450px)]">
+              <div>
+                {currentBillItems.map((item) => (
+                  <BillItemRow
+                    key={item.id}
+                    item={item}
+                    mode={mode}
+                    isEstimateMode={isEstimateMode}
+                    onQuantityChange={updateBillItemQuantity}
+                    onPriceChange={updateBillItemPrice}
+                    onDiscountChange={updateBillItemDiscount}
+                    onRemoveItem={removeBillItem}
+                    inputRefs={{ quantity: quantityInputRef, costPrice: costPriceInputRef, sellPrice: sellPriceBatchInputRef }}
+                    onEnterPress={() => productNameInputRef.current?.focus()}
+                    taxType={taxType}
+                  />
+                ))}
+              </div>
             </ScrollArea>
           </div>
 
           {(mode === 'sell' || mode === 'buy') && (
             <div className="pt-4 border-t border-dashed mt-auto space-y-3">
               <h3 className="text-md font-medium text-foreground flex items-center gap-2">
-                <CircleDollarSign size={18} className="text-muted-foreground"/> Add Ad-hoc Service / Charge
+                <CircleDollarSign size={18} className="text-muted-foreground" /> Add Ad-hoc Service / Charge
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
                 <div className="space-y-1.5">
@@ -1357,89 +1481,89 @@ export function BillingForm({
           )}
         </CardContent>
 
-        <Separator className="my-0"/>
+        <Separator className="my-0" />
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div className="space-y-1.5">
-                <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
-                <Input
+              <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
+              <Input
                 id="customerVendorName"
                 ref={customerVendorNameInputRef}
                 value={customerVendorName}
                 onChange={(e) => setCustomerVendorName(e.target.value)}
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
-                />
+              />
             </div>
             {mode !== 'buy' && (
-                 <div className="space-y-1.5">
-                    <Label htmlFor="customerPhone">Customer Phone</Label>
-                    <Input
-                    id="customerPhone"
-                    ref={customerPhoneInputRef}
-                    type="tel"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="Enter customer phone (optional)"
-                    />
-                </div>
-            )}
-             <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
-                <Label htmlFor="notes">Notes</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="customerPhone">Customer Phone</Label>
                 <Input
+                  id="customerPhone"
+                  ref={customerPhoneInputRef}
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="Enter customer phone (optional)"
+                />
+              </div>
+            )}
+            <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
+              <Label htmlFor="notes">Notes</Label>
+              <Input
                 id="notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add any notes for this bill (optional)"
-                />
+              />
             </div>
           </div>
 
-          <Separator className="my-2"/>
+          <Separator className="my-2" />
 
           <div className="flex flex-col items-end gap-0.5 text-sm">
-             { (mode === 'sell' || mode === 'return') && !isEstimateMode && ((billTotals.totalSGST ?? 0) > 0 || (billTotals.totalCGST ?? 0) > 0 || currentBillItems.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
-                <>
-                    <div className="flex justify-between w-full max-w-xs">
-                        <span className="text-muted-foreground">Subtotal (Before Tax):</span>
-                        <span className="font-medium text-foreground">₹{billTotals.subTotal.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between w-full max-w-xs">
-                        <span className="text-muted-foreground">Total SGST:</span>
-                        <span className="font-medium text-foreground">₹{billTotals.totalSGST.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between w-full max-w-xs">
-                        <span className="text-muted-foreground">Total CGST:</span>
-                        <span className="font-medium text-foreground">₹{billTotals.totalCGST.toFixed(2)}</span>
-                    </div>
-                    <Separator className="my-1.5 w-full max-w-xs"/>
-                </>
-             )}
-             { mode === 'buy' && (
+            {(mode === 'sell' || mode === 'return') && !isEstimateMode && ((billTotals.totalSGST ?? 0) > 0 || (billTotals.totalCGST ?? 0) > 0 || currentBillItems.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
+              <>
                 <div className="flex justify-between w-full max-w-xs">
-                    <span className="text-muted-foreground">Total Cost:</span>
-                    <span className="font-semibold text-destructive">₹{billTotals.grandTotal.toFixed(2)}</span>
+                  <span className="text-muted-foreground">Subtotal (Before Tax):</span>
+                  <span className="font-medium text-foreground">₹{billTotals.subTotal.toFixed(2)}</span>
                 </div>
-             )}
-             { (mode === 'sell' || mode === 'return') && (
-                <div className="flex justify-between w-full max-w-xs text-lg font-semibold text-primary">
-                    <span>{isEstimateMode && mode === 'sell' ? 'Estimate Total:' : 'Grand Total:'}</span>
-                    <span>₹{billTotals.grandTotal.toFixed(2)}</span>
+                <div className="flex justify-between w-full max-w-xs">
+                  <span className="text-muted-foreground">Total SGST:</span>
+                  <span className="font-medium text-foreground">₹{billTotals.totalSGST.toFixed(2)}</span>
                 </div>
-             )}
+                <div className="flex justify-between w-full max-w-xs">
+                  <span className="text-muted-foreground">Total CGST:</span>
+                  <span className="font-medium text-foreground">₹{billTotals.totalCGST.toFixed(2)}</span>
+                </div>
+                <Separator className="my-1.5 w-full max-w-xs" />
+              </>
+            )}
+            {mode === 'buy' && (
+              <div className="flex justify-between w-full max-w-xs">
+                <span className="text-muted-foreground">Total Cost:</span>
+                <span className="font-semibold text-destructive">₹{billTotals.grandTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {(mode === 'sell' || mode === 'return') && (
+              <div className="flex justify-between w-full max-w-xs text-lg font-semibold text-primary">
+                <span>{isEstimateMode && mode === 'sell' ? 'Estimate Total:' : 'Grand Total:'}</span>
+                <span>₹{billTotals.grandTotal.toFixed(2)}</span>
+              </div>
+            )}
           </div>
 
           {(mode === 'sell' || mode === 'buy') && (
-              <div className="flex items-center space-x-2 self-start pt-2">
+            <div className="flex items-center space-x-2 self-start pt-2">
               <Switch
-                  id="paymentStatus"
-                  checked={isPaid}
-                  onCheckedChange={setIsPaid}
-                  className={cn(isPaid ? "data-[state=checked]:bg-green-500" : "data-[state=unchecked]:bg-destructive")}
+                id="paymentStatus"
+                checked={isPaid}
+                onCheckedChange={setIsPaid}
+                className={cn(isPaid ? "data-[state=checked]:bg-green-500" : "data-[state=unchecked]:bg-destructive")}
               />
               <Label htmlFor="paymentStatus" className={cn("font-medium", isPaid ? "text-green-600 dark:text-green-500" : "text-destructive")}>
-                  {isPaid ? 'Paid' : 'Unpaid'}
+                {isPaid ? 'Paid' : 'Unpaid'}
               </Label>
-              </div>
+            </div>
           )}
 
 
