@@ -582,7 +582,7 @@ export function BillingForm({
       };
       handleProductSelectFromSearch(suggestion);
       toast({ title: "Product Found", description: `${suggestion.displayInfo.name} selected for billing.` });
-      resetFormFields(false);
+      // Removed resetFormFields(false) so the input stays populated
       setTimeout(() => quantityInputRef.current?.focus(), 50);
     } else {
       toast({ variant: "destructive", title: "Product Not Found", description: `Product with code '${barcodeValue}' not found. Press Enter again on the product name to add it as a new product.` });
@@ -1327,8 +1327,8 @@ export function BillingForm({
                 </>
               )}
 
-              <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90" variant="default">
-                <PlusCircle className="mr-2 h-4 w-4" /> Add
+              <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90 min-w-[5rem]" variant="default">
+                <CornerDownLeft className="mr-2 h-4 w-4" /> Add
               </Button>
             </div>
 
@@ -1432,7 +1432,6 @@ export function BillingForm({
                     onPriceChange={updateBillItemPrice}
                     onDiscountChange={updateBillItemDiscount}
                     onRemoveItem={removeBillItem}
-                    inputRefs={{ quantity: quantityInputRef, costPrice: costPriceInputRef, sellPrice: sellPriceBatchInputRef }}
                     onEnterPress={() => productNameInputRef.current?.focus()}
                     taxType={taxType}
                   />
