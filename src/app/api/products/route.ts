@@ -16,8 +16,17 @@ export async function GET(req: NextRequest) {
 
     if (!companyId) return NextResponse.json({ success: false, message: 'Company ID is required.' }, { status: 400 });
 
-    const companyProducts = await db.collection<Product>('products').find({ companyId: companyId }).toArray();
-    return NextResponse.json({ success: true, data: companyProducts });
+    const limit = parseInt(searchParams.get('limit') || '0', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+
+    let cursor = db.collection<Product>('products').find({ companyId });
+    const totalCount = await db.collection<Product>('products').countDocuments({ companyId });
+
+    if (offset > 0) cursor = cursor.skip(offset);
+    if (limit > 0) cursor = cursor.limit(limit);
+
+    const companyProducts = await cursor.toArray();
+    return NextResponse.json({ success: true, data: companyProducts, totalCount, limit, offset });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });
@@ -65,20 +74,20 @@ export async function POST(req: NextRequest) {
         const firstVariant = variants[0];
         const restCombinations = generateCombinations(variants.slice(1));
         const combinations: Record<string, string>[] = [];
-        
+
         firstVariant.options.forEach(option => {
-            restCombinations.forEach(combination => {
-                combinations.push({
-                    [firstVariant.name]: option.value,
-                    ...combination
-                });
+          restCombinations.forEach(combination => {
+            combinations.push({
+              [firstVariant.name]: option.value,
+              ...combination
             });
+          });
         });
         return combinations;
       };
 
       const combinations = generateCombinations(productData.variants);
-      
+
       newProduct.productSKUs = combinations.map(combination => ({
         id: generateId(),
         optionValues: combination,
@@ -88,19 +97,19 @@ export async function POST(req: NextRequest) {
     }
 
     await db.collection<Product>('products').insertOne(newProduct);
-    
+
     // Handle initial stock as a conceptual purchase bill
     if (productData.trackQuantity && productData.initialStock > 0 && productData.costPrice !== undefined && productData.sellPrice !== undefined) {
-        const firstStore = await db.collection<Store>('stores').findOne({ companyId: companyId });
-        const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0,8)}`;
-        const conceptualBill: Bill = {
-            id: initialBillId, type: 'buy', date: new Date().toISOString(), timestamp: Date.now(),
-            items: [{ id: uuidv4(), productId: newProduct.id, productName: newProduct.name, quantity: productData.initialStock, costPrice: productData.costPrice, sellPrice: productData.sellPrice }],
-            totalAmount: productData.initialStock * productData.costPrice,
-            companyId: companyId, billedByStaffId: 'SYSTEM_INIT', storeId: firstStore?.id, storeName: firstStore?.name,
-            paymentStatus: company.defaultPurchasePaymentStatus || 'paid', notes: 'Initial stock entry.'
-        };
-        await db.collection<Bill>('bills').insertOne(conceptualBill);
+      const firstStore = await db.collection<Store>('stores').findOne({ companyId: companyId });
+      const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0, 8)}`;
+      const conceptualBill: Bill = {
+        id: initialBillId, type: 'buy', date: new Date().toISOString(), timestamp: Date.now(),
+        items: [{ id: uuidv4(), productId: newProduct.id, productName: newProduct.name, quantity: productData.initialStock, costPrice: productData.costPrice, sellPrice: productData.sellPrice }],
+        totalAmount: productData.initialStock * productData.costPrice,
+        companyId: companyId, billedByStaffId: 'SYSTEM_INIT', storeId: firstStore?.id, storeName: firstStore?.name,
+        paymentStatus: company.defaultPurchasePaymentStatus || 'paid', notes: 'Initial stock entry.'
+      };
+      await db.collection<Bill>('bills').insertOne(conceptualBill);
     }
 
 

@@ -22,6 +22,7 @@ import {
   AlertDialogHeader as AlertDialogHead,
   AlertDialogTitle as AlertDialogTit,
   AlertDialogDescription as AlertDialogDesc,
+  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,20 +34,20 @@ export default function StoreBillingPage() {
   const nextSearchParams = useNextSearchParams();
   const { toast } = useToast();
 
-  const { 
-    getStoreById, 
+  const {
+    getStoreById,
     clearChatForStore,
     fetchMessagesForStore,
     messagesByStore,
     fetchProducts,
     fetchCompanyProfile,
   } = useInventoryStore((state) => ({
-     getStoreById: state.getStoreById,
-     clearChatForStore: state.clearChatForStore,
-     fetchMessagesForStore: state.fetchMessagesForStore,
-     messagesByStore: state.messagesByStore,
-     fetchProducts: state.fetchProducts,
-     fetchCompanyProfile: state.fetchCompanyProfile,
+    getStoreById: state.getStoreById,
+    clearChatForStore: state.clearChatForStore,
+    fetchMessagesForStore: state.fetchMessagesForStore,
+    messagesByStore: state.messagesByStore,
+    fetchProducts: state.fetchProducts,
+    fetchCompanyProfile: state.fetchCompanyProfile,
   }));
 
   const [isStoreAuthenticated, setIsStoreAuthenticated] = useState(false);
@@ -76,7 +77,7 @@ export default function StoreBillingPage() {
       setIsLoading(false);
       return;
     }
-    
+
     setCompanyIdForSession(storedCompanyId);
     setIsStoreAuthenticated(true);
 
@@ -85,12 +86,12 @@ export default function StoreBillingPage() {
       setCurrentStore(store);
       Promise.all([
         fetchMessagesForStore(storeId, storedCompanyId),
-        fetchProducts(storedCompanyId), 
+        fetchProducts(storedCompanyId),
         fetchCompanyProfile(storedCompanyId)
       ]).finally(() => setIsLoading(false));
     } else {
       console.warn(`Store ${storeId} not found in client store after authentication.`);
-      toast({variant: "destructive", title: "Store Data Error", description: "Could not load store details. Please try logging out and in."});
+      toast({ variant: "destructive", title: "Store Data Error", description: "Could not load store details. Please try logging out and in." });
       router.replace(`/storeportal/${storeId}/login`);
       setIsLoading(false);
     }
@@ -107,7 +108,7 @@ export default function StoreBillingPage() {
 
     if (allowedOps.length === 0) {
       if (!currentMode) {
-        router.replace(`/storeportal/${storeId}/billing?mode=sell`); 
+        router.replace(`/storeportal/${storeId}/billing?mode=sell`);
       }
       return;
     }
@@ -115,7 +116,7 @@ export default function StoreBillingPage() {
     if (!currentMode) {
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     } else if (!allowedOps.includes(currentMode)) {
-      toast({variant:"destructive", title: "Operation Not Allowed", description: `This terminal is not permitted to perform '${currentMode}' operations. Switching to default.`});
+      toast({ variant: "destructive", title: "Operation Not Allowed", description: `This terminal is not permitted to perform '${currentMode}' operations. Switching to default.` });
       router.replace(`/storeportal/${storeId}/billing?mode=${allowedOps[0]}`);
     }
   }, [storeId, isStoreAuthenticated, currentStore, nextSearchParams, router, hasMounted, isLoading, toast]);
@@ -153,7 +154,7 @@ export default function StoreBillingPage() {
 
   const loadingScreen = (message: string) => (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
-      <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company"/>
+      <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company" />
       <p className="text-lg text-muted-foreground">{message}</p>
     </div>
   );
@@ -167,11 +168,11 @@ export default function StoreBillingPage() {
   if (currentStore && !isStoreAuthenticated && !isLoading) {
     return loadingScreen(`Redirecting to login for ${currentStore.name}...`);
   }
-  
+
   const modeFromUrl = nextSearchParams.get('mode') as BillMode | null;
 
-  if (!currentStore || !isStoreAuthenticated || !companyIdForSession) { 
-      return loadingScreen("Preparing Store Terminal...");
+  if (!currentStore || !isStoreAuthenticated || !companyIdForSession) {
+    return loadingScreen("Preparing Store Terminal...");
   }
 
   return (
@@ -204,7 +205,7 @@ export default function StoreBillingPage() {
               <AlertDialogContent>
                 <AlertDialogHead>
                   <AlertDialogTit className="flex items-center gap-2">
-                     <AlertTriangle className="h-5 w-5 text-destructive" /> Are you absolutely sure?
+                    <AlertTriangle className="h-5 w-5 text-destructive" /> Are you absolutely sure?
                   </AlertDialogTit>
                   <AlertDialogDesc>
                     This action cannot be undone. This will permanently delete all chat messages for <strong>{currentStore.name}</strong>.
@@ -220,8 +221,8 @@ export default function StoreBillingPage() {
             </AlertDialog>
           </DialogHeader>
           <div className="flex-1 overflow-hidden p-0">
-            <ChatInterface 
-              storeId={currentStore.id} 
+            <ChatInterface
+              storeId={currentStore.id}
               currentUserId={currentStore.id}
               currentUserName={currentStore.name}
             />
@@ -231,7 +232,7 @@ export default function StoreBillingPage() {
 
       <Suspense fallback={loadingScreen("Loading Billing Interface...")}>
         <BillingForm
-          key={modeFromUrl || currentStore.id} 
+          key={modeFromUrl || currentStore.id}
           initialModeProp={modeFromUrl}
           storeId={currentStore.id}
           allowedModes={currentStore.allowedOperations}

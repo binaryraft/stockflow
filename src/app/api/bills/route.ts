@@ -20,13 +20,40 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Company ID is required.' }, { status: 400 });
     }
 
-    const companyBills = await db.collection<Bill>('bills')
-      .find({ companyId: companyId })
-      .sort({ timestamp: -1 })
-      .toArray();
+    const limit = parseInt(searchParams.get('limit') || '0', 10);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const storeIdFilter = searchParams.get('storeId');
 
-    console.log(`${routeLogName} Found ${companyBills.length} bills for company ${companyId}.`);
-    return NextResponse.json({ success: true, data: companyBills });
+    const query: any = { companyId: companyId };
+    if (storeIdFilter) {
+      query.storeId = storeIdFilter;
+    }
+
+    let cursor = db.collection<Bill>('bills')
+      .find(query)
+      .sort({ timestamp: -1 });
+
+    // Get total matches before pagination
+    const totalCount = await db.collection<Bill>('bills').countDocuments(query);
+
+    if (offset > 0) {
+      cursor = cursor.skip(offset);
+    }
+    if (limit > 0) {
+      cursor = cursor.limit(limit);
+    }
+
+    const companyBills = await cursor.toArray();
+
+    // Attach metadata to response if pagination is active, otherwise keeping strict array shape might be safer for existing clients unless we know they handle extra props.
+    // For now, we return the data array as is. If the client requested a limit, they get that many.
+    // Ideally, we wrap this: { data: bills, meta: { total: totalCount } }
+    // But to preserve 'data: companyBills' (array) contract:
+
+    console.log(`${routeLogName} Found ${companyBills.length} bills (Total: ${totalCount}) for company ${companyId}.`);
+
+    // We can return the total count in a separate field 'totalCount' which won't break the 'data' array contract.
+    return NextResponse.json({ success: true, data: companyBills, totalCount, limit, offset });
   } catch (error) {
     console.error(`${routeNamePrefix} Error:`, error);
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';

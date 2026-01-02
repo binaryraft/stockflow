@@ -155,6 +155,16 @@ export function BillingForm({
   const variantSelectRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
   const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
 
+  const itemsEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom of list when items are added
+  useEffect(() => {
+    if (itemsEndRef.current) {
+      itemsEndRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [currentBillItems.length]);
+
   // Load Draft Bill on Mount
   useEffect(() => {
     if (!hasMounted) return;
@@ -1477,8 +1487,8 @@ export function BillingForm({
 
           <div className="flex-grow overflow-hidden">
             <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
-            <ScrollArea className="flex-1 max-h-[calc(100vh-450px)]">
-              <div>
+            <ScrollArea className="flex-1 h-0 min-h-[300px]" ref={scrollAreaRef as any}>
+              <div className="flex flex-col gap-1 pb-2">
                 {currentBillItems.map((item) => (
                   <BillItemRow
                     key={item.id}
@@ -1493,6 +1503,7 @@ export function BillingForm({
                     taxType={taxType}
                   />
                 ))}
+                <div ref={itemsEndRef} className="h-1" />
               </div>
             </ScrollArea>
           </div>

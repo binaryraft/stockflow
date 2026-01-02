@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -109,6 +110,34 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  /* New Edit Logic */
+  const router = useRouter();
+  const { setDraftBill } = useInventoryStore(state => ({ setDraftBill: state.setDraftBill }));
+
+  const handleEditBill = (bill: Bill) => {
+    // Convert bill to draft format
+    const draftItems: BillItem[] = bill.items.map(item => ({
+      ...item,
+    }));
+
+    setDraftBill({
+      mode: bill.type as BillMode,
+      items: draftItems,
+      customerName: bill.vendorOrCustomerName || '',
+      customerPhone: bill.customerPhone || '',
+      notes: bill.notes || '',
+      isEstimate: bill.isEstimate || false,
+      taxType: bill.taxType || 'intra-state'
+    });
+
+    const targetUrl = filterByStoreId
+      ? `/storeportal/${filterByStoreId}/billing?mode=${bill.type}`
+      : `/admin/billing?mode=${bill.type}`;
+
+    router.push(targetUrl);
+  };
+  /* End New Edit Logic */
+
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
 
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'> | 'id';
@@ -832,7 +861,10 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                         <DropdownMenuContent align="end">
                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
                           <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                            <Eye className="mr-2 h-4 w-4" /> View / Edit Details
+                            <Eye className="mr-2 h-4 w-4" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditBill(bill)}>
+                            <Edit2 className="mr-2 h-4 w-4" /> Edit Bill
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
                             <Printer className="mr-2 h-4 w-4" /> Print Bill
@@ -956,7 +988,10 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel>Actions</DropdownMenuLabel>
                       <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                        <Eye className="mr-2 h-4 w-4" /> View / Edit Details
+                        <Eye className="mr-2 h-4 w-4" /> View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditBill(bill)}>
+                        <Edit2 className="mr-2 h-4 w-4" /> Edit Bill
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
                         <Printer className="mr-2 h-4 w-4" /> Print Bill
