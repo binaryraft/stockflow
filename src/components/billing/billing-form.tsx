@@ -29,6 +29,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 import { HardwareBarcodeScanModal } from '@/components/common/HardwareBarcodeScanModal';
+import { DatePicker } from '@/components/ui/date-picker';
 
 
 type PendingBillPayload = {
@@ -41,6 +42,7 @@ type PendingBillPayload = {
   storeIdForBill?: string;
   isEstimate?: boolean;
   taxType?: 'intra-state' | 'inter-state';
+  date?: string;
 };
 
 interface BillingFormProps {
@@ -68,7 +70,10 @@ export function BillingForm({
     findOrCreateProductSKU, getSkuDetails, getSkuIdentifier,
     getActiveSubscriptionPlan, userProfile, products: allProductsStoreHook,
     updateProduct: updateProductInStore,
-    fetchProducts
+    fetchProducts,
+    draftBill,
+    setDraftBill,
+    clearDraftBill
   } = useInventoryStore(state => ({
     addBill: state.addBill,
     searchProducts: state.searchProducts,
@@ -82,6 +87,9 @@ export function BillingForm({
     products: state.products,
     updateProduct: state.updateProduct,
     fetchProducts: state.fetchProducts,
+    draftBill: state.draftBill,
+    setDraftBill: state.setDraftBill,
+    clearDraftBill: state.clearDraftBill,
   }));
   const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
 
@@ -134,7 +142,7 @@ export function BillingForm({
   const [barcodeScanPurpose, setBarcodeScanPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
-
+  const [billDate, setBillDate] = useState<Date | undefined>(new Date());
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +153,50 @@ export function BillingForm({
   const serviceDescriptionInputRef = useRef<HTMLInputElement>(null);
   const serviceAmountInputRef = useRef<HTMLInputElement>(null);
   const variantSelectRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
+  const [hasLoadedDraft, setHasLoadedDraft] = useState(false);
+
+  // Load Draft Bill on Mount
+  useEffect(() => {
+    if (!hasMounted) return;
+    if (draftBill && !hasLoadedDraft && currentBillItems.length === 0) {
+      // Restore state from draft
+      if (draftBill.items.length > 0 || draftBill.customerName || draftBill.notes) {
+        setMode(draftBill.mode);
+        setCurrentBillItems(draftBill.items);
+        setCustomerVendorName(draftBill.customerName);
+        setCustomerPhone(draftBill.customerPhone);
+        setNotes(draftBill.notes);
+        setIsEstimateMode(draftBill.isEstimate);
+        setTaxType(draftBill.taxType);
+        toast({ title: "Draft Restored", description: "Your unsaved bill has been restored." });
+      }
+      setHasLoadedDraft(true);
+    }
+  }, [hasMounted, draftBill, hasLoadedDraft, currentBillItems.length, toast]);
+
+  // Save Draft Bill on Change
+  useEffect(() => {
+    if (!hasMounted) return;
+    // Don't save if empty and no specific data, to avoid overwriting with empty
+    // But if we explicitly cleared, we should clear draft. 
+    // We handle implicit save here. Explicit clear is handled in resetFullForm.
+
+    // We debounce to avoid frequent updates
+    const timer = setTimeout(() => {
+      if (currentBillItems.length > 0 || customerVendorName || notes) {
+        setDraftBill({
+          mode,
+          items: currentBillItems,
+          customerName: customerVendorName,
+          customerPhone,
+          notes,
+          isEstimate: isEstimateMode,
+          taxType
+        });
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [currentBillItems, customerVendorName, customerPhone, notes, mode, isEstimateMode, taxType, setDraftBill, hasMounted]);
 
   useEffect(() => {
     setHasMounted(true);
@@ -225,7 +277,8 @@ export function BillingForm({
     setPendingBillPayload(null);
     setBillToPotentiallyPrint(null);
     setTaxType('intra-state');
-  }, [resetFormFields, userProfile, mode]);
+    clearDraftBill();
+  }, [resetFormFields, userProfile, mode, clearDraftBill]);
 
 
   useEffect(() => {
@@ -853,12 +906,14 @@ export function BillingForm({
           companyId: companyId,
           isEstimate: billPayloadToSave.isEstimate,
           taxType: billPayloadToSave.taxType,
-          ... (({ billType, items, storeIdForBill, isEstimate, taxType, ...otherData }) => otherData)(billPayloadToSave)
+          date: billPayloadToSave.date,
+          ... (({ billType, items, storeIdForBill, isEstimate, taxType, date, ...otherData }) => otherData)(billPayloadToSave)
         },
         billPayloadToSave.items
       );
 
       if (savedBill) {
+        clearDraftBill(); // Clear draft on successful save
         setBillToPotentiallyPrint(savedBill);
         setIsPrintConfirmDialogOpen(true);
       } else {
@@ -935,6 +990,7 @@ export function BillingForm({
       storeIdForBill: finalStoreId,
       isEstimate: mode === 'sell' ? isEstimateMode : undefined,
       taxType: taxType,
+      date: billDate ? billDate.toISOString() : new Date().toISOString(),
     };
 
     if (!isAdminContext && storeIdFromProp) {
@@ -1106,6 +1162,7 @@ export function BillingForm({
             setIsVerifyEmployeeDialogOpen(open);
           }}
           storeId={storeIdFromProp}
+          companyId={companyId}
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
@@ -1514,6 +1571,13 @@ export function BillingForm({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Add any notes for this bill (optional)"
               />
+            </div>
+          </div>
+
+          <div className="flex justify-end w-full mt-2">
+            <div className="w-full md:w-1/3 space-y-1.5 px-1">
+              <Label>Bill Date</Label>
+              <DatePicker date={billDate} setDate={setBillDate} />
             </div>
           </div>
 

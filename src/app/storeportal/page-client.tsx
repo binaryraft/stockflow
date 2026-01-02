@@ -30,8 +30,18 @@ export function StoreLoginPageClient() {
     // Pre-fill from query params if available (e.g., from a direct link or old redirect)
     const queryStoreId = searchParams.get('storeId');
     const queryCompanyId = searchParams.get('companyId');
+
     if (queryStoreId) setStoreIdInput(queryStoreId);
-    // Removed companyId pre-fill as it conflicts with Employee ID field usage
+    else {
+      const lastStore = localStorage.getItem('lastStoreAccessCode');
+      if (lastStore) setStoreIdInput(lastStore);
+    }
+
+    if (queryCompanyId) setCompanyIdInput(queryCompanyId);
+    else {
+      const lastComp = localStorage.getItem('lastCompanyId');
+      if (lastComp) setCompanyIdInput(lastComp);
+    }
   }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -68,6 +78,10 @@ export function StoreLoginPageClient() {
         sessionStorage.setItem(`authenticatedStore_${data.store.id}`, 'true');
         sessionStorage.setItem('lastAuthenticatedStoreId', data.store.id);
         sessionStorage.setItem(`store_${data.store.id}_companyId`, data.store.companyId);
+
+        // Persist for convenience
+        localStorage.setItem('lastCompanyId', data.store.companyId);
+        localStorage.setItem('lastStoreAccessCode', storeIdInput.trim());
 
         toast({
           title: "Login Successful",

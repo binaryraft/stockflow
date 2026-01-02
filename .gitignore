@@ -43,3 +43,7 @@ next-env.d.ts
 # firebase
 firebase-debug.log
 firestore-debug.log
+public/downloads/*.exe
+dist_electron/
+*.exe
+StockFlow_Dist/

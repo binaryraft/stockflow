@@ -21,13 +21,15 @@ interface EmployeePasskeyDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   storeId: string;
-  onAuthenticated: (employee: Pick<User, 'id' | 'name' | 'employeeId'>) => void; // Return relevant employee details
+  companyId?: string | null;
+  onAuthenticated: (employee: any) => void; // Using any to avoid strict type mismatch with partial object, or we can use Pick<User, ...>
 }
 
 export function EmployeePasskeyDialog({
   isOpen,
   onOpenChange,
   storeId,
+  companyId: companyIdProp,
   onAuthenticated,
 }: EmployeePasskeyDialogProps) {
   const [employeePassword, setEmployeePassword] = useState(''); // Changed from passkey to password
@@ -37,23 +39,27 @@ export function EmployeePasskeyDialog({
 
   useEffect(() => {
     // Fetch companyId from localStorage when component mounts or dialog opens
-    if (isOpen && typeof window !== 'undefined') {
-      const storedCompanyId = localStorage.getItem('companyId');
-      if (storedCompanyId) {
-        setCompanyId(storedCompanyId);
-      } else {
-        // This case should ideally not happen if an admin/employee is triggering this
-        // from an authenticated session where companyId was stored.
-        console.error("Company ID not found in localStorage for employee verification.");
-        toast({
-          variant: "destructive",
-          title: "Configuration Error",
-          description: "Company context is missing. Cannot verify employee.",
-        });
-        onOpenChange(false); // Close dialog if company context is missing
+    if (isOpen) {
+      if (companyIdProp) {
+        setCompanyId(companyIdProp);
+      } else if (typeof window !== 'undefined') {
+        const storedCompanyId = localStorage.getItem('companyId');
+        if (storedCompanyId) {
+          setCompanyId(storedCompanyId);
+        } else {
+          // This case should ideally not happen if an admin/employee is triggering this
+          // from an authenticated session where companyId was stored.
+          console.error("Company ID not found in localStorage for employee verification.");
+          toast({
+            variant: "destructive",
+            title: "Configuration Error",
+            description: "Company context is missing. Cannot verify employee.",
+          });
+          onOpenChange(false); // Close dialog if company context is missing
+        }
       }
     }
-  }, [isOpen, toast, onOpenChange]);
+  }, [isOpen, toast, onOpenChange, companyIdProp]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,7 +113,7 @@ export function EmployeePasskeyDialog({
         <form onSubmit={handleSubmit}>
           <div className="py-4 space-y-2">
             <Label htmlFor="employeePasswordAuth">
-                <KeyRound className="mr-2 h-4 w-4 text-muted-foreground inline" /> Employee Password
+              <KeyRound className="mr-2 h-4 w-4 text-muted-foreground inline" /> Employee Password
             </Label>
             <Input
               id="employeePasswordAuth"

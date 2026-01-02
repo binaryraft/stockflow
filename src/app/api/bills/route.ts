@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { billData, itemsData } = body;
 
-    const { companyId, storeId, type: billType, isEstimate, billedByStaffId, taxType } = billData;
+    const { companyId, storeId, type: billType, isEstimate, billedByStaffId, taxType, date: providedDate } = billData;
 
     if (!companyId || !billType || !itemsData || !Array.isArray(itemsData) || itemsData.length === 0) {
       return NextResponse.json({ success: false, message: 'Company ID, bill type, and at least one item are required.' }, { status: 400 });
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     const productIds = itemsData.map((item: any) => item.productId).filter((id: string) => !id.startsWith('SERVICE_ITEM_') && !id.startsWith('CHARGE_ITEM_'));
     const productsToUpdate: Product[] = await productsCollection.find({ id: { $in: productIds }, companyId: companyId }).toArray();
 
-    const currentDate = new Date();
+    const currentDate = providedDate ? new Date(providedDate) : new Date();
     const datePrefix = format(currentDate, 'ddMMyy');
     const billsTodayCount = await db.collection<Bill>('bills').countDocuments({
       companyId: companyId,

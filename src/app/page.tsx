@@ -11,6 +11,7 @@ import { OtherSection } from '@/components/landing/OtherSection';
 import { ContactSection } from '@/components/landing/ContactSection';
 import { LandingFooter } from '@/components/landing/LandingFooter';
 import { CallToActionSection } from '@/components/landing/CallToActionSection';
+import { DownloadSection } from '@/components/landing/DownloadSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
@@ -97,6 +98,7 @@ export default function HomePage() {
           <LandingHeader onAdminLoginClick={showAdminLogin} onStoreLoginClick={() => router.push('/storeportal')} />
           <main className="flex-grow">
             <HeroSection onAdminLoginClick={showAdminLogin} onStoreLoginClick={() => router.push('/storeportal')} />
+            <DownloadSection />
             <FeaturesSection />
             <PricingSectionLanding />
             <OtherSection />
