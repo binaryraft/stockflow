@@ -43,14 +43,19 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate a unique 6-digit access code
+    // Generate a unique 6-digit access code
     let accessCode = '';
     let isUnique = false;
     let attempts = 0;
-    while (!isUnique && attempts < 10) {
+    while (!isUnique && attempts < 50) {
       accessCode = Math.floor(100000 + Math.random() * 900000).toString();
       const existing = await db.collection<Store>('stores').findOne({ accessCode });
       if (!existing) isUnique = true;
       attempts++;
+    }
+
+    if (!isUnique) {
+      return NextResponse.json({ success: false, message: 'Failed to generate a unique Store Access Key. Please try again.' }, { status: 500 });
     }
 
     const newStore: Store = {

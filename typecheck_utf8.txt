@@ -1,0 +1,189 @@
+﻿
+> nextn@0.1.0 typecheck
+> tsc --noEmit
+
+.next/types/app/api/bills/[billId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { billId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ billId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/bills/[billId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { billId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ billId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/bills/[billId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { billId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ billId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/categories/[categoryId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { categoryId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ categoryId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/categories/[categoryId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { categoryId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ categoryId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/categories/[categoryId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { categoryId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ categoryId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/chat/[storeId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/chat/[storeId]/route.ts(166,7): error TS2344: Type '{ __tag__: "POST"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/chat/[storeId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/companies/[companyId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { companyId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ companyId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/companies/[companyId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { companyId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ companyId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/companies/[companyId]/subscription/route.ts(2,24): error TS2306: File 'C:/Projects/stockflow/src/app/api/companies/[companyId]/subscription/route.ts' is not a module.
+.next/types/app/api/companies/[companyId]/subscription/route.ts(5,29): error TS2306: File 'C:/Projects/stockflow/src/app/api/companies/[companyId]/subscription/route.ts' is not a module.
+.next/types/app/api/customers/[customerId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { customerId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ customerId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/customers/[customerId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { customerId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ customerId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/customers/[customerId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { customerId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ customerId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/products/[productId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { productId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ productId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/products/[productId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { productId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ productId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/products/[productId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { productId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ productId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/staff/[staffId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { staffId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ staffId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/staff/[staffId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { staffId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ staffId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/staff/[staffId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { staffId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ staffId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/stores/[storeId]/route.ts(49,7): error TS2344: Type '{ __tag__: "GET"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/stores/[storeId]/route.ts(205,7): error TS2344: Type '{ __tag__: "PUT"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/api/stores/[storeId]/route.ts(244,7): error TS2344: Type '{ __tag__: "DELETE"; __param_position__: "second"; __param_type__: { params: { storeId: string; }; }; }' does not satisfy the constraint 'ParamCheck<RouteContext>'.
+  The types of '__param_type__.params' are incompatible between these types.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/app/storeportal/[storeId]/login/page.ts(34,29): error TS2344: Type '{ params: { storeId: string; }; searchParams: { [key: string]: string | string[] | undefined; }; }' does not satisfy the constraint 'PageProps'.
+  Types of property 'params' are incompatible.
+    Type '{ storeId: string; }' is missing the following properties from type 'Promise<any>': then, catch, finally, [Symbol.toStringTag]
+.next/types/validator.ts(351,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/bills/[billId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/bills/[billId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { billId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<Bill>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ billId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ billId: string; }>; }' is not assignable to type '{ params: { billId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'billId' is missing in type 'Promise<{ billId: string; }>' but required in type '{ billId: string; }'.
+.next/types/validator.ts(369,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/categories/[categoryId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/categories/[categoryId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { categoryId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<Category>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ categoryId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ categoryId: string; }>; }' is not assignable to type '{ params: { categoryId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'categoryId' is missing in type 'Promise<{ categoryId: string; }>' but required in type '{ categoryId: string; }'.
+.next/types/validator.ts(387,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/chat/[storeId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/chat/[storeId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { storeId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<ChatMessage>[]; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ storeId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ storeId: string; }>; }' is not assignable to type '{ params: { storeId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'storeId' is missing in type 'Promise<{ storeId: string; }>' but required in type '{ storeId: string; }'.
+.next/types/validator.ts(396,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/companies/[companyId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/companies/[companyId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { companyId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<Company>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ companyId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ companyId: string; }>; }' is not assignable to type '{ params: { companyId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'companyId' is missing in type 'Promise<{ companyId: string; }>' but required in type '{ companyId: string; }'.
+.next/types/validator.ts(404,39): error TS2306: File 'C:/Projects/stockflow/src/app/api/companies/[companyId]/subscription/route.ts' is not a module.
+.next/types/validator.ts(414,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/customers/[customerId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/customers/[customerId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { customerId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: Customer; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ customerId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ customerId: string; }>; }' is not assignable to type '{ params: { customerId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'customerId' is missing in type 'Promise<{ customerId: string; }>' but required in type '{ customerId: string; }'.
+.next/types/validator.ts(432,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/products/[productId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/products/[productId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { productId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<Product>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ productId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ productId: string; }>; }' is not assignable to type '{ params: { productId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'productId' is missing in type 'Promise<{ productId: string; }>' but required in type '{ productId: string; }'.
+.next/types/validator.ts(450,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/staff/[staffId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/staff/[staffId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { staffId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<User>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ staffId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ staffId: string; }>; }' is not assignable to type '{ params: { staffId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'staffId' is missing in type 'Promise<{ staffId: string; }>' but required in type '{ staffId: string; }'.
+.next/types/validator.ts(468,31): error TS2344: Type 'typeof import("C:/Projects/stockflow/src/app/api/stores/[storeId]/route")' does not satisfy the constraint 'RouteHandlerConfig<"/api/stores/[storeId]">'.
+  Types of property 'GET' are incompatible.
+    Type '(req: NextRequest, { params }: { params: { storeId: string; }; }) => Promise<NextResponse<{ success: boolean; message: string; }> | NextResponse<{ success: boolean; data: WithId<Store>; }>>' is not assignable to type '(request: NextRequest, context: { params: Promise<{ storeId: string; }>; }) => void | Response | Promise<void | Response>'.
+      Types of parameters '__1' and 'context' are incompatible.
+        Type '{ params: Promise<{ storeId: string; }>; }' is not assignable to type '{ params: { storeId: string; }; }'.
+          Types of property 'params' are incompatible.
+            Property 'storeId' is missing in type 'Promise<{ storeId: string; }>' but required in type '{ storeId: string; }'.
+src/app/admin/billing/page.tsx(130,34): error TS2345: Argument of type 'string | null' is not assignable to parameter of type 'SetStateAction<string | undefined>'.
+  Type 'null' is not assignable to type 'SetStateAction<string | undefined>'.
+src/app/storeportal/[storeId]/billing/page.tsx(199,16): error TS2552: Cannot find name 'AlertDialogTrigger'. Did you mean 'AlertDialogTit'?
+src/app/storeportal/[storeId]/billing/page.tsx(203,17): error TS2552: Cannot find name 'AlertDialogTrigger'. Did you mean 'AlertDialogTit'?
+src/components/accounting/AccountsPayableCard.tsx(22,38): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/components/accounting/AccountsReceivableCard.tsx(22,41): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/components/accounting/BalanceSheet.tsx(20,35): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/components/accounting/CashFlowStatement.tsx(25,62): error TS2345: Argument of type 'string | null | undefined' is not assignable to parameter of type 'string | undefined'.
+  Type 'null' is not assignable to type 'string | undefined'.
+src/components/accounting/sales-tax-report.tsx(114,68): error TS2554: Expected 0-3 arguments, but got 4.
+src/components/accounting/sales-tax-report.tsx(118,70): error TS2554: Expected 0-3 arguments, but got 4.
+src/components/billing/bill-history-table.tsx(160,35): error TS2304: Cannot find name 'startOfMonth'.
+src/components/billing/bill-history-table.tsx(161,34): error TS2304: Cannot find name 'endOfMonth'.
+src/components/billing/bill-history-table.tsx(167,34): error TS2304: Cannot find name 'startOfYear'.
+src/components/billing/bill-history-table.tsx(168,33): error TS2304: Cannot find name 'endOfYear'.
+src/components/billing/bill-history-table.tsx(208,13): error TS2322: Type 'string | number | boolean | BillItem[] | undefined' is not assignable to type 'string | number | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | null | undefined'.
+src/components/billing/bill-history-table.tsx(209,13): error TS2322: Type 'string | number | boolean | BillItem[] | undefined' is not assignable to type 'string | number | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | null | undefined'.
+src/components/billing/bill-history-table.tsx(885,16): error TS2304: Cannot find name 'Card'.
+src/components/billing/bill-history-table.tsx(886,18): error TS2304: Cannot find name 'CardHeader'.
+src/components/billing/bill-history-table.tsx(888,22): error TS2304: Cannot find name 'CardTitle'.
+src/components/billing/bill-history-table.tsx(891,23): error TS2304: Cannot find name 'CardTitle'.
+src/components/billing/bill-history-table.tsx(892,22): error TS2304: Cannot find name 'CardDescription'.
+src/components/billing/bill-history-table.tsx(894,23): error TS2304: Cannot find name 'CardDescription'.
+src/components/billing/bill-history-table.tsx(900,19): error TS2304: Cannot find name 'CardHeader'.
+src/components/billing/bill-history-table.tsx(901,18): error TS2304: Cannot find name 'CardContent'.
+src/components/billing/bill-history-table.tsx(939,19): error TS2304: Cannot find name 'CardContent'.
+src/components/billing/bill-history-table.tsx(940,18): error TS2304: Cannot find name 'CardFooter'.
+src/components/billing/bill-history-table.tsx(985,19): error TS2304: Cannot find name 'CardFooter'.
+src/components/billing/bill-history-table.tsx(986,17): error TS2304: Cannot find name 'Card'.
+src/components/billing/inventory-ledger-table.tsx(43,24): error TS2554: Expected 1 arguments, but got 0.
+src/components/dashboard/TopProfitableProductsChart.tsx(76,18): error TS2345: Argument of type 'ProductRevenueData[]' is not assignable to parameter of type 'SetStateAction<ProductFinancialData[]>'.
+  Type 'ProductRevenueData[]' is not assignable to type 'ProductFinancialData[]'.
+    Type 'ProductRevenueData' is not assignable to type 'ProductFinancialData'.
+      Types of property 'cogs' are incompatible.
+        Type 'number | undefined' is not assignable to type 'number'.
+          Type 'undefined' is not assignable to type 'number'.
+src/components/history/bill-history-table.tsx(151,35): error TS2304: Cannot find name 'startOfMonth'.
+src/components/history/bill-history-table.tsx(152,34): error TS2304: Cannot find name 'endOfMonth'.
+src/components/history/bill-history-table.tsx(158,34): error TS2304: Cannot find name 'startOfYear'.
+src/components/history/bill-history-table.tsx(159,33): error TS2304: Cannot find name 'endOfYear'.
+src/components/history/bill-history-table.tsx(199,13): error TS2322: Type 'string | number | boolean | BillItem[] | undefined' is not assignable to type 'string | number | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | null | undefined'.
+src/components/history/bill-history-table.tsx(200,13): error TS2322: Type 'string | number | boolean | BillItem[] | undefined' is not assignable to type 'string | number | null | undefined'.
+  Type 'false' is not assignable to type 'string | number | null | undefined'.
+src/components/products/product-form.tsx(495,7): error TS2353: Object literal may only specify known properties, and 'initialStock' does not exist in type 'Omit<Product, "id" | "companyId" | "imageUrl" | "productSKUs"> & { costPriceForNonTracked?: number | undefined; sellPriceForNonTracked?: number | undefined; }'.
+src/components/products/ProductPerformanceChart.tsx(57,105): error TS2339: Property 'toFixed' does not exist on type 'ValueType'.
+  Property 'toFixed' does not exist on type 'string'.
+src/components/products/ProductPerformanceChart.tsx(58,106): error TS2339: Property 'toFixed' does not exist on type 'ValueType'.
+  Property 'toFixed' does not exist on type 'string'.

@@ -99,12 +99,10 @@ export async function POST(req: NextRequest) {
 
       // 4. Authorization: Check if Employee is allowed in this store
       // Logic: If allowedStaffIds is defined and not empty, user MUST be in it.
-      // If allowedStaffIds is empty, we might allow all? Or allow none?
-      // Default is strictly allowed list.
-      // However, typical business logic: if list is empty, maybe only Admin/Owner? But `employee` role implies restricted.
-      // Let's assume strict: Must be in allowedStaffIds.
+      // If allowedStaffIds is empty, it implies no specific restrictions (all staff in company allowed), as per UI description.
 
-      const isAllowed = authenticatedStore.allowedStaffIds && authenticatedStore.allowedStaffIds.includes(employee.id);
+      const hasRestrictions = authenticatedStore.allowedStaffIds && authenticatedStore.allowedStaffIds.length > 0;
+      const isAllowed = !hasRestrictions || authenticatedStore.allowedStaffIds.includes(employee.id);
 
       if (!isAllowed) {
         console.warn(`${routeNamePrefix} Employee ${employee.name} (${employee.id}) not authorized for store ${authenticatedStore.name}.`);
