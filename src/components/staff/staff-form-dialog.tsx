@@ -134,17 +134,33 @@ export function StaffFormDialog({
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-muted-foreground">STAFF INFORMATION</h4>
+
+                {editingStaff && (
+                  <div className="grid grid-cols-2 gap-4 mb-2">
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
+                      <Label className="text-xs text-primary font-bold uppercase tracking-wider block mb-1">Employee ID</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="text-lg font-mono font-bold text-primary">{editingStaff.employeeId || 'N/A'}</code>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted border border-muted-foreground/20 rounded-md">
+                      <Label className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Passcode</Label>
+                      <div className="flex items-center gap-2">
+                        {editingStaff.password && editingStaff.password.startsWith('$2') && editingStaff.password.length === 60 ? (
+                          <span className="text-sm italic text-muted-foreground">Hidden (Encrypted)</span>
+                        ) : (
+                          <code className="text-lg font-mono font-bold text-muted-foreground">{editingStaff.password || 'Not Set'}</code>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <Label htmlFor="name" className="flex items-center gap-1.5"><UserIcon size={14} />Full Name*</Label>
                   <Input id="name" {...register("name")} />
                   {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
-                {editingStaff && editingStaff.employeeId && (
-                  <div className="space-y-2">
-                    <Label htmlFor="employeeIdDisplay" className="flex items-center gap-1.5 text-muted-foreground"><Briefcase size={14} />Employee ID (System Generated)</Label>
-                    <Input id="employeeIdDisplay" value={editingStaff.employeeId} readOnly disabled className="bg-muted font-mono" />
-                  </div>
-                )}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14} />Email Address*</Label>
                   <Input id="email" type="email" {...register("email")} />
