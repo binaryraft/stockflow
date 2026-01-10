@@ -54,6 +54,10 @@ const additionalChargeDefinitionDialogSchema = z.object({
 const productOptionSchema = z.object({
   id: z.string().optional(),
   value: z.string().min(1, "Option value cannot be empty"),
+  // Allow per-variant pricing and stock
+  costPrice: z.preprocess((val) => (val === "" ? undefined : parseFloat(String(val))), z.number().optional()),
+  sellPrice: z.preprocess((val) => (val === "" ? undefined : parseFloat(String(val))), z.number().optional()),
+  initialStock: z.preprocess((val) => (val === "" ? undefined : parseFloat(String(val))), z.number().optional()),
 });
 
 const productVariantFormSchema = z.object({
@@ -75,7 +79,7 @@ const newProductDialogSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Sell price must be a number" }).optional()
   ),
-  initialStock: z.preprocess( 
+  initialStock: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Initial stock must be a number" }).optional()
   ),
@@ -110,41 +114,43 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   });
 
   const variantName = watch(`variants.${variantIndex}.name`);
+  const mainCostPrice = watch('costPrice');
+  const mainSellPrice = watch('sellPrice');
 
   const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, currentOptionIndex: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       const currentOptionValue = watch(`variants.${variantIndex}.options.${currentOptionIndex}.value`);
       if (currentOptionValue && currentOptionValue.trim() !== '') {
-        appendOption({ value: '' });
+        appendOption({ value: '', costPrice: mainCostPrice, sellPrice: mainSellPrice, initialStock: 0 });
         setTimeout(() => {
           setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
         }, 50);
       }
     }
   };
-  
+
   const handleVariantNameEnter = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-       e.preventDefault();
-       if (optionFields.length === 0) {
-         appendOption({ value: '' });
-         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-       } else {
-         setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
-       }
-     }
+      e.preventDefault();
+      if (optionFields.length === 0) {
+        appendOption({ value: '', costPrice: mainCostPrice, sellPrice: mainSellPrice, initialStock: 0 });
+        setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+      } else {
+        setTimeout(() => setFocus(`variants.${variantIndex}.options.0.value`), 50);
+      }
+    }
   }
 
   return (
-    <div className="space-y-3 border border-primary/20 p-3 rounded-md bg-tertiary shadow-sm">
+    <div className="space-y-4 border border-primary/20 p-4 rounded-md bg-tertiary shadow-sm">
       <div className="flex justify-between items-center">
         <Label htmlFor={`variants.${variantIndex}.name`} className="text-sm font-medium text-primary">Variant Type {variantIndex + 1}</Label>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
               <Button type="button" variant="ghost" size="icon" onClick={() => removeVariant(variantIndex)} aria-label="Remove Variant Type">
-                <Trash2 className="h-4 w-4 text-destructive"/>
+                <Trash2 className="h-4 w-4 text-destructive" />
               </Button>
             </TooltipTrigger>
             <TooltipContent><p>Remove this variant type</p></TooltipContent>
@@ -159,40 +165,67 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       />
       {errors.variants?.[variantIndex]?.name && <p className="text-xs text-destructive mt-0.5">{errors.variants[variantIndex]?.name?.message}</p>}
 
-      <Label className="text-xs text-muted-foreground mt-1.5 block">Options for {variantName || `Variant Type ${variantIndex+1}`}</Label>
-      <div className="space-y-1.5">
+      <Label className="text-xs text-muted-foreground mt-2 block">Options for {variantName || `Variant Type ${variantIndex + 1}`}</Label>
+      <div className="space-y-3">
         {optionFields.map((optionValueField, optionIndex) => (
-          <div key={optionValueField.id} className="flex items-center gap-2">
-            <Input
-              {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
-              placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
-              aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
-            />
-            {optionFields.length > 1 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
-                      <Trash2 className="h-3 w-3 text-destructive"/>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Remove option value</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+          <div key={optionValueField.id} className="p-3 bg-background border rounded-md space-y-3">
+            <div className="flex items-center gap-2">
+              <Input
+                {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
+                placeholder={`Option Value (e.g. Red)`}
+                className="font-medium"
+                onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
+              />
+              <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-9 w-9 shrink-0 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Cost (₹)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.costPrice` as any)}
+                  defaultValue={mainCostPrice}
+                  placeholder="Cost"
+                  className="h-8 text-xs bg-muted/20"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Sell (₹)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.sellPrice` as any)}
+                  defaultValue={mainSellPrice}
+                  placeholder="Sell"
+                  className="h-8 text-xs bg-muted/20"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty</Label>
+                <Input
+                  type="number"
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock` as any)}
+                  placeholder="Qty"
+                  className="h-8 text-xs bg-muted/20"
+                />
+              </div>
+            </div>
           </div>
         ))}
         {errors.variants?.[variantIndex]?.options?.root && <p className="text-xs text-destructive mt-0.5">{errors.variants[variantIndex]?.options?.root?.message}</p>}
-        {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i:number) => err?.value?.message && <p key={i} className="text-xs text-destructive mt-0.5">{err.value.message}</p>)}
+        {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i: number) => err?.value?.message && <p key={i} className="text-xs text-destructive mt-0.5">{err.value.message}</p>)}
       </div>
       <Button
         type="button"
         variant="outline"
         size="sm"
-        className="text-xs"
+        className="text-xs w-full"
         onClick={() => {
-          appendOption({ value: '' });
+          appendOption({ value: '', costPrice: mainCostPrice, sellPrice: mainSellPrice, initialStock: 0 });
           setTimeout(() => {
             setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
           }, 50);
@@ -218,7 +251,7 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
     control,
     name: "additionalChargeDefinitions",
   });
-  
+
   const handleChargeNameEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -227,11 +260,11 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
   };
 
   const handleChargeValueEnter = (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
-     if (e.key === 'Enter') {
+    if (e.key === 'Enter') {
       e.preventDefault();
       const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
       const chargeValue = watch(`additionalChargeDefinitions.${index}.value`);
-      if (index === fields.length -1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
+      if (index === fields.length - 1 && watch(`additionalChargeDefinitions.${index}.name`) && chargeValue !== undefined) {
         append({ name: "", type: 'fixed', value: undefined });
         setTimeout(() => setFocus(`additionalChargeDefinitions.${fields.length}.name`), 50);
       }
@@ -258,95 +291,96 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
       {fields.map((field, index) => {
         const chargeType = watch(`additionalChargeDefinitions.${index}.type`);
         return (
-            <div key={field.id} className="p-3 border rounded-md bg-muted/30 space-y-2">
+          <div key={field.id} className="p-3 border rounded-md bg-muted/30 space-y-2">
             <div className="flex items-center justify-between">
-                <Label htmlFor={`additionalChargeDefinitions.${index}.name`} className="text-xs font-medium">Charge Name*</Label>
-                <TooltipProvider>
+              <Label htmlFor={`additionalChargeDefinitions.${index}.name`} className="text-xs font-medium">Charge Name*</Label>
+              <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger asChild>
+                  <TooltipTrigger asChild>
                     <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} className="h-7 w-7" aria-label="Remove Charge">
-                        <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
                     </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Remove this charge</p></TooltipContent>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Remove this charge</p></TooltipContent>
                 </Tooltip>
-                </TooltipProvider>
+              </TooltipProvider>
             </div>
             <Input
-                {...register(`additionalChargeDefinitions.${index}.name`)}
-                id={`additionalChargeDefinitions.${index}.name`}
-                placeholder="e.g., Making Charge"
-                className="h-9 text-sm"
-                onKeyDown={(e) => handleChargeNameEnter(e, index)}
+              {...register(`additionalChargeDefinitions.${index}.name`)}
+              id={`additionalChargeDefinitions.${index}.name`}
+              placeholder="e.g., Making Charge"
+              className="h-9 text-sm"
+              onKeyDown={(e) => handleChargeNameEnter(e, index)}
             />
             {errors.additionalChargeDefinitions?.[index]?.name && (
-                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].name.message}</p>
+              <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].name.message}</p>
             )}
 
             <div className="flex items-center gap-3 pt-1">
-                <Label className="text-xs">Type:</Label>
-                <Controller
-                    control={control}
-                    name={`additionalChargeDefinitions.${index}.type`}
-                    render={({ field: { onChange, value } }) => (
-                        <RadioGroup
-                            defaultValue="fixed"
-                            value={value}
-                            onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
-                            className="flex items-center gap-2"
-                        >
-                            <div className="flex items-center space-x-1.5">
-                                <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}`} />
-                                <Label htmlFor={`ac-type-fixed-${index}`} className={cn("text-xs cursor-pointer", value === 'fixed' && "text-primary font-semibold")}>Fixed (₹)</Label>
-                            </div>
-                            <div className="flex items-center space-x-1.5">
-                                <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}`} />
-                                <Label htmlFor={`ac-type-percentage-${index}`} className={cn("text-xs cursor-pointer", value === 'percentage' && "text-primary font-semibold")}>Percentage (%)</Label>
-                            </div>
-                        </RadioGroup>
-                    )}
-                />
+              <Label className="text-xs">Type:</Label>
+              <Controller
+                control={control}
+                name={`additionalChargeDefinitions.${index}.type`}
+                render={({ field: { onChange, value } }) => (
+                  <RadioGroup
+                    defaultValue="fixed"
+                    value={value}
+                    onValueChange={(val) => onChange(val as 'fixed' | 'percentage')}
+                    className="flex items-center gap-2"
+                  >
+                    <div className="flex items-center space-x-1.5">
+                      <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}`} />
+                      <Label htmlFor={`ac-type-fixed-${index}`} className={cn("text-xs cursor-pointer", value === 'fixed' && "text-primary font-semibold")}>Fixed (₹)</Label>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}`} />
+                      <Label htmlFor={`ac-type-percentage-${index}`} className={cn("text-xs cursor-pointer", value === 'percentage' && "text-primary font-semibold")}>Percentage (%)</Label>
+                    </div>
+                  </RadioGroup>
+                )}
+              />
             </div>
 
             <div className="relative">
-                <Label htmlFor={`additionalChargeDefinitions.${index}.value`} className="text-xs">
+              <Label htmlFor={`additionalChargeDefinitions.${index}.value`} className="text-xs">
                 {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
-                </Label>
-                <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                        {chargeType === 'fixed' ? 
-                            <HandCoins className={cn("h-4 w-4 text-muted-foreground", chargeType === 'fixed' && "text-primary/80")} /> :
-                            <BadgePercent className={cn("h-4 w-4 text-muted-foreground", chargeType === 'percentage' && "text-primary/80")} />
-                        }
-                    </div>
-                    <Input
-                        {...register(`additionalChargeDefinitions.${index}.value`)}
-                        id={`additionalChargeDefinitions.${index}.value`}
-                        type="number"
-                        step={chargeType === 'fixed' ? "0.01" : "0.1"}
-                        placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
-                        className="h-9 text-sm pl-10"
-                        onKeyDown={(e) => handleChargeValueEnter(e, index)}
-                    />
+              </Label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  {chargeType === 'fixed' ?
+                    <HandCoins className={cn("h-4 w-4 text-muted-foreground", chargeType === 'fixed' && "text-primary/80")} /> :
+                    <BadgePercent className={cn("h-4 w-4 text-muted-foreground", chargeType === 'percentage' && "text-primary/80")} />
+                  }
                 </div>
+                <Input
+                  {...register(`additionalChargeDefinitions.${index}.value`)}
+                  id={`additionalChargeDefinitions.${index}.value`}
+                  type="number"
+                  step={chargeType === 'fixed' ? "0.01" : "0.1"}
+                  placeholder={chargeType === 'fixed' ? "0.00" : "0.0"}
+                  className="h-9 text-sm pl-10"
+                  onKeyDown={(e) => handleChargeValueEnter(e, index)}
+                />
+              </div>
             </div>
             {errors.additionalChargeDefinitions?.[index]?.value && (
-                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].value.message}</p>
+              <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].value.message}</p>
             )}
-             {errors.additionalChargeDefinitions?.[index]?.type && (
-                <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].type.message}</p>
+            {errors.additionalChargeDefinitions?.[index]?.type && (
+              <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions[index].type.message}</p>
             )}
-            </div>
-        )})}
+          </div>
+        )
+      })}
       {errors.additionalChargeDefinitions?.root && (
         <p className="text-xs text-destructive mt-0.5">{errors.additionalChargeDefinitions.root.message}</p>
       )}
       {Array.isArray(errors.additionalChargeDefinitions) && errors.additionalChargeDefinitions.map((err: any, i: number) => (
         (err?.name?.message || err?.value?.message || err?.type?.message) && (
           <div key={i} className="text-xs text-destructive mt-0.5">
-            {err.name?.message && <p>Charge {i+1} Name: {err.name.message}</p>}
-            {err.type?.message && <p>Charge {i+1} Type: {err.type.message}</p>}
-            {err.value?.message && <p>Charge {i+1} Value: {err.value.message}</p>}
+            {err.name?.message && <p>Charge {i + 1} Name: {err.name.message}</p>}
+            {err.type?.message && <p>Charge {i + 1} Type: {err.type.message}</p>}
+            {err.value?.message && <p>Charge {i + 1} Value: {err.value.message}</p>}
           </div>
         )
       ))}
@@ -361,7 +395,7 @@ interface NewProductDialogProps {
   onProductAdded: (newProduct: Product) => void;
   initialValues?: {
     name?: string;
-    quantity?: string; 
+    quantity?: string;
     costPrice?: string;
     sellPrice?: string;
   } | null;
@@ -404,7 +438,7 @@ export function NewProductDialog({
     control,
     name: "variants",
   });
-  
+
   useEffect(() => {
     const companyIdFromStorage = localStorage.getItem('companyId');
     if (companyIdFromStorage) {
@@ -438,17 +472,20 @@ export function NewProductDialog({
 
   const onSubmit = async (data: NewProductDialogFormData) => {
     if (!currentCompanyId) {
-        toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
-        return;
+      toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
+      return;
     }
 
-    const productVariantsPayload: ProductVariantType[] = (data.variants || []).map(v_form => ({
-        id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-        name: v_form.name,
-        options: v_form.options.map(opt_form => ({
-          id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          value: opt_form.value
-        }))
+    const productVariantsPayload: any[] = (data.variants || []).map(v_form => ({
+      id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+      name: v_form.name,
+      options: v_form.options.map((opt_form: any) => ({
+        id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        value: opt_form.value,
+        costPrice: opt_form.costPrice,
+        sellPrice: opt_form.sellPrice,
+        initialStock: opt_form.initialStock
+      }))
     }));
 
     if (data.category && !categories.find(c => c.name.toLowerCase() === data.category!.toLowerCase() && c.companyId === currentCompanyId)) {
@@ -464,24 +501,24 @@ export function NewProductDialog({
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
-        ...ac, 
+        ...ac,
         id: ac.id || uuidv4(),
-        type: ac.type || 'fixed', 
+        type: ac.type || 'fixed',
       })) || [],
     };
-    
+
     if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
-        productToSaveBase.costPriceForNonTracked = data.costPrice;
-        productToSaveBase.sellPriceForNonTracked = data.sellPrice;
+      productToSaveBase.costPriceForNonTracked = data.costPrice;
+      productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
-    
+
     const newProduct = await addProduct(productToSaveBase, currentCompanyId);
     if (newProduct) {
       toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
       onProductAdded(newProduct);
-      onOpenChange(false); 
+      onOpenChange(false);
     } else {
-       toast({ variant: "destructive", title: "Add Failed", description: "Could not add product via API." });
+      toast({ variant: "destructive", title: "Add Failed", description: "Could not add product via API." });
     }
   };
 
@@ -495,9 +532,9 @@ export function NewProductDialog({
           </DialogDescription>
         </DialogHeader>
         <FormProvider {...form}>
-          <form onSubmit={handleSubmit(onSubmit)} className="contents">
-            <ScrollArea className="flex-1">
-              <div className="space-y-6 p-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col min-h-0 overflow-hidden flex-1">
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-6">
                 <div>
                   <Label htmlFor="dialog-product-name">Product Name*</Label>
                   <Input id="dialog-product-name" {...register("name")} placeholder="Enter product name" />
@@ -506,40 +543,40 @@ export function NewProductDialog({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                      <Label htmlFor="dialog-category">Category</Label>
-                      <Controller
+                    <Label htmlFor="dialog-category">Category</Label>
+                    <Controller
                       name="category"
                       control={control}
                       render={({ field }) => (
-                          <CategorySearchInput
+                        <CategorySearchInput
                           id="dialog-category"
                           value={field.value || ''}
                           onValueChange={(value) => field.onChange(value)}
                           onCategorySelect={(categoryName) => field.onChange(categoryName)}
                           placeholder="Type or select category"
-                          />
+                        />
                       )}
-                      />
+                    />
                   </div>
                   <div className="space-y-1.5 flex items-center pt-6">
-                      <Controller
-                          name="trackQuantity"
-                          control={control}
-                          render={({ field }) => (
-                          <Checkbox id="dialog-trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                          )}
-                      />
-                      <Label htmlFor="dialog-trackQuantity" className="font-normal text-sm ml-2">Track inventory quantity</Label>
+                    <Controller
+                      name="trackQuantity"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox id="dialog-trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
+                      )}
+                    />
+                    <Label htmlFor="dialog-trackQuantity" className="font-normal text-sm ml-2">Track inventory quantity</Label>
                   </div>
                 </div>
 
                 <div className="space-y-1.5">
                   <Label htmlFor="dialog-description">Description</Label>
-                  <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2}/>
+                  <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2} />
                 </div>
 
                 <div className="space-y-3 pt-2">
-                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18}/>Tax Rates (%)</Label>
+                  <Label className="text-md font-semibold text-primary flex items-center gap-2"><Percent size={18} />Tax Rates (%)</Label>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-1.5">
                       <Label htmlFor="dialog-sgstRate">SGST Rate (%)</Label>
@@ -554,68 +591,67 @@ export function NewProductDialog({
                   </div>
                 </div>
 
-                {!trackQuantityValue && !hasVariants && (
-                  <>
-                    <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                          <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                          <span>
-                              For non-tracked items (like services), set their standard cost and sell price below.
-                          </span>
-                      </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="dialog-costPrice">Cost Price</Label>
-                            <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
-                            {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="dialog-sellPrice">Sell Price</Label>
-                            <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
-                            {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
-                        </div>
-                    </div>
-                  </>
-                )}
-                {trackQuantityValue && (
+                {/* Main Cost/Sell Price Defaults - Always Visible */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dialog-costPrice">Cost Price (Default)</Label>
+                    <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                    {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="dialog-sellPrice">Sell Price (Default)</Label>
+                    <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                    {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
+                  </div>
+                </div>
+
+                {trackQuantityValue && hasVariants && (
                   <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                      <Info size={20} className="shrink-0 mt-0.5 text-primary"/>
-                      <span>
-                          For quantity-tracked products, cost and sell prices are established via Expense Bills, not here.
-                      </span>
+                    <Info size={16} className="shrink-0 mt-0.5 text-primary" />
+                    <span>
+                      Default prices above will be used for variants unless overridden below.
+                    </span>
+                  </div>
+                )}
+                {!hasVariants && trackQuantityValue && (
+                  <div className="space-y-1.5 mt-2">
+                    <Label htmlFor="dialog-initialStock">Initial Stock Quantity</Label>
+                    <Input id="dialog-initialStock" type="number" {...register("initialStock")} placeholder="0" />
+                    {errors.initialStock && <p className="text-xs text-destructive mt-1">{errors.initialStock.message}</p>}
                   </div>
                 )}
 
-                <Separator className="my-4"/>
-                <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus}/>
+                <Separator className="my-4" />
+                <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus} />
 
-                <Separator className="my-4"/>
+                <Separator className="my-4" />
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                      <Label className="text-md font-semibold text-primary">Variants (Max 2)</Label>
-                      {variantFields.length < 2 && (
+                    <Label className="text-md font-semibold text-primary">Variants (Max 2)</Label>
+                    {variantFields.length < 2 && (
                       <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => appendVariant({ name: "", options: [{value: ""}] })}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => appendVariant({ name: "", options: [{ value: "", costPrice: mainCostPrice, sellPrice: mainSellPrice, initialStock: 0 }] })}
                       >
-                          <PlusCircle className="mr-2 h-4 w-4"/> Add Variant Type
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Variant Type
                       </Button>
-                      )}
+                    )}
                   </div>
                   {errors.variants?.root && <p className="text-xs text-destructive mt-1">{errors.variants.root.message}</p>}
                   {variantFields.map((variantField, variantIndex) => (
-                      <VariantFormSection
+                    <VariantFormSection
                       key={variantField.id}
                       variantIndex={variantIndex}
                       removeVariant={removeVariant}
-                      />
+                    />
                   ))}
                   {errors.variants && typeof errors.variants.message === 'string' && <p className="text-xs text-destructive mt-1">{errors.variants.message}</p>}
                 </div>
               </div>
-            </ScrollArea>
-            <DialogFooter className="p-6 pt-4 border-t">
+            </div>
+            <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>

@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import type { Product, ProductSKU, ProductVariant, Bill, Company, Store } from '@/types';
+import type { Product, ProductSKU, ProductVariant, Bill, BillItem, Company, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SUBSCRIPTION_PLANS } from '@/lib/constants';
 
@@ -60,26 +60,53 @@ export async function POST(req: NextRequest) {
       imageUrl: productData.imageUrl || `https://placehold.co/100x100.png?text=${encodeURIComponent(productData.name.substring(0, 10))}&font=roboto`,
     };
 
+    const initialBillItems: BillItem[] = [];
+
     if (!productData.variants || productData.variants.length === 0) {
+      const skuId = generateId();
       newProduct.productSKUs.push({
-        id: generateId(),
+        id: skuId,
         optionValues: {},
         skuIdentifier: productData.name,
         stockLayers: [],
       });
+      // Handle single product initial stock
+      if (productData.trackQuantity && productData.initialStock && productData.initialStock > 0) {
+        initialBillItems.push({
+          id: uuidv4(),
+          productId: newProduct.id,
+          productName: newProduct.name,
+          quantity: productData.initialStock,
+          costPrice: productData.costPrice || 0,
+          sellPrice: productData.sellPrice || 0,
+          selectedVariantOptions: {}
+        });
+      }
     } else {
-      // Generate all possible SKU combinations from variants
-      const generateCombinations = (variants: ProductVariant[]): Record<string, string>[] => {
-        if (variants.length === 0) return [{}];
+      // Generate all possible SKU combinations from variants, capturing metadata
+      const generateCombinations = (variants: any[]): { optionValues: Record<string, string>, metadata: any }[] => {
+        if (variants.length === 0) return [{ optionValues: {}, metadata: {} }];
         const firstVariant = variants[0];
         const restCombinations = generateCombinations(variants.slice(1));
-        const combinations: Record<string, string>[] = [];
+        const combinations: { optionValues: Record<string, string>, metadata: any }[] = [];
 
-        firstVariant.options.forEach(option => {
+        firstVariant.options.forEach((option: any) => {
           restCombinations.forEach(combination => {
+            // Logic: Variant 0 (Top level) takes precedence for price/stock if defined, otherwise inherit from lower levels
+            // Actually, usually the 'lowest' specific level might override? 
+            // But here, let's assume if you set price on Color (Var 1), it applies.
+            const meta = {
+              costPrice: option.costPrice !== undefined ? option.costPrice : combination.metadata.costPrice,
+              sellPrice: option.sellPrice !== undefined ? option.sellPrice : combination.metadata.sellPrice,
+              initialStock: option.initialStock !== undefined ? option.initialStock : combination.metadata.initialStock,
+            };
+
             combinations.push({
-              [firstVariant.name]: option.value,
-              ...combination
+              optionValues: {
+                [firstVariant.name]: option.value,
+                ...combination.optionValues
+              },
+              metadata: meta
             });
           });
         });
@@ -88,26 +115,58 @@ export async function POST(req: NextRequest) {
 
       const combinations = generateCombinations(productData.variants);
 
-      newProduct.productSKUs = combinations.map(combination => ({
-        id: generateId(),
-        optionValues: combination,
-        skuIdentifier: `${newProduct.name} (${Object.values(combination).join(' - ')})`,
-        stockLayers: []
-      }));
+      newProduct.productSKUs = combinations.map(combination => {
+        const skuId = generateId();
+        const skuCost = combination.metadata.costPrice !== undefined ? combination.metadata.costPrice : (productData.costPrice || 0);
+        const skuSell = combination.metadata.sellPrice !== undefined ? combination.metadata.sellPrice : (productData.sellPrice || 0);
+        const skuStock = combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0; // Default to 0 if not set on variant
+
+        // Create bill item if this variant/SKU has stock
+        if (productData.trackQuantity && skuStock > 0) {
+          initialBillItems.push({
+            id: uuidv4(),
+            productId: newProduct.id,
+            productName: newProduct.name,
+            quantity: skuStock,
+            costPrice: skuCost,
+            sellPrice: skuSell,
+            selectedVariantOptions: combination.optionValues
+          });
+        }
+
+        return {
+          id: skuId,
+          optionValues: combination.optionValues,
+          skuIdentifier: `${newProduct.name} (${Object.values(combination.optionValues).join(' - ')})`,
+          stockLayers: [] // Stock layers are built from bills, so initially empty check for bill creation below
+        };
+      });
     }
 
     await db.collection<Product>('products').insertOne(newProduct);
 
-    // Handle initial stock as a conceptual purchase bill
-    if (productData.trackQuantity && productData.initialStock > 0 && productData.costPrice !== undefined && productData.sellPrice !== undefined) {
+    // Create Initial Purchase Bill if items exist
+    if (initialBillItems.length > 0) {
       const firstStore = await db.collection<Store>('stores').findOne({ companyId: companyId });
       const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0, 8)}`;
+      let totalAmount = 0;
+      initialBillItems.forEach(item => {
+        totalAmount += (item.quantity * item.costPrice);
+      });
+
       const conceptualBill: Bill = {
-        id: initialBillId, type: 'buy', date: new Date().toISOString(), timestamp: Date.now(),
-        items: [{ id: uuidv4(), productId: newProduct.id, productName: newProduct.name, quantity: productData.initialStock, costPrice: productData.costPrice, sellPrice: productData.sellPrice }],
-        totalAmount: productData.initialStock * productData.costPrice,
-        companyId: companyId, billedByStaffId: 'SYSTEM_INIT', storeId: firstStore?.id, storeName: firstStore?.name,
-        paymentStatus: company.defaultPurchasePaymentStatus || 'paid', notes: 'Initial stock entry.'
+        id: initialBillId,
+        type: 'buy',
+        date: new Date().toISOString(),
+        timestamp: Date.now(),
+        items: initialBillItems,
+        totalAmount: totalAmount,
+        companyId: companyId,
+        billedByStaffId: 'SYSTEM_INIT',
+        storeId: firstStore?.id,
+        storeName: firstStore?.name,
+        paymentStatus: company.defaultPurchasePaymentStatus || 'paid',
+        notes: 'Initial stock entry from product creation.'
       };
       await db.collection<Bill>('bills').insertOne(conceptualBill);
     }
