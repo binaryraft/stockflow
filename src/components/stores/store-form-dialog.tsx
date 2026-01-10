@@ -153,9 +153,9 @@ export function StoreFormDialog({
                       </div>
                     </div>
                     <div className="p-3 bg-muted border border-muted-foreground/20 rounded-md">
-                      <Label className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Access Code</Label>
+                      <Label className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Store Passkey</Label>
                       <div className="flex items-center gap-2">
-                        <code className="text-lg font-mono font-bold text-muted-foreground tracking-[0.2em]">{editingStore.accessCode}</code>
+                        <code className="text-lg font-mono font-bold text-muted-foreground">{editingStore.passkey}</code>
                       </div>
                     </div>
                   </div>
