@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { storeId: str
     const store = await db.collection<Store>('stores').findOne({ id: storeId, companyId: companyId });
 
     if (!store) return NextResponse.json({ success: false, message: 'Store not found.' }, { status: 404 });
-    
+
     return NextResponse.json({ success: true, data: store });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
@@ -39,6 +39,19 @@ export async function PUT(req: NextRequest, { params }: { params: { storeId: str
     const updateFields: Partial<Store> = { ...storeData };
     delete updateFields.id;
     delete updateFields.companyId;
+
+    if (storeData.username) {
+      updateFields.username = storeData.username.trim();
+      // Check for uniqueness if username is being changed
+      const existingUsername = await db.collection<Store>('stores').findOne({
+        companyId: companyId,
+        username: updateFields.username,
+        id: { $ne: storeId } // Exclude current store
+      });
+      if (existingUsername) {
+        return NextResponse.json({ success: false, message: 'Store Username already exists in your company. Please choose another.' }, { status: 400 });
+      }
+    }
 
     if (storeData.passkey && storeData.passkey.trim() !== "") {
       if (storeData.passkey.length < 4) {

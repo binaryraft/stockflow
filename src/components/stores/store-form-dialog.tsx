@@ -169,7 +169,7 @@ export function StoreFormDialog({
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
-                    <Input id="username" {...register("username")} placeholder="Unique ID for login" disabled={!!editingStore} />
+                    <Input id="username" {...register("username")} placeholder="Unique ID for login" />
                     {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
                   </div>
                 </div>
