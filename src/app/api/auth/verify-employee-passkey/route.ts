@@ -27,10 +27,22 @@ export async function POST(req: NextRequest) {
 
     let authenticatedEmployee: User | undefined = undefined;
     for (const emp of companyEmployees) {
-        if (emp.password && bcrypt.compareSync(employeePassword, emp.password)) {
+      if (emp.password) {
+        // Check if stored password is a bcrypt hash (starts with $2 and is 60 chars)
+        const isHashed = emp.password.startsWith('$2') && emp.password.length === 60;
+        if (isHashed) {
+          if (bcrypt.compareSync(employeePassword, emp.password)) {
             authenticatedEmployee = emp;
             break;
+          }
+        } else {
+          // Plain text comparison
+          if (emp.password === employeePassword) {
+            authenticatedEmployee = emp;
+            break;
+          }
         }
+      }
     }
 
     if (!authenticatedEmployee) {
@@ -40,8 +52,8 @@ export async function POST(req: NextRequest) {
 
     const isExplicitlyAllowed = store.allowedStaffIds?.includes(authenticatedEmployee.id);
     const isGenerallyAllowedIfAssigned =
-        (!store.allowedStaffIds || store.allowedStaffIds.length === 0) &&
-        (authenticatedEmployee.assignedStoreIds?.includes(storeId) ?? false);
+      (!store.allowedStaffIds || store.allowedStaffIds.length === 0) &&
+      (authenticatedEmployee.assignedStoreIds?.includes(storeId) ?? false);
     const isCompanyEmployeeWithoutExplicitStoreAssignment = (!store.allowedStaffIds || store.allowedStaffIds.length === 0) && (!authenticatedEmployee.assignedStoreIds || authenticatedEmployee.assignedStoreIds.length === 0);
 
     if (isExplicitlyAllowed || isGenerallyAllowedIfAssigned || isCompanyEmployeeWithoutExplicitStoreAssignment) {
