@@ -178,7 +178,7 @@ export default function StoreBillingPage() {
   return (
     <div className="flex flex-col gap-6 p-4 md:p-6">
       <PageTitle
-        title={`${currentStore.name} - Billing Terminal`}
+        title={currentStore.name}
         icon={ShoppingCart}
         actions={
           <div className="flex items-center gap-2">

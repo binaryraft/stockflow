@@ -40,22 +40,22 @@ export function BillSaveAnimation({ show, billMode, isEstimate, onClose }: BillS
     } else {
       IconComponent = Send;
       text = "Sales Bill Saved!";
-      iconColor = "text-green-600"; 
+      iconColor = "text-green-600";
     }
   } else if (billMode === 'buy') {
     IconComponent = ShoppingBag;
     text = "Expense Bill Saved!";
-    iconColor = "text-red-600"; 
+    iconColor = "text-red-600";
   } else if (billMode === 'return') {
     IconComponent = RotateCcw;
     text = "Return Entry Saved!";
-    iconColor = "text-amber-500"; 
+    iconColor = "text-amber-500";
   }
 
   return (
     <div
       className={cn(
-        "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm transition-opacity duration-300",
+        "fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/40 backdrop-blur-md transition-opacity duration-300",
         show ? "opacity-100" : "opacity-0 pointer-events-none"
       )}
     >
