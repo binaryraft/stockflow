@@ -25,7 +25,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 type SortableStaffColumns = keyof Pick<Staff, 'name' | 'email' | 'phone'>;
 
 export function StaffTable() {
-  const { staffs, deleteStaff, getAllStores, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
+  const { staffs, deleteStaff, getAllStores, getActiveSubscriptionPlan, getStaffDetailsByIds, fetchStaff } = useInventoryStore();
   const { toast } = useToast();
 
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
@@ -78,6 +78,7 @@ export function StaffTable() {
       return;
     }
     setEditingStaff(staff);
+    fetchStaff(localStorage.getItem('companyId') || ''); // Refresh to get latest data including passwords
     setIsFormDialogOpen(true);
   };
 
@@ -140,6 +141,7 @@ export function StaffTable() {
                     return;
                   }
                   setEditingStaff(null);
+                  fetchStaff(localStorage.getItem('companyId') || ''); // Force refresh on add intent
                   setIsFormDialogOpen(true);
                 }}
                 disabled={!userCanAddStaff || isAdminOnlyPlan}

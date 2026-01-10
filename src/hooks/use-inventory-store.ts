@@ -388,7 +388,8 @@ export const useInventoryStore = create<InventoryState>()(
       },
       fetchStaff: async (companyId) => {
         if (!companyId) return console.warn("fetchStaff: companyId is required");
-        if (get().staffs.length > 0) return;
+        // Removed cache check to ensure we get fresh data (passwords) when revisiting the page
+        // if (get().staffs.length > 0) return; 
 
         try {
           const response = await fetch(`/api/staff?companyId=${companyId}`);
