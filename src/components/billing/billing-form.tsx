@@ -51,6 +51,7 @@ interface BillingFormProps {
   initialModeProp?: BillMode | null;
   isAdminContext?: boolean;
   preselectedStoreId?: string | null;
+  companyId?: string | null;
 }
 
 export function BillingForm({
@@ -59,6 +60,7 @@ export function BillingForm({
   initialModeProp,
   isAdminContext = false,
   preselectedStoreId,
+  companyId: companyIdFromProp,
 }: BillingFormProps) {
   const router = useRouter();
   const searchParamsHook = useSearchParams();
@@ -91,7 +93,7 @@ export function BillingForm({
     setDraftBill: state.setDraftBill,
     clearDraftBill: state.clearDraftBill,
   }));
-  const companyId = useInventoryStore(state => localStorage.getItem('companyId') || "comp_default_001");
+  const companyId = useInventoryStore(state => companyIdFromProp || localStorage.getItem('companyId') || "comp_default_001");
 
   const [allStores, setAllStores] = useState<Store[]>([]);
   const [activePlan, setActivePlan] = useState<ReturnType<typeof getActiveSubscriptionPlan>>(undefined);
@@ -1655,6 +1657,48 @@ export function BillingForm({
           </div>
         </CardFooter>
       </Card>
+
+      <EmployeePasskeyDialog
+        isOpen={isVerifyEmployeeDialogOpen}
+        onOpenChange={setIsVerifyEmployeeDialogOpen}
+        storeId={pendingBillPayload?.storeIdForBill || finalStoreIdForSkuDetails || ""}
+        companyId={companyId}
+        onAuthenticated={handleEmployeeVerifiedForBill}
+      />
+
+      <NewProductDialog
+        isOpen={isNewProductDialogOpen}
+        onOpenChange={setIsNewProductDialogOpen}
+        initialValues={newProductDialogInitialValues}
+        onProductAdded={handleNewProductAddedFromDialog}
+      />
+
+      <BillSaveAnimation show={isSavingAnimationVisible} billMode={lastSavedBillMode || 'sell'} isEstimate={lastSavedBillIsEstimate} onClose={handleAnimationClose} />
+
+      <HardwareBarcodeScanModal
+        isOpen={isBarcodeModalOpen}
+        onOpenChange={setIsBarcodeModalOpen}
+        onScan={handleBarcodeScannedFromModal}
+      />
+
+      <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bill Saved Successfully!</AlertDialogTitle>
+            <AlertDialogDescription>
+              Do you want to print the receipt now?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              if (billToPotentiallyPrint) {
+                triggerPrint(generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook));
+              }
+            }}>Print Receipt</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

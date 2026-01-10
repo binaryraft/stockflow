@@ -237,6 +237,7 @@ export default function StoreBillingPage() {
           storeId={currentStore.id}
           allowedModes={currentStore.allowedOperations}
           isAdminContext={false}
+          companyId={companyIdForSession}
         />
       </Suspense>
     </div>
