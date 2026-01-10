@@ -126,7 +126,7 @@ export function EmployeePasskeyDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!isLoading) onOpenChange(open); }}>
-      <DialogContent className={cn("sm:max-w-xs p-0 border-0 bg-transparent shadow-none")}>
+      <DialogContent className={cn("sm:max-w-xs p-0 border-0 bg-transparent shadow-none [&>button]:hidden")}>
         <div className={cn(
           "bg-background border rounded-lg shadow-2xl overflow-hidden transition-transform",
           isErrorShake ? "animate-shake border-destructive/50" : "border-border"

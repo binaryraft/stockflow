@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
           }
         } else {
           // Plain text comparison
-          if (emp.password === employeePassword) {
+          if (emp.password.trim() === employeePassword.trim()) {
             authenticatedEmployee = emp;
             break;
           }
