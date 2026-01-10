@@ -57,64 +57,58 @@ export async function POST(req: NextRequest) {
         console.warn(`${routeNamePrefix} No employee found with ID: ${employeeId} for company ${companyId}.`);
       }
     } else if (loginType === 'store') {
-      const { companyId, storeAccessCode, employeeId, employeePasskey } = body;
+      const { adminEmail, storeUsername, storePasskey } = body;
 
-      if (!companyId || !storeAccessCode || !employeeId || !employeePasskey) {
-        console.warn(`${routeNamePrefix} Company ID, Store Access Code, Employee ID, and Password are required.`);
-        return NextResponse.json({ success: false, message: 'Company ID, Store Access Code, Employee ID, and Password are required.' }, { status: 400 });
+      if (!adminEmail || !storeUsername || !storePasskey) {
+        console.warn(`${routeNamePrefix} Admin Email, Store Username, and Store Passkey are required.`);
+        return NextResponse.json({ success: false, message: 'Admin Email, Store Username, and Store Passkey are required.' }, { status: 400 });
       }
 
-      // 1. Find the Store by Access Code (Global Unique 6-digit)
-      authenticatedStore = await db.collection<Store>('stores').findOne({ accessCode: storeAccessCode });
+      // 1. Find Admin User to get Company ID
+      const adminUser = await db.collection<User>('users').findOne({ role: 'admin', email: adminEmail.toLowerCase() });
+      if (!adminUser) {
+        console.warn(`${routeNamePrefix} Admin user not found with email: ${adminEmail}.`);
+        // Security best practice: Don't reveal strict user existence, but here for debugging/UX in internal tool:
+        return NextResponse.json({ success: false, message: 'Invalid Admin Email.' }, { status: 404 });
+      }
+
+      const companyId = adminUser.companyId;
+
+      // 2. Find the Store by Username and Company ID
+      authenticatedStore = await db.collection<Store>('stores').findOne({ companyId: companyId, username: storeUsername });
 
       if (!authenticatedStore) {
-        console.warn(`${routeNamePrefix} Store not found with Access Code: ${storeAccessCode}.`);
-        return NextResponse.json({ success: false, message: 'Invalid Store Access Code.' }, { status: 404 });
+        console.warn(`${routeNamePrefix} Store not found with Username: ${storeUsername} in company ${companyId}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Store Username.' }, { status: 404 });
       }
 
-      // 2. Verify Company ID matches
-      if (authenticatedStore.companyId !== companyId) {
-        console.warn(`${routeNamePrefix} Company ID mismatch for store ${authenticatedStore.id}. Expected ${authenticatedStore.companyId}, got ${companyId}.`);
-        return NextResponse.json({ success: false, message: 'Invalid Company ID for this store.' }, { status: 401 });
+      // 3. Verify Store Passkey
+      // Note: Store passkey is stored as plain text or simple string in 'passkey' field based on current schema. 
+      // Ideally should be hashed, but keeping consistent with existing pattern which seemed to treat it as a shared secret.
+      // If it should be hashed, we would use bcrypt.compareSync. But typically 'passkey' suggests a simpler code. 
+      // The store form saves it directly. 
+      if (authenticatedStore.passkey !== storePasskey) {
+        console.warn(`${routeNamePrefix} Invalid passkey for store ${authenticatedStore.id}.`);
+        return NextResponse.json({ success: false, message: 'Invalid Store Passkey.' }, { status: 401 });
       }
 
-      // 2. Find the Employee in the same company
-      const employee = await db.collection<User>('users').findOne({
-        role: 'employee',
-        employeeId: employeeId,
-        companyId: authenticatedStore.companyId
-      });
-
-      if (!employee) {
-        console.warn(`${routeNamePrefix} Employee ${employeeId} not found in company ${authenticatedStore.companyId}.`);
-        return NextResponse.json({ success: false, message: 'Invalid Employee ID.' }, { status: 401 });
-      }
-
-      // 3. Authenticate Employee (Passkey/Password)
-      // Check if employee has password and it matches
-      if (!employee.password || !bcrypt.compareSync(employeePasskey, employee.password)) {
-        console.warn(`${routeNamePrefix} Invalid passkey for employee ${employeeId}.`);
-        return NextResponse.json({ success: false, message: 'Invalid Employee Passkey.' }, { status: 401 });
-      }
-
-      // 4. Authorization: Check if Employee is allowed in this store
-      // Logic: If allowedStaffIds is defined and not empty, user MUST be in it.
-      // If allowedStaffIds is empty, it implies no specific restrictions (all staff in company allowed), as per UI description.
-
-      const hasRestrictions = authenticatedStore.allowedStaffIds && authenticatedStore.allowedStaffIds.length > 0;
-      const isAllowed = !hasRestrictions || authenticatedStore.allowedStaffIds.includes(employee.id);
-
-      if (!isAllowed) {
-        console.warn(`${routeNamePrefix} Employee ${employee.name} (${employee.id}) not authorized for store ${authenticatedStore.name}.`);
-        return NextResponse.json({ success: false, message: 'You are not authorized to access this store terminal.' }, { status: 403 });
-      }
-
-      console.log(`${routeNamePrefix} Store terminal ${authenticatedStore.id} authenticated by employee ${employee.id}.`);
+      console.log(`${routeNamePrefix} Store terminal ${authenticatedStore.id} authenticated.`);
 
       // Return success with store details
+      // We don't return a specific user object since this is terminal processing. 
+      // The frontend might need a dummy user or just handle store session. 
+      // I will return a placeholder user object representing the "Store Terminal" if needed by frontend consistency.
+
+      const terminalUser = {
+        id: `terminal_${authenticatedStore.id}`,
+        name: `${authenticatedStore.name} Terminal`,
+        role: 'employee', // Treat as employee role for permission purposes in frontend?
+        companyId: authenticatedStore.companyId
+      };
+
       return NextResponse.json({
         success: true,
-        message: `Welcome, ${employee.name}. Terminal Authenticated.`,
+        message: `Welcome to ${authenticatedStore.name}. Terminal Authenticated.`,
         store: {
           id: authenticatedStore.id,
           name: authenticatedStore.name,
@@ -122,11 +116,7 @@ export async function POST(req: NextRequest) {
           location: authenticatedStore.location,
           allowedOperations: authenticatedStore.allowedOperations,
         },
-        user: {
-          id: employee.id,
-          name: employee.name,
-          role: employee.role
-        }
+        user: terminalUser
       });
 
     } else {

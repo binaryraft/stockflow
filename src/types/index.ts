@@ -146,6 +146,7 @@ export interface Store {
   id: string;
   companyId: string;
   name: string;
+  username: string; // Unique username for login
   location: string;
   phone: string;
   email: string;

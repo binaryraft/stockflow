@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { storeData, companyId } = body;
 
-    if (!companyId || !storeData || !storeData.name || !storeData.location || !storeData.passkey || !storeData.email || !storeData.phone) {
-      return NextResponse.json({ success: false, message: 'Complete store data and Company ID are required.' }, { status: 400 });
+    if (!companyId || !storeData || !storeData.name || !storeData.username || !storeData.location || !storeData.passkey || !storeData.email || !storeData.phone) {
+      return NextResponse.json({ success: false, message: 'Complete store data, including Username, and Company ID are required.' }, { status: 400 });
     }
 
     const company = await db.collection<Company>('companies').findOne({ id: companyId });
@@ -42,8 +42,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: `Store limit reached for your current plan.` }, { status: 403 });
     }
 
-    // Generate a unique 6-digit access code
-    // Generate a unique 6-digit access code
+    // Check username uniqueness within company (?) or global?
+    // "make sure the admin dont contain same store usernames" implies per company/admin.
+    // However, for login we use (Admin Email + Store Username). So uniqueness per Company is sufficient.
+    const existingUsername = await db.collection<Store>('stores').findOne({ companyId, username: storeData.username.trim() });
+    if (existingUsername) {
+      return NextResponse.json({ success: false, message: 'Store Username already exists in your company. Please choose another.' }, { status: 400 });
+    }
+
+    // Generate a unique 6-digit access code (Legacy support or secondary method)
     let accessCode = '';
     let isUnique = false;
     let attempts = 0;
@@ -62,11 +69,12 @@ export async function POST(req: NextRequest) {
       id: `store_${uuidv4()}`,
       companyId: companyId,
       name: storeData.name.trim(),
+      username: storeData.username.trim(),
       location: storeData.location.trim(),
       email: storeData.email.toLowerCase(),
       phone: storeData.phone.trim(),
       accessCode: accessCode,
-      passkey: storeData.passkey, // Keeping generic passkey as fallback/admin key if needed, or just legacy
+      passkey: storeData.passkey,
       allowedStaffIds: Array.isArray(storeData.allowedStaffIds) ? storeData.allowedStaffIds : [],
       allowedOperations: storeData.allowedOperations,
     };

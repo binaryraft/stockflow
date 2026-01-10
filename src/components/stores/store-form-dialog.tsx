@@ -29,6 +29,7 @@ const billModeSchema = z.enum(['sell', 'buy', 'return']);
 
 const storeFormSchema = z.object({
   name: z.string().min(2, { message: "Store name must be at least 2 characters." }),
+  username: z.string().min(3, { message: "Username must be at least 3 characters." }).regex(/^[a-z0-9_]+$/, "Username must be lowercase, alphanumeric, and underscores only."),
   location: z.string().min(3, { message: "Location must be at least 3 characters." }),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
@@ -67,7 +68,7 @@ export function StoreFormDialog({
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StoreFormData>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: {
-      name: '', location: '', email: '', phone: '', passkey: '',
+      name: '', username: '', location: '', email: '', phone: '', passkey: '',
       allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
     },
   });
@@ -87,12 +88,12 @@ export function StoreFormDialog({
       }
       if (editingStore) {
         reset({
-          name: editingStore.name, location: editingStore.location, email: editingStore.email, phone: editingStore.phone, passkey: '',
+          name: editingStore.name, username: editingStore.username || '', location: editingStore.location, email: editingStore.email, phone: editingStore.phone, passkey: '',
           allowedStaffIds: editingStore.allowedStaffIds || [], allowedOperations: editingStore.allowedOperations || ['sell', 'buy', 'return'],
         });
       } else {
         reset({
-          name: '', location: '', email: '', phone: '', passkey: '', allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
+          name: '', username: '', location: '', email: '', phone: '', passkey: '', allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
         });
       }
     }
@@ -109,7 +110,7 @@ export function StoreFormDialog({
       return;
     }
     const storePayload: Partial<Omit<Store, 'id' | 'companyId'>> = {
-      name: data.name, location: data.location, email: data.email, phone: data.phone,
+      name: data.name, username: data.username, location: data.location, email: data.email, phone: data.phone,
       allowedStaffIds: data.allowedStaffIds || [], allowedOperations: data.allowedOperations,
     };
     if (passkeyToSubmit && passkeyToSubmit.length >= 4) (storePayload as any).passkey = passkeyToSubmit;
@@ -138,25 +139,41 @@ export function StoreFormDialog({
           </DialogTitle>
           <DialogDescription>Fill in the store details. Fields marked with * are required.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 p-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
                 {editingStore && editingStore.accessCode && (
-                  <div className="p-3 mb-4 bg-primary/10 border border-primary/20 rounded-md">
-                    <Label className="text-xs text-primary font-bold uppercase tracking-wider block mb-1">Store Access Code</Label>
-                    <div className="flex items-center gap-2">
-                      <code className="text-2xl font-mono font-bold text-primary tracking-[0.2em]">{editingStore.accessCode}</code>
-                      <span className="text-xs text-muted-foreground ml-auto">(Use this for Terminal Login)</span>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
+                      <Label className="text-xs text-primary font-bold uppercase tracking-wider block mb-1">Store Username</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="text-lg font-mono font-bold text-primary">{editingStore.username || 'N/A'}</code>
+                      </div>
+                    </div>
+                    <div className="p-3 bg-muted border border-muted-foreground/20 rounded-md">
+                      <Label className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Access Code</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="text-lg font-mono font-bold text-muted-foreground tracking-[0.2em]">{editingStore.accessCode}</code>
+                      </div>
                     </div>
                   </div>
                 )}
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14} />Store Name*</Label>
-                  <Input id="name" {...register("name")} />
-                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14} />Store Name*</Label>
+                    <Input id="name" {...register("name")} />
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
+                    <Input id="username" {...register("username")} placeholder="Unique ID for login" disabled={!!editingStore} />
+                    {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
+                  </div>
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location*</Label>
                   <Input id="location" {...register("location")} />
@@ -213,7 +230,7 @@ export function StoreFormDialog({
                   <div className="space-y-2 pt-2">
                     <Label className="flex items-center gap-1.5"><UserIcon size={14} />Allowed Staff (Optional)</Label>
                     <p className="text-xs text-muted-foreground -mt-1">Select specific staff members allowed to access this store. If none are selected, any assigned staff can access it.</p>
-                    <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
+                    <div className="h-32 border rounded-md p-3 bg-tertiary/50 overflow-y-auto">
                       <div className="space-y-2">
                         {allStaff.map((staff) => (
                           <div key={staff.id} className="flex items-center space-x-2">
@@ -225,13 +242,13 @@ export function StoreFormDialog({
                           </div>
                         ))}
                       </div>
-                    </ScrollArea>
+                    </div>
                     {errors.allowedStaffIds && <p className="text-sm text-destructive mt-1">{errors.allowedStaffIds.message}</p>}
                   </div>
                 )}
               </div>
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
             <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
             <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
