@@ -69,8 +69,13 @@ export function StaffFormDialog({
   useEffect(() => {
     if (isOpen) {
       if (editingStaff) {
+        // Check if password seems hashed (bcrypt hashes start with $2 and are 60 chars)
+        const isHashed = editingStaff.password && editingStaff.password.startsWith('$2') && editingStaff.password.length === 60;
+        const passwordToDisplay = isHashed ? '' : (editingStaff.password || '');
+
         reset({
-          name: editingStaff.name, email: editingStaff.email, phone: editingStaff.phone || '', password: '',
+          name: editingStaff.name, email: editingStaff.email, phone: editingStaff.phone || '',
+          password: passwordToDisplay,
           assignedStoreIds: editingStaff.assignedStoreIds || [],
         });
       } else {
@@ -110,6 +115,8 @@ export function StaffFormDialog({
     }
   };
 
+  const isHashedPassword = editingStaff?.password && editingStaff.password.startsWith('$2') && editingStaff.password.length === 60;
+
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) reset(); onOpenChange(open); }}>
       <DialogContent className="sm:max-w-xl flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
@@ -123,7 +130,7 @@ export function StaffFormDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
-          <ScrollArea className="flex-1 p-6">
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="space-y-6">
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-muted-foreground">STAFF INFORMATION</h4>
@@ -155,8 +162,16 @@ export function StaffFormDialog({
               <div className="space-y-4">
                 <h4 className="text-sm font-semibold text-muted-foreground">AUTHENTICATION</h4>
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="flex items-center gap-1.5"><KeyRound size={14} />Password*{editingStaff ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
-                  <Input id="password" type="password" {...register("password")} placeholder={editingStaff ? "Enter new password to change" : "Min. 6 characters"} />
+                  <Label htmlFor="password" className="flex items-center gap-1.5"><KeyRound size={14} />Password*
+                    {editingStaff && <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span>}
+                  </Label>
+                  <Input
+                    id="password"
+                    type="text"
+                    {...register("password")}
+                    placeholder={editingStaff ? (isHashedPassword ? "Hidden (Security). Enter new to change." : "Enter password") : "Min. 6 characters"}
+                    className="font-mono"
+                  />
                   {errors.password && <p className="text-sm text-destructive mt-1">{errors.password.message}</p>}
                 </div>
               </div>
@@ -171,7 +186,7 @@ export function StaffFormDialog({
                       <p className="text-xs text-muted-foreground -mt-1">
                         Select stores this staff member can access.
                       </p>
-                      <ScrollArea className="h-32 border rounded-md p-3 bg-tertiary/50">
+                      <div className="h-32 border rounded-md p-3 bg-tertiary/50 overflow-y-auto">
                         <div className="space-y-2">
                           {allStores.map((store) => (
                             <div key={store.id} className="flex items-center space-x-2">
@@ -189,14 +204,14 @@ export function StaffFormDialog({
                             </div>
                           ))}
                         </div>
-                      </ScrollArea>
+                      </div>
                       {errors.assignedStoreIds && <p className="text-sm text-destructive mt-1">{errors.assignedStoreIds.message}</p>}
                     </div>
                   </div>
                 </>
               )}
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>

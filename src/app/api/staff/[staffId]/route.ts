@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import type { User, Store } from '@/types'; 
+import type { User, Store } from '@/types';
 import bcrypt from 'bcryptjs';
 
 const SALT_ROUNDS = 10;
@@ -17,12 +17,12 @@ export async function GET(req: NextRequest, { params }: { params: { staffId: str
     if (!companyId || !staffId) return NextResponse.json({ success: false, message: 'Company and Staff ID are required.' }, { status: 400 });
 
     const staffMember = await db.collection<User>('users').findOne(
-      { id: staffId, role: 'employee', companyId: companyId },
-      { projection: { password: 0 } }
+      { id: staffId, role: 'employee', companyId: companyId }
+      // Removed projection to expose password as per request
     );
 
     if (!staffMember) return NextResponse.json({ success: false, message: 'Staff member not found.' }, { status: 404 });
-    
+
     return NextResponse.json({ success: true, data: staffMember });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
@@ -46,8 +46,9 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
     delete updateFields.companyId;
     delete updateFields.role;
 
+    // Store as plain text as per request
     if (staffData.password && staffData.password.trim() !== "") {
-      updateFields.password = bcrypt.hashSync(staffData.password, SALT_ROUNDS);
+      updateFields.password = staffData.password;
     } else {
       delete updateFields.password;
     }
@@ -58,8 +59,8 @@ export async function PUT(req: NextRequest, { params }: { params: { staffId: str
     );
 
     if (result.matchedCount === 0) return NextResponse.json({ success: false, message: 'Staff member not found.' }, { status: 404 });
-    
-    const updatedStaff = await db.collection<User>('users').findOne({ id: staffId }, { projection: { password: 0 } });
+
+    const updatedStaff = await db.collection<User>('users').findOne({ id: staffId });
     return NextResponse.json({ success: true, data: updatedStaff });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';

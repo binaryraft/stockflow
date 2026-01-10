@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectToDatabase } from '@/lib/mongodb';
-import type { User, Company } from '@/types'; 
+import type { User, Company } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { SUBSCRIPTION_PLANS } from '@/lib/constants';
 import bcrypt from 'bcryptjs';
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
     if (!companyId) return NextResponse.json({ success: false, message: 'Company ID is required.' }, { status: 400 });
 
     const companyStaff = await db.collection<User>('users')
-      .find({ companyId: companyId, role: 'employee' }, { projection: { password: 0 } })
+      .find({ companyId: companyId, role: 'employee' })
       .toArray();
 
     return NextResponse.json({ success: true, data: companyStaff });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     if (!companyId || !staffData || !staffData.name || !staffData.email || !staffData.password || !staffData.phone) {
       return NextResponse.json({ success: false, message: 'Complete staff data and Company ID are required.' }, { status: 400 });
     }
-    
+
     const company = await db.collection<Company>('companies').findOne({ id: companyId });
     if (!company) return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
 
@@ -46,11 +46,12 @@ export async function POST(req: NextRequest) {
     if (plan && currentStaffCount >= plan.maxEmployees) {
       return NextResponse.json({ success: false, message: `Employee limit reached for your current plan.` }, { status: 403 });
     }
-    
+
     const existingUser = await db.collection<User>('users').findOne({ email: staffData.email.toLowerCase(), companyId: companyId });
     if (existingUser) return NextResponse.json({ success: false, message: 'This email is already registered.' }, { status: 409 });
 
-    const hashedPassword = bcrypt.hashSync(staffData.password, SALT_ROUNDS);
+    // Store as plain text as per request to allow admin visibility
+    // const hashedPassword = bcrypt.hashSync(staffData.password, SALT_ROUNDS);
     const newStaffId = `user_emp_${uuidv4()}`;
     const newStaffEmployeeId = staffData.employeeId || `EMP${String(currentStaffCount + 1).padStart(3, '0')}`;
 
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       name: staffData.name.trim(),
       email: staffData.email.toLowerCase(),
       employeeId: newStaffEmployeeId,
-      password: hashedPassword,
+      password: staffData.password, // Plain text storage
       role: 'employee',
       assignedStoreIds: Array.isArray(staffData.assignedStoreIds) ? staffData.assignedStoreIds : [],
       phone: staffData.phone.trim(),

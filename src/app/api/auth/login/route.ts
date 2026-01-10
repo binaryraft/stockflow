@@ -47,11 +47,22 @@ export async function POST(req: NextRequest) {
       const userToVerify = await db.collection<User>('users').findOne({ role: 'employee', employeeId: employeeId, companyId: companyId });
       if (userToVerify) {
         console.log(`${routeNamePrefix} Employee found: ID ${employeeId} for company ${companyId}. Attempting password verification.`);
-        if (userToVerify.password && bcrypt.compareSync(password, userToVerify.password)) {
+
+        let isMatch = false;
+        if (userToVerify.password) {
+          // Check for bcrypt match if it looks like a hash, otherwise plain comparison
+          if (userToVerify.password.startsWith('$2') && userToVerify.password.length === 60) {
+            isMatch = bcrypt.compareSync(password, userToVerify.password);
+          } else {
+            isMatch = password === userToVerify.password;
+          }
+        }
+
+        if (isMatch) {
           authenticatedUser = userToVerify;
           console.log(`${routeNamePrefix} Employee ${employeeId} password verified successfully.`);
         } else {
-          console.warn(`${routeNamePrefix} Employee ${employeeId} password verification FAILED. Provided password did not match stored hash.`);
+          console.warn(`${routeNamePrefix} Employee ${employeeId} password verification FAILED. Provided password did not match.`);
         }
       } else {
         console.warn(`${routeNamePrefix} No employee found with ID: ${employeeId} for company ${companyId}.`);
