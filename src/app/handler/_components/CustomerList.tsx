@@ -3,13 +3,13 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import type { Company, User, SubscriptionType } from '@/types';
-import { getCustomers, markAsPaid } from '../actions';
+import { getCustomers, markAsPaid, approveSubscriptionChange, rejectSubscriptionChange } from '../actions';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Check, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface CustomerData {
@@ -38,11 +38,34 @@ export function CustomerList() {
       const result = await markAsPaid(companyId, subscriptionType);
       if (result.success) {
         toast({ title: 'Success', description: `Company ${companyId} marked as paid.` });
-        // Refresh the list
         await fetchAndSetCustomers();
       } else {
         toast({ variant: 'destructive', title: 'Error', description: result.error });
       }
+    });
+  };
+
+  const handleApproveSubscription = (companyId: string) => {
+    startUpdateTransition(async () => {
+        const result = await approveSubscriptionChange(companyId);
+        if (result.success) {
+            toast({ title: 'Approved', description: 'Subscription change approved.' });
+            await fetchAndSetCustomers();
+        } else {
+            toast({ variant: 'destructive', title: 'Error', description: result.error });
+        }
+    });
+  };
+
+  const handleRejectSubscription = (companyId: string) => {
+    startUpdateTransition(async () => {
+        const result = await rejectSubscriptionChange(companyId);
+        if (result.success) {
+            toast({ title: 'Rejected', description: 'Subscription change rejected.' });
+            await fetchAndSetCustomers();
+        } else {
+             toast({ variant: 'destructive', title: 'Error', description: result.error });
+        }
     });
   };
 
@@ -82,6 +105,20 @@ export function CustomerList() {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-gray-900 dark:text-white">{company.activeSubscriptionId}</div>
                   <div className="text-sm text-gray-500 capitalize">{company.subscriptionType}</div>
+                  {company.pendingSubscriptionId && (
+                      <div className="mt-2 p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-200 dark:border-amber-800">
+                          <div className="text-xs font-semibold text-amber-800 dark:text-amber-400">Requesting:</div>
+                          <div className="text-xs text-amber-900 dark:text-amber-300 font-medium">{company.pendingSubscriptionId}</div>
+                          <div className="flex gap-1 mt-1">
+                              <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleApproveSubscription(company.id)} disabled={isUpdating}>
+                                  <Check className="h-3 w-3 text-green-600" />
+                              </Button>
+                               <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleRejectSubscription(company.id)} disabled={isUpdating}>
+                                  <X className="h-3 w-3 text-red-600" />
+                              </Button>
+                          </div>
+                      </div>
+                  )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                     {company.paymentStatus === 'paid' ? (

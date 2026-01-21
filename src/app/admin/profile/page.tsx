@@ -180,7 +180,11 @@ export default function ProfilePage() {
         const updatedCompany = await updateUserProfileFields({ activeSubscriptionId: planId }, currentCompanyId); 
         if (updatedCompany) {
             const selectedPlanDetails = SUBSCRIPTION_PLANS.find(p => p.id === planId);
-            toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
+            if (updatedCompany.pendingSubscriptionId === planId) {
+                toast({ title: 'Request Sent', description: `Your request to switch to ${selectedPlanDetails?.name} is pending admin approval.` });
+            } else {
+                toast({ title: 'Subscription Updated', description: `Your plan has been changed to ${selectedPlanDetails?.name}.` });
+            }
         } else {
             throw new Error("Failed to update subscription on server.");
         }
@@ -358,12 +362,18 @@ export default function ProfilePage() {
                     </Button>
                 ) : (
                     <Button
-                    className={cn("w-full", currentActivePlan?.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : "bg-secondary hover:bg-secondary/90 text-secondary-foreground")}
+                    className={cn("w-full", 
+                        currentActivePlan?.id === plan.id ? "bg-primary/80 hover:bg-primary/70" : 
+                        userProfile.pendingSubscriptionId === plan.id ? "bg-amber-500 hover:bg-amber-600 text-white" :
+                        "bg-secondary hover:bg-secondary/90 text-secondary-foreground"
+                    )}
                     onClick={() => handleSubscriptionSelect(plan.id)}
-                    disabled={currentActivePlan?.id === plan.id || isUpdatingSubscription}
+                    disabled={currentActivePlan?.id === plan.id || isUpdatingSubscription || (!!userProfile.pendingSubscriptionId && userProfile.pendingSubscriptionId !== plan.id)}
                     >
-                    {isUpdatingSubscription && currentActivePlan?.id !== plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    {currentActivePlan?.id === plan.id ? 'Current Plan' : (isUpdatingSubscription ? 'Updating...' : 'Choose Plan')}
+                    {isUpdatingSubscription && currentActivePlan?.id !== plan.id && userProfile.pendingSubscriptionId !== plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {currentActivePlan?.id === plan.id ? 'Current Plan' : 
+                        userProfile.pendingSubscriptionId === plan.id ? 'Pending Approval' :
+                        (isUpdatingSubscription ? 'Updating...' : 'Choose Plan')}
                     </Button>
                 )}
               </CardFooter>

@@ -527,7 +527,7 @@ export const useInventoryStore = create<InventoryState>()(
                 activeSubscriptionId: companyData.activeSubscriptionId, defaultBillNotes: companyData.defaultBillNotes,
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus, defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
                 companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE, paymentStatus: companyData.paymentStatus,
-                subscriptionExpiryDate: companyData.subscriptionExpiryDate, dataMode: 'global', creationDate: companyData.creationDate,
+                subscriptionExpiryDate: companyData.subscriptionExpiryDate, pendingSubscriptionId: companyData.pendingSubscriptionId, dataMode: 'global', creationDate: companyData.creationDate,
               }
             }));
             return companyData;

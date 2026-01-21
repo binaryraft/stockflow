@@ -46,6 +46,15 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
         return NextResponse.json({ success: false, message: 'Invalid subscription plan ID.' }, { status: 400 });
     }
 
+    // Intercept subscription change to require admin approval
+    if (updateableData.activeSubscriptionId) {
+        const currentCompany = await db.collection<Company>('companies').findOne({ id: companyId });
+        if (currentCompany && currentCompany.activeSubscriptionId !== updateableData.activeSubscriptionId) {
+            updateableData.pendingSubscriptionId = updateableData.activeSubscriptionId;
+            delete updateableData.activeSubscriptionId; // Do not update active plan immediately
+        }
+    }
+
     const result = await db.collection<Company>('companies').updateOne({ id: companyId }, { $set: updateableData });
     
     if (result.matchedCount === 0) return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });

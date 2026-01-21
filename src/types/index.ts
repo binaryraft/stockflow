@@ -128,6 +128,7 @@ export interface Company {
   creationDate?: string;
   subscriptionStartDate?: string | null;
   subscriptionExpiryDate?: string | null;
+  pendingSubscriptionId?: string | null;
 }
 
 export interface User {
@@ -182,6 +183,7 @@ export interface UserProfile {
   companyCurrency?: string;
   paymentStatus?: PaymentStatus;
   subscriptionExpiryDate?: string | null;
+  pendingSubscriptionId?: string | null;
 }
 
 export interface ChatMessage {

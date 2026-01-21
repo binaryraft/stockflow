@@ -66,3 +66,48 @@ export async function markAsPaid(companyId: string, subscriptionType: Subscripti
     return { success: false, error: `Failed to save update to database: ${message}` };
   }
 }
+
+export async function approveSubscriptionChange(companyId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    const company = await db.collection<Company>('companies').findOne({ id: companyId });
+    
+    if (!company) return { success: false, error: 'Company not found.' };
+    if (!company.pendingSubscriptionId) return { success: false, error: 'No pending subscription to approve.' };
+
+    const result = await db.collection<Company>('companies').updateOne(
+      { id: companyId },
+      { 
+        $set: { activeSubscriptionId: company.pendingSubscriptionId },
+        $unset: { pendingSubscriptionId: "" }
+      }
+    );
+
+    if (result.matchedCount === 0) return { success: false, error: 'Failed to update company.' };
+
+    return { success: true };
+  } catch (e) {
+    console.error("Failed to approve subscription:", e);
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return { success: false, error: `Failed to approve: ${message}` };
+  }
+}
+
+export async function rejectSubscriptionChange(companyId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    
+    const result = await db.collection<Company>('companies').updateOne(
+      { id: companyId },
+      { $unset: { pendingSubscriptionId: "" } }
+    );
+
+    if (result.matchedCount === 0) return { success: false, error: 'Company not found.' };
+
+    return { success: true };
+  } catch (e) {
+    console.error("Failed to reject subscription:", e);
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return { success: false, error: `Failed to reject: ${message}` };
+  }
+}
