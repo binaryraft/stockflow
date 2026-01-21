@@ -52,6 +52,7 @@ interface BillingFormProps {
   isAdminContext?: boolean;
   preselectedStoreId?: string | null;
   companyId?: string | null;
+  redirectBasePath?: string;
 }
 
 export function BillingForm({
@@ -61,6 +62,7 @@ export function BillingForm({
   isAdminContext = false,
   preselectedStoreId,
   companyId: companyIdFromProp,
+  redirectBasePath,
 }: BillingFormProps) {
   const router = useRouter();
   const searchParamsHook = useSearchParams();
@@ -1033,9 +1035,9 @@ export function BillingForm({
     setLastSavedBillIsEstimate(false);
     resetFullForm();
 
-    if (isAdminContext) {
+    if (isAdminContext || redirectBasePath) {
       const currentQueryModeInUrl = searchParamsHook.get('mode');
-      const basePath = '/admin/billing';
+      const basePath = redirectBasePath || '/admin/billing';
       if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
       } else {
         router.push(basePath);
@@ -1053,7 +1055,7 @@ export function BillingForm({
     if (newMode !== mode) {
       resetFullForm();
       setMode(newMode);
-      const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
+      const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
       router.push(`${basePath}?mode=${newMode}`, { scroll: false });
     }
   };
