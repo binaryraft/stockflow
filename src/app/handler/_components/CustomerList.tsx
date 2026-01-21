@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Loader2, Check, X } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface CustomerData {
   company: Company;
@@ -70,7 +71,11 @@ export function CustomerList() {
   };
 
   if (isLoading) {
-    return <div className="text-center p-8">Loading customer data...</div>;
+    return (
+      <div className="flex items-center justify-center p-12 bg-card rounded-lg shadow-md">
+        <LoadingSpinner text="Loading customer data..." />
+      </div>
+    );
   }
 
   return (

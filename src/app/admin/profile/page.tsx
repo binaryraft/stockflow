@@ -15,6 +15,7 @@ import { CheckCircle, Edit3, Save, User, BadgeCheck, Mail, Building, Phone, File
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 import NextImage from 'next/image'; 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface EditableProfileFieldProps {
   fieldId: keyof Omit<Company, 'id' | 'token' | 'activeSubscriptionId'>; // Exclude fields not directly editable here
@@ -200,9 +201,8 @@ export default function ProfilePage() {
 
   if (!hasMounted || isLoadingProfile || !userProfile || !currentCompanyId) {
     return (
-      <div className="flex flex-1 flex-col items-center justify-center p-4">
-        <User className="h-12 w-12 text-muted-foreground mb-4 animate-pulse" />
-        <p className="text-lg text-muted-foreground">Loading profile & subscription information...</p>
+      <div className="flex flex-1 flex-col items-center justify-center p-8">
+        <LoadingSpinner text="Loading profile & subscription information..." />
       </div>
     );
   }

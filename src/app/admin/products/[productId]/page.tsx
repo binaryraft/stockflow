@@ -19,6 +19,7 @@ import { getCurrencySymbol } from '@/lib/utils';
 import { ProductFinancialsChart } from '@/components/products/ProductFinancialsChart';
 import { ProductSummaryCard } from '@/components/products/ProductSummaryCard';
 import { StockLevelsCard } from '@/components/products/StockLevelsCard';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 
 function getQuantityAndContextualInfoInBill(bill: Bill, productId: string): { quantity: number; label: string; colorClass: string } {
@@ -79,7 +80,11 @@ export default function ProductDetailsPage() {
   }, [productId, getProductById, getBillsForProduct, getProductAnalytics]);
 
   if (isLoading) {
-    return <div className="flex-1 flex items-center justify-center">Loading product details...</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <LoadingSpinner text="Loading product details..." />
+      </div>
+    );
   }
 
   if (!product) {

@@ -10,6 +10,7 @@ import { AppBlocker } from '@/components/layout/AppBlocker';
 import { CompanyRecoveryDialog } from '@/components/auth/CompanyRecoveryDialog';
 import type { PaymentStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -117,15 +118,15 @@ export default function AdminLayout({
   }, [hasMounted, checkAuthAndSubscription]);
 
   const loadingScreen = (message: string) => (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
+    <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <Image
         src="/logo.svg"
         alt={`${APP_NAME} Logo`}
         width={80}
         height={80}
-        className="mb-6 animate-pulse"
+        className="mb-8 animate-pulse"
       />
-      <p className="text-lg text-muted-foreground">{message}</p>
+      <LoadingSpinner text={message} size={60} />
     </div>
   );
 

@@ -8,6 +8,7 @@ import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/utils';
 import type { TimePeriod } from '@/types';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface ProductFinancialData {
   name: string; 
@@ -78,7 +79,11 @@ export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
   }, [getTopProfitableProducts, period]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><p>Loading chart data...</p></div>;
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner size={32} />
+      </div>
+    );
   }
   
   if (chartData.length === 0) {

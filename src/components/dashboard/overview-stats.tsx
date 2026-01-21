@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { TodaysFinancialSummary, TimePeriod } from '@/types'; 
 import { getCurrencySymbol } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const LOW_STOCK_THRESHOLD = 5;
 
@@ -94,6 +95,18 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     });
     setIsLoading(false);
   }, [products, getLowStockProductCount, getPeriodFinancialSummary, currencySymbol, getAllCustomers, period]);
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 col-span-4">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="h-32 border rounded-xl flex items-center justify-center bg-card">
+            <LoadingSpinner size={24} />
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

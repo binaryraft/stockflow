@@ -8,6 +8,7 @@ import { ChartConfig, ChartContainer } from '@/components/ui/chart';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { getCurrencySymbol } from '@/lib/utils';
 import type { TimePeriod, ProductRevenueData } from '@/types';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const chartConfig = {
   revenue: {
@@ -55,7 +56,11 @@ export function TopProductsChart({ period }: { period: TimePeriod }) {
   }, [getTopSellingProductsByRevenue, period]);
 
   if (isLoading) {
-    return <div className="flex items-center justify-center h-full"><p>Loading chart data...</p></div>;
+    return (
+      <div className="flex items-center justify-center h-full">
+        <LoadingSpinner size={32} />
+      </div>
+    );
   }
   
   if (chartData.length === 0) {

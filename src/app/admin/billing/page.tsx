@@ -19,6 +19,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, subMonths, subYears } from 'date-fns';
 import type { DateRange } from "react-day-picker";
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 
 type BillingView = 'history' | 'ledger' | 'new';
@@ -320,9 +321,8 @@ function BillingContent() {
 }
 
 const LoadingFallback = () => (
-  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
-    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-    <p className="text-muted-foreground">Loading Billing Information...</p>
+  <div className="flex-1 flex items-center justify-center p-12">
+    <LoadingSpinner text="Loading Billing Information..." />
   </div>
 );
 

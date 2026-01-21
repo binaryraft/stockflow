@@ -32,6 +32,7 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
@@ -306,7 +307,11 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   };
 
   if (isLoading) {
-    return <div className="flex-1 flex items-center justify-center p-6">Loading bill history...</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <LoadingSpinner text="Loading bill history..." />
+      </div>
+    );
   }
   if (!currentCompanyId && !isLoading) {
     return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load bills.</div>;
@@ -744,7 +749,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">Loading bills...</TableCell>
+                <TableCell colSpan={9} className="h-48 text-center">
+                  <LoadingSpinner text="Loading bills..." size={40} />
+                </TableCell>
               </TableRow>
             ) : filteredAndSortedBills.length > 0 ? (
               filteredAndSortedBills.map((bill) => {
@@ -869,7 +876,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
         {isLoading ? (
-          <div className="flex justify-center items-center py-10"><p className="text-muted-foreground">Loading bills...</p></div>
+          <div className="flex justify-center items-center py-10">
+            <LoadingSpinner text="Loading bills..." size={40} />
+          </div>
         ) : filteredAndSortedBills.length > 0 ? (
           filteredAndSortedBills.map((bill) => {
             const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);

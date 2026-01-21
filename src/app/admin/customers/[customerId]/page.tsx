@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { getCurrencySymbol } from '@/lib/utils';
 import { StatCard } from '@/components/dashboard/stat-card';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 
 interface CustomerAnalytics {
@@ -97,7 +98,11 @@ export default function CustomerDetailsPage() {
 
 
   if (isLoading) {
-    return <div className="flex-1 flex items-center justify-center">Loading customer details...</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <LoadingSpinner text="Loading customer details..." />
+      </div>
+    );
   }
 
   if (!customer) {

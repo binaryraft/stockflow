@@ -28,6 +28,7 @@ import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { getCurrencySymbol } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type SortableColumns = 'name' | 'category' | 'stock' | 'costPrice' | 'sellPrice' | 'sku' | 'expiryDate';
 
@@ -246,7 +247,11 @@ export function ProductsTable() {
 
 
   if (isLoading && hasMounted) {
-    return <div className="flex-1 flex items-center justify-center p-6">Loading products...</div>;
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <LoadingSpinner text="Loading products..." />
+      </div>
+    );
   }
   if (!companyId && hasMounted) {
      return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load products.</div>;
@@ -405,7 +410,7 @@ export function ProductsTable() {
                         </DropdownMenuItem>
                         {!product.isArchived && (
                           <DropdownMenuItem asChild className="cursor-pointer">
-                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? `&isVariant=true`: ""}`} target="_blank">
+                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? \`&isVariant=true\`: ""}`} target="_blank">
                                 <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
                             </Link>
                           </DropdownMenuItem>
@@ -445,8 +450,8 @@ export function ProductsTable() {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-32 text-center text-muted-foreground">
-                  {isLoading ? "Loading products..." : (companyId ? (searchTerm ? "No products match your search." : "No products found. Add some to get started!") : "Company ID not available.")}
+                <TableCell colSpan={10} className="h-48 text-center">
+                  {isLoading ? <LoadingSpinner text="Loading products..." size={40} /> : (companyId ? (searchTerm ? "No products match your search." : "No products found. Add some to get started!") : "Company ID not available.")}
                 </TableCell>
               </TableRow>
             )}
@@ -508,8 +513,8 @@ export function ProductsTable() {
             )
           })
         ) : (
-          <div className="text-center py-10 text-muted-foreground">
-            {isLoading ? "Loading products..." : (searchTerm ? "No products match search" : "No products found.")}
+          <div className="text-center py-10">
+            {isLoading ? <LoadingSpinner text="Loading products..." size={40} /> : (searchTerm ? "No products match search" : "No products found.")}
           </div>
         )}
       </div>

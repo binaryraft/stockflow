@@ -23,6 +23,7 @@ import { BalanceSheet } from '@/components/accounting/BalanceSheet';
 import { generateReportPrintContent, triggerPrint } from '@/lib/print-utils';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import type { Store } from '@/types';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'thisFY' | 'lastFY' | 'all' | 'custom';
 type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
@@ -226,9 +227,8 @@ function AccountingPageContent() {
 }
 
 const LoadingFallback = () => (
-  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
-    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-    <p className="text-muted-foreground">Loading Accounting Reports...</p>
+  <div className="flex-1 flex items-center justify-center p-12">
+    <LoadingSpinner text="Loading Accounting Reports..." />
   </div>
 );
 

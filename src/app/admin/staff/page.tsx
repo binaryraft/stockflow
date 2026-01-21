@@ -4,12 +4,12 @@
 import React, { Suspense } from 'react';
 import { PageTitle } from '@/components/common/page-title';
 import { StaffTable } from '@/components/staff/staff-table';
-import { Loader2, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const LoadingFallback = () => (
-  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
-    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-    <p className="text-muted-foreground">Loading Staff...</p>
+  <div className="flex-1 flex items-center justify-center p-12">
+    <LoadingSpinner text="Loading Staff..." />
   </div>
 );
 

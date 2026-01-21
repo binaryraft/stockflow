@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { StoreLoginPageClient } from './page-client';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
-import { Loader2 } from 'lucide-react';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 function LoadingFallback() {
   return (
@@ -13,12 +13,9 @@ function LoadingFallback() {
         alt={`${APP_NAME} Logo`}
         width={64}
         height={64}
-        className="mb-3 animate-pulse"
+        className="mb-8 animate-pulse"
       />
-      <div className="flex items-center gap-2 text-lg text-muted-foreground">
-        <Loader2 className="h-6 w-6 animate-spin" />
-        <span>Loading Store Portal...</span>
-      </div>
+      <LoadingSpinner text="Loading Store Portal..." size={50} />
     </div>
   );
 }

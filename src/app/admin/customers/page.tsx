@@ -8,6 +8,7 @@ import { Contact, Loader2, PlusCircle } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 function CustomersContent() {
   const fetchCustomers = useInventoryStore((state) => state.fetchCustomers);
@@ -42,7 +43,11 @@ function CustomersContent() {
   };
   
   if (isLoading && companyId) {
-    return <div className="flex-1 flex items-center justify-center">Fetching customer data...</div>
+    return (
+      <div className="flex-1 flex items-center justify-center p-12">
+        <LoadingSpinner text="Fetching customer data..." />
+      </div>
+    );
   }
   if (!isLoading && !companyId) {
     return <div className="flex-1 flex items-center justify-center text-destructive">Could not load customers: Company ID missing.</div>
@@ -65,9 +70,8 @@ function CustomersContent() {
 }
 
 const LoadingFallback = () => (
-  <div className="flex-1 flex flex-col items-center justify-center p-6 gap-3">
-    <Loader2 className="h-8 w-8 text-primary animate-spin" />
-    <p className="text-muted-foreground">Loading Customers...</p>
+  <div className="flex-1 flex items-center justify-center p-12">
+    <LoadingSpinner text="Loading Customers..." />
   </div>
 );
 
