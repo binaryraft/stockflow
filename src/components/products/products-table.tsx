@@ -410,7 +410,7 @@ export function ProductsTable() {
                         </DropdownMenuItem>
                         {!product.isArchived && (
                           <DropdownMenuItem asChild className="cursor-pointer">
-                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? \`&isVariant=true\`: ""}`} target="_blank">
+                            <Link href={`/admin/billing?action=new&mode=buy&prefillProductId=${product.id}${isVariantProduct ? "&isVariant=true": ""}`} target="_blank">
                                 <PackageSearch className="mr-2 h-4 w-4" /> New Purchase Bill <ExternalLink className="ml-auto h-3 w-3 opacity-70"/>
                             </Link>
                           </DropdownMenuItem>
