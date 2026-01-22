@@ -14,8 +14,8 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign, BadgePercent, HandCoins, QrCode } from 'lucide-react';
-import { QRScannerModal } from '@/components/common/QRScannerModal';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign, BadgePercent, HandCoins } from 'lucide-react';
+import { UnifiedScannerModal } from '@/components/common/UnifiedScannerModal';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -374,7 +374,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const [isLoading, setIsLoading] = useState(false);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
-  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
 
   const isEditing = !!initialData;
@@ -545,18 +545,18 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   }
 
 
-  const handleQRScanned = (qrValue: string) => {
-    setValue('sku', qrValue);
-    setIsQRScannerOpen(false);
-    toast({ title: "QR Code Scanned", description: `Product code set to: ${qrValue}` });
+  const handleCodeScanned = (codeValue: string) => {
+    setValue('sku', codeValue);
+    setIsScannerOpen(false);
+    toast({ title: "Code Scanned", description: `Product code set to: ${codeValue}` });
   };
 
   return (
     <div className="space-y-6">
-      <QRScannerModal
-        isOpen={isQRScannerOpen}
-        onOpenChange={setIsQRScannerOpen}
-        onScan={handleQRScanned}
+      <UnifiedScannerModal
+        isOpen={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScan={handleCodeScanned}
         purpose="updateProductSku"
         productNameForUpdate={watch('name') || 'Product'}
       />
@@ -601,13 +601,13 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                             type="button"
                             variant="outline"
                             size="icon"
-                            onClick={() => setIsQRScannerOpen(true)}
-                            aria-label="Scan QR Code"
+                            onClick={() => setIsScannerOpen(true)}
+                            aria-label="Scan Barcode/QR"
                           >
-                            <QrCode className="h-5 w-5 text-primary" />
+                            <PackageSearch className="h-5 w-5 text-primary" />
                           </Button>
                         </TooltipTrigger>
-                        <TooltipContent><p>Scan QR Code for Product</p></TooltipContent>
+                        <TooltipContent><p>Scan Barcode/QR Code</p></TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   </div>

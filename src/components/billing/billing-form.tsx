@@ -15,7 +15,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, QrCode } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -28,8 +28,7 @@ import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
-import { HardwareBarcodeScanModal } from '@/components/common/HardwareBarcodeScanModal';
-import { QRScannerModal } from '@/components/common/QRScannerModal';
+import { UnifiedScannerModal } from '@/components/common/UnifiedScannerModal';
 import { DatePicker } from '@/components/ui/date-picker';
 
 
@@ -143,9 +142,8 @@ export function BillingForm({
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
 
-  const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
-  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
-  const [barcodeScanPurpose, setBarcodeScanPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [scannerPurpose, setScannerPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
   const [billDate, setBillDate] = useState<Date | undefined>(new Date());
@@ -678,32 +676,32 @@ export function BillingForm({
     }
   };
 
-  const handleBarcodeIconClick = () => {
+  const handleScannerIconClick = () => {
     if (currentProductForSelection) {
       setProductToUpdateSkuFor(currentProductForSelection);
-      setBarcodeScanPurpose('updateProductSku');
+      setScannerPurpose('updateProductSku');
     } else {
       setProductToUpdateSkuFor(null);
-      setBarcodeScanPurpose('addItem');
+      setScannerPurpose('addItem');
     }
-    setIsBarcodeModalOpen(true);
+    setIsScannerOpen(true);
   };
 
-  const handleBarcodeScannedFromModal = async (barcodeValue: string) => {
-    setIsBarcodeModalOpen(false);
+  const handleScannedFromModal = async (scannedValue: string) => {
+    setIsScannerOpen(false);
 
-    if (barcodeScanPurpose === 'addItem') {
-      await findAndPopulateProductByBarcode(barcodeValue);
-    } else if (barcodeScanPurpose === 'updateProductSku' && productToUpdateSkuFor) {
+    if (scannerPurpose === 'addItem') {
+      await findAndPopulateProductByBarcode(scannedValue);
+    } else if (scannerPurpose === 'updateProductSku' && productToUpdateSkuFor) {
       const productToUpdate = productToUpdateSkuFor;
       try {
         const updatedProduct = await updateProductInStore(
           productToUpdate.id,
-          { sku: barcodeValue },
+          { sku: scannedValue },
           companyId
         );
         if (updatedProduct) {
-          toast({ title: "Product SKU Updated", description: `Base SKU for ${updatedProduct.name} set to ${barcodeValue}.` });
+          toast({ title: "Product Code Updated", description: `Code for ${updatedProduct.name} set to ${scannedValue}.` });
           if (currentProductForSelection && currentProductForSelection.id === updatedProduct.id) {
             setCurrentProductForSelection(updatedProduct);
             setProductNameQuery(updatedProduct.name);
@@ -711,58 +709,14 @@ export function BillingForm({
             updateSkuDisplayInfo(skuToUse);
           }
         } else {
-          toast({ variant: "destructive", title: "Update Failed", description: "Could not update product SKU." });
+          toast({ variant: "destructive", title: "Update Failed", description: "Could not update product code." });
         }
       } catch (error) {
-        console.error("Error updating product SKU:", error);
-        toast({ variant: "destructive", title: "Error", description: "An error occurred while updating SKU." });
+        console.error("Error updating product code:", error);
+        toast({ variant: "destructive", title: "Error", description: "An error occurred while updating code." });
       }
     }
-    setBarcodeScanPurpose(null);
-    setProductToUpdateSkuFor(null);
-    productNameInputRef.current?.focus();
-  };
-
-  const handleQRIconClick = () => {
-    if (currentProductForSelection) {
-      setProductToUpdateSkuFor(currentProductForSelection);
-    } else {
-      setProductToUpdateSkuFor(null);
-    }
-    setIsQRScannerOpen(true);
-  };
-
-  const handleQRScannedFromModal = async (qrValue: string) => {
-    setIsQRScannerOpen(false);
-
-    if (currentProductForSelection && productToUpdateSkuFor) {
-      // Update product SKU with QR code
-      const productToUpdate = productToUpdateSkuFor;
-      try {
-        const updatedProduct = await updateProductInStore(
-          productToUpdate.id,
-          { sku: qrValue },
-          companyId
-        );
-        if (updatedProduct) {
-          toast({ title: "Product QR Updated", description: `QR code for ${updatedProduct.name} set to ${qrValue}.` });
-          if (currentProductForSelection.id === productToUpdate.id) {
-            setCurrentProductForSelection(updatedProduct);
-            const skuToUse = updatedProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || updatedProduct.productSKUs[0] || { id: updatedProduct.id + '_temp', optionValues: {}, stockLayers: [], skuIdentifier: updatedProduct.name };
-            updateSkuDisplayInfo(skuToUse);
-          }
-        } else {
-          toast({ variant: "destructive", title: "Update Failed", description: "Could not update product QR code." });
-        }
-      } catch (error) {
-        console.error("Error updating product QR code:", error);
-        toast({ variant: "destructive", title: "Error", description: "An error occurred while updating QR code." });
-      }
-    } else {
-      // Add item by QR code
-      await findAndPopulateProductByBarcode(qrValue);
-    }
-
+    setScannerPurpose(null);
     setProductToUpdateSkuFor(null);
     productNameInputRef.current?.focus();
   };
@@ -1226,19 +1180,12 @@ export function BillingForm({
           onAuthenticated={handleEmployeeVerifiedForBill}
         />
       )}
-      <HardwareBarcodeScanModal
-        isOpen={isBarcodeModalOpen}
-        onOpenChange={setIsBarcodeModalOpen}
-        onScan={handleBarcodeScannedFromModal}
-        purpose={barcodeScanPurpose || 'addItem'}
+      <UnifiedScannerModal
+        isOpen={isScannerOpen}
+        onOpenChange={setIsScannerOpen}
+        onScan={handleScannedFromModal}
+        purpose={scannerPurpose || 'addItem'}
         productNameForUpdate={productToUpdateSkuFor?.name}
-      />
-      <QRScannerModal
-        isOpen={isQRScannerOpen}
-        onOpenChange={setIsQRScannerOpen}
-        onScan={handleQRScannedFromModal}
-        purpose={currentProductForSelection ? 'updateProductSku' : 'addItem'}
-        productNameForUpdate={currentProductForSelection?.name}
       />
 
 
@@ -1354,21 +1301,11 @@ export function BillingForm({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleBarcodeIconClick} className="shrink-0" aria-label="Scan Hardware Barcode">
+                        <Button variant="outline" size="icon" onClick={handleScannerIconClick} className="shrink-0" aria-label="Scan Barcode/QR">
                           <BarcodeIconLucide className="h-5 w-5 text-primary" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent><p>{currentProductForSelection ? `Update Barcode for ${currentProductForSelection.name}` : "Scan Barcode to Add Item"}</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleQRIconClick} className="shrink-0" aria-label="Scan QR Code">
-                          <QrCode className="h-5 w-5 text-primary" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>{currentProductForSelection ? `Update QR Code for ${currentProductForSelection.name}` : "Scan QR Code to Add Item"}</p></TooltipContent>
+                      <TooltipContent><p>{currentProductForSelection ? `Update Code for ${currentProductForSelection.name}` : "Scan Barcode/QR to Add Item"}</p></TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (
@@ -1739,12 +1676,6 @@ export function BillingForm({
       />
 
       <BillSaveAnimation show={isSavingAnimationVisible} billMode={lastSavedBillMode || 'sell'} isEstimate={lastSavedBillIsEstimate} onClose={handleAnimationClose} />
-
-      <HardwareBarcodeScanModal
-        isOpen={isBarcodeModalOpen}
-        onOpenChange={setIsBarcodeModalOpen}
-        onScan={handleBarcodeScannedFromModal}
-      />
 
       <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
         <AlertDialogContent>
