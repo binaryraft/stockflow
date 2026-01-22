@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Product, ProductSKU, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { cn } from '@/lib/utils';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CornerDownLeft } from 'lucide-react';
 
 export interface ProductSearchSuggestion {
   product: Product;
@@ -127,7 +127,8 @@ export function ProductSearchInput({
       });
 
       setSuggestions(detailedSuggestions);
-      setShowSuggestions(detailedSuggestions.length > 0);
+      // Always show suggestions if we have a search term, so we can show "Add New" option if empty
+      setShowSuggestions(true);
       setActiveIndex(-1);
     } catch (err) {
       console.error("Search error", err);
@@ -138,9 +139,9 @@ export function ProductSearchInput({
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
-       if (value && document.activeElement === inputRef?.current) {
-          performSearch(value);
-       }
+      if (value && document.activeElement === inputRef?.current) {
+        performSearch(value);
+      }
     }, 400);
 
     return () => clearTimeout(delayDebounceFn);
@@ -234,36 +235,58 @@ export function ProductSearchInput({
           </div>
         )}
       </div>
-      
-      {showSuggestions && suggestions.length > 0 && (
+
+      {showSuggestions && (
         <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-md shadow-lg max-h-60 overflow-hidden">
           <ScrollArea className="max-h-60">
             <ul className="py-1">
-              {suggestions.map((suggestion, index) => (
+              {suggestions.length > 0 ? (
+                suggestions.map((suggestion, index) => (
+                  <li
+                    key={`${suggestion.product.id}-${suggestion.sku.id}-${suggestion.layer?.id || 'no-layer'}-${index}`}
+                    id={`suggestion-${index}`}
+                    className={cn(
+                      "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors",
+                      index === activeIndex && "bg-accent text-accent-foreground",
+                      suggestion.displayInfo.stock === 0 && suggestion.product.trackQuantity && "text-muted-foreground opacity-75"
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      handleSelectSuggestion(suggestion);
+                    }}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="truncate mr-2 font-medium">{suggestion.displayInfo.name}</span>
+                      <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap text-right">
+                        {suggestion.displayInfo.stock !== 'N/A' ? `Qty: ${suggestion.displayInfo.stock}` : ""}
+                        {" "}
+                        {suggestion.displayInfo.price}
+                      </span>
+                    </div>
+                    {suggestion.displayInfo.category && <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{suggestion.displayInfo.category}</div>}
+                  </li>
+                ))
+              ) : (
                 <li
-                  key={`${suggestion.product.id}-${suggestion.sku.id}-${suggestion.layer?.id || 'no-layer'}-${index}`}
-                  id={`suggestion-${index}`}
                   className={cn(
-                    "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors",
-                    index === activeIndex && "bg-accent text-accent-foreground",
-                    suggestion.displayInfo.stock === 0 && suggestion.product.trackQuantity && "text-muted-foreground opacity-75"
+                    "px-3 py-3 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-3 text-primary",
+                    activeIndex === 0 && "bg-accent text-accent-foreground"
                   )}
                   onMouseDown={(e) => {
-                     e.preventDefault();
-                     handleSelectSuggestion(suggestion);
+                    e.preventDefault();
+                    if (onEnterWithoutSelection) onEnterWithoutSelection(value);
+                    setShowSuggestions(false);
                   }}
                 >
-                  <div className="flex justify-between items-center">
-                    <span className="truncate mr-2 font-medium">{suggestion.displayInfo.name}</span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap text-right">
-                      {suggestion.displayInfo.stock !== 'N/A' ? `Qty: ${suggestion.displayInfo.stock}` : ""}
-                      {" "}
-                      {suggestion.displayInfo.price}
-                    </span>
+                  <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                    <CornerDownLeft className="h-4 w-4" />
                   </div>
-                  {suggestion.displayInfo.category && <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{suggestion.displayInfo.category}</div>}
+                  <div className="flex flex-col">
+                    <span className="font-medium">Add "{value}"</span>
+                    <span className="text-xs text-muted-foreground">Press Enter to add new product</span>
+                  </div>
                 </li>
-              ))}
+              )}
             </ul>
           </ScrollArea>
         </div>

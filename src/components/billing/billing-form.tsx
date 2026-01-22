@@ -311,14 +311,33 @@ export function BillingForm({
   };
 
   const handleProductNameSubmit = (val: string) => {
-    // barcode logic
-    // if not found set hint
+    // Open the new product dialog with the name pre-filled
+    setNewProductDialogInitialValues({ name: val });
+    setIsNewProductDialogOpen(true);
+    // Also set hint just in case
     setProductNotFoundHint(val);
   };
 
   return (
     <div className="flex flex-col gap-6">
+      <NewProductDialog
+        isOpen={isNewProductDialogOpen}
+        onOpenChange={setIsNewProductDialogOpen}
+        onProductAdded={(product) => {
+          setCurrentProductForSelection(product);
+          handleProductSelectFromSearch({
+            product,
+            sku: product.productSKUs?.[0] || { id: 'temp', optionValues: {}, stockLayers: [], skuIdentifier: product.name },
+            displayInfo: { name: product.name, stock: product.trackQuantity ? (product.productSKUs?.[0]?.stockLayers?.reduce((acc, l) => acc + l.quantity, 0) ?? 0) : 'N/A', price: product.productSKUs?.[0]?.stockLayers?.[0]?.sellPrice?.toString() ?? '0', category: product.category }
+          });
+          setProductNameQuery(product.name);
+          setProductNotFoundHint('');
+        }}
+        initialValues={newProductDialogInitialValues}
+      />
+
       <BillSaveAnimation
+
         show={isSavingAnimationVisible}
         billMode={lastSavedBillMode}
         isEstimate={lastSavedBillIsEstimate}
