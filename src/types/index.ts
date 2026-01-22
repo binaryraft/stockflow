@@ -41,6 +41,7 @@ export interface Product {
   category?: string;
   trackQuantity: boolean;
   sku?: string;
+  hsnCode?: string;
   expiryDate?: string;
   imageUrl?: string | null;
   description?: string;
@@ -77,6 +78,7 @@ export interface BillItem {
 
 export interface Bill {
   id: string;
+  invoiceNumber?: string; // Human readable invoice number (e.g., FY24-25/001)
   type: BillMode;
   date: string;
   timestamp: number;
@@ -89,6 +91,10 @@ export interface Bill {
   totalIGST?: number;
   totalDiscount?: number;
   taxType?: 'intra-state' | 'inter-state';
+  gstin?: string;
+  placeOfSupply?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
   totalAmount: number;
   isEstimate?: boolean;
   notes?: string;
@@ -230,11 +236,33 @@ export interface CurrencyOption {
   name: string;
 }
 
+// Payload for pending bills (before saving)
+export interface PendingBillPayload {
+  billType: BillMode;
+  items: BillItem[];
+  vendorOrCustomerName?: string;
+  customerPhone?: string;
+  notes?: string;
+  isEstimate?: boolean;
+  taxType?: 'intra-state' | 'inter-state';
+  date?: string;
+  storeIdForBill?: string;
+  paymentStatus?: 'paid' | 'unpaid';
+  gstin?: string; // Added for GST compliance
+  placeOfSupply?: string; // Added for GST compliance
+  billingAddress?: string; // Added for GST compliance
+  shippingAddress?: string; // Added for GST compliance
+}
+
 export interface Customer {
   id: string;
   companyId: string;
   name?: string;
   phone?: string;
+  gstin?: string;
+  billingAddress?: string;
+  shippingAddress?: string;
+  placeOfSupply?: string;
   email?: string;
   address?: string;
   firstSeen: string;

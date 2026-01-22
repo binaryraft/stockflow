@@ -82,6 +82,7 @@ const productFormSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
+  hsnCode: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
   additionalChargeDefinitions: z.array(additionalChargeDefinitionSchema).optional(),
 });
@@ -440,6 +441,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         sgstRate: initialData.sgstRate,
         cgstRate: initialData.cgstRate,
+        hsnCode: initialData.hsnCode || '',
         variants: initialData.variants?.map(v => ({
           id: v.id, name: v.name,
           options: v.options.map(o => ({ id: o.id, value: o.value }))
@@ -482,7 +484,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
       name: data.name, description: data.description, category: data.category,
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
-      sgstRate: data.sgstRate, cgstRate: data.cgstRate,
+      sgstRate: data.sgstRate, cgstRate: data.cgstRate, hsnCode: data.hsnCode,
       variants: (data.variants || []).map(v_form => ({
         id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
@@ -718,6 +720,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                       {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
                     </div>
                   </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="hsnCode">HSN Code <span className="text-xs text-muted-foreground">(Optional for some businesses)</span></Label>
+                  <Input id="hsnCode" {...register("hsnCode")} placeholder="e.g. 123456" />
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="expiryDate">Expiry Date <span className="text-xs text-muted-foreground">(Optional)</span></Label>

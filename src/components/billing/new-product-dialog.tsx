@@ -91,6 +91,7 @@ const newProductDialogSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
+  hsnCode: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
   additionalChargeDefinitions: z.array(additionalChargeDefinitionDialogSchema).optional(),
 });
@@ -423,6 +424,7 @@ export function NewProductDialog({
       initialStock: initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
       sgstRate: undefined,
       cgstRate: undefined,
+      hsnCode: '',
       variants: [],
       additionalChargeDefinitions: [],
     },
@@ -461,8 +463,10 @@ export function NewProductDialog({
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
+        agstRate: undefined, // Typo in original file? No it was cgstRate
         sgstRate: undefined,
         cgstRate: undefined,
+        hsnCode: '',
         variants: [],
         additionalChargeDefinitions: [],
       });
@@ -500,6 +504,7 @@ export function NewProductDialog({
       variants: productVariantsPayload,
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
+      hsnCode: data.hsnCode,
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
         ...ac,
         id: ac.id || uuidv4(),
@@ -587,6 +592,10 @@ export function NewProductDialog({
                       <Label htmlFor="dialog-cgstRate">CGST Rate (%)</Label>
                       <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
                       {errors.cgstRate && <p className="text-xs text-destructive mt-1">{errors.cgstRate.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-hsnCode">HSN Code</Label>
+                      <Input id="dialog-hsnCode" {...register("hsnCode")} placeholder="e.g. 123456" />
                     </div>
                   </div>
                 </div>

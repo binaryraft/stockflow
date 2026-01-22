@@ -53,203 +53,181 @@ export const generateBillPrintContent = (
   let content = '<html><head><title>Print Bill</title>';
   const styles =
     "<style>\n" +
-    "  body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 10px; line-height: 1.4; color: #333; font-size: 10pt; background: #fff; }\n" +
-    "  @page { size: auto; margin: 0; }\n" +
-    "  .print-container { width: 100%; max-width: 100%; margin: 0; }\n" +
-    "  .header, .bill-to, .bill-info, .items-section, .notes-section, .summary-section, .billed-by-section { margin-bottom: 10px; padding: 10px; border: 1px solid #e0e0e0; border-radius: 0; page-break-inside: avoid; background-color: #fff; }\n" +
-    "  .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; border: none; }\n" +
-    "  .header h1 { margin: 0 0 5px 0; font-size: 16pt; font-weight: bold; color: #000; }\n" +
-    "  .header p { margin: 2px 0; font-size: 9pt; color: #444; }\n" +
-    "  h3, h4 { margin-top: 0; margin-bottom: 6px; font-size: 11pt; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 2px; color: #111; }\n" +
-    "  h4 { font-size: 10pt; }\n" +
-    "  table { width: 100%; border-collapse: collapse; margin-top: 5px; font-size: 9pt; }\n" +
-    "  th, td { border: 1px solid #ddd; padding: 4px 6px; text-align: left; vertical-align: top; }\n" +
-    "  th { background-color: #f7f7f7; font-weight: bold; color: #222; }\n" +
+    "  body { font-family: 'Open Sans', Arial, sans-serif; margin: 0; padding: 15px; line-height: 1.35; color: #1f2937; font-size: 9pt; background: #fff; }\n" +
+    "  @page { size: auto; margin: 5mm; }\n" +
+    "  .print-container { width: 100%; max-width: 100%; margin: 0; border: 1px solid #e5e7eb; }\n" +
+    "  .header { text-align: center; padding: 15px; border-bottom: 2px solid #374151; background-color: #f9fafb; }\n" +
+    "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px; }\n" +
+    "  .header p { margin: 2px 0; font-size: 9pt; color: #4b5563; }\n" +
+    "  .bill-title-box { text-align: center; margin: 10px 0; border-top: 1px dashed #d1d5db; border-bottom: 1px dashed #d1d5db; padding: 5px 0; }\n" +
+    "  .bill-title-box h2 { margin: 0; font-size: 12pt; font-weight: 600; text-transform: uppercase; color: #374151; }\n" +
+    "  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 15px; border-bottom: 1px solid #e5e7eb; }\n" +
+    "  .info-block h4 { margin: 0 0 5px 0; font-size: 10pt; font-weight: 700; color: #111827; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; width: fit-content; }\n" +
+    "  .info-block p { margin: 2px 0; font-size: 9pt; }\n" +
+    "  table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 9pt; }\n" +
+    "  th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
+    "  th { background-color: #f3f4f6; font-weight: 600; color: #374151; text-transform: uppercase; font-size: 8pt; }\n" +
     "  .text-right { text-align: right; }\n" +
-    "  .font-medium { font-weight: bold; }\n" +
-    "  .text-muted-foreground { color: #555; font-size: 0.9em; }\n" +
-    "  .badge { display: inline-block; padding: 0.25em 0.5em; font-size: 0.75em; font-weight: bold; border: 1px solid #ccc; border-radius: 3px; }\n" +
-    "  .badge-destructive { color: #b91c1c; background-color: #fecaca; border-color: #f87171; }\n" +
-    "  .badge-success { color: #15803d; background-color: #dcfce7; border-color: #86efac; }\n" +
-    "  .badge-paid { color: #15803d; background-color: #dcfce7; border-color: #86efac; } \n" +
-    "  .badge-unpaid { color: #b91c1c; background-color: #fecaca; border-color: #f87171; } \n" +
-    "  .total-row td { font-weight: bold; background-color: #f7f7f7; font-size: 10pt; }\n" +
-    "  .items-section .variant-options { font-size: 0.8em; color: #555; display: block; font-style: italic; }\n" +
-    "  .notes-content { white-space: pre-wrap; font-style: italic; background-color: #f9f9f9; padding: 5px; border: 1px solid #eee; }\n" +
-    "  .no-print { display: none !important; } \n" +
-    "  /* Responsive adjustments for narrow widths (POS) */\n" +
-    "  @media print and (max-width: 80mm) {\n" +
-    "     body { font-size: 9pt; padding: 5px; }\n" +
-    "     h1 { font-size: 12pt; }\n" +
-    "     h3, h4 { font-size: 10pt; }\n" +
-    "     th, td { padding: 2px 4px; font-size: 8pt; }\n" +
-    "     .header, .bill-to, .bill-info, .items-section, .summary-section { border: none; padding: 0; margin-bottom: 10px; }\n" +
-    "     .header { border-bottom: 1px dashed #000; }\n" +
-    "     table { font-size: 8pt; }\n" +
-    "  }\n" +
+    "  .text-center { text-align: center; }\n" +
+    "  .font-medium { font-weight: 600; }\n" +
+    "  .font-bold { font-weight: 700; }\n" +
+    "  .total-section { display: flex; justify-content: flex-end; padding: 10px 15px; background-color: #f9fafb; border-top: 1px solid #e5e7eb; }\n" +
+    "  .total-table { width: auto; min-width: 250px; border: none; }\n" +
+    "  .total-table td { border: none; padding: 3px 0; }\n" +
+    "  .total-table .final-total { border-top: 1px solid #d1d5db; border-bottom: 1px double #374151; font-weight: bold; font-size: 11pt; padding: 5px 0; color: #000; margin-top: 5px; }\n" +
+    "  .notes-section { padding: 10px 15px; font-size: 8.5pt; color: #4b5563; border-top: 1px solid #e5e7eb; }\n" +
+    "  .footer { text-align: center; font-size: 8pt; color: #9ca3af; padding: 10px; border-top: 1px solid #e5e7eb; }\n" +
+    "  .badge { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 8pt; font-weight: 600; }\n" +
+    "  .badge-paid { background-color: #dcfce7; color: #166534; border: 1px solid #86efac; }\n" +
+    "  .badge-unpaid { background-color: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }\n" +
     "</style>\n";
   content += styles;
   content += '</head><body>';
   content += '<div class="print-container">';
 
+  // Header
   content += '<div class="header">';
   content += `<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`;
-  content += `<p>${userProfile?.companyAddress || COMPANY_ADDRESS}</p>`; // Use profile address
-  content += `<p>Phone: ${userProfile?.companyPhone || 'N/A'} | GSTIN: ${userProfile?.companyGstNo || 'N/A'}</p>`; // Use profile phone/GST
-  content += `<h2>${billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE' : (billToPrint.type === 'sell' ? 'TAX INVOICE' : getBillTypeNameForPrint(billToPrint).toUpperCase())}</h2>`;
-  content += '</div>';
-
-  content += '<table style="width:100%; margin-bottom: 20px; border:0;"><tr><td style="width:50%; vertical-align:top; border:0;">';
-  if (billToPrint.vendorOrCustomerName || billToPrint.customerPhone) {
-    content += '<div class="bill-to">';
-    content += `<h4>${getPartyDetailsTitleForPrint(billToPrint.type)}</h4>`;
-    if (billToPrint.vendorOrCustomerName) content += `<p><strong>${getPartyNameLabelForPrint(billToPrint.type)}:</strong> ${billToPrint.vendorOrCustomerName}</p>`;
-    if (billToPrint.customerPhone) content += `<p><strong>Phone:</strong> ${billToPrint.customerPhone}</p>`;
-    content += '</div>';
-  }
-  content += '</td><td style="width:50%; vertical-align:top; border:0;">';
-  content += '<div class="bill-info text-right">';
-  content += `<h4>Bill Information</h4>`;
-  content += `<p><strong>Bill ID:</strong> ${billToPrint.id}</p>`;
-  content += `<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'PPpp')}</p>`;
-  if (!(billToPrint.type === 'sell' && billToPrint.isEstimate)) {
-    content += `<p><strong>Type:</strong> ${getBillTypeNameForPrint(billToPrint)}</p>`;
-  }
-  if (billToPrint.paymentStatus && (billToPrint.type === 'sell' || billToPrint.type === 'buy') && !billToPrint.isEstimate) {
-    content += `<p><strong>Payment:</strong> <span class="badge badge-${billToPrint.paymentStatus === 'paid' ? 'paid' : 'unpaid'}">${billToPrint.paymentStatus.charAt(0).toUpperCase() + billToPrint.paymentStatus.slice(1)}</span></p>`;
+  content += `<p>${userProfile?.companyAddress || COMPANY_ADDRESS}</p>`;
+  content += `<p>Phone: ${userProfile?.companyPhone || 'N/A'} | Email: ${userProfile?.companyEmail || 'N/A'}</p>`;
+  if (userProfile?.companyGstNo) {
+    content += `<p style="font-weight: 600; margin-top: 4px;">GSTIN: ${userProfile.companyGstNo}</p>`;
   }
   content += '</div>';
-  content += '</td></tr></table>';
 
-  if (billToPrint.billedByStaffName || billToPrint.storeName) {
-    content += '<div class="billed-by-section">';
-    content += `<h4>Transaction Origin</h4>`;
-    if (billToPrint.storeName) content += `<p><strong>Store:</strong> ${billToPrint.storeName}</p>`;
-    if (billToPrint.billedByStaffName) content += `<p><strong>Billed by:</strong> ${billToPrint.billedByStaffName}</p>`;
-    content += '</div>';
+  const billTitle = billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE / QUOTATION' :
+    (billToPrint.type === 'sell' ? 'TAX INVOICE' : getBillTypeNameForPrint(billToPrint).toUpperCase());
+
+  content += `<div class="bill-title-box"><h2>${billTitle}</h2></div>`;
+
+  // Info Grid (Customer & Bill Details)
+  content += '<div class="info-grid">';
+
+  // Left: Bill To
+  content += '<div class="info-block">';
+  content += `<h4>${getPartyDetailsTitleForPrint(billToPrint.type)}</h4>`;
+  if (billToPrint.vendorOrCustomerName) content += `<p><strong>${getPartyNameLabelForPrint(billToPrint.type)}:</strong> ${billToPrint.vendorOrCustomerName}</p>`;
+  if (billToPrint.customerPhone) content += `<p><strong>Phone:</strong> ${billToPrint.customerPhone}</p>`;
+  if (billToPrint.billingAddress) content += `<p><strong>Address:</strong> ${billToPrint.billingAddress}</p>`;
+  if (billToPrint.gstin) content += `<p><strong>Partys GSTIN:</strong> ${billToPrint.gstin}</p>`;
+  if (billToPrint.placeOfSupply) content += `<p><strong>Place of Supply:</strong> ${billToPrint.placeOfSupply}</p>`;
+  content += '</div>';
+
+  // Right: Bill Info
+  content += '<div class="info-block text-right">';
+  content += `<h4>Invoice Details</h4>`;
+  content += `<p><strong>Invoice No:</strong> ${billToPrint.invoiceNumber || billToPrint.id.substring(0, 8).toUpperCase()}</p>`; // Fallback to ID stub if no invoice number
+  content += `<p><strong>Date:</strong> ${format(new Date(billToPrint.date), 'dd-MMM-yyyy')}</p>`;
+  if (billToPrint.paymentStatus && !billToPrint.isEstimate) {
+    const status = billToPrint.paymentStatus === 'paid' ? 'Paid' : 'Unpaid';
+    const badgeClass = billToPrint.paymentStatus === 'paid' ? 'badge-paid' : 'badge-unpaid';
+    content += `<p><strong>Status:</strong> <span class="badge ${badgeClass}">${status}</span></p>`;
   }
+  if (billToPrint.billedByStaffName) content += `<p><strong>Issued By:</strong> ${billToPrint.billedByStaffName}</p>`;
+  content += '</div>';
 
+  content += '</div>'; // End info-grid
+
+  // Items Table
   content += '<div class="items-section">';
-  content += '<h3>Items</h3>';
-
   const showTaxDetailsInItems = billToPrint.type === 'sell' && !billToPrint.isEstimate;
 
-  if (billToPrint.type === 'buy') {
-    content += '<table><thead><tr><th>#</th><th>Product Details</th><th>Purch. Qty</th><th>Sold Qty</th><th>Rem. Qty</th><th>Cost/Unit</th><th>Sell Price (Set)</th><th>Item Total</th></tr></thead><tbody>';
-    billToPrint.items.forEach((item, index) => {
-      const sku = getProductSkuForPrint(item.productId, item.selectedVariantOptions, products);
-      const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-
-      const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
-      const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
-      const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
-      const costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
-      const sellPriceSet = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-
-      content += '<tr>';
-      content += `<td>${index + 1}</td>`;
-      content += `<td>${item.productName}`;
-      if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-        content += '<span class="variant-options">';
-        content += Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
-        content += '</span>';
-      }
-      content += '</td>';
-      content += `<td class="text-right">${purchasedQty.toFixed(2)}</td>`;
-      content += `<td class="text-right" style="color: green;">${soldQty.toFixed(2)}</td>`;
-      content += `<td class="text-right font-medium">${remainingQty.toFixed(2)}</td>`;
-      content += `<td class="text-right">${currencySymbol}${costPrice.toFixed(2)}</td>`;
-      content += `<td class="text-right">${currencySymbol}${sellPriceSet.toFixed(2)}</td>`;
-      content += `<td class="text-right font-medium">${currencySymbol}${(item.quantity * costPrice).toFixed(2)}</td>`;
-      content += '</tr>';
-    });
-  } else {
-    const itemSubTotalColName = showTaxDetailsInItems ? "Subtotal" : "Item Total";
-    content += '<table><thead><tr><th>#</th><th>Product/Charge</th><th>Qty</th><th>Price/Unit</th>';
-    if (showTaxDetailsInItems && billToPrint.items.some(i => !i.isAdditionalCharge)) {
-      content += '<th>SGST</th><th>CGST</th>';
+  content += '<table><thead><tr>';
+  content += '<th style="width: 30px;">#</th>';
+  content += '<th>Item Description</th>';
+  content += '<th class="text-center" style="width: 60px;">HSN</th>';
+  content += '<th class="text-right" style="width: 50px;">Qty</th>';
+  content += '<th class="text-right" style="width: 80px;">Rate</th>';
+  if (showTaxDetailsInItems) {
+    content += '<th class="text-right" style="width: 70px;">Taxable</th>';
+    if (billToPrint.taxType === 'inter-state') {
+      content += '<th class="text-right" style="width: 60px;">IGST</th>';
+    } else {
+      content += '<th class="text-right" style="width: 60px;">SGST</th>';
+      content += '<th class="text-right" style="width: 60px;">CGST</th>';
     }
-    content += `<th class="text-right">${itemSubTotalColName}</th></tr></thead><tbody>`;
-
-    billToPrint.items.forEach((item, index) => {
-      const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-      const itemPreTaxSubtotal = item.quantity * sellPrice;
-      const itemSgst = item.sgstAmount || 0;
-      const itemCgst = item.cgstAmount || 0;
-      const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
-
-      content += '<tr>';
-      content += `<td>${index + 1}</td>`;
-      content += `<td>${item.productName}`;
-      if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
-        content += '<span class="variant-options">';
-        content += Object.entries(item.selectedVariantOptions).map(([key, value]) => `${key}: ${value}`).join(', ');
-        content += '</span>';
-      }
-      if (billToPrint.type === 'return') {
-        if (item.isDefective) {
-          content += ' <span class="badge badge-destructive">Defective</span>';
-        } else {
-          content += ' <span class="badge badge-success">Restocked</span>';
-        }
-      }
-      content += '</td>';
-      content += `<td class="text-right">${item.quantity.toFixed(2)}</td>`;
-      content += `<td class="text-right">${currencySymbol}${sellPrice.toFixed(2)}</td>`;
-      if (showTaxDetailsInItems && billToPrint.items.some(i => !i.isAdditionalCharge)) {
-        if (item.isAdditionalCharge) {
-          content += `<td class="text-right">-</td>`;
-          content += `<td class="text-right">-</td>`;
-        } else {
-          content += `<td class="text-right">${currencySymbol}${itemSgst.toFixed(2)}</td>`;
-          content += `<td class="text-right">${currencySymbol}${itemCgst.toFixed(2)}</td>`;
-        }
-      }
-      content += `<td class="text-right font-medium">${currencySymbol}${(showTaxDetailsInItems && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</td>`;
-      content += '</tr>';
-    });
   }
+  content += '<th class="text-right" style="width: 90px;">Total</th>';
+  content += '</tr></thead><tbody>';
+
+  billToPrint.items.forEach((item, index) => {
+    // Attempt to find product to get HSN if not on item (though usually it should be on item snapshot if we stored it, but we can look up)
+    const product = products.find(p => p.id === item.productId);
+    const hsn = product?.hsnCode || '-';
+
+    // Calculations
+    const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
+    const itemTotal = item.quantity * sellPrice;
+    const discount = item.discountAmount || 0;
+    const taxableValue = Math.max(0, itemTotal - discount);
+
+    const sgst = item.sgstAmount || 0;
+    const cgst = item.cgstAmount || 0;
+    const igst = item.igstAmount || 0;
+    const finalAmount = taxableValue + sgst + cgst + igst;
+
+    content += '<tr>';
+    content += `<td>${index + 1}</td>`;
+    content += `<td><span class="font-medium">${item.productName}</span>`;
+    if (item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0) {
+      content += `<div style="font-size: 8pt; color: #6b7280; font-style: italic;">${Object.values(item.selectedVariantOptions).join(', ')}</div>`;
+    }
+    content += `</td>`;
+    content += `<td class="text-center">${hsn}</td>`;
+    content += `<td class="text-right">${item.quantity}</td>`;
+    content += `<td class="text-right">${currencySymbol}${sellPrice.toFixed(2)}</td>`;
+
+    if (showTaxDetailsInItems) {
+      content += `<td class="text-right">${currencySymbol}${taxableValue.toFixed(2)}</td>`;
+      if (billToPrint.taxType === 'inter-state') {
+        content += `<td class="text-right">${currencySymbol}${igst.toFixed(2)}</td>`;
+      } else {
+        content += `<td class="text-right">${currencySymbol}${sgst.toFixed(2)}</td>`;
+        content += `<td class="text-right">${currencySymbol}${cgst.toFixed(2)}</td>`;
+      }
+    }
+    content += `<td class="text-right font-bold">${currencySymbol}${finalAmount.toFixed(2)}</td>`;
+    content += '</tr>';
+  });
   content += '</tbody></table>';
   content += '</div>';
 
-  if (billToPrint.notes) {
-    content += '<div class="notes-section">';
-    content += '<h4>Notes</h4>';
-    content += `<p class="notes-content">${billToPrint.notes}</p>`;
-    content += '</div>';
+  // Summary Section
+  content += '<div class="total-section">';
+  content += '<table class="total-table">';
+  content += `<tr><td class="text-right">Subtotal:</td><td class="text-right font-medium">${currencySymbol}${billToPrint.subTotal?.toFixed(2) || '0.00'}</td></tr>`;
+
+  if (billToPrint.totalDiscount && billToPrint.totalDiscount > 0) {
+    content += `<tr><td class="text-right" style="color: #059669;">Discount:</td><td class="text-right font-medium" style="color: #059669;">-${currencySymbol}${billToPrint.totalDiscount.toFixed(2)}</td></tr>`;
   }
 
-  content += '<div class="summary-section">';
-  content += '<h4>Summary</h4>';
-  content += `<table style="width: auto; margin-left: auto; border: none;">`;
-
-  if (billToPrint.type === 'buy') {
-    const expectedRevenue = billToPrint.items.reduce((acc, item) => {
-      const sku = getProductSkuForPrint(item.productId, item.selectedVariantOptions, products);
-      const layerForThisBillItem = sku?.stockLayers.find(l => l.purchaseBillId === billToPrint.id && l.costPrice === item.costPrice && Math.abs(l.initialQuantity - item.quantity) < 0.001);
-      const sellPriceForCalc = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-      return acc + (sellPriceForCalc * item.quantity);
-    }, 0);
-    const expectedProfitOrLoss = expectedRevenue - billToPrint.totalAmount;
-    const profitLossColor = expectedProfitOrLoss >= 0 ? '#166534' : '#b91c1c';
-    content += `<tr class="total-row"><td style="text-align:right; border: none; color: #b91c1c;"><strong>Total Cost (This Expense Bill):</strong></td><td class="text-right" style="border: none; color: #b91c1c;"><strong>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
-    content += `<tr><td style="text-align:right; border: none;">Expected Revenue (from items in this bill):</td><td class="text-right" style="border: none;">${currencySymbol}${expectedRevenue.toFixed(2)}</td></tr>`;
-    content += `<tr><td style="text-align:right; border: none;">Expected Profit/(Loss) (from items in this bill):</td><td class="text-right" style="color:${profitLossColor}; border: none; font-weight: bold;">${currencySymbol}${expectedProfitOrLoss.toFixed(2)}</td></tr>`;
-  } else if (billToPrint.type === 'sell' || billToPrint.type === 'return') {
-    if (showTaxDetailsInItems) {
-      content += `<tr><td style="text-align:right; border: none;">Subtotal:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.subTotal || 0).toFixed(2)}</td></tr>`;
-      content += `<tr><td style="text-align:right; border: none;">Total SGST:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`;
-      content += `<tr><td style="text-align:right; border: none;">Total CGST:</td><td class="text-right" style="border: none;">${currencySymbol}${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`;
+  if (showTaxDetailsInItems) {
+    if (billToPrint.taxType === 'inter-state') {
+      content += `<tr><td class="text-right">Total IGST:</td><td class="text-right font-medium">${currencySymbol}${(billToPrint.totalIGST || 0).toFixed(2)}</td></tr>`;
+    } else {
+      content += `<tr><td class="text-right">Total SGST:</td><td class="text-right font-medium">${currencySymbol}${(billToPrint.totalSGST || 0).toFixed(2)}</td></tr>`;
+      content += `<tr><td class="text-right">Total CGST:</td><td class="text-right font-medium">${currencySymbol}${(billToPrint.totalCGST || 0).toFixed(2)}</td></tr>`;
     }
-    const totalRowColor = billToPrint.type === 'sell' ? (billToPrint.isEstimate ? '#1d4ed8' : '#166534') : '#b45309';
-    const totalLabel = billToPrint.type === 'sell' && billToPrint.isEstimate ? 'Estimate Total:' : 'Grand Total:';
-    content += `<tr class="total-row"><td style="text-align:right; border: none; color: ${totalRowColor};"><strong>${totalLabel}</strong></td><td class="text-right" style="border: none; color: ${totalRowColor};"><strong>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</strong></td></tr>`;
   }
+
+  content += `<tr><td colspan="2"><div class="final-total text-right">Grand Total: ${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</div></td></tr>`;
   content += '</table>';
   content += '</div>';
 
+  // Notes
+  if (billToPrint.notes) {
+    content += '<div class="notes-section">';
+    content += '<strong>Notes:</strong> ' + billToPrint.notes;
+    content += '</div>';
+  }
+
+  // Footer
+  content += '<div class="footer">';
+  content += '<p>Thank you for your business!</p>';
+  content += '<p>This is a computer generated invoice and does not require a signature.</p>';
   content += '</div>';
-  content += '</body></html>';
+
+  content += '</div></body></html>';
   return content;
 };
 
