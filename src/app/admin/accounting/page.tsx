@@ -24,6 +24,7 @@ import { generateReportPrintContent, triggerPrint } from '@/lib/print-utils';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import type { Store } from '@/types';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AccountingSummaryCards } from '@/components/accounting/accounting-summary-cards';
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'thisFY' | 'lastFY' | 'all' | 'custom';
 type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
@@ -31,7 +32,7 @@ type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
 function getFiscalYearDates(date: Date, offsetYears: number = 0): { from: Date, to: Date } {
   const currentYear = date.getFullYear();
   const currentMonth = date.getMonth(); // 0-11
-  
+
   let fiscalYearStartYear = currentMonth >= 3 ? currentYear : currentYear - 1; // In India, FY is April-March. April is month 3.
   fiscalYearStartYear -= offsetYears;
 
@@ -57,14 +58,14 @@ function getDatesFromPreset(preset: TimePeriodPreset): DateRange | undefined {
     case 'thisYear':
       return { from: startOfYear(now), to: endOfYear(now) };
     case 'lastYear':
-       const lastYearStart = startOfYear(subDays(now, 365));
-       return { from: lastYearStart, to: endOfYear(lastYearStart) };
+      const lastYearStart = startOfYear(subDays(now, 365));
+      return { from: lastYearStart, to: endOfYear(lastYearStart) };
     case 'thisFY':
-        return getFiscalYearDates(now);
+      return getFiscalYearDates(now);
     case 'lastFY':
-        return getFiscalYearDates(now, 1);
+      return getFiscalYearDates(now, 1);
     case 'all':
-      return { from: new Date(2000, 0, 1), to: endOfYear(subDays(now, -365*5)) }; 
+      return { from: new Date(2000, 0, 1), to: endOfYear(subDays(now, -365 * 5)) };
     default:
       return undefined;
   }
@@ -78,17 +79,17 @@ function AccountingPageContent() {
     userProfile: state.userProfile,
     getAllStores: state.getAllStores,
   }));
-  
+
   const stores = useMemo(() => getAllStores(), [getAllStores]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
-  
+
   const handlePresetChange = (preset: TimePeriodPreset) => {
     setTimePeriodPreset(preset);
     if (preset !== 'custom') {
       setDateRange(getDatesFromPreset(preset));
     }
   };
-  
+
   const handleCustomDateChange = (newRange: DateRange | undefined) => {
     setTimePeriodPreset('custom');
     setDateRange(newRange);
@@ -100,14 +101,14 @@ function AccountingPageContent() {
       console.error('Could not find report content element to print.');
       return;
     }
-    
+
     let reportTitle = '';
-    switch(activeTab) {
-        case 'pnl': reportTitle = 'Profit & Loss Statement'; break;
-        case 'cashflow': reportTitle = 'Cash Flow Statement'; break;
-        case 'balance-sheet': reportTitle = 'Simplified Financial Position'; break;
-        case 'gst': reportTitle = 'GST Report'; break;
-        default: reportTitle = 'Accounting Report';
+    switch (activeTab) {
+      case 'pnl': reportTitle = 'Profit & Loss Statement'; break;
+      case 'cashflow': reportTitle = 'Cash Flow Statement'; break;
+      case 'balance-sheet': reportTitle = 'Simplified Financial Position'; break;
+      case 'gst': reportTitle = 'GST Report'; break;
+      default: reportTitle = 'Accounting Report';
     }
 
     const storeName = selectedStoreId === 'all' ? 'All Stores' : stores.find(s => s.id === selectedStoreId)?.name || '';
@@ -120,56 +121,56 @@ function AccountingPageContent() {
 
   const pageActions = (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-        {stores.length > 0 && (
-          <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
-            <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
-              <SelectValue placeholder="Select Store" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all"><Building className="mr-2 h-4 w-4 inline-block" />All Stores</SelectItem>
-              {stores.map(store => (
-                <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <Select value={timePeriodPreset} onValueChange={(value) => handlePresetChange(value as TimePeriodPreset)}>
-            <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
-                <SelectValue placeholder="Filter by time" />
-            </SelectTrigger>
-            <SelectContent>
-                <SelectItem value="thisMonth">This Month</SelectItem>
-                <SelectItem value="lastMonth">Last Month</SelectItem>
-                <SelectItem value="thisQuarter">This Quarter</SelectItem>
-                <SelectItem value="lastQuarter">Last Quarter</SelectItem>
-                <SelectItem value="thisYear">This Year</SelectItem>
-                <SelectItem value="lastYear">Last Year</SelectItem>
-                <SelectItem value="thisFY">This Fiscal Year (Apr-Mar)</SelectItem>
-                <SelectItem value="lastFY">Last Fiscal Year (Apr-Mar)</SelectItem>
-                <SelectItem value="all">All Time</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-            </SelectContent>
+      {stores.length > 0 && (
+        <Select value={selectedStoreId} onValueChange={setSelectedStoreId}>
+          <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+            <SelectValue placeholder="Select Store" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all"><Building className="mr-2 h-4 w-4 inline-block" />All Stores</SelectItem>
+            {stores.map(store => (
+              <SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>
+            ))}
+          </SelectContent>
         </Select>
-        {timePeriodPreset === 'custom' && (
-            <Popover>
-                <PopoverTrigger asChild>
-                    <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !dateRange && "text-muted-foreground" )}>
-                        <CalendarDays className="mr-2 h-4 w-4" />
-                        {dateRange?.from ? (
-                            dateRange.to ? (
-                                <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
-                            ) : ( format(dateRange.from, "LLL dd, y") )
-                        ) : ( <span>Pick a date range</span> )}
-                    </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={handleCustomDateChange} numberOfMonths={2} />
-                </PopoverContent>
-            </Popover>
-        )}
-        <Button variant="outline" onClick={handlePrintReport} className="h-9">
-            <PrinterIcon className="mr-2 h-4 w-4" /> Print Report
-        </Button>
+      )}
+      <Select value={timePeriodPreset} onValueChange={(value) => handlePresetChange(value as TimePeriodPreset)}>
+        <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+          <SelectValue placeholder="Filter by time" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="thisMonth">This Month</SelectItem>
+          <SelectItem value="lastMonth">Last Month</SelectItem>
+          <SelectItem value="thisQuarter">This Quarter</SelectItem>
+          <SelectItem value="lastQuarter">Last Quarter</SelectItem>
+          <SelectItem value="thisYear">This Year</SelectItem>
+          <SelectItem value="lastYear">Last Year</SelectItem>
+          <SelectItem value="thisFY">This Fiscal Year (Apr-Mar)</SelectItem>
+          <SelectItem value="lastFY">Last Fiscal Year (Apr-Mar)</SelectItem>
+          <SelectItem value="all">All Time</SelectItem>
+          <SelectItem value="custom">Custom Range</SelectItem>
+        </SelectContent>
+      </Select>
+      {timePeriodPreset === 'custom' && (
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !dateRange && "text-muted-foreground")}>
+              <CalendarDays className="mr-2 h-4 w-4" />
+              {dateRange?.from ? (
+                dateRange.to ? (
+                  <>{format(dateRange.from, "LLL dd, y")} - {format(dateRange.to, "LLL dd, y")}</>
+                ) : (format(dateRange.from, "LLL dd, y"))
+              ) : (<span>Pick a date range</span>)}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar initialFocus mode="range" defaultMonth={dateRange?.from} selected={dateRange} onSelect={handleCustomDateChange} numberOfMonths={2} />
+          </PopoverContent>
+        </Popover>
+      )}
+      <Button variant="outline" onClick={handlePrintReport} className="h-9">
+        <PrinterIcon className="mr-2 h-4 w-4" /> Print Report
+      </Button>
     </div>
   );
 
@@ -177,44 +178,51 @@ function AccountingPageContent() {
     <div className="flex flex-col gap-6" id="accounting-reports-container">
       <PageTitle title="Accounting & Reports" icon={BookOpen} actions={pageActions} />
 
+      {/* Intelligent Summary Section */}
+      <AccountingSummaryCards
+        startDate={dateRange?.from}
+        endDate={dateRange?.to}
+        storeId={selectedStoreId}
+      />
+
       <Tabs defaultValue="pnl" value={activeTab} onValueChange={(v) => setActiveTab(v as AccountingTab)} className="w-full">
         <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-4 no-print">
-          <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16}/>P&L Statement</TabsTrigger>
-          <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16}/>Cash Flow</TabsTrigger>
-          <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16}/>Balance Sheet</TabsTrigger>
-          <TabsTrigger value="gst" className="gap-2"><FileText size={16}/>GST Report</TabsTrigger>
+          <TabsTrigger value="pnl" className="gap-2"><BarChart2 size={16} />P&L Statement</TabsTrigger>
+          <TabsTrigger value="cashflow" className="gap-2"><Wallet size={16} />Cash Flow</TabsTrigger>
+          <TabsTrigger value="balance-sheet" className="gap-2"><Scale size={16} />Balance Sheet</TabsTrigger>
+          <TabsTrigger value="gst" className="gap-2"><FileText size={16} />GST Report</TabsTrigger>
         </TabsList>
         <div id="pnl-report-content">
-            <TabsContent value="pnl" className="mt-6">
-                <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
-            </TabsContent>
+          <TabsContent value="pnl" className="mt-6">
+            <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
+          </TabsContent>
         </div>
-         <div id="cashflow-report-content">
-            <TabsContent value="cashflow" className="mt-6">
-                <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
-            </TabsContent>
+        <div id="cashflow-report-content">
+          <TabsContent value="cashflow" className="mt-6">
+            <CashFlowStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
+          </TabsContent>
         </div>
         <div id="balance-sheet-report-content">
-            <TabsContent value="balance-sheet" className="mt-6">
-                <BalanceSheet storeId={selectedStoreId} />
-            </TabsContent>
+          <TabsContent value="balance-sheet" className="mt-6">
+            <BalanceSheet storeId={selectedStoreId} />
+          </TabsContent>
         </div>
         <div id="gst-report-content">
-            <TabsContent value="gst" className="mt-6">
-                 <GstReport startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId}/>
-            </TabsContent>
+          <TabsContent value="gst" className="mt-6">
+            <GstReport startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
+          </TabsContent>
         </div>
       </Tabs>
 
       <Separator className="my-8 no-print" />
-      
+
       <div className="space-y-4 no-print">
         <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-semibold tracking-tight">Outstanding Balances</h2>
-            <Badge variant="outline">Live Data</Badge>
+          <h2 className="text-2xl font-semibold tracking-tight">Outstanding Balances</h2>
+          <Badge variant="outline">Live Data</Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-            These cards show current outstanding receivables and payables, and are not affected by the date filter above.
+          These cards show current outstanding receivables and payables, and are not affected by the date filter above.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2 mt-4 no-print">

@@ -15,9 +15,9 @@ import React, { useState, useEffect } from 'react';
 
 export function SidebarNav() {
   const pathname = usePathname();
-  const { state: sidebarState, toggleSidebar } = useSidebar();
+  const { state: sidebarState, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const getActiveSubscriptionPlan = useInventoryStore((state) => state.getActiveSubscriptionPlan);
-  
+
   const [hasMounted, setHasMounted] = useState(false);
   const [activePlanId, setActivePlanId] = useState<string | undefined>(undefined);
 
@@ -42,7 +42,7 @@ export function SidebarNav() {
               <span className="truncate">{APP_NAME}</span>
             </Link>
           ) : (
-             <Tooltip>
+            <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
@@ -60,18 +60,18 @@ export function SidebarNav() {
 
           {sidebarState === 'expanded' && (
             <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 hidden md:flex text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
-                    onClick={toggleSidebar}
-                    aria-label="Collapse sidebar"
-                    >
-                    <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" align="center"><p>Collapse Sidebar</p></TooltipContent>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 hidden md:flex text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+                  onClick={toggleSidebar}
+                  aria-label="Collapse sidebar"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center"><p>Collapse Sidebar</p></TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -105,8 +105,17 @@ export function SidebarNav() {
                     >
                       <Link
                         href={isDisabledBySubscription ? "#" : link.href}
-                        className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")} 
-                        onClick={(e) => { if (isDisabledBySubscription) e.preventDefault(); }}
+                        className={cn("flex items-center gap-3", isDisabledBySubscription && "pointer-events-none")}
+                        onClick={(e) => {
+                          if (isDisabledBySubscription) {
+                            e.preventDefault();
+                            return;
+                          }
+                          // Auto close on mobile
+                          if (isMobile) {
+                            setOpenMobile(false);
+                          }
+                        }}
                       >
                         <link.icon className={cn("h-5 w-5 shrink-0")} />
                         {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
@@ -120,7 +129,7 @@ export function SidebarNav() {
                     </SidebarMenuItem>
                   );
                 })}
-                {groupIndex < NAV_LINK_GROUPS.length -1 && <SidebarSeparator className="my-2" />}
+                {groupIndex < NAV_LINK_GROUPS.length - 1 && <SidebarSeparator className="my-2" />}
               </React.Fragment>
             ))}
           </SidebarMenu>
