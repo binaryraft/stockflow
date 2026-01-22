@@ -23,10 +23,38 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '0', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
     const storeIdFilter = searchParams.get('storeId');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
+    const searchTerm = searchParams.get('search');
+    const billType = searchParams.get('type');
+    const isEstimate = searchParams.get('isEstimate');
 
     const query: any = { companyId: companyId };
     if (storeIdFilter) {
       query.storeId = storeIdFilter;
+    }
+    
+    if (billType) {
+      query.type = billType;
+    }
+    
+    if (isEstimate !== null) {
+      query.isEstimate = isEstimate === 'true';
+    }
+    
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = startDate; // ISO string comparison works
+      if (endDate) query.date.$lte = endDate;
+    }
+
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, 'i');
+      query.$or = [
+        { id: regex },
+        { vendorOrCustomerName: regex },
+        { customerPhone: regex }
+      ];
     }
 
     let cursor = db.collection<Bill>('bills')

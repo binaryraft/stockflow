@@ -112,6 +112,7 @@ export function BillItemRow({
     )}>
       <div>
         <span className="truncate text-sm font-medium block" title={item.productName}>{item.productName}</span>
+        {item.hsnCode && <span className="text-[10px] text-muted-foreground block -mt-0.5 mb-0.5">HSN: {item.hsnCode}</span>}
         {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
           <div className="text-xs text-muted-foreground mt-0.5 leading-tight">
             {Object.entries(item.selectedVariantOptions)

@@ -29,10 +29,19 @@ interface ExpenseSummary {
   uncoveredBillCount: number;
 }
 
+interface PaginationState {
+  currentPage: number;
+  totalPages: number;
+  totalCount: number;
+  limit: number;
+}
+
 interface InventoryState {
   // Core Data Stores
   products: Product[];
+  productsPagination: PaginationState;
   bills: Bill[];
+  billsPagination: PaginationState;
   categories: Category[];
   customers: Customer[];
   staffs: User[];
@@ -42,6 +51,7 @@ interface InventoryState {
 
   // Product Actions
   fetchProducts: (companyId: string) => Promise<void>;
+  fetchProductsPaginated: (companyId: string, page: number, limit: number, search?: string, sort?: { field: string, order: 'asc' | 'desc' }) => Promise<void>;
   addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
   updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
   archiveProduct: (productId: string, companyId: string) => Promise<boolean>;
@@ -62,6 +72,7 @@ interface InventoryState {
 
   // Bill Actions
   fetchBills: (companyId: string) => Promise<void>;
+  fetchBillsPaginated: (companyId: string, page: number, limit: number, options?: { storeId?: string, search?: string, startDate?: string, endDate?: string, type?: string, isEstimate?: boolean }) => Promise<void>;
   addBill: (billData: any, itemsData: any) => Promise<Bill | null>;
   deleteBill: (billId: string, companyId: string) => Promise<boolean>;
   updateBillNonCriticalDetails: (billId: string, details: { paymentStatus?: Bill['paymentStatus'], notes?: string }, companyId: string) => Promise<Bill | null>;
@@ -107,6 +118,7 @@ interface InventoryState {
   getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
   findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>) => ProductSKU | undefined;
   searchProducts: (searchTerm: string) => Product[];
+  searchProductsRemote: (companyId: string, searchTerm: string) => Promise<Product[]>;
   searchCategories: (searchTerm: string) => string[];
   getMessagesForStore: (storeId: string) => ChatMessage[];
   getStaffDetailsByIds: (staffIds: string[]) => User[];
@@ -152,7 +164,9 @@ const defaultUserProfile: UserProfile = {
 
 const storeInitialState = {
   products: [],
+  productsPagination: { currentPage: 1, totalPages: 1, totalCount: 0, limit: 50 },
   bills: [],
+  billsPagination: { currentPage: 1, totalPages: 1, totalCount: 0, limit: 50 },
   categories: [],
   customers: [],
   staffs: [],
@@ -171,20 +185,37 @@ export const useInventoryStore = create<InventoryState>()(
       // #region API-Driven Actions
       // --- Product Actions ---
       fetchProducts: async (companyId) => {
-        if (!companyId) return console.warn("fetchProducts: companyId is required");
-        // Preloading check: If we have products, don't fetch again unless forced interaction (user can reload page)
-        if (get().products.length > 0) return;
-
-        try {
-          const response = await fetch(`/api/products?companyId=${companyId}`);
-          if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
-          const result = await response.json();
-          if (result.success && Array.isArray(result.data)) set({ products: result.data || [] });
-          else { console.error("Failed to fetch products or data format incorrect:", result.message); set({ products: [] }); }
-        } catch (error) {
-          console.error("Error in fetchProducts:", error);
-          set({ products: [] });
-        }
+        // Legacy support: fetch all (or default page)
+        get().fetchProductsPaginated(companyId, 1, 0); // 0 limit means all? Or we default to 50? API says 0 is all.
+      },
+      fetchProductsPaginated: async (companyId, page, limit, search, sort) => {
+         if (!companyId) return console.warn("fetchProductsPaginated: companyId is required");
+         try {
+           const offset = (page - 1) * limit;
+           const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+           const sortParam = sort ? `&sort=${sort.field}&order=${sort.order}` : '';
+           const response = await fetch(`/api/products?companyId=${companyId}&limit=${limit}&offset=${offset}${searchParam}${sortParam}`);
+           if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
+           const result = await response.json();
+           
+           if (result.success && Array.isArray(result.data)) {
+             set({ 
+               products: result.data || [],
+               productsPagination: {
+                 currentPage: page,
+                 limit: limit,
+                 totalCount: result.totalCount || 0,
+                 totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
+               }
+             });
+           } else { 
+             console.error("Failed to fetch products or data format incorrect:", result.message); 
+             set({ products: [] }); 
+           }
+         } catch (error) {
+           console.error("Error in fetchProductsPaginated:", error);
+           set({ products: [] });
+         }
       },
       addProduct: async (productData, companyId) => {
         try {
@@ -255,17 +286,41 @@ export const useInventoryStore = create<InventoryState>()(
 
       // --- Bill Actions ---
       fetchBills: async (companyId) => {
-        if (!companyId) return console.warn("fetchBills: companyId is required");
-        if (get().bills.length > 0) return; // Cache hit
-
+        get().fetchBillsPaginated(companyId, 1, 0);
+      },
+      fetchBillsPaginated: async (companyId, page, limit, options) => {
+        if (!companyId) return console.warn("fetchBillsPaginated: companyId is required");
+        
         try {
-          const response = await fetch(`/api/bills?companyId=${companyId}`);
+          const offset = (page - 1) * limit;
+          let url = `/api/bills?companyId=${companyId}&limit=${limit}&offset=${offset}`;
+          if (options?.storeId) url += `&storeId=${options.storeId}`;
+          if (options?.search) url += `&search=${encodeURIComponent(options.search)}`;
+          if (options?.startDate) url += `&startDate=${options.startDate}`;
+          if (options?.endDate) url += `&endDate=${options.endDate}`;
+          if (options?.type) url += `&type=${options.type}`;
+          if (options?.isEstimate !== undefined) url += `&isEstimate=${options.isEstimate}`;
+
+          const response = await fetch(url);
           if (!response.ok) throw new Error(`Failed to fetch bills: ${response.statusText}`);
           const result = await response.json();
-          if (result.success && Array.isArray(result.data)) set({ bills: result.data.sort((a: Bill, b: Bill) => b.timestamp - a.timestamp) });
-          else { console.error("Failed to fetch bills or data format incorrect:", result.message); set({ bills: [] }); }
+          
+          if (result.success && Array.isArray(result.data)) {
+             set({ 
+               bills: result.data || [],
+               billsPagination: {
+                 currentPage: page,
+                 limit: limit,
+                 totalCount: result.totalCount || 0,
+                 totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
+               }
+             });
+          } else { 
+            console.error("Failed to fetch bills or data format incorrect:", result.message); 
+            set({ bills: [] }); 
+          }
         } catch (error) {
-          console.error("Error in fetchBills:", error);
+          console.error("Error in fetchBillsPaginated:", error);
           set({ bills: [] });
         }
       },
@@ -714,6 +769,18 @@ export const useInventoryStore = create<InventoryState>()(
           (p.sku || '').toLowerCase().includes(lowerSearchTerm) ||
           p.productSKUs.some(sku => sku.skuIdentifier?.toLowerCase().includes(lowerSearchTerm))
         ));
+      },
+      searchProductsRemote: async (companyId, searchTerm) => {
+        if (!searchTerm) return [];
+        try {
+          const response = await fetch(`/api/products?companyId=${companyId}&limit=20&search=${encodeURIComponent(searchTerm)}`);
+          if (!response.ok) throw new Error("Search failed");
+          const result = await response.json();
+          return result.success ? (result.data || []) : [];
+        } catch (error) {
+          console.error("searchProductsRemote error:", error);
+          return [];
+        }
       },
       searchCategories: (searchTerm: string) => {
         const lowerSearchTerm = searchTerm.toLowerCase();

@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -34,6 +34,15 @@ import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState(value);
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedValue(value), delay);
+    return () => clearTimeout(handler);
+  }, [value, delay]);
+  return debouncedValue;
+}
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
@@ -73,31 +82,35 @@ interface BillHistoryTableProps {
 
 export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate }: BillHistoryTableProps) {
   const {
-    bills: allBillsFromStore,
+    bills,
+    billsPagination,
     userProfile,
     deleteBill: deleteBillFromStore,
     getProductById,
     getSkuDetails,
     updateBillNonCriticalDetails: updateBillDetailsInStore,
     products: allProductsStore,
-    fetchBills,
+    fetchBillsPaginated,
     companyId: currentCompanyId,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
+      billsPagination: state.billsPagination,
       getProductById: state.getProductById,
       userProfile: state.userProfile,
       deleteBill: state.deleteBill,
       getSkuDetails: state.getSkuDetails,
       updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
       products: state.products,
-      fetchBills: state.fetchBills,
+      fetchBillsPaginated: state.fetchBillsPaginated,
       companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null,
     })
   );
   const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = useState('');
+  const debouncedSearchTerm = useDebounce(searchTerm, 500);
+
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
@@ -107,26 +120,57 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   type BillTypeFilter = 'all' | BillMode | 'estimate';
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
 
+  // Date Range Calculation for API
+  const dateParams = useMemo(() => {
+    const now = new Date();
+    let start: Date | undefined;
+    let end: Date | undefined;
+
+    switch (timePeriodFilter) {
+      case 'today': start = startOfDay(now); end = endOfDay(now); break;
+      case 'thisWeek': start = startOfWeek(now, { weekStartsOn: 1 }); end = endOfWeek(now, { weekStartsOn: 1 }); break;
+      case 'thisMonth': start = startOfMonth(now); end = endOfMonth(now); break;
+      case 'lastMonth': start = startOfMonth(subMonths(now, 1)); end = endOfMonth(subMonths(now, 1)); break;
+      case 'thisYear': start = startOfYear(now); end = endOfYear(now); break;
+      case 'lastYear': start = startOfYear(subYears(now, 1)); end = endOfYear(subYears(now, 1)); break;
+      case 'custom': if (customStartDate && customEndDate) { start = startOfDay(customStartDate); end = endOfDay(customEndDate); } break;
+      default: break;
+    }
+
+    return {
+      startDate: start?.toISOString(),
+      endDate: end?.toISOString()
+    };
+  }, [timePeriodFilter, customStartDate, customEndDate]);
+
+  // Fetch Bills Effect
   useEffect(() => {
     if (currentCompanyId) {
       setIsLoading(true);
-      fetchBills(currentCompanyId).finally(() => setIsLoading(false));
-    } else {
-      setIsLoading(false);
+      const options = {
+        storeId: filterByStoreId,
+        search: debouncedSearchTerm,
+        startDate: dateParams.startDate,
+        endDate: dateParams.endDate,
+        type: billTypeFilter === 'all' ? undefined : (billTypeFilter === 'estimate' ? 'sell' : billTypeFilter),
+        isEstimate: billTypeFilter === 'estimate' ? true : (billTypeFilter === 'all' ? undefined : false)
+      };
+      fetchBillsPaginated(currentCompanyId, currentPage, 50, options)
+        .finally(() => setIsLoading(false));
     }
-  }, [currentCompanyId, fetchBills]);
+  }, [currentCompanyId, currentPage, debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams, fetchBillsPaginated]);
+
+  // Reset page on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams]);
 
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
-    if (!getProductById) {
-      console.error("getProductById function is not available in findProductSKUfromStore in BillHistoryTable");
-      return undefined;
-    }
     const product = getProductById(productId);
     if (!product) return undefined;
-    if (productId.startsWith('SERVICE_ITEM_') || productId.startsWith('CHARGE_ITEM_')) return undefined;
-
     const targetOptionValues = selectedOptions || {};
     return product.productSKUs.find(sku =>
       JSON.stringify(Object.fromEntries(Object.entries(sku.optionValues).sort())) ===
@@ -134,108 +178,228 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     );
   }, [getProductById]);
 
-  const filteredAndSortedBills = useMemo(() => {
-    let processBills = [...allBillsFromStore];
-
-    if (filterByStoreId) {
-      processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
+  const requestSort = (key: SortableBillColumns) => {
+    let direction: 'ascending' | 'descending' = 'ascending';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
+      direction = 'descending';
     }
+    setSortConfig({ key, direction });
+  };
 
-    if (timePeriodFilter === 'today') {
-      processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'thisWeek') {
-      processBills = processBills.filter(bill => isThisWeek(new Date(bill.timestamp), { weekStartsOn: 1 }));
-    } else if (timePeriodFilter === 'thisMonth') {
-      processBills = processBills.filter(bill => isThisMonth(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'lastMonth') {
-      const today = new Date();
-      const firstDayLastMonth = startOfMonth(subMonths(today, 1));
-      const lastDayLastMonth = endOfMonth(subMonths(today, 1));
-      processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastMonth, end: lastDayLastMonth }));
-    } else if (timePeriodFilter === 'thisYear') {
-      processBills = processBills.filter(bill => isThisYear(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'lastYear') {
-      const today = new Date();
-      const firstDayLastYear = startOfYear(subYears(today, 1));
-      const lastDayLastYear = endOfYear(subYears(today, 1));
-      processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastYear, end: lastDayLastYear }));
-    } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
-      const start = startOfDay(customStartDate);
-      const end = endOfDay(customEndDate);
-      if (isValid(start) && isValid(end) && end >= start) {
-        processBills = processBills.filter(bill => {
-          const billDate = new Date(bill.timestamp);
-          return isWithinInterval(billDate, { start, end });
-        });
-      }
+  const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
+  const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
+  const [editableNotes, setEditableNotes] = useState<string>('');
+
+  const handleViewBill = (bill: Bill) => {
+    setSelectedBill(bill);
+    setIsEditingBillDetails(false);
+    setEditablePaymentStatus(bill.paymentStatus);
+    setEditableNotes(bill.notes || '');
+    setIsViewDialogOpen(true);
+  };
+
+  const handleDeleteBillClick = async (billId: string, billDisplayId: string) => {
+    if (!currentCompanyId) return;
+    const success = await deleteBillFromStore(billId, currentCompanyId);
+    if (success) toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
+    else toast({ variant: "destructive", title: "Deletion Failed", description: `Could not delete bill ${billDisplayId}.` });
+  };
+
+  const handleEnterEditMode = () => {
+    if (selectedBill) {
+      setEditablePaymentStatus(selectedBill.paymentStatus);
+      setEditableNotes(selectedBill.notes || '');
+      setIsEditingBillDetails(true);
     }
+  };
 
+  const handleCancelEditMode = () => setIsEditingBillDetails(false);
 
-    if (billTypeFilter !== 'all') {
-      if (billTypeFilter === 'estimate') {
-        processBills = processBills.filter(bill => bill.type === 'sell' && bill.isEstimate === true);
-      } else {
-        processBills = processBills.filter(bill => bill.type === billTypeFilter && bill.isEstimate !== true);
-      }
+  const handleSaveBillDetails = async () => {
+    if (selectedBill && currentCompanyId) {
+      const updatedBill = await updateBillDetailsInStore(selectedBill.id, {
+        paymentStatus: editablePaymentStatus,
+        notes: editableNotes,
+      }, currentCompanyId);
+      if (updatedBill) {
+        setSelectedBill(updatedBill);
+        toast({ title: "Bill Updated", description: "Details updated." });
+        setIsEditingBillDetails(false);
+      } else toast({ variant: "destructive", title: "Update Failed", description: "Could not update." });
     }
+  };
 
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      processBills = processBills.filter(bill =>
-        bill.id.toLowerCase().includes(lowerSearchTerm) ||
-        (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) ||
-        format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
-        bill.totalAmount.toString().includes(lowerSearchTerm) ||
-        (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
-        bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.billedByStaffName && bill.billedByStaffName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.storeName && bill.storeName.toLowerCase().includes(lowerSearchTerm))
-      );
-    }
 
-    if (sortConfig !== null) {
-      processBills.sort((a, b) => {
-        let valA: any = a[sortConfig.key as keyof Bill];
-        let valB: any = b[sortConfig.key as keyof Bill];
+  const handlePrintSelectedBill = (bill: Bill | null) => {
+    if (!bill || !userProfile) return;
+    const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
+    triggerPrint(printContent);
+  };
 
-        if (sortConfig.key === 'id') {
-          valA = a.id; valB = b.id;
-        } else if (sortConfig.key === 'date') {
-          valA = a.timestamp;
-          valB = b.timestamp;
-        } else if (sortConfig.key === 'type') {
-          valA = getBillTypeName(a);
-          valB = getBillTypeName(b);
-        } else if (sortConfig.key === 'billedByStaffName') {
-          valA = a.billedByStaffName || '';
-          valB = b.billedByStaffName || '';
-        } else if (sortConfig.key === 'storeName') {
-          valA = a.storeName || '';
-          valB = b.storeName || '';
-        } else if (sortConfig.key === 'paymentStatus') {
-          valA = a.paymentStatus || '';
-          valB = b.paymentStatus || '';
-        }
+  if (!currentCompanyId && !isLoading) {
+    return <div className="p-6 text-destructive text-center">Error: Company Context Missing.</div>;
+  }
 
-        let comparison = 0;
-        if (valA === undefined || valA === null) comparison = sortConfig.direction === 'ascending' ? 1 : -1;
-        else if (valB === undefined || valB === null) comparison = sortConfig.direction === 'ascending' ? -1 : 1;
-        else if (typeof valA === 'string' && typeof valB === 'string') {
-          comparison = valA.localeCompare(valB);
-        } else if (typeof valA === 'number' && typeof valB === 'number') {
-          comparison = valA - valB;
-        }
+  return (
+    <>
+      {selectedBill && (
+        <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
+          if (!open) { setSelectedBill(null); setIsEditingBillDetails(false); }
+          setIsViewDialogOpen(open);
+        }}>
+          {/* Dialog Content remains largely same as before, but ensure it uses the updated selectedBill */}
+          <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary">
+             <DialogHeader className="border-b pb-4 mb-4">
+              <DialogTitle className={cn("flex items-center gap-2 text-xl", getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor)}>
+                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon, { className: "h-6 w-6" })}
+                Bill Details {selectedBill.isEstimate && "(Estimate)"}
+              </DialogTitle>
+              <DialogDescription>{getBillTypeName(selectedBill)} (ID: <span className="font-mono">{selectedBill.id}</span>)</DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="max-h-[65vh] p-1">
+               <div className="space-y-6 py-2 px-2">
+                 {/* Bill details view - reusing previous logic */}
+                 <div className="p-4 border rounded-md bg-card shadow-sm">
+                    <h3 className="text-lg font-semibold text-primary">{userProfile?.companyName}</h3>
+                    <p className="text-sm text-muted-foreground">{userProfile?.companyAddress}</p>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 border rounded-md bg-card">
+                       <h4 className="text-sm font-semibold mb-2">{getPartyDetailsTitle(selectedBill.type)}</h4>
+                       <p className="text-sm font-medium">{selectedBill.vendorOrCustomerName || '-'}</p>
+                       <p className="text-sm text-muted-foreground">{selectedBill.customerPhone}</p>
+                    </div>
+                    <div className="p-4 border rounded-md bg-card">
+                       <h4 className="text-sm font-semibold mb-2">Info</h4>
+                       <p className="text-sm">Date: {format(new Date(selectedBill.date), 'PPpp')}</p>
+                       {isEditingBillDetails ? (
+                         <div className="mt-2"><Label>Status</Label><Select value={editablePaymentStatus} onValueChange={v => setEditablePaymentStatus(v as any)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="paid">Paid</SelectItem><SelectItem value="unpaid">Unpaid</SelectItem></SelectContent></Select></div>
+                       ) : <Badge className="mt-1 capitalize">{selectedBill.paymentStatus || 'N/A'}</Badge>}
+                    </div>
+                 </div>
 
-        return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
-      });
-    } else {
-      processBills.sort((a, b) => b.timestamp - a.timestamp);
-    }
+                 <Table>
+                    <TableHeader><TableRow><TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                       {selectedBill.items.map(item => (
+                         <TableRow key={item.id}>
+                            <TableCell className="text-sm">{item.productName}</TableCell>
+                            <TableCell className="text-right">{item.quantity}</TableCell>
+                            <TableCell className="text-right">₹{((item.sellPrice || item.costPrice || 0) * item.quantity).toFixed(2)}</TableCell>
+                         </TableRow>
+                       ))}
+                    </TableBody>
+                 </Table>
+                 
+                 <div className="p-4 border rounded-md bg-muted/30">
+                    <div className="flex justify-between font-bold text-lg"><span>Total Amount:</span><span>₹{selectedBill.totalAmount.toFixed(2)}</span></div>
+                 </div>
+               </div>
+            </ScrollArea>
+            <DialogFooter className="pt-4 border-t flex justify-between">
+               <div className="flex gap-2">
+                {!isEditingBillDetails ? (
+                   <Button variant="outline" onClick={handleEnterEditMode} disabled={selectedBill.isEstimate}><Edit2 className="mr-2 h-4 w-4"/> Edit</Button>
+                ) : (
+                   <Button onClick={handleSaveBillDetails}><Save className="mr-2 h-4 w-4"/> Save</Button>
+                )}
+               </div>
+               <div className="flex gap-2">
+                 <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}><Printer className="h-4 w-4"/></Button>
+                 <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
+               </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
 
-    return processBills;
-  }, [allBillsFromStore, searchTerm, sortConfig, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]);
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
+        <Input
+          placeholder="Search bills..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="max-w-md w-full md:w-auto bg-background"
+        />
+        <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
+          <SelectTrigger className="w-full md:w-[180px] bg-background">
+            <SelectValue placeholder="Filter by type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="sell">Sales</SelectItem>
+            <SelectItem value="estimate">Estimates</SelectItem>
+            <SelectItem value="buy">Expenses</SelectItem>
+            <SelectItem value="return">Returns</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-[120px]">Date</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Party Details</TableHead>
+              <TableHead className="text-right">Total Amount</TableHead>
+              <TableHead className="text-center">Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow><TableCell colSpan={6} className="h-48 text-center"><LoadingSpinner text="Loading bills..." /></TableCell></TableRow>
+            ) : bills.length > 0 ? (
+              bills.map((bill) => {
+                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
+                return (
+                  <TableRow key={bill.id}>
+                    <TableCell className="py-3">
+                      <div className="flex flex-col">
+                        <span className="font-bold">{format(new Date(bill.date), 'dd MMM')}</span>
+                        <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'p')}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={cn("text-xs", billDisplayInfo.className)}>{billDisplayInfo.name}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="font-medium">{bill.vendorOrCustomerName || '-'}</div>
+                      <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-primary">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant="outline" className="capitalize">{bill.paymentStatus || '-'}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                       <Button variant="ghost" size="sm" onClick={() => handleViewBill(bill)}><Eye className="h-4 w-4"/></Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
+            ) : (
+              <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No bills found.</TableCell></TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
+      
+      {/* Pagination Controls */}
+      {billsPagination.totalPages > 1 && (
+         <div className="flex items-center justify-end space-x-2 py-4">
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+              <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+            </Button>
+            <div className="text-sm font-medium">Page {currentPage} of {billsPagination.totalPages}</div>
+            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(billsPagination.totalPages, p + 1))} disabled={currentPage === billsPagination.totalPages}>
+              Next <ChevronRight className="h-4 w-4 ml-1" />
+            </Button>
+         </div>
+       )}
+    </>
+  );
+}
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';

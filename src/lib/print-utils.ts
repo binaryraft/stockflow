@@ -153,7 +153,7 @@ export const generateBillPrintContent = (
   billToPrint.items.forEach((item, index) => {
     // Attempt to find product to get HSN if not on item (though usually it should be on item snapshot if we stored it, but we can look up)
     const product = products.find(p => p.id === item.productId);
-    const hsn = product?.hsnCode || '-';
+    const hsn = item.hsnCode || product?.hsnCode || '-';
 
     // Calculations
     const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;

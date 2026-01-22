@@ -74,6 +74,7 @@ export interface BillItem {
   discountAmount?: number;
   isAdditionalCharge?: boolean;
   sourceChargeDefinitionId?: string;
+  hsnCode?: string;
 }
 
 export interface Bill {
@@ -180,6 +181,7 @@ export interface UserProfile {
   companySlogan?: string;
   companyPhone?: string;
   companyAddress?: string;
+  companyEmail?: string;
   companyGstNo?: string;
   activeSubscriptionId: string;
   dataMode: 'local' | 'global';

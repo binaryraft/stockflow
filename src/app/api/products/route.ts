@@ -18,9 +18,22 @@ export async function GET(req: NextRequest) {
 
     const limit = parseInt(searchParams.get('limit') || '0', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
+    const searchTerm = searchParams.get('search') || '';
+    const sortField = searchParams.get('sort') || '_id';
+    const sortOrder = searchParams.get('order') === 'asc' ? 1 : -1;
 
-    let cursor = db.collection<Product>('products').find({ companyId });
-    const totalCount = await db.collection<Product>('products').countDocuments({ companyId });
+    let query: any = { companyId };
+    if (searchTerm) {
+      const regex = new RegExp(searchTerm, 'i');
+      query.$or = [
+        { name: regex },
+        { category: regex },
+        { 'productSKUs.skuIdentifier': regex }
+      ];
+    }
+
+    let cursor = db.collection<Product>('products').find(query).sort({ [sortField]: sortOrder });
+    const totalCount = await db.collection<Product>('products').countDocuments(query);
 
     if (offset > 0) cursor = cursor.skip(offset);
     if (limit > 0) cursor = cursor.limit(limit);

@@ -463,7 +463,6 @@ export function NewProductDialog({
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
-        agstRate: undefined, // Typo in original file? No it was cgstRate
         sgstRate: undefined,
         cgstRate: undefined,
         hsnCode: '',

@@ -121,6 +121,19 @@ export function BillingForm({
     setActivePlan(getActiveSubscriptionPlan());
   }, [getAllStores, getActiveSubscriptionPlan]);
 
+  // Auto-detect Tax Type based on GSTIN
+  useEffect(() => {
+    if (gstin && gstin.length >= 2 && userProfile?.companyGstNo && userProfile.companyGstNo.length >= 2) {
+      const customerStateCode = gstin.substring(0, 2);
+      const companyStateCode = userProfile.companyGstNo.substring(0, 2);
+      if (customerStateCode !== companyStateCode) {
+        setTaxType('inter-state');
+      } else {
+        setTaxType('intra-state');
+      }
+    }
+  }, [gstin, userProfile?.companyGstNo]);
+
   const finalStoreIdForSkuDetails = useMemo(() => {
     return isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
   }, [isAdminContext, selectedStoreIdForAdmin, storeIdFromProp]);
@@ -220,7 +233,8 @@ export function BillingForm({
       sgstAmount: sgst,
       cgstAmount: cgst,
       igstAmount: igst,
-      isAdditionalCharge: false
+      isAdditionalCharge: false,
+      hsnCode: product.hsnCode
     };
 
     setCurrentBillItems(prev => [...prev, newItem]);
@@ -253,7 +267,7 @@ export function BillingForm({
       date: billDate?.toISOString(),
       storeIdForBill: isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp,
       paymentStatus: isPaid ? 'paid' : 'unpaid',
-      // gstin: gstin // TODO: Add to payload type if needed for backend
+      gstin: gstin
     };
 
     if (!isAdminContext && storeIdFromProp) {
