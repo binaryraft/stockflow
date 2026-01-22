@@ -15,7 +15,9 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2 } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText } from 'lucide-react';
+import { BillingProductSelector } from './billing-product-selector';
+import { Textarea } from '@/components/ui/textarea';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -124,6 +126,10 @@ export function BillingForm({
   const [isPaid, setIsPaid] = useState(true);
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
   const [taxType, setTaxType] = useState<'intra-state' | 'inter-state'>('intra-state');
+  const [customerGstin, setCustomerGstin] = useState('');
+  const [placeOfSupply, setPlaceOfSupply] = useState('');
+  const [billingAddress, setBillingAddress] = useState('');
+  const [shippingAddress, setShippingAddress] = useState('');
 
   const [productNotFoundHint, setProductNotFoundHint] = useState('');
   const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
@@ -272,6 +278,10 @@ export function BillingForm({
     setCurrentBillItems([]);
     setCustomerVendorName('');
     setCustomerPhone('');
+    setCustomerGstin('');
+    setPlaceOfSupply('');
+    setBillingAddress('');
+    setShippingAddress('');
 
     setNotes(userProfile.defaultBillNotes || '');
     if (mode === 'sell') {
@@ -1003,6 +1013,10 @@ export function BillingForm({
       isEstimate: mode === 'sell' ? isEstimateMode : undefined,
       taxType: taxType,
       date: billDate ? billDate.toISOString() : new Date().toISOString(),
+      gstin: customerGstin || undefined,
+      placeOfSupply: placeOfSupply || undefined,
+      billingAddress: billingAddress || undefined,
+      shippingAddress: shippingAddress || undefined,
     };
 
     if (!isAdminContext && storeIdFromProp) {
@@ -1268,223 +1282,35 @@ export function BillingForm({
             <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
               <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
             </h3>
-            <div className={cn(
-              "grid gap-4 items-baseline",
-              "grid-cols-1",
-              mode === 'buy' ? "md:grid-cols-[1fr_auto_auto_auto_auto_auto]" : "md:grid-cols-[1fr_auto_auto_auto_auto]"
-            )}>
-              <div className="space-y-1.5 flex-grow">
-                <Label htmlFor="productNameGlobal">Product Name / SKU / Barcode</Label>
-                <div className="flex items-center gap-2">
-                  <ProductSearchInput
-                    inputRef={productNameInputRef}
-                    value={productNameQuery}
-                    onValueChange={(v) => {
-                      setProductNameQuery(v);
-                      if (!v) {
-                        setCurrentProductForSelection(null);
-                        setSelectedVariantOptions({});
-                        setProductNotFoundHint('');
-                        updateSkuDisplayInfo(undefined);
-                        setIsDisplayingLayerStock(false);
-                      }
-                    }}
-                    onProductSelect={handleProductSelectFromSearch}
-                    onEnterWithoutSelection={handleProductNameSubmit}
-                    placeholder={mode === 'return' ? 'Scan or type product, then Enter' : 'Scan barcode, or type product name/SKU, then Enter'}
-                    id="productNameGlobal"
-                    className="flex-grow"
-                    currentMode={mode}
-                  />
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleBarcodeIconClick} className="shrink-0" aria-label="Scan Hardware Barcode">
-                          <BarcodeIconLucide className="h-5 w-5 text-primary" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>{currentProductForSelection ? `Update Barcode for ${currentProductForSelection.name}` : "Scan Barcode to Add Item"}</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                  {currentProductForSelection && isAdminContext && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="ghost" size="icon" onClick={handleEditProductClick} className="shrink-0" aria-label="Edit selected product">
-                            <Edit3 className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Edit {currentProductForSelection.name}</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                </div>
-                {isLoadingProductSearch && <div className="text-xs text-muted-foreground flex items-center gap-1 mt-1"><Loader2 className="h-3 w-3 animate-spin" /> Searching...</div>}
-                {currentProductForSelection && (
-                  <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
-                    <span>Selected: {getSkuDetails(currentProductForSelection.productSKUs.find(sku => JSON.stringify(Object.entries(sku.optionValues).sort()) === JSON.stringify(Object.entries(selectedVariantOptions).sort())), finalStoreIdForSkuDetails)?.skuIdentifier || currentProductForSelection.name}</span>
-                    {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
-                      <span className="block">
-                        {isDisplayingLayerStock && mode === 'sell' ? `Layer Stock: ${currentSkuStock.toFixed(2)}` : `Total Stock: ${currentSkuStock.toFixed(2)}`}
-                      </span>
-                    )}
-                    {currentSkuSellPrice !== null && (
-                      <span className="block">
-                        Current Sell Price: Ôé╣{currentSkuSellPrice.toFixed(2)}
-                        {currentProductForSelection.trackQuantity && (isDisplayingLayerStock && mode === 'sell' ? "" : " (from oldest batch)")}
-                      </span>
-                    )}
-                    {mode === 'sell' && !isEstimateMode && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && !currentProductForSelection.id?.startsWith('SERVICE_ITEM_') && (
-                      <span className="block text-primary/80">
-                        Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%
-                      </span>
-                    )}
-                  </div>
-                )}
-                {productNotFoundHint && productNameQuery.toLowerCase() === productNotFoundHint.toLowerCase() && (
-                  <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
-                    <Info size={16} className="text-accent shrink-0" />
-                    Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter again to add it as a new product.
-                  </div>
-                )}
-              </div>
-
-              <div className="space-y-1.5 w-full md:w-24">
-                <Label htmlFor="quantityGlobal">Quantity</Label>
-                <Input
-                  id="quantityGlobal"
-                  ref={quantityInputRef}
-                  type="number"
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}
-                  onFocus={(e) => e.target.select()}
-                  step="any"
-                  min="0.01"
-                  placeholder="1"
-                />
-              </div>
-
-              {mode === 'buy' && (
-                <>
-                  <div className="space-y-1.5 w-full md:w-32">
-                    <Label htmlFor="costPrice">Cost Price/Unit</Label>
-                    <Input
-                      id="costPrice"
-                      ref={costPriceInputRef}
-                      type="number"
-                      value={costPrice}
-                      onChange={(e) => setCostPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('costPrice'))}
-                      onFocus={(e) => e.target.select()}
-                      step="0.01" min="0" placeholder="0.00"
-                    />
-                  </div>
-                  <div className="space-y-1.5 w-full md:w-32">
-                    <Label htmlFor="sellPriceGlobalBuy">Sell Price/Unit (Set for this Batch)</Label>
-                    <Input
-                      id="sellPriceGlobalBuy"
-                      ref={sellPriceBatchInputRef}
-                      type="number"
-                      value={sellPrice}
-                      onChange={(e) => setSellPrice(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('sellPrice'))}
-                      onFocus={(e) => e.target.select()}
-                      step="0.01" min="0" placeholder="0.00"
-                    />
-                  </div>
-                </>
-              )}
-
-              <Button onClick={handleAddNewItem} className="w-full md:w-auto self-end bg-primary hover:bg-primary/90 min-w-[5rem]" variant="default">
-                <CornerDownLeft className="mr-2 h-4 w-4" /> Add
-              </Button>
-            </div>
-
-            {currentProductForSelection && currentProductForSelection.variants && currentProductForSelection.variants.length > 0 && (
-              <div className={cn(`grid md:grid-cols-${Math.min(currentProductForSelection.variants.length, 3)} gap-4 mt-3 items-end`)}>
-                {currentProductForSelection.variants.map((variant, index) => {
-                  if (!variantSelectRefs.current[variant.id]) {
-                    variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
-                  }
-                  return (
-                    <div key={variant.id} className="space-y-1.5">
-                      <Label htmlFor={`variant-select-${variant.id}-trigger`}>{variant.name}</Label>
-                      <Select
-                        open={variantDropdownOpenState[variant.id] || false}
-                        onOpenChange={(isOpen) => {
-                          setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
-                        }}
-                        value={selectedVariantOptions[variant.name] || ""}
-                        onValueChange={(value) => {
-                          setSelectedVariantOptions((prev) => ({ ...prev, [variant.name]: value }));
-                          setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: false }));
-
-                          const currentIndex = currentProductForSelection!.variants!.findIndex(v_ => v_.id === variant.id);
-                          if (currentIndex < currentProductForSelection!.variants!.length - 1) {
-                            const nextVariantId = currentProductForSelection!.variants![currentIndex + 1].id;
-                            setTimeout(() => {
-                              setVariantDropdownOpenState((prev) => ({ ...prev, [nextVariantId]: true }));
-                              variantSelectRefs.current[nextVariantId]?.current?.focus();
-                            }, 50);
-                          } else {
-                            setTimeout(() => {
-                              quantityInputRef.current?.focus();
-                              quantityInputRef.current?.select();
-                            }, 50);
-                          }
-                        }}
-                      >
-                        <SelectTrigger
-                          id={`variant-select-${variant.id}-trigger`}
-                          ref={variantSelectRefs.current[variant.id]}
-                          className="w-full select-trigger-class"
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !variantDropdownOpenState[variant.id]) {
-                              e.preventDefault();
-                              setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: true }));
-                            } else if (e.key === 'Tab' && !e.shiftKey) {
-                              if (index < currentProductForSelection!.variants!.length - 1) {
-                                e.preventDefault();
-                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
-                                const nextVariantId = currentProductForSelection!.variants![index + 1].id;
-                                setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
-                                variantSelectRefs.current[nextVariantId]?.current?.focus();
-                              } else if (index === currentProductForSelection!.variants!.length - 1) {
-                                e.preventDefault();
-                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
-                                quantityInputRef.current?.focus();
-                                quantityInputRef.current?.select();
-                              }
-                            }
-                          }}
-                        >
-                          <SelectValue placeholder={`Select ${variant.name}`} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {variant.options.map((option) => (
-                            <SelectItem key={option.id} value={option.value}>
-                              {option.value}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {mode === 'return' && (
-              <div className="flex items-center space-x-2 pt-2">
-                <Switch
-                  id="isDefective"
-                  checked={returnItemIsDefective}
-                  onCheckedChange={setReturnItemIsDefective}
-                />
-                <Label htmlFor="isDefective">Item is defective</Label>
-              </div>
-            )}
+            <BillingProductSelector
+              mode={mode}
+              productNameQuery={productNameQuery}
+              setProductNameQuery={setProductNameQuery}
+              isLoadingProductSearch={isLoadingProductSearch}
+              currentProductForSelection={currentProductForSelection}
+              setCurrentProductForSelection={setCurrentProductForSelection}
+              selectedVariantOptions={selectedVariantOptions}
+              setSelectedVariantOptions={setSelectedVariantOptions}
+              quantity={quantity}
+              setQuantity={setQuantity}
+              costPrice={costPrice}
+              setCostPrice={setCostPrice}
+              sellPrice={sellPrice}
+              setSellPrice={setSellPrice}
+              currentSkuStock={currentSkuStock}
+              currentSkuSellPrice={currentSkuSellPrice}
+              isDisplayingLayerStock={isDisplayingLayerStock}
+              onAddProduct={handleAddNewItem}
+              onScannerClick={handleBarcodeIconClick}
+              onEditProductClick={handleEditProductClick}
+              productNotFoundHint={productNotFoundHint}
+              handleProductSelectFromSearch={handleProductSelectFromSearch}
+              handleProductNameSubmit={handleProductNameSubmit}
+              finalStoreIdForSkuDetails={finalStoreIdForSkuDetails}
+              returnItemIsDefective={returnItemIsDefective}
+              setReturnItemIsDefective={setReturnItemIsDefective}
+              productNameInputRef={productNameInputRef}
+            />
           </div>
 
           <div className="flex-grow overflow-hidden">
@@ -1510,49 +1336,51 @@ export function BillingForm({
             </ScrollArea>
           </div>
 
-          {(mode === 'sell' || mode === 'buy') && (
-            <div className="pt-4 border-t border-dashed mt-auto space-y-3">
-              <h3 className="text-md font-medium text-foreground flex items-center gap-2">
-                <CircleDollarSign size={18} className="text-muted-foreground" /> Add Ad-hoc Service / Charge
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
-                <div className="space-y-1.5">
-                  <Label htmlFor="serviceDescription">Description</Label>
-                  <Input
-                    id="serviceDescription"
-                    ref={serviceDescriptionInputRef}
-                    value={serviceDescription}
-                    onChange={(e) => setServiceDescription(e.target.value)}
-                    placeholder="e.g., Delivery Fee, Repair Service"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceDescription'))}
-                  />
+          {
+            (mode === 'sell' || mode === 'buy') && (
+              <div className="pt-4 border-t border-dashed mt-auto space-y-3">
+                <h3 className="text-md font-medium text-foreground flex items-center gap-2">
+                  <CircleDollarSign size={18} className="text-muted-foreground" /> Add Ad-hoc Service / Charge
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="serviceDescription">Description</Label>
+                    <Input
+                      id="serviceDescription"
+                      ref={serviceDescriptionInputRef}
+                      value={serviceDescription}
+                      onChange={(e) => setServiceDescription(e.target.value)}
+                      placeholder="e.g., Delivery Fee, Repair Service"
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceDescription'))}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="serviceAmount">Amount</Label>
+                    <Input
+                      id="serviceAmount"
+                      ref={serviceAmountInputRef}
+                      type="number"
+                      value={serviceAmount}
+                      onChange={(e) => setServiceAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                  <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                  </Button>
                 </div>
-                <div className="space-y-1.5">
-                  <Label htmlFor="serviceAmount">Amount</Label>
-                  <Input
-                    id="serviceAmount"
-                    ref={serviceAmountInputRef}
-                    type="number"
-                    value={serviceAmount}
-                    onChange={(e) => setServiceAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
-                    placeholder="0.00"
-                    step="0.01"
-                    min="0"
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
-                    onFocus={(e) => e.target.select()}
-                  />
-                </div>
-                <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Add Service
-                </Button>
               </div>
-            </div>
-          )}
-        </CardContent>
+            )
+          }
+        </CardContent >
 
         <Separator className="my-0" />
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="customerVendorName">{mode === 'buy' ? 'Vendor Name' : (mode === 'sell' ? 'Customer Name' : 'Party Name')}</Label>
               <Input
@@ -1563,20 +1391,67 @@ export function BillingForm({
                 placeholder={`Enter ${mode === 'buy' ? 'vendor' : (mode === 'sell' ? 'customer' : 'party')} name (optional)`}
               />
             </div>
-            {mode !== 'buy' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="customerPhone">Customer Phone</Label>
-                <Input
-                  id="customerPhone"
-                  ref={customerPhoneInputRef}
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  placeholder="Enter customer phone (optional)"
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="customerPhone">{mode === 'buy' ? 'Vendor' : 'Customer'} Phone</Label>
+              <Input
+                id="customerPhone"
+                ref={customerPhoneInputRef}
+                type="tel"
+                value={customerPhone}
+                onChange={(e) => setCustomerPhone(e.target.value)}
+                placeholder={`Enter ${mode === 'buy' ? 'vendor' : 'customer'} phone (optional)`}
+              />
+            </div>
+
+            {(mode === 'sell' || mode === 'return') && (
+              <>
+                <div className="space-y-1.5">
+                  <Label htmlFor="customerGstin" className="flex items-center gap-1.5">
+                    <ReceiptText size={14} className="text-muted-foreground" /> Party GSTIN
+                  </Label>
+                  <Input
+                    id="customerGstin"
+                    value={customerGstin}
+                    onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                    placeholder="Enter Party GSTIN (optional)"
+                    className="uppercase"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="placeOfSupply" className="flex items-center gap-1.5">
+                    <MapPin size={14} className="text-muted-foreground" /> Place of Supply
+                  </Label>
+                  <Input
+                    id="placeOfSupply"
+                    value={placeOfSupply}
+                    onChange={(e) => setPlaceOfSupply(e.target.value)}
+                    placeholder="e.g. Maharashtra (27)"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="billingAddress">Billing Address</Label>
+                  <Textarea
+                    id="billingAddress"
+                    value={billingAddress}
+                    onChange={(e) => setBillingAddress(e.target.value)}
+                    placeholder="Enter complete billing address"
+                    rows={2}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="shippingAddress">Shipping Address</Label>
+                  <Textarea
+                    id="shippingAddress"
+                    value={shippingAddress}
+                    onChange={(e) => setShippingAddress(e.target.value)}
+                    placeholder="Enter shipping address (if different)"
+                    rows={2}
+                  />
+                </div>
+              </>
             )}
-            <div className={cn("space-y-1.5", mode === 'buy' && "md:col-span-2")}>
+
+            <div className={cn("space-y-1.5", (mode === 'buy' || mode === 'return') ? "md:col-span-2" : "md:col-span-2")}>
               <Label htmlFor="notes">Notes</Label>
               <Input
                 id="notes"
@@ -1656,7 +1531,7 @@ export function BillingForm({
             </Button>
           </div>
         </CardFooter>
-      </Card>
+      </Card >
 
       <EmployeePasskeyDialog
         isOpen={isVerifyEmployeeDialogOpen}
@@ -1699,6 +1574,6 @@ export function BillingForm({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   );
 }

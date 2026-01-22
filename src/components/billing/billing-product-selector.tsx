@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { CornerDownLeft, Barcode as BarcodeIconLucide, Info, Loader2, Edit3 } from 'lucide-react';
+import { CornerDownLeft, Barcode as BarcodeIconLucide, Info, Loader2, Edit3, Settings2 } from 'lucide-react';
 import { ProductSearchInput, type ProductSearchSuggestion } from './product-search-input';
 import { Product, ProductSKU, BillMode } from '@/types';
 import { cn } from '@/lib/utils';
@@ -145,10 +145,13 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                 </span>
                             )}
                             {currentSkuSellPrice !== null && (
-                                <span className="block">Price: ₹{currentSkuSellPrice.toFixed(2)}</span>
+                                <span className="block italic">Price: ₹{currentSkuSellPrice.toFixed(2)}</span>
                             )}
                             {mode === 'sell' && currentProductForSelection.hsnCode && (
-                                <span className="block text-primary/80">HSN: {currentProductForSelection.hsnCode}</span>
+                                <span className="block text-primary/80 font-medium">HSN: {currentProductForSelection.hsnCode}</span>
+                            )}
+                            {mode === 'sell' && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && (
+                                <span className="block text-primary/70">Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%</span>
                             )}
                         </div>
                     )}
@@ -216,25 +219,51 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
             {/* Variants */}
             {currentProductForSelection?.variants && currentProductForSelection.variants.length > 0 && (
                 <div className="grid md:grid-cols-3 gap-4 mt-3">
-                    {currentProductForSelection.variants.map((variant) => (
-                        <div key={variant.id} className="space-y-1.5">
-                            <Label>{variant.name}</Label>
-                            <Select
-                                value={selectedVariantOptions[variant.name] || ""}
-                                onValueChange={(val) => {
-                                    setSelectedVariantOptions(prev => ({ ...prev, [variant.name]: val }));
-                                    // Logic to focus next or quantity
-                                }}
-                            >
-                                <SelectTrigger><SelectValue placeholder={`Select ${variant.name}`} /></SelectTrigger>
-                                <SelectContent>
-                                    {variant.options.map(opt => (
-                                        <SelectItem key={opt.id} value={opt.value}>{opt.value}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    ))}
+                    {currentProductForSelection.variants.map((variant, index) => {
+                        if (!variantSelectRefs.current[variant.id]) {
+                            variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
+                        }
+                        return (
+                            <div key={variant.id} className="space-y-1.5">
+                                <Label>{variant.name}</Label>
+                                <Select
+                                    open={variantDropdownOpenState[variant.id] || false}
+                                    onOpenChange={(isOpen) => {
+                                        setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
+                                    }}
+                                    value={selectedVariantOptions[variant.name] || ""}
+                                    onValueChange={(val) => {
+                                        setSelectedVariantOptions(prev => ({ ...prev, [variant.name]: val }));
+                                        setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+
+                                        // Focus next variant or quantity
+                                        const currentIndex = currentProductForSelection.variants!.findIndex(v => v.id === variant.id);
+                                        if (currentIndex < currentProductForSelection.variants!.length - 1) {
+                                            const nextVariantId = currentProductForSelection.variants![currentIndex + 1].id;
+                                            setTimeout(() => {
+                                                setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
+                                                variantSelectRefs.current[nextVariantId]?.current?.focus();
+                                            }, 50);
+                                        } else {
+                                            setTimeout(() => {
+                                                quantityInputRef.current?.focus();
+                                                quantityInputRef.current?.select();
+                                            }, 50);
+                                        }
+                                    }}
+                                >
+                                    <SelectTrigger ref={variantSelectRefs.current[variant.id]}>
+                                        <SelectValue placeholder={`Select ${variant.name}`} />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {variant.options.map(opt => (
+                                            <SelectItem key={opt.id} value={opt.value}>{opt.value}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </div>
