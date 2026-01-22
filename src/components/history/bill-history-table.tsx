@@ -236,239 +236,25 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     triggerPrint(printContent);
   };
 
-  if (!currentCompanyId && !isLoading) {
-    return <div className="p-6 text-destructive text-center">Error: Company Context Missing.</div>;
-  }
+  const filteredAndSortedBills = useMemo(() => {
+    if (!bills) return [];
+    const res = [...bills];
+    if (sortConfig) {
+      res.sort((a, b) => {
+        // Handle nested properties or specific keys if needed
+        let aValue: any = a[sortConfig.key as keyof Bill];
+        let bValue: any = b[sortConfig.key as keyof Bill];
 
-  return (
-    <>
-      {selectedBill && (
-        <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
-          if (!open) { setSelectedBill(null); setIsEditingBillDetails(false); }
-          setIsViewDialogOpen(open);
-        }}>
-          {/* Dialog Content remains largely same as before, but ensure it uses the updated selectedBill */}
-          <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary">
-             <DialogHeader className="border-b pb-4 mb-4">
-              <DialogTitle className={cn("flex items-center gap-2 text-xl", getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor)}>
-                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon, { className: "h-6 w-6" })}
-                Bill Details {selectedBill.isEstimate && "(Estimate)"}
-              </DialogTitle>
-              <DialogDescription>{getBillTypeName(selectedBill)} (ID: <span className="font-mono">{selectedBill.id}</span>)</DialogDescription>
-            </DialogHeader>
-            <ScrollArea className="max-h-[65vh] p-1">
-               <div className="space-y-6 py-2 px-2">
-                 {/* Bill details view - reusing previous logic */}
-                 <div className="p-4 border rounded-md bg-card shadow-sm">
-                    <h3 className="text-lg font-semibold text-primary">{userProfile?.companyName}</h3>
-                    <p className="text-sm text-muted-foreground">{userProfile?.companyAddress}</p>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="p-4 border rounded-md bg-card">
-                       <h4 className="text-sm font-semibold mb-2">{getPartyDetailsTitle(selectedBill.type)}</h4>
-                       <p className="text-sm font-medium">{selectedBill.vendorOrCustomerName || '-'}</p>
-                       <p className="text-sm text-muted-foreground">{selectedBill.customerPhone}</p>
-                    </div>
-                    <div className="p-4 border rounded-md bg-card">
-                       <h4 className="text-sm font-semibold mb-2">Info</h4>
-                       <p className="text-sm">Date: {format(new Date(selectedBill.date), 'PPpp')}</p>
-                       {isEditingBillDetails ? (
-                         <div className="mt-2"><Label>Status</Label><Select value={editablePaymentStatus} onValueChange={v => setEditablePaymentStatus(v as any)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="paid">Paid</SelectItem><SelectItem value="unpaid">Unpaid</SelectItem></SelectContent></Select></div>
-                       ) : <Badge className="mt-1 capitalize">{selectedBill.paymentStatus || 'N/A'}</Badge>}
-                    </div>
-                 </div>
+        // Specific handling for 'storeName' if it's not directly on bill or we want to sort by it
+        // The type SortableBillColumns includes storeName and billedByStaffName which are on the Bill object as per my previous read (lines 118)
 
-                 <Table>
-                    <TableHeader><TableRow><TableHead>Item</TableHead><TableHead className="text-right">Qty</TableHead><TableHead className="text-right">Total</TableHead></TableRow></TableHeader>
-                    <TableBody>
-                       {selectedBill.items.map(item => (
-                         <TableRow key={item.id}>
-                            <TableCell className="text-sm">{item.productName}</TableCell>
-                            <TableCell className="text-right">{item.quantity}</TableCell>
-                            <TableCell className="text-right">₹{((item.sellPrice || item.costPrice || 0) * item.quantity).toFixed(2)}</TableCell>
-                         </TableRow>
-                       ))}
-                    </TableBody>
-                 </Table>
-                 
-                 <div className="p-4 border rounded-md bg-muted/30">
-                    <div className="flex justify-between font-bold text-lg"><span>Total Amount:</span><span>₹{selectedBill.totalAmount.toFixed(2)}</span></div>
-                 </div>
-               </div>
-            </ScrollArea>
-            <DialogFooter className="pt-4 border-t flex justify-between">
-               <div className="flex gap-2">
-                {!isEditingBillDetails ? (
-                   <Button variant="outline" onClick={handleEnterEditMode} disabled={selectedBill.isEstimate}><Edit2 className="mr-2 h-4 w-4"/> Edit</Button>
-                ) : (
-                   <Button onClick={handleSaveBillDetails}><Save className="mr-2 h-4 w-4"/> Save</Button>
-                )}
-               </div>
-               <div className="flex gap-2">
-                 <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}><Printer className="h-4 w-4"/></Button>
-                 <DialogClose asChild><Button variant="ghost">Close</Button></DialogClose>
-               </div>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
-        <Input
-          placeholder="Search bills..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md w-full md:w-auto bg-background"
-        />
-        <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
-          <SelectTrigger className="w-full md:w-[180px] bg-background">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Types</SelectItem>
-            <SelectItem value="sell">Sales</SelectItem>
-            <SelectItem value="estimate">Estimates</SelectItem>
-            <SelectItem value="buy">Expenses</SelectItem>
-            <SelectItem value="return">Returns</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[120px]">Date</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Party Details</TableHead>
-              <TableHead className="text-right">Total Amount</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="h-48 text-center"><LoadingSpinner text="Loading bills..." /></TableCell></TableRow>
-            ) : bills.length > 0 ? (
-              bills.map((bill) => {
-                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
-                return (
-                  <TableRow key={bill.id}>
-                    <TableCell className="py-3">
-                      <div className="flex flex-col">
-                        <span className="font-bold">{format(new Date(bill.date), 'dd MMM')}</span>
-                        <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'p')}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={cn("text-xs", billDisplayInfo.className)}>{billDisplayInfo.name}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{bill.vendorOrCustomerName || '-'}</div>
-                      <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>
-                    </TableCell>
-                    <TableCell className="text-right font-bold text-primary">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge variant="outline" className="capitalize">{bill.paymentStatus || '-'}</Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                       <Button variant="ghost" size="sm" onClick={() => handleViewBill(bill)}><Eye className="h-4 w-4"/></Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })
-            ) : (
-              <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No bills found.</TableCell></TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      
-      {/* Pagination Controls */}
-      {billsPagination.totalPages > 1 && (
-         <div className="flex items-center justify-end space-x-2 py-4">
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-              <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-            </Button>
-            <div className="text-sm font-medium">Page {currentPage} of {billsPagination.totalPages}</div>
-            <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(billsPagination.totalPages, p + 1))} disabled={currentPage === billsPagination.totalPages}>
-              Next <ChevronRight className="h-4 w-4 ml-1" />
-            </Button>
-         </div>
-       )}
-    </>
-  );
-}
-
-  const requestSort = (key: SortableBillColumns) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
+        if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
+        return 0;
+      });
     }
-    setSortConfig({ key, direction });
-  };
-
-  const [isEditingBillDetails, setIsEditingBillDetails] = useState(false);
-  const [editablePaymentStatus, setEditablePaymentStatus] = useState<Bill['paymentStatus']>(undefined);
-  const [editableNotes, setEditableNotes] = useState<string>('');
-
-  const handleViewBill = (bill: Bill) => {
-    setSelectedBill(bill);
-    setIsEditingBillDetails(false);
-    setEditablePaymentStatus(bill.paymentStatus);
-    setEditableNotes(bill.notes || '');
-    setIsViewDialogOpen(true);
-  };
-
-  const handleDeleteBillClick = async (billId: string, billDisplayId: string) => {
-    if (!currentCompanyId) {
-      toast({ variant: "destructive", title: "Error", description: "Company context is missing." });
-      return;
-    }
-    const success = await deleteBillFromStore(billId, currentCompanyId);
-    if (success) {
-      toast({ title: "Bill Deleted", description: `Bill ${billDisplayId} has been removed.` });
-    } else {
-      toast({ variant: "destructive", title: "Deletion Failed", description: `Could not delete bill ${billDisplayId}.` });
-    }
-  };
-
-  const handleEnterEditMode = () => {
-    if (selectedBill) {
-      setEditablePaymentStatus(selectedBill.paymentStatus);
-      setEditableNotes(selectedBill.notes || '');
-      setIsEditingBillDetails(true);
-    }
-  };
-
-  const handleCancelEditMode = () => {
-    setIsEditingBillDetails(false);
-  };
-
-  const handleSaveBillDetails = async () => {
-    if (selectedBill && currentCompanyId) {
-      const updatedBill = await updateBillDetailsInStore(selectedBill.id, {
-        paymentStatus: editablePaymentStatus,
-        notes: editableNotes,
-      }, currentCompanyId);
-
-      if (updatedBill) {
-        setSelectedBill(updatedBill);
-        toast({ title: "Bill Updated", description: "Payment status and/or notes have been updated." });
-        setIsEditingBillDetails(false);
-      } else {
-        toast({ variant: "destructive", title: "Update Failed", description: "Could not update bill details." });
-      }
-    }
-  };
-
-
-  const handlePrintSelectedBill = (bill: Bill | null) => {
-    if (!bill || !userProfile) return;
-    const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
-    triggerPrint(printContent);
-  };
+    return res;
+  }, [bills, sortConfig]);
 
   if (isLoading) {
     return (
@@ -477,6 +263,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       </div>
     );
   }
+
   if (!currentCompanyId && !isLoading) {
     return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load bills.</div>;
   }
@@ -1156,6 +943,18 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           <p className="text-center text-muted-foreground py-10">No bills found for the selected filters.</p>
         )}
       </div>
+      {/* Pagination Controls */}
+      {billsPagination && billsPagination.totalPages > 1 && (
+        <div className="flex items-center justify-end space-x-2 py-4">
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+          </Button>
+          <div className="text-sm font-medium">Page {currentPage} of {billsPagination.totalPages}</div>
+          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(billsPagination.totalPages, p + 1))} disabled={currentPage === billsPagination.totalPages}>
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }
