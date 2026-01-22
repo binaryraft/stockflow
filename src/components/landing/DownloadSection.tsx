@@ -110,15 +110,11 @@ export function DownloadSection() {
                             <div className={cn("p-5 rounded-2xl mb-5 transition-transform duration-300 group-hover:scale-110 shadow-inner", platform.bgColor)}>
                                 <platform.icon className={cn("w-10 h-10", platform.color)} />
                             </div>
-                            <h3 className="text-xl font-bold mb-3">{platform.name}</h3>
+                            <h3 className="text-xl font-bold mb-2">{platform.name}</h3>
+                            <p className="text-xs text-muted-foreground font-mono uppercase tracking-widest opacity-70 mb-3">{platform.version}</p>
                             <p className="text-muted-foreground text-sm mb-6 flex-grow leading-relaxed px-2">{platform.description}</p>
 
                             <div className="w-full mt-auto space-y-4">
-                                <div className="flex items-center justify-center gap-2">
-                                    <span className="h-px bg-border flex-grow"></span>
-                                    <span className="text-[10px] text-muted-foreground font-mono uppercase tracking-widest opacity-70">{platform.version}</span>
-                                    <span className="h-px bg-border flex-grow"></span>
-                                </div>
                                 <Button
                                     variant="default"
                                     className={cn("w-full shadow-md font-medium transition-all hover:scale-[1.02] active:scale-[0.98]", platform.btnClass)}

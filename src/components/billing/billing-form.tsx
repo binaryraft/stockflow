@@ -652,7 +652,7 @@ export function BillingForm({
       // Removed resetFormFields(false) so the input stays populated
       setTimeout(() => quantityInputRef.current?.focus(), 50);
     } else {
-      toast({ variant: "destructive", title: "Product Not Found", description: `Product with code '${barcodeValue}' not found. Press Enter again on the product name to add it as a new product.` });
+      // Product not found - set hint for user to add new product (no toast to avoid confusion)
       setProductNameQuery(barcodeValue);
       setProductNotFoundHint(barcodeValue);
       productNameInputRef.current?.focus();
@@ -1344,9 +1344,9 @@ export function BillingForm({
                   </div>
                 )}
                 {productNotFoundHint && productNameQuery.toLowerCase() === productNotFoundHint.toLowerCase() && (
-                  <div className="bg-accent/10 text-accent-foreground p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow">
-                    <Info size={16} className="text-accent shrink-0" />
-                    Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary dark:text-primary mx-0.5 shrink-0" /> Enter again to add it as a new product.
+                  <div className="bg-primary/10 text-primary p-2 rounded-md flex items-center gap-2 my-2 text-sm shadow border border-primary/20">
+                    <Info size={16} className="text-primary shrink-0" />
+                    Product '{productNotFoundHint}' not found. Press <CornerDownLeft size={16} strokeWidth={2.5} className="inline text-primary mx-0.5 shrink-0" /> Enter again to add it as a new product.
                   </div>
                 )}
               </div>
