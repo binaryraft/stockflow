@@ -103,7 +103,14 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                 setProductNameQuery(v);
                                 if (!v) setCurrentProductForSelection(null);
                             }}
-                            onProductSelect={handleProductSelectFromSearch}
+                            onProductSelect={(suggestion) => {
+                                handleProductSelectFromSearch(suggestion);
+                                // Focus quantity input after selection for faster billing
+                                setTimeout(() => {
+                                    quantityInputRef.current?.focus();
+                                    quantityInputRef.current?.select();
+                                }, 50);
+                            }}
                             onEnterWithoutSelection={handleProductNameSubmit}
                             placeholder={mode === 'return' ? 'Scan or type product...' : 'Scan barcode, or type product...'}
                             id="productNameGlobal"
