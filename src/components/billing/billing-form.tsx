@@ -405,7 +405,7 @@ export function BillingForm({
           displayInfo: {
             name: skuDetails.skuIdentifier || product.name,
             stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-            price: skuDetails.currentSellPrice !== null ? `Ôé╣${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+            price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
           }
         };
         handleProductSelectFromSearch(suggestionForNewProduct);
@@ -643,7 +643,7 @@ export function BillingForm({
         displayInfo: {
           name: skuDetails.skuIdentifier || foundProduct.name,
           stock: foundProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-          price: skuDetails.currentSellPrice !== null ? `Ôé╣${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+          price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
         }
       };
       handleProductSelectFromSearch(suggestion);
@@ -1082,7 +1082,7 @@ export function BillingForm({
       displayInfo: {
         name: skuDetails.skuIdentifier || newProduct.name,
         stock: newProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-        price: skuDetails.currentSellPrice !== null ? `Ôé╣${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+        price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
       },
     };
     handleProductSelectFromSearch(suggestion);
@@ -1467,15 +1467,15 @@ export function BillingForm({
               <>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Subtotal (Before Tax):</span>
-                  <span className="font-medium text-foreground">Ôé╣{billTotals.subTotal.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{billTotals.subTotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Total SGST:</span>
-                  <span className="font-medium text-foreground">Ôé╣{billTotals.totalSGST.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{billTotals.totalSGST.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Total CGST:</span>
-                  <span className="font-medium text-foreground">Ôé╣{billTotals.totalCGST.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{billTotals.totalCGST.toFixed(2)}</span>
                 </div>
                 <Separator className="my-1.5 w-full max-w-xs" />
               </>
@@ -1483,13 +1483,13 @@ export function BillingForm({
             {mode === 'buy' && (
               <div className="flex justify-between w-full max-w-xs">
                 <span className="text-muted-foreground">Total Cost:</span>
-                <span className="font-semibold text-destructive">Ôé╣{billTotals.grandTotal.toFixed(2)}</span>
+                <span className="font-semibold text-destructive">₹{billTotals.grandTotal.toFixed(2)}</span>
               </div>
             )}
             {(mode === 'sell' || mode === 'return') && (
               <div className="flex justify-between w-full max-w-xs text-lg font-semibold text-primary">
                 <span>{isEstimateMode && mode === 'sell' ? 'Estimate Total:' : 'Grand Total:'}</span>
-                <span>Ôé╣{billTotals.grandTotal.toFixed(2)}</span>
+                <span>₹{billTotals.grandTotal.toFixed(2)}</span>
               </div>
             )}
           </div>
