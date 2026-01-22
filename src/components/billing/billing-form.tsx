@@ -15,7 +15,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2 } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, QrCode } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
@@ -29,6 +29,7 @@ import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 import { HardwareBarcodeScanModal } from '@/components/common/HardwareBarcodeScanModal';
+import { QRScannerModal } from '@/components/common/QRScannerModal';
 import { DatePicker } from '@/components/ui/date-picker';
 
 
@@ -143,6 +144,7 @@ export function BillingForm({
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
 
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
   const [barcodeScanPurpose, setBarcodeScanPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
@@ -721,6 +723,50 @@ export function BillingForm({
     productNameInputRef.current?.focus();
   };
 
+  const handleQRIconClick = () => {
+    if (currentProductForSelection) {
+      setProductToUpdateSkuFor(currentProductForSelection);
+    } else {
+      setProductToUpdateSkuFor(null);
+    }
+    setIsQRScannerOpen(true);
+  };
+
+  const handleQRScannedFromModal = async (qrValue: string) => {
+    setIsQRScannerOpen(false);
+
+    if (currentProductForSelection && productToUpdateSkuFor) {
+      // Update product SKU with QR code
+      const productToUpdate = productToUpdateSkuFor;
+      try {
+        const updatedProduct = await updateProductInStore(
+          productToUpdate.id,
+          { sku: qrValue },
+          companyId
+        );
+        if (updatedProduct) {
+          toast({ title: "Product QR Updated", description: `QR code for ${updatedProduct.name} set to ${qrValue}.` });
+          if (currentProductForSelection.id === productToUpdate.id) {
+            setCurrentProductForSelection(updatedProduct);
+            const skuToUse = updatedProduct.productSKUs.find(s => Object.keys(s.optionValues).length === 0) || updatedProduct.productSKUs[0] || { id: updatedProduct.id + '_temp', optionValues: {}, stockLayers: [], skuIdentifier: updatedProduct.name };
+            updateSkuDisplayInfo(skuToUse);
+          }
+        } else {
+          toast({ variant: "destructive", title: "Update Failed", description: "Could not update product QR code." });
+        }
+      } catch (error) {
+        console.error("Error updating product QR code:", error);
+        toast({ variant: "destructive", title: "Error", description: "An error occurred while updating QR code." });
+      }
+    } else {
+      // Add item by QR code
+      await findAndPopulateProductByBarcode(qrValue);
+    }
+
+    setProductToUpdateSkuFor(null);
+    productNameInputRef.current?.focus();
+  };
+
 
   const handleEnterNavigation = (currentField: 'quantity' | 'costPrice' | 'sellPrice' | 'serviceDescription' | 'serviceAmount') => {
     if (currentField === 'quantity') {
@@ -1187,6 +1233,13 @@ export function BillingForm({
         purpose={barcodeScanPurpose || 'addItem'}
         productNameForUpdate={productToUpdateSkuFor?.name}
       />
+      <QRScannerModal
+        isOpen={isQRScannerOpen}
+        onOpenChange={setIsQRScannerOpen}
+        onScan={handleQRScannedFromModal}
+        purpose={currentProductForSelection ? 'updateProductSku' : 'addItem'}
+        productNameForUpdate={currentProductForSelection?.name}
+      />
 
 
       <div className="flex justify-center">
@@ -1306,6 +1359,16 @@ export function BillingForm({
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent><p>{currentProductForSelection ? `Update Barcode for ${currentProductForSelection.name}` : "Scan Barcode to Add Item"}</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleQRIconClick} className="shrink-0" aria-label="Scan QR Code">
+                          <QrCode className="h-5 w-5 text-primary" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>{currentProductForSelection ? `Update QR Code for ${currentProductForSelection.name}` : "Scan QR Code to Add Item"}</p></TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                   {currentProductForSelection && isAdminContext && (

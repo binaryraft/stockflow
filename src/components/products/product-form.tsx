@@ -14,7 +14,8 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, Bill, StockLayer, ProductSKU, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from '@/components/billing/category-search-input';
-import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign, BadgePercent, HandCoins } from 'lucide-react';
+import { PlusCircle, Trash2, ListCollapse, PackageSearch, CalendarDays, Info, Percent, DollarSign, BadgePercent, HandCoins, QrCode } from 'lucide-react';
+import { QRScannerModal } from '@/components/common/QRScannerModal';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
@@ -373,6 +374,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const [isLoading, setIsLoading] = useState(false);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
   const [initialData, setInitialData] = useState<Product | null | undefined>(initialProductProp);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
 
 
   const isEditing = !!initialData;
@@ -543,8 +545,21 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   }
 
 
+  const handleQRScanned = (qrValue: string) => {
+    setValue('sku', qrValue);
+    setIsQRScannerOpen(false);
+    toast({ title: "QR Code Scanned", description: `Product code set to: ${qrValue}` });
+  };
+
   return (
     <div className="space-y-6">
+      <QRScannerModal
+        isOpen={isQRScannerOpen}
+        onOpenChange={setIsQRScannerOpen}
+        onScan={handleQRScanned}
+        purpose="updateProductSku"
+        productNameForUpdate={watch('name') || 'Product'}
+      />
       <FormProvider {...form}>
         <form onSubmit={handleSubmit(onSubmit)}>
           <div className="space-y-6">
@@ -577,7 +592,25 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="sku">Product Code/Base SKU <span className="text-xs text-muted-foreground">(Optional)</span></Label>
-                  <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" />
+                  <div className="flex items-center gap-2">
+                    <Input id="sku" {...register("sku")} placeholder="e.g., PRD-00123" className="flex-1" />
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setIsQRScannerOpen(true)}
+                            aria-label="Scan QR Code"
+                          >
+                            <QrCode className="h-5 w-5 text-primary" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Scan QR Code for Product</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="description">Description</Label>
