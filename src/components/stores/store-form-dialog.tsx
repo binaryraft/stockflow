@@ -31,6 +31,8 @@ const storeFormSchema = z.object({
   name: z.string().min(2, { message: "Store name must be at least 2 characters." }),
   username: z.string().min(3, { message: "Username must be at least 3 characters." }).regex(/^[a-z0-9_]+$/, "Username must be lowercase, alphanumeric, and underscores only."),
   location: z.string().min(3, { message: "Location must be at least 3 characters." }),
+  address: z.string().optional(),
+  gstin: z.string().optional(),
   email: z.string().email({ message: "Invalid email address." }),
   phone: z.string().min(10, { message: "Phone number must be at least 10 digits." }),
   passkey: z.string().min(4, { message: "Passkey must be at least 4 characters for new stores, or leave blank to keep current on edit." }).or(z.literal('')).optional(),
@@ -68,7 +70,7 @@ export function StoreFormDialog({
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, setValue, watch } = useForm<StoreFormData>({
     resolver: zodResolver(storeFormSchema),
     defaultValues: {
-      name: '', username: '', location: '', email: '', phone: '', passkey: '',
+      name: '', username: '', location: '', address: '', gstin: '', email: '', phone: '', passkey: '',
       allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
     },
   });
@@ -88,12 +90,14 @@ export function StoreFormDialog({
       }
       if (editingStore) {
         reset({
-          name: editingStore.name, username: editingStore.username || '', location: editingStore.location, email: editingStore.email, phone: editingStore.phone, passkey: '',
+          name: editingStore.name, username: editingStore.username || '', location: editingStore.location,
+          address: editingStore.address || '', gstin: editingStore.gstin || '',
+          email: editingStore.email, phone: editingStore.phone, passkey: '',
           allowedStaffIds: editingStore.allowedStaffIds || [], allowedOperations: editingStore.allowedOperations || ['sell', 'buy', 'return'],
         });
       } else {
         reset({
-          name: '', username: '', location: '', email: '', phone: '', passkey: '', allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
+          name: '', username: '', location: '', address: '', gstin: '', email: '', phone: '', passkey: '', allowedStaffIds: [], allowedOperations: ['sell', 'buy', 'return'],
         });
       }
     }
@@ -110,7 +114,9 @@ export function StoreFormDialog({
       return;
     }
     const storePayload: Partial<Omit<Store, 'id' | 'companyId'>> = {
-      name: data.name, username: data.username, location: data.location, email: data.email, phone: data.phone,
+      name: data.name, username: data.username, location: data.location,
+      address: data.address, gstin: data.gstin,
+      email: data.email, phone: data.phone,
       allowedStaffIds: data.allowedStaffIds || [], allowedOperations: data.allowedOperations,
     };
     if (passkeyToSubmit && passkeyToSubmit.length >= 4) (storePayload as any).passkey = passkeyToSubmit;
@@ -174,10 +180,23 @@ export function StoreFormDialog({
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location (City)*</Label>
+                    <Input id="location" {...register("location")} placeholder="e.g. Mumbai" />
+                    {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="gstin" className="flex items-center gap-1.5"><ReceiptText size={14} />Store GSTIN</Label>
+                    <Input id="gstin" {...register("gstin")} placeholder="Store specific GSTIN (optional)" className="uppercase" onChange={(e) => setValue('gstin', e.target.value.toUpperCase())} />
+                    {errors.gstin && <p className="text-sm text-destructive mt-1">{errors.gstin.message}</p>}
+                  </div>
+                </div>
+
                 <div className="space-y-2">
-                  <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location*</Label>
-                  <Input id="location" {...register("location")} />
-                  {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                  <Label htmlFor="address" className="flex items-center gap-1.5"><MapPin size={14} />Detailed Address</Label>
+                  <Input id="address" {...register("address")} placeholder="Full address for bills" />
+                  {errors.address && <p className="text-sm text-destructive mt-1">{errors.address.message}</p>}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">

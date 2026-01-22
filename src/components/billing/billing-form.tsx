@@ -12,7 +12,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput, type ProductSearchSuggestion } from './product-search-input';
 import { BillItemRow, BillItemHeader } from './bill-item-row';
-import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition } from '@/types';
+import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition, PendingBillPayload } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText } from 'lucide-react';
@@ -34,18 +34,6 @@ import { HardwareBarcodeScanModal } from '@/components/common/HardwareBarcodeSca
 import { DatePicker } from '@/components/ui/date-picker';
 
 
-type PendingBillPayload = {
-  billType: BillMode;
-  vendorOrCustomerName?: string;
-  customerPhone?: string;
-  notes?: string;
-  paymentStatus?: 'paid' | 'unpaid';
-  items: Omit<BillItem, 'id' | 'productName' | 'sgstAmount' | 'cgstAmount'>[];
-  storeIdForBill?: string;
-  isEstimate?: boolean;
-  taxType?: 'intra-state' | 'inter-state';
-  date?: string;
-};
 
 interface BillingFormProps {
   storeId?: string;
@@ -218,9 +206,12 @@ export function BillingForm({
 
   useEffect(() => {
     setHasMounted(true);
+    if (companyId) {
+      fetchProducts(companyId);
+    }
     setAllStores(getAllStores());
     setActivePlan(getActiveSubscriptionPlan());
-  }, [getAllStores, getActiveSubscriptionPlan]);
+  }, [getAllStores, getActiveSubscriptionPlan, fetchProducts, companyId]);
 
   const determineMode = useCallback((): BillMode => {
     const urlMode = initialModeProp || searchParamsHook.get('mode') as BillMode | null;
@@ -1568,7 +1559,7 @@ export function BillingForm({
             <AlertDialogCancel>Close</AlertDialogCancel>
             <AlertDialogAction onClick={() => {
               if (billToPotentiallyPrint) {
-                triggerPrint(generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook));
+                triggerPrint(generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook, allStores));
               }
             }}>Print Receipt</AlertDialogAction>
           </AlertDialogFooter>

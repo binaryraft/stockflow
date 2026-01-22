@@ -49,100 +49,132 @@ export function ProductSearchInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { searchProductsRemote, getSkuDetails, getSkuIdentifier } = useInventoryStore(state => ({
+  const { searchProductsLocal, searchProductsRemote, getSkuDetails, getSkuIdentifier } = useInventoryStore(state => ({
+    searchProductsLocal: state.searchProducts,
     searchProductsRemote: state.searchProductsRemote,
     getSkuDetails: state.getSkuDetails,
     getSkuIdentifier: state.getSkuIdentifier,
   }));
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const performSearch = useCallback(async (searchTerm: string) => {
-    if (!searchTerm || searchTerm.length < 1) {
+  const mapProductsToSuggestions = useCallback((foundProducts: Product[]) => {
+    const detailedSuggestions: ProductSearchSuggestion[] = [];
+
+    foundProducts.forEach(product => {
+      if (product.productSKUs && product.productSKUs.length > 0) {
+        product.productSKUs.forEach(sku => {
+          const skuDetails = getSkuDetails(sku);
+          const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
+
+          if (currentMode === 'sell' && product.trackQuantity) {
+            const availableLayers = sku.stockLayers.filter(layer => layer.quantity > 0);
+            if (availableLayers.length > 0) {
+              availableLayers.forEach(layer => {
+                detailedSuggestions.push({
+                  product,
+                  sku,
+                  layer,
+                  displayInfo: {
+                    name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
+                    stock: layer.quantity,
+                    price: `₹${layer.sellPrice.toFixed(2)}`,
+                    category: product.category,
+                  },
+                });
+              });
+            } else {
+              detailedSuggestions.push({
+                product,
+                sku,
+                displayInfo: {
+                  name: `${baseSkuIdentifier} (Out of Stock)`,
+                  stock: 0,
+                  price: 'N/A',
+                  category: product.category,
+                },
+              });
+            }
+          } else {
+            const isOutOfStock = product.trackQuantity && (skuDetails.totalStock === null || skuDetails.totalStock === 0);
+            const outOfStockLabel = isOutOfStock ? " (Out of Stock)" : "";
+            detailedSuggestions.push({
+              product,
+              sku,
+              displayInfo: {
+                name: `${baseSkuIdentifier}${outOfStockLabel}`,
+                stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
+                price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+                category: product.category,
+              },
+            });
+          }
+        });
+      }
+    });
+
+    return detailedSuggestions;
+  }, [getSkuDetails, getSkuIdentifier, currentMode]);
+
+  const performSearch = useCallback(async (searchTerm: string, isRemote = false) => {
+    if (!searchTerm || searchTerm.trim().length < 1) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    setIsSearching(true);
-    const companyId = localStorage.getItem('companyId');
-    if (!companyId) {
-      setIsSearching(false);
-      return;
-    }
+    // Always show suggestions if we have a search term
+    setShowSuggestions(true);
 
-    try {
-      const foundProducts = await searchProductsRemote(companyId, searchTerm);
-      const detailedSuggestions: ProductSearchSuggestion[] = [];
-
-      foundProducts.forEach(product => {
-        if (product.productSKUs && product.productSKUs.length > 0) {
-          product.productSKUs.forEach(sku => {
-            const skuDetails = getSkuDetails(sku);
-            const baseSkuIdentifier = sku.skuIdentifier || getSkuIdentifier(product.name, sku.optionValues);
-
-            if (currentMode === 'sell' && product.trackQuantity) {
-              const availableLayers = sku.stockLayers.filter(layer => layer.quantity > 0);
-              if (availableLayers.length > 0) {
-                availableLayers.forEach(layer => {
-                  detailedSuggestions.push({
-                    product,
-                    sku,
-                    layer,
-                    displayInfo: {
-                      name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
-                      stock: layer.quantity,
-                      price: `₹${layer.sellPrice.toFixed(2)}`,
-                      category: product.category,
-                    },
-                  });
-                });
-              } else {
-                detailedSuggestions.push({
-                  product,
-                  sku,
-                  displayInfo: {
-                    name: `${baseSkuIdentifier} (Out of Stock)`,
-                    stock: 0,
-                    price: 'N/A',
-                    category: product.category,
-                  },
-                });
-              }
-            } else {
-              const isOutOfStock = product.trackQuantity && (skuDetails.totalStock === null || skuDetails.totalStock === 0);
-              const outOfStockLabel = isOutOfStock ? " (Out of Stock)" : "";
-              detailedSuggestions.push({
-                product,
-                sku,
-                displayInfo: {
-                  name: `${baseSkuIdentifier}${outOfStockLabel}`,
-                  stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-                  price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
-                  category: product.category,
-                },
-              });
-            }
-          });
-        }
-      });
-
-      setSuggestions(detailedSuggestions);
-      // Always show suggestions if we have a search term, so we can show "Add New" option if empty
-      setShowSuggestions(true);
+    if (!isRemote) {
+      // Instant Local Search
+      const localResults = searchProductsLocal(searchTerm).slice(0, 25);
+      const detailed = mapProductsToSuggestions(localResults);
+      setSuggestions(detailed);
       setActiveIndex(-1);
-    } catch (err) {
-      console.error("Search error", err);
-    } finally {
-      setIsSearching(false);
-    }
-  }, [searchProductsRemote, getSkuDetails, getSkuIdentifier, currentMode]);
+    } else {
+      // Remote Search (Background/Complementary)
+      const companyId = localStorage.getItem('companyId');
+      if (!companyId) return;
 
+      setIsSearching(true);
+      try {
+        const foundProducts = await searchProductsRemote(companyId, searchTerm);
+        const detailedRemote = mapProductsToSuggestions(foundProducts);
+
+        setSuggestions(prev => {
+          // Merge unique results, prioritizing detailed ones or just keeping latest?
+          // For simplicity and speed, let's just use the latest comprehensive results from server
+          // But actually, we don't want to lose local matches if the server search is different.
+          // Let's create a unique set by ProductID + SKU ID + LayerID
+          const existingKeys = new Set(prev.map(s => `${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
+          const newUniqueResults = detailedRemote.filter(s => !existingKeys.has(`${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
+          return [...prev, ...newUniqueResults];
+        });
+      } catch (err) {
+        console.error("Remote search error", err);
+      } finally {
+        setIsSearching(false);
+      }
+    }
+  }, [searchProductsLocal, searchProductsRemote, mapProductsToSuggestions]);
+
+  // Handle immediate local search
+  useEffect(() => {
+    if (value && document.activeElement === inputRef?.current) {
+      performSearch(value, false);
+    } else if (!value) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+    }
+  }, [value, performSearch, inputRef]);
+
+  // Handle debounced remote search
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       if (value && document.activeElement === inputRef?.current) {
-        performSearch(value);
+        performSearch(value, true);
       }
-    }, 400);
+    }, 250); // Faster debounce for remote filling
 
     return () => clearTimeout(delayDebounceFn);
   }, [value, performSearch, inputRef]);
@@ -222,7 +254,7 @@ export function ProductSearchInput({
           type="text"
           value={value}
           onChange={(e) => onValueChange(e.target.value)}
-          onFocus={() => { if (value) performSearch(value); }}
+          onFocus={() => { if (value) performSearch(value, false); }}
           onKeyDown={handleKeyDown}
           onBlur={handleInputBlur}
           placeholder={placeholder}

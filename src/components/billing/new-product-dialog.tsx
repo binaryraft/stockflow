@@ -91,6 +91,10 @@ const newProductDialogSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
+  igstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "IGST rate must be a number" }).min(0, "IGST rate cannot be negative").optional()
+  ),
   hsnCode: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
   additionalChargeDefinitions: z.array(additionalChargeDefinitionDialogSchema).optional(),
@@ -424,6 +428,7 @@ export function NewProductDialog({
       initialStock: initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
       sgstRate: undefined,
       cgstRate: undefined,
+      igstRate: undefined,
       hsnCode: '',
       variants: [],
       additionalChargeDefinitions: [],
@@ -433,6 +438,8 @@ export function NewProductDialog({
   const { control, register, handleSubmit, formState: { errors, isSubmitting }, reset, watch, setFocus, setValue } = form;
 
   const trackQuantityValue = watch('trackQuantity');
+  const mainCostPrice = watch('costPrice');
+  const mainSellPrice = watch('sellPrice');
   const currentVariants = watch('variants');
   const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
 
@@ -465,6 +472,7 @@ export function NewProductDialog({
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
         sgstRate: undefined,
         cgstRate: undefined,
+        igstRate: undefined,
         hsnCode: '',
         variants: [],
         additionalChargeDefinitions: [],
@@ -503,6 +511,7 @@ export function NewProductDialog({
       variants: productVariantsPayload,
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
+      igstRate: data.igstRate,
       hsnCode: data.hsnCode,
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
         ...ac,
@@ -589,8 +598,13 @@ export function NewProductDialog({
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="dialog-cgstRate">CGST Rate (%)</Label>
-                      <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
-                      {errors.cgstRate && <p className="text-xs text-destructive mt-1">{errors.cgstRate.message}</p>}
+                      <Input id="dialog-cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9" />
+                      {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-igstRate">IGST Rate (%)</Label>
+                      <Input id="dialog-igstRate" type="number" step="0.01" {...register("igstRate")} placeholder="e.g., 18" />
+                      {errors.igstRate && <p className="text-sm text-destructive mt-1">{errors.igstRate.message}</p>}
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="dialog-hsnCode">HSN Code</Label>

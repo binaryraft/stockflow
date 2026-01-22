@@ -1,6 +1,6 @@
 
 import { format } from 'date-fns';
-import type { Bill, BillItem, ProductSKU, Product, UserProfile } from '@/types';
+import type { Bill, BillItem, ProductSKU, Product, UserProfile, Store } from '@/types';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { getCurrencySymbol } from './utils'; // Import the new helper
 
@@ -47,7 +47,8 @@ const getPartyNameLabelForPrint = (billType: Bill['type']): string => {
 export const generateBillPrintContent = (
   billToPrint: Bill,
   userProfile: UserProfile | undefined,
-  products: Product[]
+  products: Product[],
+  allStores?: Store[]
 ): string => {
   const currencySymbol = getCurrencySymbol(userProfile?.companyCurrency);
   let content = '<html><head><title>Print Bill</title>';
@@ -85,13 +86,19 @@ export const generateBillPrintContent = (
   content += '</head><body>';
   content += '<div class="print-container">';
 
-  // Header
+  // Header - Use Store details if available, else fallback to Company details
+  const store = allStores?.find(s => s.id === billToPrint.storeId);
+  const headerName = store?.name || userProfile?.companyName || DEFAULT_COMPANY_NAME;
+  const headerAddress = store?.address || userProfile?.companyAddress || COMPANY_ADDRESS;
+  const headerPhone = store?.phone || userProfile?.companyPhone || 'N/A';
+  const headerGstin = store?.gstin || userProfile?.companyGstNo;
+
   content += '<div class="header">';
-  content += `<h1>${userProfile?.companyName || DEFAULT_COMPANY_NAME}</h1>`;
-  content += `<p>${userProfile?.companyAddress || COMPANY_ADDRESS}</p>`;
-  content += `<p>Phone: ${userProfile?.companyPhone || 'N/A'} | Email: ${userProfile?.companyEmail || 'N/A'}</p>`;
-  if (userProfile?.companyGstNo) {
-    content += `<p style="font-weight: 600; margin-top: 4px;">GSTIN: ${userProfile.companyGstNo}</p>`;
+  content += `<h1>${headerName}</h1>`;
+  content += `<p>${headerAddress}</p>`;
+  content += `<p>Phone: ${headerPhone}${userProfile?.companyEmail ? ` | Email: ${userProfile.companyEmail}` : ''}</p>`;
+  if (headerGstin) {
+    content += `<p style="font-weight: 600; margin-top: 4px;">GSTIN: ${headerGstin}</p>`;
   }
   content += '</div>';
 

@@ -3,14 +3,14 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, StockLayer, BillMode } from '@/types';
+import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, StockLayer, BillMode, PendingBillPayload } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, endOfDay, isToday, isThisWeek, isThisMonth, isThisYear, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
 import { toast } from './use-toast';
 
 // Re-export types for convenience in other files
-export type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff } from '@/types';
+export type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, BillMode, ChatMessage, StockLayer, ProductOption, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, PendingBillPayload } from '@/types';
 
 
 // #region Types and Interfaces
@@ -52,21 +52,13 @@ interface InventoryState {
   // Product Actions
   fetchProducts: (companyId: string) => Promise<void>;
   fetchProductsPaginated: (companyId: string, page: number, limit: number, search?: string, sort?: { field: string, order: 'asc' | 'desc' }) => Promise<void>;
-  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
-  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number }, companyId: string) => Promise<Product | null>;
+  addProduct: (productData: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStock?: number, costPrice?: number, sellPrice?: number }, companyId: string) => Promise<Product | null>;
+  updateProduct: (productId: string, productData: Partial<Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'>> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStock?: number, costPrice?: number, sellPrice?: number }, companyId: string) => Promise<Product | null>;
   archiveProduct: (productId: string, companyId: string) => Promise<boolean>;
   unarchiveProduct: (productId: string, companyId: string) => Promise<boolean>;
 
   // Draft Bill Actions
-  draftBill: {
-    mode: BillMode;
-    items: BillItem[];
-    customerName: string;
-    customerPhone: string;
-    notes: string;
-    isEstimate: boolean;
-    taxType: 'intra-state' | 'inter-state';
-  } | null;
+  draftBill: PendingBillPayload | null;
   setDraftBill: (draft: InventoryState['draftBill']) => void;
   clearDraftBill: () => void;
 
@@ -189,33 +181,33 @@ export const useInventoryStore = create<InventoryState>()(
         get().fetchProductsPaginated(companyId, 1, 0); // 0 limit means all? Or we default to 50? API says 0 is all.
       },
       fetchProductsPaginated: async (companyId, page, limit, search, sort) => {
-         if (!companyId) return console.warn("fetchProductsPaginated: companyId is required");
-         try {
-           const offset = (page - 1) * limit;
-           const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
-           const sortParam = sort ? `&sort=${sort.field}&order=${sort.order}` : '';
-           const response = await fetch(`/api/products?companyId=${companyId}&limit=${limit}&offset=${offset}${searchParam}${sortParam}`);
-           if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
-           const result = await response.json();
-           
-           if (result.success && Array.isArray(result.data)) {
-             set({ 
-               products: result.data || [],
-               productsPagination: {
-                 currentPage: page,
-                 limit: limit,
-                 totalCount: result.totalCount || 0,
-                 totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
-               }
-             });
-           } else { 
-             console.error("Failed to fetch products or data format incorrect:", result.message); 
-             set({ products: [] }); 
-           }
-         } catch (error) {
-           console.error("Error in fetchProductsPaginated:", error);
-           set({ products: [] });
-         }
+        if (!companyId) return console.warn("fetchProductsPaginated: companyId is required");
+        try {
+          const offset = (page - 1) * limit;
+          const searchParam = search ? `&search=${encodeURIComponent(search)}` : '';
+          const sortParam = sort ? `&sort=${sort.field}&order=${sort.order}` : '';
+          const response = await fetch(`/api/products?companyId=${companyId}&limit=${limit}&offset=${offset}${searchParam}${sortParam}`);
+          if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
+          const result = await response.json();
+
+          if (result.success && Array.isArray(result.data)) {
+            set({
+              products: result.data || [],
+              productsPagination: {
+                currentPage: page,
+                limit: limit,
+                totalCount: result.totalCount || 0,
+                totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
+              }
+            });
+          } else {
+            console.error("Failed to fetch products or data format incorrect:", result.message);
+            set({ products: [] });
+          }
+        } catch (error) {
+          console.error("Error in fetchProductsPaginated:", error);
+          set({ products: [] });
+        }
       },
       addProduct: async (productData, companyId) => {
         try {
@@ -290,7 +282,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
       fetchBillsPaginated: async (companyId, page, limit, options) => {
         if (!companyId) return console.warn("fetchBillsPaginated: companyId is required");
-        
+
         try {
           const offset = (page - 1) * limit;
           let url = `/api/bills?companyId=${companyId}&limit=${limit}&offset=${offset}`;
@@ -304,20 +296,20 @@ export const useInventoryStore = create<InventoryState>()(
           const response = await fetch(url);
           if (!response.ok) throw new Error(`Failed to fetch bills: ${response.statusText}`);
           const result = await response.json();
-          
+
           if (result.success && Array.isArray(result.data)) {
-             set({ 
-               bills: result.data || [],
-               billsPagination: {
-                 currentPage: page,
-                 limit: limit,
-                 totalCount: result.totalCount || 0,
-                 totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
-               }
-             });
-          } else { 
-            console.error("Failed to fetch bills or data format incorrect:", result.message); 
-            set({ bills: [] }); 
+            set({
+              bills: result.data || [],
+              billsPagination: {
+                currentPage: page,
+                limit: limit,
+                totalCount: result.totalCount || 0,
+                totalPages: limit > 0 ? Math.ceil((result.totalCount || 0) / limit) : 1
+              }
+            });
+          } else {
+            console.error("Failed to fetch bills or data format incorrect:", result.message);
+            set({ bills: [] });
           }
         } catch (error) {
           console.error("Error in fetchBillsPaginated:", error);

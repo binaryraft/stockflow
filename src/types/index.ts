@@ -158,6 +158,8 @@ export interface Store {
   location: string;
   phone: string;
   email: string;
+  gstin?: string; // Store specific GSTIN
+  address?: string; // Store detailed address
   accessCode: string;
   passkey: string;
   allowedStaffIds: string[];

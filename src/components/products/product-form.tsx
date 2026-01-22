@@ -82,6 +82,10 @@ const productFormSchema = z.object({
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "CGST rate must be a number" }).min(0, "CGST rate cannot be negative").optional()
   ),
+  igstRate: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "IGST rate must be a number" }).min(0, "IGST rate cannot be negative").optional()
+  ),
   hsnCode: z.string().optional(),
   variants: z.array(productVariantFormSchema).max(2, "Maximum of 2 variant types allowed").optional(),
   additionalChargeDefinitions: z.array(additionalChargeDefinitionSchema).optional(),
@@ -385,7 +389,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     defaultValues: {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined,
-      expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+      expiryDate: '', sgstRate: undefined, cgstRate: undefined, igstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     },
   });
@@ -419,7 +423,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     let defaults: ProductFormData = {
       name: '', description: '', category: '', trackQuantity: true, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
-      expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+      expiryDate: '', sgstRate: undefined, cgstRate: undefined, igstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
     };
 
@@ -441,6 +445,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         expiryDate: initialData.expiryDate ? initialData.expiryDate.split('T')[0] : '',
         sgstRate: initialData.sgstRate,
         cgstRate: initialData.cgstRate,
+        igstRate: initialData.igstRate,
         hsnCode: initialData.hsnCode || '',
         variants: initialData.variants?.map(v => ({
           id: v.id, name: v.name,
@@ -459,7 +464,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         description: '', category: '', trackQuantity: true, sku: '',
         costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
-        expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
+        expiryDate: '', sgstRate: undefined, cgstRate: undefined, igstRate: undefined, variants: [],
         additionalChargeDefinitions: [],
         initialStock: undefined
       };
@@ -481,10 +486,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
       await addCategoryToStore(data.category!, currentCompanyId);
     }
 
-    const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
+    const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number, initialStock?: number, costPrice?: number, sellPrice?: number } = {
       name: data.name, description: data.description, category: data.category,
       trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
-      sgstRate: data.sgstRate, cgstRate: data.cgstRate, hsnCode: data.hsnCode,
+      sgstRate: data.sgstRate, cgstRate: data.cgstRate, igstRate: data.igstRate, hsnCode: data.hsnCode,
       variants: (data.variants || []).map(v_form => ({
         id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
@@ -716,8 +721,13 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                     </div>
                     <div className="space-y-1.5">
                       <Label htmlFor="cgstRate">CGST Rate (%)</Label>
-                      <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9 for 9%" />
+                      <Input id="cgstRate" type="number" step="0.01" {...register("cgstRate")} placeholder="e.g., 9" />
                       {errors.cgstRate && <p className="text-sm text-destructive mt-1">{errors.cgstRate.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="igstRate">IGST Rate (%)</Label>
+                      <Input id="igstRate" type="number" step="0.01" {...register("igstRate")} placeholder="e.g., 18" />
+                      {errors.igstRate && <p className="text-sm text-destructive mt-1">{errors.igstRate.message}</p>}
                     </div>
                   </div>
                 </div>
