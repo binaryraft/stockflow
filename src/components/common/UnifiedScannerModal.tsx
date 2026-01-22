@@ -79,14 +79,23 @@ export function UnifiedScannerModal({
         setInternalError(null);
 
         try {
+            // First, request camera permission explicitly
+            const permissionStatus = await navigator.permissions.query({ name: 'camera' as PermissionName });
+
+            if (permissionStatus.state === 'denied') {
+                setInternalError('Camera permission denied. Please enable camera access in your browser settings and try again.');
+                setIsScanning(false);
+                return;
+            }
+
             // Dynamically import ZXing library
             const { BrowserMultiFormatReader } = await import('@zxing/browser');
 
             const codeReader = new BrowserMultiFormatReader();
             codeReaderRef.current = codeReader;
 
-            // Get available video devices
-            const videoInputDevices = await codeReader.listVideoInputDevices();
+            // Get available video devices (static method)
+            const videoInputDevices = await BrowserMultiFormatReader.listVideoInputDevices();
 
             if (videoInputDevices.length === 0) {
                 setInternalError('No camera found. Please connect a camera or enter code manually.');
@@ -121,9 +130,23 @@ export function UnifiedScannerModal({
             if (videoRef.current && videoRef.current.srcObject) {
                 setStream(videoRef.current.srcObject as MediaStream);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to start camera scanner:', error);
-            setInternalError('Failed to access camera. Please check permissions or enter code manually.');
+
+            // Provide specific error messages based on error type
+            let errorMessage = 'Failed to access camera. ';
+
+            if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                errorMessage = 'Camera permission denied. Please click "Allow" when prompted, or enable camera access in your browser settings.';
+            } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                errorMessage = 'No camera found. Please connect a camera or enter code manually.';
+            } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                errorMessage = 'Camera is already in use by another application. Please close other apps using the camera.';
+            } else {
+                errorMessage += 'Please check permissions or enter code manually.';
+            }
+
+            setInternalError(errorMessage);
             setIsScanning(false);
         }
     };
