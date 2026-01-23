@@ -181,6 +181,7 @@ export const useInventoryStore = create<InventoryState>()(
         get().fetchProductsPaginated(companyId, 1, 0); // 0 limit means all? Or we default to 50? API says 0 is all.
       },
       fetchProductsPaginated: async (companyId, page, limit, search, sort) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchProductsPaginated: companyId is required");
         try {
           const offset = (page - 1) * limit;
@@ -210,6 +211,38 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addProduct: async (productData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          const productId = uuidv4();
+          const newProduct: Product = {
+            ...productData as any,
+            id: productId,
+            companyId,
+            productSKUs: (productData as any).productSKUs || [],
+            isArchived: false,
+          };
+
+          // If simple initial stock provided (standard form)
+          if (productData.initialStock && productData.costPrice && productData.sellPrice) {
+            const defaultSku: ProductSKU = {
+              id: uuidv4(),
+              optionValues: {},
+              stockLayers: [{
+                id: uuidv4(),
+                purchaseBillId: 'INITIAL_STOCK',
+                purchaseDate: new Date().toISOString(),
+                initialQuantity: Number(productData.initialStock),
+                quantity: Number(productData.initialStock),
+                costPrice: Number(productData.costPrice),
+                sellPrice: Number(productData.sellPrice),
+              }]
+            };
+            newProduct.productSKUs.push(defaultSku);
+          }
+
+          set((state) => ({ products: [...state.products, newProduct] }));
+          if (productData.category) get().addCategory(productData.category, companyId);
+          return newProduct;
+        }
         try {
           const response = await fetch('/api/products', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -227,6 +260,13 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateProduct: async (productId, productData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set((state) => ({
+            products: state.products.map(p => p.id === productId ? { ...p, ...productData } as Product : p)
+          }));
+          if (productData.category) get().addCategory(productData.category, companyId);
+          return get().products.find(p => p.id === productId) || null;
+        }
         try {
           const response = await fetch(`/api/products/${productId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -281,6 +321,7 @@ export const useInventoryStore = create<InventoryState>()(
         get().fetchBillsPaginated(companyId, 1, 0);
       },
       fetchBillsPaginated: async (companyId, page, limit, options) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchBillsPaginated: companyId is required");
 
         try {
@@ -317,6 +358,49 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addBill: async (billData, itemsData) => {
+        if (get().userProfile.dataMode === 'local') {
+          const billId = uuidv4();
+          const timestamp = Date.now();
+          const newBill: Bill = {
+            ...billData,
+            id: billId,
+            timestamp,
+            items: itemsData.map((item: any) => ({ ...item, id: uuidv4() })),
+          };
+
+          // Basic Stock Deduction/Addition Logic for Offline Mode
+          if (billData.type === 'sell' && !billData.isEstimate) {
+            set(state => ({
+              products: state.products.map(p => {
+                const updatedSKUs = p.productSKUs.map(sku => {
+                  const itemForSku = itemsData.find((i: any) => i.productId === p.id && JSON.stringify(i.selectedVariantOptions || {}) === JSON.stringify(sku.optionValues || {}));
+                  if (itemForSku && p.trackQuantity) {
+                    // Deduct from stock layers (First In First Out)
+                    let remainingToDeduct = itemForSku.quantity;
+                    const updatedLayers = sku.stockLayers.map(layer => {
+                      if (remainingToDeduct <= 0) return layer;
+                      const deduction = Math.min(layer.quantity, remainingToDeduct);
+                      remainingToDeduct -= deduction;
+                      return { ...layer, quantity: layer.quantity - deduction };
+                    });
+                    return { ...sku, stockLayers: updatedLayers };
+                  }
+                  return sku;
+                });
+                return { ...p, productSKUs: updatedSKUs };
+              }),
+              bills: [newBill, ...state.bills]
+            }));
+          } else if (billData.type === 'buy') {
+            // Logic for adding stock layers for buy bills would go here
+            // For now, keep it simple: just add the bill
+            set(state => ({ bills: [newBill, ...state.bills] }));
+          } else {
+            set(state => ({ bills: [newBill, ...state.bills] }));
+          }
+
+          return newBill;
+        }
         try {
           const response = await fetch('/api/bills', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -388,6 +472,7 @@ export const useInventoryStore = create<InventoryState>()(
 
       // --- Other Fetch & CUD Actions (Staff, Stores, etc.) ---
       fetchCategories: async (companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchCategories: companyId is required");
         if (get().categories.length > 0) return;
 
@@ -403,6 +488,13 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addCategory: async (categoryName, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          const exists = get().categories.find(c => c.name.toLowerCase() === categoryName.toLowerCase());
+          if (exists) return exists;
+          const newCategory = { id: uuidv4(), name: categoryName, companyId };
+          set(state => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
+          return newCategory;
+        }
         try {
           const response = await fetch('/api/categories', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -419,6 +511,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchCustomers: async (companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchCustomers: companyId is required");
         if (get().customers.length > 0) return;
 
@@ -434,6 +527,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchStaff: async (companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchStaff: companyId is required");
         // Removed cache check to ensure we get fresh data (passwords) when revisiting the page
         // if (get().staffs.length > 0) return; 
@@ -450,6 +544,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addStaff: async (staffData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          const newStaff = { ...staffData, id: uuidv4(), companyId, role: 'employee' as const };
+          set(state => ({ staffs: [...state.staffs, newStaff] }));
+          return newStaff;
+        }
         try {
           const response = await fetch('/api/staff', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -466,6 +565,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateStaff: async (staffId, staffData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set(state => ({ staffs: state.staffs.map(s => s.id === staffId ? { ...s, ...staffData } as User : s) }));
+          return get().staffs.find(s => s.id === staffId) || null;
+        }
         try {
           const response = await fetch(`/api/staff/${staffId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -482,6 +585,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteStaff: async (staffId, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set(state => ({ staffs: state.staffs.filter(s => s.id !== staffId) }));
+          return true;
+        }
         try {
           const response = await fetch(`/api/staff/${staffId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -495,6 +602,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchStores: async (companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         if (!companyId) return console.warn("fetchStores: companyId is required");
         if (get().stores.length > 0) return;
 
@@ -510,6 +618,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addStore: async (storeData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          const newStore = { ...storeData, id: uuidv4(), companyId };
+          set(state => ({ stores: [...state.stores, newStore] }));
+          return newStore;
+        }
         try {
           const response = await fetch('/api/stores', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -526,6 +639,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateStore: async (storeId, storeData, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set(state => ({ stores: state.stores.map(s => s.id === storeId ? { ...s, ...storeData } as Store : s) }));
+          return get().stores.find(s => s.id === storeId) || null;
+        }
         try {
           const response = await fetch(`/api/stores/${storeId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -542,6 +659,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteStore: async (storeId, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set(state => ({ stores: state.stores.filter(s => s.id !== storeId) }));
+          return true;
+        }
         try {
           const response = await fetch(`/api/stores/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -555,6 +676,9 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchCompanyProfile: async (companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          return null;
+        }
         if (!companyId) {
           console.warn("fetchCompanyProfile called without companyId.");
           set({ userProfile: { ...defaultUserProfile, dataMode: 'local' } });
@@ -588,6 +712,19 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateUserProfileFields: async (data, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set(state => ({
+            userProfile: {
+              ...state.userProfile,
+              ...data,
+              // Mapping Company fields back to UserProfile if needed
+              companyName: (data as any).name || state.userProfile.companyName,
+              companyLogoUrl: (data as any).logoUrl || state.userProfile.companyLogoUrl,
+              companyCurrency: (data as any).currency || state.userProfile.companyCurrency,
+            }
+          }));
+          return null; // Return null as Company type locally is hard to mimic perfectly
+        }
         try {
           const response = await fetch(`/api/companies/${companyId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -763,6 +900,7 @@ export const useInventoryStore = create<InventoryState>()(
         ));
       },
       searchProductsRemote: async (companyId, searchTerm) => {
+        if (get().userProfile.dataMode === 'local') return [];
         if (!searchTerm) return [];
         try {
           const response = await fetch(`/api/products?companyId=${companyId}&limit=20&search=${encodeURIComponent(searchTerm)}`);

@@ -20,13 +20,14 @@ export const LOCAL_NAV_LINKS = [
       { href: '/local/billing', label: 'Billing', icon: DollarSign },
       { href: '/local/products', label: 'Products', icon: Package },
       { href: '/local/accounting', label: 'Accounting', icon: BookOpen },
+      { href: '/local/profile', label: 'Profile', icon: Package2 },
     ]
   },
   {
-      title: "Settings",
-      links: [
-        { href: '/local/settings', label: 'Settings', icon: SettingsIcon },
-      ]
+    title: "Settings",
+    links: [
+      { href: '/local/settings', label: 'Settings', icon: SettingsIcon },
+    ]
   }
 ];
 
@@ -44,7 +45,7 @@ export function LocalSidebarNav() {
               <span className="truncate">{APP_NAME} <span className="text-xs font-normal text-muted-foreground">(Local)</span></span>
             </Link>
           ) : (
-             <Tooltip>
+            <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
@@ -62,18 +63,18 @@ export function LocalSidebarNav() {
 
           {sidebarState === 'expanded' && (
             <Tooltip>
-                <TooltipTrigger asChild>
-                    <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 hidden md:flex text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
-                    onClick={toggleSidebar}
-                    aria-label="Collapse sidebar"
-                    >
-                    <ChevronLeft className="h-5 w-5" />
-                    </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" align="center"><p>Collapse Sidebar</p></TooltipContent>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 hidden md:flex text-muted-foreground hover:text-foreground hover:bg-sidebar-accent"
+                  onClick={toggleSidebar}
+                  aria-label="Collapse sidebar"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" align="center"><p>Collapse Sidebar</p></TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -92,22 +93,22 @@ export function LocalSidebarNav() {
                   const isActive = pathname === link.href || (link.href !== "/local" && pathname.startsWith(link.href));
                   return (
                     <SidebarMenuItem key={link.href}>
-                        <SidebarMenuButton
+                      <SidebarMenuButton
                         asChild
                         size="default"
                         isActive={isActive}
                         tooltip={link.label}
                         className="h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold"
-                        >
+                      >
                         <Link href={link.href} className="flex items-center gap-3">
-                            <link.icon className="h-5 w-5 shrink-0" />
-                            {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
+                          <link.icon className="h-5 w-5 shrink-0" />
+                          {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
                         </Link>
-                        </SidebarMenuButton>
+                      </SidebarMenuButton>
                     </SidebarMenuItem>
                   );
                 })}
-                {groupIndex < LOCAL_NAV_LINKS.length -1 && <SidebarSeparator className="my-2" />}
+                {groupIndex < LOCAL_NAV_LINKS.length - 1 && <SidebarSeparator className="my-2" />}
               </React.Fragment>
             ))}
           </SidebarMenu>
