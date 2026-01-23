@@ -20,9 +20,9 @@ export async function GET(req: NextRequest) {
 
     const customersMap = new Map<string, Customer>();
 
-    const billsCursor = db.collection<Bill>('bills').find({ 
-      companyId: companyId, 
-      type: { $in: ['sell', 'return'] } 
+    const billsCursor = db.collection<Bill>('bills').find({
+      companyId: companyId,
+      type: { $in: ['sell', 'return'] }
     });
 
     for await (const bill of billsCursor) {
@@ -38,21 +38,32 @@ export async function GET(req: NextRequest) {
           companyId: companyId,
           name: bill.vendorOrCustomerName,
           phone: bill.customerPhone,
+          gstin: bill.gstin,
+          billingAddress: bill.billingAddress,
+          shippingAddress: bill.shippingAddress,
+          placeOfSupply: bill.placeOfSupply,
           firstSeen: billDate,
           lastSeen: billDate,
         };
       } else {
         if (new Date(billDate) < new Date(customer.firstSeen)) customer.firstSeen = billDate;
-        if (new Date(billDate) > new Date(customer.lastSeen)) customer.lastSeen = billDate;
-        if (!customer.name && bill.vendorOrCustomerName) customer.name = bill.vendorOrCustomerName;
+        if (new Date(billDate) > new Date(customer.lastSeen)) {
+          customer.lastSeen = billDate;
+          // Most recent bill info for name, gstin, and addresses
+          if (bill.vendorOrCustomerName) customer.name = bill.vendorOrCustomerName;
+          if (bill.gstin) customer.gstin = bill.gstin;
+          if (bill.billingAddress) customer.billingAddress = bill.billingAddress;
+          if (bill.shippingAddress) customer.shippingAddress = bill.shippingAddress;
+          if (bill.placeOfSupply) customer.placeOfSupply = bill.placeOfSupply;
+        }
       }
       customersMap.set(customerKey, customer);
     }
-    
+
     // In a real app, you would also fetch from a dedicated 'customers' collection
     // and merge the results. For this derived logic, we just use the map.
     const derivedCustomers = Array.from(customersMap.values())
-      .sort((a,b) => (a.name || "").localeCompare(b.name || ""));
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
     console.log(`${routeLogName} Found/derived ${derivedCustomers.length} customers for company ${companyId}.`);
     return NextResponse.json({ success: true, data: derivedCustomers });

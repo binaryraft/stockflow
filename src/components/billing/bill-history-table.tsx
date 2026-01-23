@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -84,24 +84,26 @@ interface BillHistoryTableProps {
 export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate }: BillHistoryTableProps) {
   const {
     bills: allBillsFromStore,
+    billsPagination,
     userProfile,
     deleteBill: deleteBillFromStore,
     getProductById,
     getSkuDetails,
     updateBillNonCriticalDetails: updateBillDetailsInStore,
     products: allProductsStore,
-    fetchBills,
+    fetchBillsPaginated,
     companyId: currentCompanyId,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
+      billsPagination: state.billsPagination,
       getProductById: state.getProductById,
       userProfile: state.userProfile,
       deleteBill: state.deleteBill,
       getSkuDetails: state.getSkuDetails,
       updateBillNonCriticalDetails: state.updateBillNonCriticalDetails,
       products: state.products,
-      fetchBills: state.fetchBills,
+      fetchBillsPaginated: state.fetchBillsPaginated,
       companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null,
     })
   );
@@ -121,9 +123,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     }));
 
     setDraftBill({
-      mode: bill.type as BillMode,
+      billType: bill.type as BillMode,
       items: draftItems,
-      customerName: bill.vendorOrCustomerName || '',
+      vendorOrCustomerName: bill.vendorOrCustomerName || '',
       customerPhone: bill.customerPhone || '',
       notes: bill.notes || '',
       isEstimate: bill.isEstimate || false,
@@ -146,14 +148,68 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const [billTypeFilter, setBillTypeFilter] = useState<BillTypeFilter>('all');
   const [isLoading, setIsLoading] = useState(true);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  // Debounce search
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   useEffect(() => {
     if (currentCompanyId) {
       setIsLoading(true);
-      fetchBills(currentCompanyId).finally(() => setIsLoading(false));
+
+      let startDateStr: string | undefined = undefined;
+      let endDateStr: string | undefined = undefined;
+
+      const now = new Date();
+      if (timePeriodFilter === 'today') {
+        startDateStr = startOfDay(now).toISOString();
+        endDateStr = endOfDay(now).toISOString();
+      } else if (timePeriodFilter === 'thisWeek') {
+        startDateStr = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+        endDateStr = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      } else if (timePeriodFilter === 'thisMonth') {
+        startDateStr = startOfMonth(now).toISOString();
+        endDateStr = endOfMonth(now).toISOString();
+      } else if (timePeriodFilter === 'lastMonth') {
+        startDateStr = startOfMonth(subMonths(now, 1)).toISOString();
+        endDateStr = endOfMonth(subMonths(now, 1)).toISOString();
+      } else if (timePeriodFilter === 'thisYear') {
+        startDateStr = startOfYear(now).toISOString();
+        endDateStr = endOfYear(now).toISOString();
+      } else if (timePeriodFilter === 'lastYear') {
+        startDateStr = startOfYear(subYears(now, 1)).toISOString();
+        endDateStr = endOfYear(subYears(now, 1)).toISOString();
+      } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
+        if (isValid(customStartDate) && isValid(customEndDate)) {
+          startDateStr = startOfDay(customStartDate).toISOString();
+          endDateStr = endOfDay(customEndDate).toISOString();
+        }
+      }
+
+      const options = {
+        storeId: filterByStoreId,
+        search: debouncedSearch,
+        type: billTypeFilter === 'estimate' ? 'sell' : (billTypeFilter === 'all' ? undefined : billTypeFilter),
+        isEstimate: billTypeFilter === 'estimate' ? true : (billTypeFilter === 'all' ? undefined : false),
+        startDate: startDateStr,
+        endDate: endDateStr,
+      };
+
+      fetchBillsPaginated(currentCompanyId, currentPage, 50, options as any)
+        .finally(() => setIsLoading(false));
     } else {
       setIsLoading(false);
     }
-  }, [currentCompanyId, fetchBills]);
+  }, [currentCompanyId, fetchBillsPaginated, currentPage, debouncedSearch, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]);
+
+  // Reset page on filter change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [debouncedSearch, billTypeFilter, filterByStoreId, timePeriodFilter]);
 
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
@@ -175,63 +231,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const filteredAndSortedBills = useMemo(() => {
     let processBills = [...allBillsFromStore];
 
-    if (filterByStoreId) {
-      processBills = processBills.filter(bill => bill.storeId === filterByStoreId);
-    }
 
-    if (timePeriodFilter === 'today') {
-      processBills = processBills.filter(bill => isToday(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'thisWeek') {
-      processBills = processBills.filter(bill => isThisWeek(new Date(bill.timestamp), { weekStartsOn: 1 }));
-    } else if (timePeriodFilter === 'thisMonth') {
-      processBills = processBills.filter(bill => isThisMonth(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'lastMonth') {
-      const today = new Date();
-      const firstDayLastMonth = startOfMonth(subMonths(today, 1));
-      const lastDayLastMonth = endOfMonth(subMonths(today, 1));
-      processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastMonth, end: lastDayLastMonth }));
-    } else if (timePeriodFilter === 'thisYear') {
-      processBills = processBills.filter(bill => isThisYear(new Date(bill.timestamp)));
-    } else if (timePeriodFilter === 'lastYear') {
-      const today = new Date();
-      const firstDayLastYear = startOfYear(subYears(today, 1));
-      const lastDayLastYear = endOfYear(subYears(today, 1));
-      processBills = processBills.filter(bill => isWithinInterval(new Date(bill.timestamp), { start: firstDayLastYear, end: lastDayLastYear }));
-    } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
-      const start = startOfDay(customStartDate);
-      const end = endOfDay(customEndDate);
-      if (isValid(start) && isValid(end) && end >= start) {
-        processBills = processBills.filter(bill => {
-          const billDate = new Date(bill.timestamp);
-          return isWithinInterval(billDate, { start, end });
-        });
-      }
-    }
+    // Filter logic moved to server-side fetching
 
-
-    if (billTypeFilter !== 'all') {
-      if (billTypeFilter === 'estimate') {
-        processBills = processBills.filter(bill => bill.type === 'sell' && bill.isEstimate === true);
-      } else {
-        processBills = processBills.filter(bill => bill.type === billTypeFilter && bill.isEstimate !== true);
-      }
-    }
-
-    if (searchTerm) {
-      const lowerSearchTerm = searchTerm.toLowerCase();
-      processBills = processBills.filter(bill =>
-        bill.id.toLowerCase().includes(lowerSearchTerm) ||
-        (bill.vendorOrCustomerName && bill.vendorOrCustomerName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.customerPhone && bill.customerPhone.toLowerCase().includes(lowerSearchTerm)) ||
-        getBillTypeName(bill).toLowerCase().includes(lowerSearchTerm) ||
-        format(new Date(bill.date), 'PPpp').toLowerCase().includes(lowerSearchTerm) ||
-        bill.totalAmount.toString().includes(lowerSearchTerm) ||
-        (bill.paymentStatus && bill.paymentStatus.toLowerCase().includes(lowerSearchTerm)) ||
-        bill.items.some(item => item.productName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.billedByStaffName && bill.billedByStaffName.toLowerCase().includes(lowerSearchTerm)) ||
-        (bill.storeName && bill.storeName.toLowerCase().includes(lowerSearchTerm))
-      );
-    }
 
     if (sortConfig !== null) {
       processBills.sort((a, b) => {
@@ -1028,6 +1030,40 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           <p className="text-center text-muted-foreground py-10">No bills found for the selected filters.</p>
         )}
       </div>
+
+      {/* Pagination Controls */}
+      {billsPagination && billsPagination.totalPages > 1 && (
+        <div className="flex items-center justify-end space-x-2 py-4 px-2 no-print">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCurrentPage(p => Math.max(1, p - 1));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={currentPage === 1 || isLoading}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
+          </Button>
+          <div className="text-sm font-medium">
+            Page {currentPage} of {billsPagination.totalPages}
+            <span className="text-xs text-muted-foreground ml-2 hidden sm:inline">
+              (Total Bills: {billsPagination.totalCount})
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setCurrentPage(p => Math.min(billsPagination.totalPages, p + 1));
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            disabled={currentPage === billsPagination.totalPages || isLoading}
+          >
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
+        </div>
+      )}
     </>
   );
 }

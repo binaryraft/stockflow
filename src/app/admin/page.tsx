@@ -15,25 +15,27 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { ExpenseTrackerCard } from '@/components/dashboard/expense-tracker-card';
 import { ExpenseSummaryStats } from '@/components/dashboard/expense-summary-stats';
-import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFinancialSummaryStats'; 
-import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart'; 
+import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFinancialSummaryStats';
+import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart';
 import { getCurrencySymbol } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
-    if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Expense' };
-    if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-green-50 bg-green-600', name: 'Sales' };
-    if (isDefectiveReturn) return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return (Defective)' };
-    return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return' };
+  if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Expense' };
+  if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-green-50 bg-green-600', name: 'Sales' };
+  if (isDefectiveReturn) return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return (Defective)' };
+  return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return' };
 };
 
 export default function DashboardPage() {
-  const getRecentBillsFromStore = useInventoryStore((state) => state.getRecentBills);
-  const userProfile = useInventoryStore((state) => state.userProfile);
-  
+  const { dashboardAnalytics, fetchDashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+    dashboardAnalytics: state.dashboardAnalytics,
+    fetchDashboardAnalytics: state.fetchDashboardAnalytics,
+    userProfile: state.userProfile,
+  }));
+
   const [hasMounted, setHasMounted] = useState(false);
-  const [recentBills, setRecentBills] = useState<Bill[]>([]);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('daily');
 
@@ -43,15 +45,18 @@ export default function DashboardPage() {
   }, [userProfile.companyCurrency]);
 
   useEffect(() => {
-    if (hasMounted) {
-      setRecentBills(getRecentBillsFromStore(5)); 
+    const companyId = localStorage.getItem('companyId');
+    if (companyId) {
+      fetchDashboardAnalytics(companyId, timePeriod);
     }
-  }, [hasMounted, getRecentBillsFromStore]);
+  }, [fetchDashboardAnalytics, timePeriod]);
+
+  const recentBills = dashboardAnalytics?.recentBills || [];
 
   return (
     <div className="flex flex-col gap-8 page-transition">
-      <PageTitle 
-        title="Admin Dashboard" 
+      <PageTitle
+        title="Admin Dashboard"
         actions={
           <Tabs defaultValue={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)} className="w-full md:w-auto">
             <TabsList className="grid w-full grid-cols-4">
@@ -63,17 +68,17 @@ export default function DashboardPage() {
           </Tabs>
         }
       />
-      
+
       <OverviewStats period={timePeriod} />
 
-      <OverallFinancialSummaryStats period={timePeriod} /> 
+      <OverallFinancialSummaryStats period={timePeriod} />
 
       <div className="grid gap-6 md:grid-cols-2">
         <Card className="card-hover-effect">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="h-5 w-5 text-primary" />
-                Sales & Expenses
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Sales & Expenses
             </CardTitle>
             <CardDescription>Overview of sales and expenses for the selected period.</CardDescription>
           </CardHeader>
@@ -83,9 +88,9 @@ export default function DashboardPage() {
         </Card>
         <Card className="card-hover-effect">
           <CardHeader>
-             <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-primary" />
-                Top Selling Products/SKUs
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primary" />
+              Top Selling Products/SKUs
             </CardTitle>
             <CardDescription>Products/SKUs generating the most revenue for the period.</CardDescription>
           </CardHeader>
@@ -98,8 +103,8 @@ export default function DashboardPage() {
       <Card className="card-hover-effect">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-              <ListChecks className="h-5 w-5 text-primary" /> 
-              Top Profitable Products (Revenue vs. Cost)
+            <ListChecks className="h-5 w-5 text-primary" />
+            Top Profitable Products (Revenue vs. Cost)
           </CardTitle>
           <CardDescription>Comparison of revenue and cost for top profitable products/SKUs for the period.</CardDescription>
         </CardHeader>
@@ -107,7 +112,7 @@ export default function DashboardPage() {
           <TopProfitableProductsChart period={timePeriod} />
         </CardContent>
       </Card>
-      
+
       <ExpenseSummaryStats />
       <ExpenseTrackerCard />
 
@@ -132,7 +137,7 @@ export default function DashboardPage() {
                 <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
               </Link>
             </Button>
-             <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">
+            <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">
               <Link href="/admin/products/add">
                 <PackageSearch className="mr-2 h-4 w-4" /> Add New Product
               </Link>
@@ -159,7 +164,7 @@ export default function DashboardPage() {
                   <div key={bill.id} className="flex items-center justify-between text-sm p-3 rounded-lg bg-tertiary shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center gap-3">
                       <div className={cn("p-1.5 rounded-full", displayInfo.colorClass)}>
-                         {React.cloneElement(displayInfo.icon, { className: "h-5 w-5" })}
+                        {React.cloneElement(displayInfo.icon, { className: "h-5 w-5" })}
                       </div>
                       <div>
                         <span className="font-medium text-foreground">{displayInfo.name}</span>
@@ -169,8 +174,8 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                        <span className={cn("font-semibold", amountColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</span>
-                        <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'PP p')}</span>
+                      <span className={cn("font-semibold", amountColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</span>
+                      <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'PP p')}</span>
                     </div>
                   </div>
                 );
@@ -178,14 +183,14 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        
+
         <Card className="card-hover-effect">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
               Quick Links
             </CardTitle>
-             <CardDescription>Navigate to important sections.</CardDescription>
+            <CardDescription>Navigate to important sections.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 pt-4">
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
@@ -197,10 +202,10 @@ export default function DashboardPage() {
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
               <Link href="/admin/staff">Manage Staff</Link>
             </Button>
-             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
+            <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
               <Link href="/admin/stores">Manage Stores</Link>
             </Button>
-             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
+            <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
               <Link href="/admin/chat">Store Chat</Link>
             </Button>
           </CardContent>

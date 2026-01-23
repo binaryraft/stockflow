@@ -14,10 +14,11 @@ interface OverallFinancialSummaryStatsProps {
 }
 
 export function OverallFinancialSummaryStats({ period }: OverallFinancialSummaryStatsProps) {
-  const getSummary = useInventoryStore((state) => state.getOverallFinancialSummary);
-  const userProfile = useInventoryStore((state) => state.userProfile);
-  const [summary, setSummary] = useState<FinancialSummary | null>(null);
-  const [hasMounted, setHasMounted] = useState(false);
+  const { dashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+    dashboardAnalytics: state.dashboardAnalytics,
+    userProfile: state.userProfile,
+  }));
+
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   const periodTextMap: Record<TimePeriod, string> = {
@@ -28,16 +29,18 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   };
 
   useEffect(() => {
-    setHasMounted(true);
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
 
-  useEffect(() => {
-    if (hasMounted) {
-      const companyId = localStorage.getItem('companyId') || undefined;
-      setSummary(getSummary(period, companyId));
-    }
-  }, [hasMounted, getSummary, period]);
+  const summary = dashboardAnalytics ? {
+    totalRevenue: dashboardAnalytics.summary.totalRevenue,
+    totalCOGS: dashboardAnalytics.summary.totalRevenue - dashboardAnalytics.summary.grossProfit,
+    grossProfit: dashboardAnalytics.summary.grossProfit,
+    totalExpenses: dashboardAnalytics.summary.totalExpenses,
+    netProfit: dashboardAnalytics.summary.grossProfit - dashboardAnalytics.summary.totalExpenses,
+  } : null;
+
+  const hasMounted = !!dashboardAnalytics;
 
   const cardTitle = `Financial Summary (${periodTextMap[period]})`;
   const cardDescription = `Financial performance metrics for the selected period.`;
@@ -63,17 +66,17 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   const summaryItems = [
     { label: "Total Sales Revenue", value: summary.totalRevenue, icon: <TrendingUp className="text-green-500" />, colorClass: "text-green-600 dark:text-green-500" },
     { label: "Total Cost of Goods Sold (COGS)", value: summary.totalCOGS, icon: <TrendingDown className="text-orange-500" />, colorClass: "text-orange-600 dark:text-orange-500" },
-    { label: "Gross Profit", value: summary.grossProfit, icon: <DollarSign className={cn(summary.grossProfit >=0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.grossProfit >=0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
+    { label: "Gross Profit", value: summary.grossProfit, icon: <DollarSign className={cn(summary.grossProfit >= 0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.grossProfit >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
     { label: "Total Operating Expenses", value: summary.totalExpenses, icon: <TrendingDown className="text-red-500" />, colorClass: "text-destructive" },
-    { label: "Net Profit / (Loss)", value: summary.netProfit, icon: <AlertTriangle className={cn(summary.netProfit >=0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.netProfit >=0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
+    { label: "Net Profit / (Loss)", value: summary.netProfit, icon: <AlertTriangle className={cn(summary.netProfit >= 0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.netProfit >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
   ];
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-primary">
-           <BarChart className="h-5 w-5" />
-           {cardTitle}
+          <BarChart className="h-5 w-5" />
+          {cardTitle}
         </CardTitle>
         <CardDescription>{cardDescription}</CardDescription>
       </CardHeader>

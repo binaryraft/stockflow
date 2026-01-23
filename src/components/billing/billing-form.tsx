@@ -65,7 +65,9 @@ export function BillingForm({
     fetchProducts,
     draftBill,
     setDraftBill,
-    clearDraftBill
+    clearDraftBill,
+    getAllCustomers,
+    fetchCustomers,
   } = useInventoryStore(state => ({
     addBill: state.addBill,
     searchProducts: state.searchProducts,
@@ -82,6 +84,8 @@ export function BillingForm({
     draftBill: state.draftBill,
     setDraftBill: state.setDraftBill,
     clearDraftBill: state.clearDraftBill,
+    getAllCustomers: state.getAllCustomers,
+    fetchCustomers: state.fetchCustomers,
   }));
   const companyId = useInventoryStore(state => companyIdFromProp || localStorage.getItem('companyId') || "comp_default_001");
 
@@ -139,6 +143,7 @@ export function BillingForm({
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
   const [billDate, setBillDate] = useState<Date | undefined>(new Date());
+  const [isVerifyingGst, setIsVerifyingGst] = useState(false);
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -166,14 +171,14 @@ export function BillingForm({
     if (!hasMounted) return;
     if (draftBill && !hasLoadedDraft && currentBillItems.length === 0) {
       // Restore state from draft
-      if (draftBill.items.length > 0 || draftBill.customerName || draftBill.notes) {
-        setMode(draftBill.mode);
+      if (draftBill.items.length > 0 || draftBill.vendorOrCustomerName || draftBill.notes) {
+        setMode(draftBill.billType);
         setCurrentBillItems(draftBill.items);
-        setCustomerVendorName(draftBill.customerName);
-        setCustomerPhone(draftBill.customerPhone);
-        setNotes(draftBill.notes);
-        setIsEstimateMode(draftBill.isEstimate);
-        setTaxType(draftBill.taxType);
+        setCustomerVendorName(draftBill.vendorOrCustomerName || '');
+        setCustomerPhone(draftBill.customerPhone || '');
+        setNotes(draftBill.notes || '');
+        setIsEstimateMode(draftBill.isEstimate || false);
+        setTaxType(draftBill.taxType || 'intra-state');
         toast({ title: "Draft Restored", description: "Your unsaved bill has been restored." });
       }
       setHasLoadedDraft(true);
@@ -191,13 +196,17 @@ export function BillingForm({
     const timer = setTimeout(() => {
       if (currentBillItems.length > 0 || customerVendorName || notes) {
         setDraftBill({
-          mode,
+          billType: mode,
           items: currentBillItems,
-          customerName: customerVendorName,
+          vendorOrCustomerName: customerVendorName,
           customerPhone,
           notes,
           isEstimate: isEstimateMode,
-          taxType
+          taxType,
+          gstin: customerGstin,
+          placeOfSupply,
+          billingAddress,
+          shippingAddress
         });
       }
     }, 1000);
@@ -208,10 +217,41 @@ export function BillingForm({
     setHasMounted(true);
     if (companyId) {
       fetchProducts(companyId);
+      fetchCustomers(companyId);
     }
     setAllStores(getAllStores());
     setActivePlan(getActiveSubscriptionPlan());
-  }, [getAllStores, getActiveSubscriptionPlan, fetchProducts, companyId]);
+  }, [getAllStores, getActiveSubscriptionPlan, fetchProducts, fetchCustomers, companyId]);
+
+  // Auto-populate customer from phone number
+  useEffect(() => {
+    if (customerPhone.length === 10 && hasMounted) {
+      const customers = getAllCustomers(companyId);
+      const matched = customers.find(c => c.phone === customerPhone);
+      if (matched) {
+        if (!customerVendorName || customerVendorName.trim() === '') {
+          setCustomerVendorName(matched.name || '');
+        }
+        if (!customerGstin || customerGstin.trim() === '') {
+          setCustomerGstin(matched.gstin || '');
+        }
+        if (!billingAddress || billingAddress.trim() === '') {
+          setBillingAddress(matched.billingAddress || matched.address || '');
+        }
+        if (!shippingAddress || shippingAddress.trim() === '') {
+          setShippingAddress(matched.shippingAddress || '');
+        }
+        if (!placeOfSupply || placeOfSupply.trim() === '') {
+          setPlaceOfSupply(matched.placeOfSupply || '');
+        }
+
+        toast({
+          title: "Customer Recognized",
+          description: `Welcome back, ${matched.name || 'valued customer'}. Details auto-populated.`
+        });
+      }
+    }
+  }, [customerPhone, getAllCustomers, companyId, hasMounted, toast]);
 
   const determineMode = useCallback((): BillMode => {
     const urlMode = initialModeProp || searchParamsHook.get('mode') as BillMode | null;
@@ -960,6 +1000,46 @@ export function BillingForm({
     setBillToPotentiallyPrint(null);
   };
 
+  const handleVerifyGst = async () => {
+    if (customerGstin.length !== 15) {
+      toast({ variant: "destructive", title: "Invalid GSTIN", description: "GSTIN must be 15 characters long." });
+      return;
+    }
+
+    setIsVerifyingGst(true);
+    try {
+      const response = await fetch(`/api/gst/verify?gstin=${customerGstin}`);
+      const result = await response.json();
+
+      if (result.success) {
+        const { data } = result;
+        // Auto populate fields if they are empty
+        if (data.tradeName && (!customerVendorName || customerVendorName.trim() === '')) {
+          setCustomerVendorName(data.tradeName);
+        }
+        if (data.address && (!billingAddress || billingAddress.trim() === '')) {
+          setBillingAddress(data.address);
+        }
+        if (data.state) {
+          setPlaceOfSupply(`${data.state} (${data.stateCode})`);
+        }
+
+        toast({
+          title: data.isPartial ? "State Identified" : "GST Verified",
+          description: data.isPartial
+            ? `Identified state as ${data.state} from GSTIN code.`
+            : `Verified: ${data.tradeName}. Details auto-populated.`
+        });
+      } else {
+        toast({ variant: "destructive", title: "Verification Failed", description: result.message });
+      }
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to connect to GST verification service." });
+    } finally {
+      setIsVerifyingGst(false);
+    }
+  };
+
   const handleSaveBill = () => {
     if (currentBillItems.length === 0) {
       toast({ variant: "destructive", title: "Empty Bill", description: "Please add items to the bill." });
@@ -992,23 +1072,12 @@ export function BillingForm({
       finalStoreId = storeIdFromProp;
     }
 
-    const billItemsForStore: Omit<BillItem, 'id' | 'productName' | 'sgstAmount' | 'cgstAmount' | 'igstAmount'>[] = currentBillItems.map(item => ({
-      productId: item.productId, quantity: item.quantity,
-      costPrice: item.costPrice || 0,
-      sellPrice: item.sellPrice || 0,
-      isDefective: item.isDefective, selectedVariantOptions: item.selectedVariantOptions,
-      isAdditionalCharge: item.isAdditionalCharge,
-      sourceChargeDefinitionId: item.sourceChargeDefinitionId,
-      discountValue: item.discountValue,
-      discountType: item.discountType,
-    }));
-
     const billPaymentStatus = (mode === 'sell' || mode === 'buy') ? (isPaid ? 'paid' : 'unpaid') : undefined;
 
     const currentBillPayload: PendingBillPayload = {
       billType: mode, vendorOrCustomerName: customerVendorName || undefined,
       customerPhone: customerPhone || undefined, notes: notes || undefined,
-      paymentStatus: billPaymentStatus, items: billItemsForStore,
+      paymentStatus: billPaymentStatus, items: currentBillItems,
       storeIdForBill: finalStoreId,
       isEstimate: mode === 'sell' ? isEstimateMode : undefined,
       taxType: taxType,
@@ -1409,13 +1478,26 @@ export function BillingForm({
                   <Label htmlFor="customerGstin" className="flex items-center gap-1.5">
                     <ReceiptText size={14} className="text-muted-foreground" /> Party GSTIN
                   </Label>
-                  <Input
-                    id="customerGstin"
-                    value={customerGstin}
-                    onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
-                    placeholder="Enter Party GSTIN (optional)"
-                    className="uppercase"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="customerGstin"
+                      value={customerGstin}
+                      onChange={(e) => setCustomerGstin(e.target.value.toUpperCase())}
+                      placeholder="Enter Party GSTIN (optional)"
+                      className="uppercase flex-grow"
+                      maxLength={15}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleVerifyGst}
+                      disabled={isVerifyingGst || customerGstin.length !== 15}
+                      className="shrink-0"
+                    >
+                      {isVerifyingGst ? <Loader2 className="h-4 w-4 animate-spin" /> : "Verify"}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="placeOfSupply" className="flex items-center gap-1.5">

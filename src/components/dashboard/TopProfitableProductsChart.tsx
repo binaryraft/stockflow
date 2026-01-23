@@ -11,7 +11,7 @@ import type { TimePeriod } from '@/types';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface ProductFinancialData {
-  name: string; 
+  name: string;
   revenue: number;
   cogs: number;
 }
@@ -29,7 +29,7 @@ const chartConfig = {
 
 const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: any) => {
   if (active && payload && payload.length) {
-    const data = payload[0].payload; 
+    const data = payload[0].payload;
     const originalItem = chartData.find((d: ProductFinancialData) => d.name === data.name || (typeof data.name === 'string' && typeof d.name === 'string' && `${d.name.substring(0, 22)}...` === data.name));
     const displayName = originalItem && typeof originalItem.name === 'string' ? originalItem.name : (typeof data.name === 'string' ? data.name : "Unknown Product");
     const profit = data.revenue - data.cogs;
@@ -40,7 +40,7 @@ const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: an
         {payload.map((entry: any) => (
           <div key={entry.dataKey} className="flex justify-between items-center my-0.5">
             <span className="flex items-center">
-              <span style={{display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color, marginRight: '6px'}}></span>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: entry.color, marginRight: '6px' }}></span>
               <span className="text-muted-foreground">{entry.dataKey === 'cogs' ? 'Total Cost (COGS)' : 'Total Revenue'}:</span>
             </span>
             <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-red-600' : 'text-green-600')}>
@@ -61,22 +61,23 @@ const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: an
 };
 
 export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
-  const getTopProfitableProducts = useInventoryStore((state) => state.getTopProfitableProducts);
-  const userProfile = useInventoryStore((state) => state.userProfile);
-  const [chartData, setChartData] = useState<ProductFinancialData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { dashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+    dashboardAnalytics: state.dashboardAnalytics,
+    userProfile: state.userProfile,
+  }));
+
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const data = getTopProfitableProducts(5, period); 
-    setChartData(data);
-    setIsLoading(false);
-  }, [getTopProfitableProducts, period]);
+  const chartData = (dashboardAnalytics?.topProducts || []).map(p => ({
+    name: p.name,
+    revenue: p.revenue,
+    cogs: p.revenue - (p.profit || 0),
+  }));
+  const isLoading = !dashboardAnalytics;
 
   if (isLoading) {
     return (
@@ -85,52 +86,52 @@ export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
       </div>
     );
   }
-  
+
   if (chartData.length === 0) {
     return <div className="flex items-center justify-center h-full"><p>No profit data available for products in this period.</p></div>;
   }
 
   const formattedChartData = chartData
-    .filter(item => typeof item.name === 'string' && item.name.trim() !== '') 
+    .filter(item => typeof item.name === 'string' && item.name.trim() !== '')
     .map(item => ({
-    ...item,
-    name: item.name.length > 25 ? `${item.name.substring(0, 22)}...` : item.name,
-  }));
+      ...item,
+      name: item.name.length > 25 ? `${item.name.substring(0, 22)}...` : item.name,
+    }));
 
   return (
     <ChartContainer config={chartConfig} className="w-full h-full">
-      <BarChart 
+      <BarChart
         data={formattedChartData}
         layout="vertical"
         margin={{
           top: 5,
-          right: 20, 
-          left: 10, 
+          right: 20,
+          left: 10,
           bottom: 5,
         }}
-        barGap={4} 
+        barGap={4}
       >
         <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-        <XAxis 
-          type="number" 
-          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} 
-          axisLine={false} 
+        <XAxis
+          type="number"
+          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`}
+          axisLine={false}
           tickLine={false}
         />
-        <YAxis 
-          dataKey="name" 
-          type="category" 
-          tickLine={false} 
-          axisLine={false} 
+        <YAxis
+          dataKey="name"
+          type="category"
+          tickLine={false}
+          axisLine={false}
           tickMargin={5}
-          width={150} 
-          interval={0} 
+          width={150}
+          interval={0}
         />
-        <Tooltip 
-          cursor={{ fill: 'hsl(var(--muted))' }} 
-          content={<CustomTooltip chartData={chartData} currencySymbol={currencySymbol} />} 
+        <Tooltip
+          cursor={{ fill: 'hsl(var(--muted))' }}
+          content={<CustomTooltip chartData={chartData} currencySymbol={currencySymbol} />}
         />
-        <Legend verticalAlign="top" height={36}/>
+        <Legend verticalAlign="top" height={36} />
         <Bar dataKey="revenue" fill="var(--color-revenue)" radius={4} barSize={15} name="Revenue" />
         <Bar dataKey="cogs" fill="var(--color-cogs)" radius={4} barSize={15} name="Cost" />
       </BarChart>

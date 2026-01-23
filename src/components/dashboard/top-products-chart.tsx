@@ -38,22 +38,19 @@ const CustomTooltip = ({ active, payload, label, currencySymbol }: any) => {
 
 
 export function TopProductsChart({ period }: { period: TimePeriod }) {
-  const getTopSellingProductsByRevenue = useInventoryStore((state) => state.getTopSellingProductsByRevenue);
-  const userProfile = useInventoryStore((state) => state.userProfile);
-  const [chartData, setChartData] = useState<ProductRevenueData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { dashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+    dashboardAnalytics: state.dashboardAnalytics,
+    userProfile: state.userProfile,
+  }));
+
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const data = getTopSellingProductsByRevenue(5, period); 
-    setChartData(data);
-    setIsLoading(false);
-  }, [getTopSellingProductsByRevenue, period]);
+  const chartData = dashboardAnalytics?.topProducts || [];
+  const isLoading = !dashboardAnalytics;
 
   if (isLoading) {
     return (
@@ -62,45 +59,45 @@ export function TopProductsChart({ period }: { period: TimePeriod }) {
       </div>
     );
   }
-  
+
   if (chartData.length === 0) {
     return <div className="flex items-center justify-center h-full"><p>No product sales data available for this period.</p></div>;
   }
 
   return (
     <ChartContainer config={chartConfig} className="w-full h-full">
-      <BarChart 
+      <BarChart
         data={chartData}
         layout="vertical"
         margin={{
           top: 5,
           right: 10,
-          left: 5, 
+          left: 5,
           bottom: 0,
         }}
       >
         <CartesianGrid horizontal={false} strokeDasharray="3 3" />
-        <XAxis 
-          type="number" 
-          dataKey="revenue" 
-          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} 
-          axisLine={false} 
+        <XAxis
+          type="number"
+          dataKey="revenue"
+          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`}
+          axisLine={false}
           tickLine={false}
         />
-        <YAxis 
-          dataKey="name" 
-          type="category" 
-          tickLine={false} 
-          axisLine={false} 
+        <YAxis
+          dataKey="name"
+          type="category"
+          tickLine={false}
+          axisLine={false}
           tickMargin={5}
-          width={100} 
-          interval={0} 
+          width={100}
+          interval={0}
         />
-        <Tooltip 
-          cursor={{ fill: 'hsl(var(--muted))' }} 
+        <Tooltip
+          cursor={{ fill: 'hsl(var(--muted))' }}
           content={<CustomTooltip currencySymbol={currencySymbol} />}
         />
-        <Bar dataKey="revenue" fill={chartConfig.revenue.color} radius={4} barSize={30}/>
+        <Bar dataKey="revenue" fill={chartConfig.revenue.color} radius={4} barSize={30} />
       </BarChart>
     </ChartContainer>
   );

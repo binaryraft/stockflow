@@ -7,7 +7,7 @@ import { StatCard } from './stat-card';
 import { Package, DollarSign, ShoppingCart, AlertTriangle, Users, ReceiptText, Archive, TrendingUp, Contact } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import type { TodaysFinancialSummary, TimePeriod } from '@/types'; 
+import type { TodaysFinancialSummary, TimePeriod } from '@/types';
 import { getCurrencySymbol } from '@/lib/utils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
@@ -16,39 +16,25 @@ const LOW_STOCK_THRESHOLD = 5;
 interface DailyStats {
   totalProducts: number;
   totalCustomers: number;
-  salesToday: string; 
-  purchasesToday: string; 
+  salesToday: string;
+  purchasesToday: string;
   transactionsToday: number;
   defectivesToday: number;
   lowStockCount: number;
-  grossProfitToday: string; 
+  grossProfitToday: string;
 }
 
 export function OverviewStats({ period }: { period: TimePeriod }) {
-  const { 
-    products, 
-    getLowStockProductCount, 
-    getPeriodFinancialSummary,
+  const {
+    dashboardAnalytics,
+    fetchDashboardAnalytics,
     userProfile,
-    getAllCustomers
   } = useInventoryStore((state) => ({
-    products: state.products,
-    getLowStockProductCount: state.getLowStockProductCount,
-    getPeriodFinancialSummary: state.getPeriodFinancialSummary,
+    dashboardAnalytics: state.dashboardAnalytics,
+    fetchDashboardAnalytics: state.fetchDashboardAnalytics,
     userProfile: state.userProfile,
-    getAllCustomers: state.getAllCustomers,
   }));
 
-  const [stats, setStats] = useState<DailyStats>({
-    totalProducts: 0,
-    totalCustomers: 0,
-    salesToday: '₹0.00',
-    purchasesToday: '₹0.00',
-    transactionsToday: 0,
-    defectivesToday: 0,
-    lowStockCount: 0,
-    grossProfitToday: '₹0.00',
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
@@ -71,30 +57,21 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
   }, [userProfile.companyCurrency]);
 
   useEffect(() => {
-    setIsLoading(true);
-    
-    const companyId = localStorage.getItem('companyId') || undefined;
-    const periodFinancials = getPeriodFinancialSummary(period, companyId);
-    const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
-    const totalCustomers = getAllCustomers(companyId).length;
-
-    let lowStock = 0;
-    if (typeof getLowStockProductCount === 'function') {
-      lowStock = getLowStockProductCount(LOW_STOCK_THRESHOLD, companyId);
+    const companyId = localStorage.getItem('companyId');
+    if (companyId) {
+      setIsLoading(true);
+      fetchDashboardAnalytics(companyId, period).finally(() => setIsLoading(false));
     }
+  }, [fetchDashboardAnalytics, period]);
 
-    setStats({
-      totalProducts: totalTrackedProducts,
-      totalCustomers: totalCustomers,
-      salesToday: `${currencySymbol}${periodFinancials.totalRevenue.toFixed(2)}`,
-      purchasesToday: `${currencySymbol}${periodFinancials.totalExpenses.toFixed(2)}`,
-      transactionsToday: periodFinancials.transactionsToday,
-      defectivesToday: periodFinancials.defectivesToday,
-      lowStockCount: lowStock,
-      grossProfitToday: `${currencySymbol}${periodFinancials.grossProfit.toFixed(2)}`,
-    });
-    setIsLoading(false);
-  }, [products, getLowStockProductCount, getPeriodFinancialSummary, currencySymbol, getAllCustomers, period]);
+  const stats = {
+    sales: `${currencySymbol}${(dashboardAnalytics?.summary.totalRevenue || 0).toFixed(2)}`,
+    purchases: `${currencySymbol}${(dashboardAnalytics?.summary.totalExpenses || 0).toFixed(2)}`,
+    transactions: dashboardAnalytics?.summary.transactionsToday || 0,
+    lowStock: dashboardAnalytics?.summary.lowStockCount || 0,
+    grossProfit: `${currencySymbol}${(dashboardAnalytics?.summary.grossProfit || 0).toFixed(2)}`,
+    grossProfitValue: dashboardAnalytics?.summary.grossProfit || 0,
+  };
 
   if (isLoading) {
     return (
@@ -112,33 +89,33 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <StatCard
         title={`${periodTextMap[period]} Sales`}
-        value={stats.salesToday}
+        value={stats.sales}
         icon={DollarSign}
-        description={`${stats.transactionsToday} ${periodDescriptionMap[period]}`}
+        description={`${stats.transactions} ${periodDescriptionMap[period]}`}
         isLoading={isLoading}
       />
-       <StatCard
+      <StatCard
         title={`${periodTextMap[period]} Gross Profit`}
-        value={stats.grossProfitToday}
+        value={stats.grossProfit}
         icon={TrendingUp}
         description="Sales minus Cost of Goods Sold"
         isLoading={isLoading}
-        valueClassName={parseFloat(stats.grossProfitToday.replace(currencySymbol, '')) >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}
+        valueClassName={stats.grossProfitValue >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}
       />
       <StatCard
         title={`${periodTextMap[period]} Purchases`}
-        value={stats.purchasesToday}
+        value={stats.purchases}
         icon={ShoppingCart}
         description={`Total cost of purchases`}
         isLoading={isLoading}
       />
       <StatCard
         title="Low Stock Products"
-        value={stats.lowStockCount}
+        value={stats.lowStock}
         icon={Archive}
         description={`Products below ${LOW_STOCK_THRESHOLD} units`}
         isLoading={isLoading}
-        valueClassName={stats.lowStockCount > 0 ? "text-destructive" : undefined}
+        valueClassName={stats.lowStock > 0 ? "text-destructive" : undefined}
       />
     </div>
   );

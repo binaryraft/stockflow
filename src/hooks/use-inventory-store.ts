@@ -36,6 +36,13 @@ interface PaginationState {
   limit: number;
 }
 
+interface DashboardAnalytics {
+  summary: TodaysFinancialSummary & { lowStockCount: number; totalReturns: number; };
+  topProducts: ProductRevenueData[];
+  timeSeriesData: Array<{ date: string; sales: number; expenses: number }>;
+  recentBills: Bill[];
+}
+
 interface InventoryState {
   // Core Data Stores
   products: Product[];
@@ -97,6 +104,10 @@ interface InventoryState {
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
   clearChatForStore: (storeId: string, companyId: string) => Promise<boolean>;
 
+  // Analytics Actions
+  fetchDashboardAnalytics: (companyId: string, period: TimePeriod) => Promise<void>;
+  dashboardAnalytics: DashboardAnalytics | null;
+
   // Simple Getters (Client-side helpers)
   getProductById: (productId: string) => Product | undefined;
   getBillById: (billId: string) => Bill | undefined;
@@ -107,7 +118,7 @@ interface InventoryState {
   getAllStaff: () => User[];
   getAllCustomers: (companyId?: string) => Customer[];
   getSkuIdentifier: (productName: string, optionValues: Record<string, string>) => string;
-  getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
+  getSkuDetails: (sku: ProductSKU | undefined, targetStoreId?: string, product?: Product) => { totalStock: number | null; currentSellPrice: number | null; averageCostPrice: number | null; skuIdentifier?: string; };
   findOrCreateProductSKU: (productId: string, optionValues: Record<string, string>) => ProductSKU | undefined;
   searchProducts: (searchTerm: string) => Product[];
   searchProductsRemote: (companyId: string, searchTerm: string) => Promise<Product[]>;
@@ -166,6 +177,7 @@ const storeInitialState = {
   userProfile: { ...defaultUserProfile },
   messagesByStore: {},
   draftBill: null,
+  dashboardAnalytics: null,
 };
 // #endregion
 
@@ -177,8 +189,7 @@ export const useInventoryStore = create<InventoryState>()(
       // #region API-Driven Actions
       // --- Product Actions ---
       fetchProducts: async (companyId) => {
-        // Legacy support: fetch all (or default page)
-        get().fetchProductsPaginated(companyId, 1, 0); // 0 limit means all? Or we default to 50? API says 0 is all.
+        get().fetchProductsPaginated(companyId, 1, 100);
       },
       fetchProductsPaginated: async (companyId, page, limit, search, sort) => {
         if (get().userProfile.dataMode === 'local') return;
@@ -318,7 +329,7 @@ export const useInventoryStore = create<InventoryState>()(
 
       // --- Bill Actions ---
       fetchBills: async (companyId) => {
-        get().fetchBillsPaginated(companyId, 1, 0);
+        get().fetchBillsPaginated(companyId, 1, 100);
       },
       fetchBillsPaginated: async (companyId, page, limit, options) => {
         if (get().userProfile.dataMode === 'local') return;
@@ -785,6 +796,21 @@ export const useInventoryStore = create<InventoryState>()(
           return false;
         }
       },
+      fetchDashboardAnalytics: async (companyId, period) => {
+        try {
+          const response = await fetch(`/api/analytics?companyId=${companyId}&period=${period}`);
+          if (!response.ok) throw new Error(`Failed to fetch analytics: ${response.statusText}`);
+          const result = await response.json();
+          if (result.success) {
+            set({ dashboardAnalytics: result.data });
+          } else {
+            throw new Error(result.message || 'Failed to fetch analytics');
+          }
+        } catch (error) {
+          console.error("Error fetching dashboard analytics:", error);
+          set({ dashboardAnalytics: null });
+        }
+      },
       // #endregion
 
       // #region Getters and Client-Side Helpers
@@ -804,9 +830,9 @@ export const useInventoryStore = create<InventoryState>()(
         const sortedOptions = Object.entries(optionValues).sort(([keyA], [keyB]) => keyA.localeCompare(keyB)).map(([, value]) => value).join(' - ');
         return `${productName} (${sortedOptions})`;
       },
-      getSkuDetails: (sku, targetStoreId) => {
+      getSkuDetails: (sku, targetStoreId, overrideProduct) => {
         const { products, getSkuIdentifier } = get();
-        const product = products.find(p => p.productSKUs.some(s => s.id === sku?.id));
+        const product = overrideProduct || products.find(p => p.productSKUs.some(s => s.id === sku?.id));
         const skuIdentifier = sku?.skuIdentifier || (sku && product ? getSkuIdentifier(product.name, sku.optionValues) : undefined);
 
         if (!sku || !product) return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };

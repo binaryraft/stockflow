@@ -29,22 +29,19 @@ interface DailyData {
 }
 
 export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
-  const getDailySalesAndExpenses = useInventoryStore((state) => state.getDailySalesAndExpenses);
-  const userProfile = useInventoryStore((state) => state.userProfile);
-  const [chartData, setChartData] = useState<DailyData[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { dashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+    dashboardAnalytics: state.dashboardAnalytics,
+    userProfile: state.userProfile,
+  }));
+
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
 
-  useEffect(() => {
-    setIsLoading(true);
-    const data = getDailySalesAndExpenses(period); 
-    setChartData(data);
-    setIsLoading(false);
-  }, [getDailySalesAndExpenses, period]);
+  const chartData = dashboardAnalytics?.timeSeriesData || [];
+  const isLoading = !dashboardAnalytics;
 
   if (isLoading) {
     return (
@@ -75,18 +72,18 @@ export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(value) => value} 
+          tickFormatter={(value) => value}
         />
         <YAxis
           tickLine={false}
           axisLine={false}
           tickMargin={8}
-          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`} 
+          tickFormatter={(value) => `${currencySymbol}${value / 1000}k`}
         />
         <Tooltip
           cursor={true}
-          content={<ChartTooltipContent 
-            indicator="dot" 
+          content={<ChartTooltipContent
+            indicator="dot"
             formatter={(value, name) => (
               <div className="flex flex-col">
                 <span className="capitalize">{name}</span>
