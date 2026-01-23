@@ -156,11 +156,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                         </div>
                     )}
 
-                    {productNotFoundHint && productNameQuery.toLowerCase() === productNotFoundHint.toLowerCase() && (
-                        <div className="bg-destructive/10 text-destructive p-2 rounded-md text-sm mt-2">
-                            Product not found. Press Enter again to add new.
-                        </div>
-                    )}
+
                 </div>
 
                 {/* Quantity */}

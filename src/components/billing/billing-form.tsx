@@ -609,8 +609,8 @@ export function BillingForm({
     resetFormFields(true);
   };
 
-  const findAndPopulateProductByBarcode = async (barcodeValue: string) => {
-    if (!barcodeValue.trim()) return;
+  const findAndPopulateProductByBarcode = async (barcodeValue: string, showErrorToast = true) => {
+    if (!barcodeValue.trim()) return false;
     setIsLoadingProductSearch(true);
     setProductNotFoundHint('');
 
@@ -650,16 +650,27 @@ export function BillingForm({
       toast({ title: "Product Found", description: `${suggestion.displayInfo.name} selected for billing.` });
       // Removed resetFormFields(false) so the input stays populated
       setTimeout(() => quantityInputRef.current?.focus(), 50);
+      return true;
     } else {
-      toast({ variant: "destructive", title: "Product Not Found", description: `Product with code '${barcodeValue}' not found. Press Enter again on the product name to add it as a new product.` });
+      if (showErrorToast) {
+        toast({ variant: "destructive", title: "Product Not Found", description: `Product with code '${barcodeValue}' not found.` });
+      }
       setProductNameQuery(barcodeValue);
       setProductNotFoundHint(barcodeValue);
       productNameInputRef.current?.focus();
+      return false;
     }
   };
 
-  const handleProductNameSubmit = (inputValue: string) => {
-    if (productNotFoundHint && inputValue.trim() !== '' && inputValue.toLowerCase() === productNotFoundHint.toLowerCase()) {
+  const handleProductNameSubmit = async (inputValue: string) => {
+    // If we have a hint already, it means we already tried once and user confirmed they want to add it?
+    // Actually, as per the new requirement, we want to go straight to add product dialog.
+
+    // First, try to find it (as SKU or Barcode)
+    const found = await findAndPopulateProductByBarcode(inputValue, false);
+
+    if (!found && inputValue.trim() !== '') {
+      // Directly open the add product dialog
       const billingFormPreFill = {
         name: inputValue,
         quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
@@ -669,9 +680,7 @@ export function BillingForm({
       setNewProductDialogInitialValues(billingFormPreFill);
       setIsNewProductDialogOpen(true);
       setProductNotFoundHint('');
-      resetFormFields(true); // Reset fields after deciding to open dialog
-    } else {
-      findAndPopulateProductByBarcode(inputValue);
+      resetFormFields(true);
     }
   };
 
