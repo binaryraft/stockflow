@@ -5,6 +5,7 @@ import './globals.css';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/toaster';
+import { AITrigger } from '@/components/ai/AITrigger';
 
 const inter = Inter({
   variable: '--font-inter',
@@ -43,6 +44,7 @@ export default function RootLayout({
         >
           {children}
           <Toaster />
+          <AITrigger />
         </ThemeProvider>
       </body>
     </html>
