@@ -64,31 +64,97 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   }
 
   const summaryItems = [
-    { label: "Total Sales Revenue", value: summary.totalRevenue, icon: <TrendingUp className="text-green-500" />, colorClass: "text-green-600 dark:text-green-500" },
-    { label: "Total Cost of Goods Sold (COGS)", value: summary.totalCOGS, icon: <TrendingDown className="text-orange-500" />, colorClass: "text-orange-600 dark:text-orange-500" },
-    { label: "Gross Profit", value: summary.grossProfit, icon: <DollarSign className={cn(summary.grossProfit >= 0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.grossProfit >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
-    { label: "Total Operating Expenses", value: summary.totalExpenses, icon: <TrendingDown className="text-red-500" />, colorClass: "text-destructive" },
-    { label: "Net Profit / (Loss)", value: summary.netProfit, icon: <AlertTriangle className={cn(summary.netProfit >= 0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.netProfit >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
+    {
+      label: "Total Sales",
+      value: summary.totalRevenue,
+      icon: <TrendingUp />,
+      gradient: "from-green-500/10 to-green-500/5",
+      iconColor: "text-green-600 dark:text-green-400",
+      description: "Total gross revenue generated"
+    },
+    {
+      label: "COGS",
+      value: summary.totalCOGS,
+      icon: <TrendingDown />,
+      gradient: "from-orange-500/10 to-orange-500/5",
+      iconColor: "text-orange-600 dark:text-orange-400",
+      description: "Cost of Goods Sold"
+    },
+    {
+      label: "Gross Profit",
+      value: summary.grossProfit,
+      icon: <DollarSign />,
+      gradient: "from-primary/15 to-primary/5",
+      iconColor: "text-primary",
+      description: "Sales minus COGS"
+    },
+    {
+      label: "Operating Expenses",
+      value: summary.totalExpenses,
+      icon: <TrendingDown />,
+      gradient: "from-destructive/10 to-destructive/5",
+      iconColor: "text-destructive",
+      description: "Direct business overheads"
+    },
   ];
 
+  const netProfit = summary.netProfit;
+  const isProfitable = netProfit >= 0;
+
   return (
-    <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-primary">
-          <BarChart className="h-5 w-5" />
-          {cardTitle}
-        </CardTitle>
-        <CardDescription>{cardDescription}</CardDescription>
+    <Card className="overflow-hidden border-none shadow-xl bg-gradient-to-br from-card to-muted/30">
+      <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
+      <CardHeader className="pb-2">
+        <div className="flex justify-between items-center">
+          <div>
+            <CardTitle className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
+              {cardTitle}
+            </CardTitle>
+            <CardDescription className="text-sm font-medium opacity-80 mt-1">{cardDescription}</CardDescription>
+          </div>
+          <div className={cn(
+            "px-4 py-2 rounded-2xl flex flex-col items-end transition-all-fast hover:scale-105 border",
+            isProfitable
+              ? "bg-green-500/10 border-green-500/20 text-green-700 dark:text-green-400"
+              : "bg-destructive/10 border-destructive/20 text-destructive"
+          )}>
+            <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Net {isProfitable ? 'Profit' : 'Loss'}</span>
+            <span className="text-2xl font-black tabular-nums">{currencySymbol}{Math.abs(netProfit).toFixed(2)}</span>
+          </div>
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4 pt-3">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 text-sm">
-          {summaryItems.map(item => (
-            <div key={item.label} className="p-3 bg-tertiary rounded-md shadow-sm border border-border/50">
-              <div className="flex items-center gap-2 mb-1">
-                {React.cloneElement(item.icon, { size: 18 })}
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{item.label}</h4>
+
+      <CardContent className="pt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          {summaryItems.map((item, idx) => (
+            <div
+              key={item.label}
+              className={cn(
+                "group relative p-5 rounded-2xl transition-all duration-300 hover:-translate-y-1 border border-border/50 bg-gradient-to-b overflow-hidden",
+                item.gradient
+              )}
+            >
+              <div className="flex justify-between items-start mb-4">
+                <div className={cn("p-2.5 rounded-xl bg-background/80 shadow-sm transition-transform group-hover:scale-110", item.iconColor)}>
+                  {React.cloneElement(item.icon as React.ReactElement, { size: 20 })}
+                </div>
               </div>
-              <p className={cn("text-xl font-bold", item.colorClass)}>{currencySymbol}{item.value.toFixed(2)}</p>
+
+              <div className="space-y-1">
+                <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.label}</p>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold tracking-tight text-foreground">{currencySymbol}{item.value.toFixed(2)}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground/80 font-medium leading-none">{item.description}</p>
+              </div>
+
+              {/* Decorative accent */}
+              <div className={cn(
+                "absolute -bottom-6 -right-6 w-16 h-16 rounded-full blur-3xl opacity-20 transition-opacity group-hover:opacity-40",
+                item.iconColor.includes('green') ? 'bg-green-500' :
+                  item.iconColor.includes('primary') ? 'bg-primary' :
+                    item.iconColor.includes('orange') ? 'bg-orange-500' : 'bg-destructive'
+              )} />
             </div>
           ))}
         </div>

@@ -26,11 +26,11 @@ import { useToast } from '@/hooks/use-toast';
 export default function AdminStoreChatPage() {
   const params = useParams();
   const storeId = params.storeId as string;
-  const { 
-    getStoreById, 
-    fetchMessagesForStore, 
-    clearChatForStore, 
-    messagesByStore, 
+  const {
+    getStoreById,
+    fetchMessagesForStore,
+    clearChatForStore,
+    messagesByStore,
     companyId: currentCompanyIdFromStoreHook // Not used directly for fetch, companyId from localStorage is used
   } = useInventoryStore((state) => ({
     getStoreById: state.getStoreById,
@@ -65,7 +65,7 @@ export default function AdminStoreChatPage() {
       // Waiting for companyId
       setIsLoading(true);
     } else {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [storeId, currentCompanyId, getStoreById, fetchMessagesForStore]);
 
@@ -78,7 +78,7 @@ export default function AdminStoreChatPage() {
           description: `All messages for ${store.name} have been deleted.`,
         });
       } else {
-         toast({
+        toast({
           variant: "destructive",
           title: "Clear Failed",
           description: `Could not clear chat for ${store.name}.`,
@@ -107,18 +107,18 @@ export default function AdminStoreChatPage() {
       </div>
     );
   }
-  
+
   // Fallback if store is somehow null after loading
   if (!store) {
-      return <div className="flex-1 flex items-center justify-center">Store details unavailable.</div>;
+    return <div className="flex-1 flex items-center justify-center">Store details unavailable.</div>;
   }
 
 
   return (
     <div className="flex flex-col h-[calc(100vh_-_var(--header-height)_-_theme(spacing.12))]">
-      <PageTitle 
-        title={`Chat with ${store.name}`} 
-        icon={MessageSquare} 
+      <PageTitle
+        title={`Chat with ${store.name}`}
+        icon={MessageSquare}
         actions={
           <div className="flex items-center gap-2">
             <AlertDialog>
@@ -154,11 +154,11 @@ export default function AdminStoreChatPage() {
       />
       <div className="flex-1 overflow-hidden">
         {currentCompanyId && (
-          <ChatInterface 
-            storeId={store.id} 
-            currentUserId="admin" 
-            currentUserName="Admin" 
-            // companyId={currentCompanyId} // No longer needed as prop, ChatInterface will get it
+          <ChatInterface
+            storeId={store.id}
+            currentUserId="admin"
+            currentUserName="Admin"
+            companyId={currentCompanyId}
           />
         )}
       </div>

@@ -225,6 +225,7 @@ export default function StoreBillingPage() {
               storeId={currentStore.id}
               currentUserId={currentStore.id}
               currentUserName={currentStore.name}
+              companyId={companyIdForSession}
             />
           </div>
         </DialogContent>

@@ -23,7 +23,7 @@ import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 
-type SortableStoreColumns = keyof Pick<Store, 'name' | 'location' | 'email' | 'phone'>;
+type SortableStoreColumns = keyof Pick<Store, 'name' | 'username' | 'location' | 'email' | 'phone'>;
 
 export function StoresTable() {
   const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
@@ -45,6 +45,7 @@ export function StoresTable() {
     if (searchTerm) {
       sortableStores = sortableStores.filter(store =>
         store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        store.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         store.location.toLowerCase().includes(searchTerm.toLowerCase()) ||
         store.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         store.phone.toLowerCase().includes(searchTerm.toLowerCase())
@@ -165,6 +166,9 @@ export function StoresTable() {
               <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Name <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
+              <TableHead onClick={() => requestSort('username')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
+                Username <ArrowUpDown className="ml-2 h-3 w-3 inline" />
+              </TableHead>
               <TableHead onClick={() => requestSort('location')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
                 Location <ArrowUpDown className="ml-2 h-3 w-3 inline" />
               </TableHead>
@@ -186,6 +190,9 @@ export function StoresTable() {
                 return (
                   <TableRow key={store.id}>
                     <TableCell className="font-medium py-3 px-4">{store.name}</TableCell>
+                    <TableCell className="py-3 px-4">
+                      <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{store.username || 'N/A'}</code>
+                    </TableCell>
                     <TableCell className="py-3 px-4">{store.location}</TableCell>
                     <TableCell className="py-3 px-4">{store.email}</TableCell>
                     <TableCell className="py-3 px-4">{store.phone}</TableCell>
@@ -195,8 +202,18 @@ export function StoresTable() {
                         : allowedStaff.map(staff => staff.name).join(', ') || <span className="text-muted-foreground">None explicitly</span>
                       }
                     </TableCell>
-                    <TableCell className="py-3 px-4 text-xs capitalize">
-                      {store.allowedOperations.join(', ')}
+                    <TableCell className="py-3 px-4">
+                      <div className="flex flex-wrap gap-1">
+                        {store.allowedOperations.includes('sell') && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-tighter border border-primary/20">Sales</span>
+                        )}
+                        {store.allowedOperations.includes('buy') && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive text-[10px] font-bold uppercase tracking-tighter border border-destructive/20">Purchase</span>
+                        )}
+                        {store.allowedOperations.includes('return') && (
+                          <span className="px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-500 text-[10px] font-bold uppercase tracking-tighter border border-amber-500/20">Return</span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right py-3 px-4">
                       <DropdownMenu>

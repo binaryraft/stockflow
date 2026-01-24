@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, PieChart, Activity, AlertCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
 
 interface AccountingSummaryCardsProps {
@@ -122,29 +121,31 @@ export function AccountingSummaryCards({ startDate, endDate, storeId }: Accounti
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {cards.map((card, index) => (
-                <motion.div
+                <div
                     key={card.title}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.1 }}
+                    className="animate-fadeInUp"
+                    style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                    <Card className="border-none shadow-sm h-full hover:shadow-md transition-shadow">
+                    <Card className="border-none shadow-sm h-full hover:shadow-md transition-shadow group overflow-hidden relative">
+                        <div className={`absolute top-0 right-0 w-24 h-24 blur-3xl rounded-full opacity-10 transition-opacity group-hover:opacity-20 translate-x-12 -translate-y-12 ${card.bg}`} />
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                            <CardTitle className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
                                 {card.title}
                             </CardTitle>
-                            <div className={`p-2 rounded-full ${card.bg}`}>
+                            <div className={`p-2 rounded-xl transition-transform group-hover:scale-110 ${card.bg}`}>
                                 <card.icon className={`h-4 w-4 ${card.color}`} />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold">{card.value}</div>
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <div className="text-2xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/80">
+                                {card.value}
+                            </div>
+                            <p className="text-[10px] font-medium text-muted-foreground mt-1.5 uppercase tracking-widest opacity-70">
                                 {card.desc}
                             </p>
                         </CardContent>
                     </Card>
-                </motion.div>
+                </div>
             ))}
         </div>
     );

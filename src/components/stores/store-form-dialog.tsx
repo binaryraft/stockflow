@@ -23,7 +23,8 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Store, User, BillMode } from '@/types';
 import { Separator } from '../ui/separator';
-import { Building, MapPin, Mail, Phone, KeyRound, Briefcase, ShoppingBag, Send, RotateCcw, User as UserIcon } from 'lucide-react';
+import { Building, MapPin, Mail, Phone, KeyRound, Briefcase, ShoppingBag, Send, RotateCcw, User as UserIcon, ReceiptText, Info, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const billModeSchema = z.enum(['sell', 'buy', 'return']);
 
@@ -63,7 +64,7 @@ export function StoreFormDialog({
   editingStore,
   allStaff
 }: StoreFormDialogProps) {
-  const { addStore, updateStore } = useInventoryStore();
+  const { addStore, updateStore, userProfile } = useInventoryStore();
   const { toast } = useToast();
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
@@ -146,26 +147,64 @@ export function StoreFormDialog({
           <DialogDescription>Fill in the store details. Fields marked with * are required.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col min-h-0">
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto p-6 scroll-smooth">
             <div className="space-y-6">
+              <div className="p-3 bg-secondary/30 border border-secondary/50 rounded-lg flex gap-3 items-start">
+                <Info className="h-5 w-5 text-secondary-foreground mt-0.5 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-semibold text-secondary-foreground">Terminal Login Credentials:</p>
+                  <p className="text-muted-foreground text-xs mt-1">
+                    Terminal users will need the <strong className="text-foreground">Admin Email ({userProfile.companyEmail || 'N/A'})</strong>,
+                    the <strong className="text-foreground">Store Username</strong>, and the
+                    <strong className="text-foreground"> Store Passkey</strong> to access this terminal.
+                  </p>
+                </div>
+              </div>
+
               <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-muted-foreground">STORE DETAILS</h4>
-                {editingStore && editingStore.accessCode && (
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                  <Building size={14} className="text-primary" /> Store Details
+                </h4>
+
+                {editingStore && (
                   <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="p-3 bg-primary/10 border border-primary/20 rounded-md">
-                      <Label className="text-xs text-primary font-bold uppercase tracking-wider block mb-1">Store Username</Label>
-                      <div className="flex items-center gap-2">
-                        <code className="text-lg font-mono font-bold text-primary">{editingStore.username || 'N/A'}</code>
+                    <div className="p-3 bg-primary/5 border border-primary/20 rounded-xl relative group transition-all hover:bg-primary/10">
+                      <Label className="text-[10px] text-primary/70 font-bold uppercase tracking-widest block mb-1">Store Username</Label>
+                      <div className="flex items-center justify-between">
+                        <code className="text-lg font-mono font-bold text-primary tracking-tight">{editingStore.username || 'N/A'}</code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            navigator.clipboard.writeText(editingStore.username || '');
+                            toast({ title: "Copied!", description: "Username copied to clipboard." });
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                        </Button>
                       </div>
                     </div>
-                    <div className="p-3 bg-muted border border-muted-foreground/20 rounded-md">
-                      <Label className="text-xs text-muted-foreground font-bold uppercase tracking-wider block mb-1">Store Passkey</Label>
-                      <div className="flex items-center gap-2">
-                        <code className="text-lg font-mono font-bold text-muted-foreground">{editingStore.passkey}</code>
+                    <div className="p-3 bg-muted/30 border border-muted-foreground/20 rounded-xl relative group transition-all hover:bg-muted/50">
+                      <Label className="text-[10px] text-muted-foreground/70 font-bold uppercase tracking-widest block mb-1">Store Passkey</Label>
+                      <div className="flex items-center justify-between">
+                        <code className="text-lg font-mono font-bold text-foreground tracking-tight">{editingStore.passkey || '****'}</code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            navigator.clipboard.writeText(editingStore.passkey || '');
+                            toast({ title: "Copied!", description: "Passkey copied to clipboard." });
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2" /><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" /></svg>
+                        </Button>
                       </div>
                     </div>
                   </div>
                 )}
+
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -246,21 +285,69 @@ export function StoreFormDialog({
                   {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
                 </div>
                 {allStaff.length > 0 && (
-                  <div className="space-y-2 pt-2">
-                    <Label className="flex items-center gap-1.5"><UserIcon size={14} />Allowed Staff (Optional)</Label>
-                    <p className="text-xs text-muted-foreground -mt-1">Select specific staff members allowed to access this store. If none are selected, any assigned staff can access it.</p>
-                    <div className="h-32 border rounded-md p-3 bg-tertiary/50 overflow-y-auto">
-                      <div className="space-y-2">
-                        {allStaff.map((staff) => (
-                          <div key={staff.id} className="flex items-center space-x-2">
-                            <Checkbox id={`staff-${staff.id}`} checked={selectedStaffIds.includes(staff.id)} onCheckedChange={(checked) => {
-                              const currentIds = selectedStaffIds;
-                              setValue('allowedStaffIds', checked ? [...currentIds, staff.id] : currentIds.filter(id => id !== staff.id));
-                            }} />
-                            <Label htmlFor={`staff-${staff.id}`} className="font-normal text-sm">{staff.name} <span className="text-xs text-muted-foreground">({staff.email})</span></Label>
+                  <div className="space-y-3 pt-2">
+                    <div className="flex flex-col gap-1">
+                      <Label className="flex items-center gap-1.5 font-semibold text-foreground">
+                        <UserIcon size={14} className="text-primary" /> Allowed Staff (Terminal Access)
+                      </Label>
+                      <p className="text-[11px] text-muted-foreground">Select staff members authorized to operate this store terminal. If empty, all authorized staff can access.</p>
+                    </div>
+
+                    {selectedStaffIds.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 border border-dashed rounded-lg">
+                        {allStaff.filter(s => selectedStaffIds.includes(s.id)).map(staff => (
+                          <div key={staff.id} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium border border-primary/20">
+                            {staff.name}
+                            <button
+                              type="button"
+                              onClick={() => setValue('allowedStaffIds', selectedStaffIds.filter(id => id !== staff.id))}
+                              className="hover:text-destructive transition-colors ml-0.5"
+                            >
+                              <XCircle className="h-3 w-3" />
+                            </button>
                           </div>
                         ))}
                       </div>
+                    )}
+
+                    <div className="h-40 border rounded-xl bg-muted/10 overflow-hidden flex flex-col">
+                      <div className="bg-muted/30 px-3 py-1.5 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex justify-between">
+                        <span>Staff Directory</span>
+                        <span>{selectedStaffIds.length} Selected</span>
+                      </div>
+                      <ScrollArea className="flex-1">
+                        <div className="p-2 space-y-1">
+                          {allStaff.map((staff) => (
+                            <div
+                              key={staff.id}
+                              className={cn(
+                                "flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer hover:bg-muted/50",
+                                selectedStaffIds.includes(staff.id) && "bg-primary/5 border border-primary/10"
+                              )}
+                              onClick={() => {
+                                const checked = selectedStaffIds.includes(staff.id);
+                                setValue('allowedStaffIds', checked ? selectedStaffIds.filter(id => id !== staff.id) : [...selectedStaffIds, staff.id]);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className={cn("h-2 w-2 rounded-full", selectedStaffIds.includes(staff.id) ? "bg-primary" : "bg-muted-foreground/30")} />
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{staff.name}</span>
+                                  <span className="text-[10px] text-muted-foreground">{staff.email}</span>
+                                </div>
+                              </div>
+                              <Checkbox
+                                id={`staff-${staff.id}`}
+                                checked={selectedStaffIds.includes(staff.id)}
+                                onCheckedChange={(checked) => {
+                                  setValue('allowedStaffIds', checked ? [...selectedStaffIds, staff.id] : selectedStaffIds.filter(id => id !== staff.id));
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
                     </div>
                     {errors.allowedStaffIds && <p className="text-sm text-destructive mt-1">{errors.allowedStaffIds.message}</p>}
                   </div>

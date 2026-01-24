@@ -162,6 +162,7 @@ const defaultUserProfile: UserProfile = {
   companyCurrency: DEFAULT_CURRENCY_CODE,
   dataMode: 'local',
   paymentStatus: 'pending',
+  companyEmail: '',
   subscriptionExpiryDate: null,
 };
 
@@ -710,6 +711,7 @@ export const useInventoryStore = create<InventoryState>()(
                 defaultSalesPaymentStatus: companyData.defaultSalesPaymentStatus, defaultPurchasePaymentStatus: companyData.defaultPurchasePaymentStatus,
                 companyCurrency: companyData.currency || DEFAULT_CURRENCY_CODE, paymentStatus: companyData.paymentStatus,
                 subscriptionExpiryDate: companyData.subscriptionExpiryDate, pendingSubscriptionId: companyData.pendingSubscriptionId, dataMode: 'global', creationDate: companyData.creationDate,
+                companyEmail: (companyData as any).email || localStorage.getItem('userEmail') || state.userProfile.companyEmail,
               }
             }));
             return companyData;

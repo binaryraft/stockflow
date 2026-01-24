@@ -14,12 +14,13 @@ interface ChatInterfaceProps {
   storeId: string;
   currentUserId: 'admin' | string;
   currentUserName: string;
+  companyId: string;
 }
 
-export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatInterfaceProps) {
-  const { 
-    messagesByStore, 
-    addChatMessage, 
+export function ChatInterface({ storeId, currentUserId, currentUserName, companyId }: ChatInterfaceProps) {
+  const {
+    messagesByStore,
+    addChatMessage,
     getMessagesForStore,
     fetchMessagesForStore
   } = useInventoryStore((state) => ({
@@ -38,14 +39,19 @@ export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatI
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
-    const companyIdFromStorage = localStorage.getItem('companyId');
-    if (companyIdFromStorage) {
-      setCurrentCompanyId(companyIdFromStorage);
+    // We already have companyId from props, but we keep this for backwards compatibility if needed
+    if (!companyId) {
+      const companyIdFromStorage = localStorage.getItem('companyId');
+      if (companyIdFromStorage) {
+        setCurrentCompanyId(companyIdFromStorage);
+      } else {
+        console.error("ChatInterface: Company ID not found in props or localStorage.");
+        setIsLoadingMessages(false);
+      }
     } else {
-      console.error("ChatInterface: Company ID not found in localStorage.");
-      setIsLoadingMessages(false);
+      setCurrentCompanyId(companyId);
     }
-  }, []);
+  }, [companyId]);
 
   useEffect(() => {
     if (storeId && currentCompanyId) {
@@ -54,10 +60,10 @@ export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatI
         setIsLoadingMessages(false);
       });
     } else if (!currentCompanyId) {
-        setIsLoadingMessages(false); // No companyId, can't fetch
+      setIsLoadingMessages(false); // No companyId, can't fetch
     }
   }, [storeId, currentCompanyId, fetchMessagesForStore]);
-  
+
   useEffect(() => {
     setMessages(getMessagesForStore(storeId));
   }, [storeId, getMessagesForStore, messagesByStore]);
@@ -72,7 +78,7 @@ export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatI
   }, [messages]); // Scroll on new messages
 
   useEffect(() => {
-    if(!isLoadingMessages) inputRef.current?.focus();
+    if (!isLoadingMessages) inputRef.current?.focus();
   }, [isLoadingMessages]);
 
   const handleSendMessage = async (e?: React.FormEvent) => {
@@ -91,7 +97,7 @@ export function ChatInterface({ storeId, currentUserId, currentUserName }: ChatI
         setTimeout(() => inputRef.current?.focus(), 0);
       }
     } else if (!currentCompanyId) {
-        console.error("Cannot send message: Company ID is missing.");
+      console.error("Cannot send message: Company ID is missing.");
     }
   };
 
