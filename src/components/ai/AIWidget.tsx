@@ -13,7 +13,14 @@ interface AIWidgetProps {
 export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
     const [input, setInput] = useState('')
     const [isThinking, setIsThinking] = useState(false)
-    const [messages, setMessages] = useState<Array<{ role: 'user' | 'ai', content: string, type?: 'system' | 'split' }>>([
+    const [messages, setMessages] = useState<Array<{
+        role: 'user' | 'ai',
+        content: string,
+        type?: 'system' | 'split',
+        requiresConfirmation?: boolean,
+        action?: string,
+        data?: any
+    }>>([
         { role: 'ai', content: 'How can I help you? Choose an option below or type your request.' }
     ])
     const [isFocused, setIsFocused] = useState(false)
@@ -56,7 +63,13 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
                 setActiveView('split')
                 setMessages(prev => [...prev, { role: 'ai', content: "Scanner mode activated. Please point your camera at the bill." }])
             } else {
-                setMessages(prev => [...prev, { role: 'ai', content: response.message }])
+                setMessages(prev => [...prev, {
+                    role: 'ai',
+                    content: response.message,
+                    requiresConfirmation: response.requiresConfirmation,
+                    action: response.action,
+                    data: response.data
+                }])
             }
 
             setIsThinking(false)
@@ -226,6 +239,31 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
                                             : "bg-white/5 text-white/90 rounded-tl-none border border-white/10"
                                     )}>
                                         {m.content}
+
+                                        {m.requiresConfirmation && (
+                                            <div className="mt-4 flex gap-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setMessages(prev => [...prev, { role: 'ai', content: `Processing ${m.action?.replace(/_/g, ' ')} for ${m.data?.productName || 'items'}...` }]);
+                                                        // Here you would trigger the actual store action
+                                                        setTimeout(() => {
+                                                            setMessages(prev => [...prev, { role: 'ai', content: "✅ Task completed successfully!" }]);
+                                                        }, 1000);
+                                                    }}
+                                                    className="px-4 py-2 bg-emerald-500 text-emerald-950 font-bold rounded-xl text-xs hover:bg-emerald-400 transition-all shadow-lg shadow-emerald-500/20"
+                                                >
+                                                    Confirm & Execute
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        setMessages(prev => [...prev, { role: 'ai', content: "Action cancelled. How else can I help?" }]);
+                                                    }}
+                                                    className="px-4 py-2 bg-white/10 text-white/60 rounded-xl text-xs hover:bg-white/20 transition-all"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))}

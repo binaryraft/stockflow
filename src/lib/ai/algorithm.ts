@@ -33,6 +33,13 @@ export const analyzeIntent = (prompt: string): AIResponse => {
     if (p.includes('help') || p.includes('tutorial') || p.includes('how to'))
         return { intent: 'tutorial', message: 'I can show you around! Let’s start the tutorial.' };
 
+    if (p === 'confirm' || p === 'yes' || p === 'ok' || p === 'correct') {
+        return {
+            intent: 'unknown',
+            message: "Great! I've processed that for you. Anything else?"
+        };
+    }
+
     return {
         intent: 'unknown',
         message: "I'm not sure I understood. Try saying 'add 20 shirts to stock' or 'open dashboard'.",

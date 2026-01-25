@@ -1,15 +1,17 @@
 export const handleSalesIntent = (p: string) => {
-    // Stock addition pattern: "add 20 kurthi's to stock"
-    const stockMatch = p.match(/add (\d+)\s+(.+?)(?:\s+to stock)?$/i);
+    // Enhanced Stock addition pattern: "add 20 kurthis at 200rs"
+    const stockMatch = p.match(/add (\d+)\s+(.+?)(?:\s+at\s+([0-9.]+)(?:\s*rs|\s*rupees)?)?(?:\s+to stock)?$/i);
+
     if (stockMatch) {
         const qty = parseInt(stockMatch[1]);
+        const price = stockMatch[3] ? parseFloat(stockMatch[3]) : undefined;
         const productName = stockMatch[2].replace(/'s$/, '').trim();
 
         return {
             intent: 'sales' as const,
             action: 'add_to_stock',
-            message: `I've prepared a bill for ${qty} x ${productName}. Please confirm.`,
-            data: { qty, productName },
+            message: `I've prepared a bill for ${qty} x ${productName}${price ? ` at ₹${price}` : ''}. Please confirm.`,
+            data: { qty, productName, price },
             requiresConfirmation: true
         };
     }
