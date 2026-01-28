@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { P2PProvider } from '@/hooks/use-p2p';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,9 +44,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
-          <AITrigger />
+          <P2PProvider>
+            {children}
+            <Toaster />
+            <AITrigger />
+          </P2PProvider>
         </ThemeProvider>
       </body>
     </html>

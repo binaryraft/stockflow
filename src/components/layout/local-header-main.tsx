@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
 
+import { P2PStatus } from '../p2p/p2p-status';
+
 export function LocalHeaderMain() {
   const router = useRouter();
 
@@ -67,6 +69,7 @@ export function LocalHeaderMain() {
       </div>
 
       <div className="flex w-full items-center justify-end gap-3 md:ml-auto">
+        <P2PStatus />
         <ThemeToggle />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
