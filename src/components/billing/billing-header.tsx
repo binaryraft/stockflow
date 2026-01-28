@@ -43,6 +43,9 @@ interface BillingHeaderProps {
     setTaxType: (val: 'intra-state' | 'inter-state') => void;
 }
 
+import { useP2P } from '@/hooks/use-p2p';
+import { Wifi, RefreshCcw } from 'lucide-react';
+
 export const BillingHeader: React.FC<BillingHeaderProps> = ({
     mode, setMode, allowedModes,
     customerVendorName, setCustomerVendorName,
@@ -54,6 +57,7 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
     isEstimateMode, setIsEstimateMode,
     taxType, setTaxType
 }) => {
+    const { isConnected, peers, syncStatus } = useP2P();
     const displayModes = allowedModes || ['sell', 'buy', 'return'];
 
     const activeModeConfig = {
@@ -70,8 +74,10 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
 
     return (
         <div className="space-y-4">
-            {/* Mode Selection Tabs */}
-            <div className="flex justify-center">
+            {/* Mode Selection Tabs & P2P Sync Indicator */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div className="hidden md:block w-32" /> {/* Spacer */}
+
                 <Tabs value={mode} onValueChange={(v) => setMode(v as BillMode)} className="w-auto">
                     <TabsList className="grid w-full grid-cols-3 gap-1 h-11">
                         {displayModes.includes('sell') && (
@@ -91,7 +97,23 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
                         )}
                     </TabsList>
                 </Tabs>
+
+                <div className="flex items-center gap-2 min-w-32">
+                    {isConnected && (
+                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/20 text-primary">
+                            <Wifi className="h-3.5 w-3.5 animate-pulse" />
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold leading-none">{peers.length} Peers</span>
+                                <span className="text-[9px] flex items-center gap-1 opacity-80 leading-none mt-1">
+                                    <RefreshCcw className={cn("h-2 w-2", syncStatus === 'syncing' && "animate-spin")} />
+                                    {syncStatus === 'syncing' ? 'Syncing' : 'Synced'}
+                                </span>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
+
 
             {/* Admin Store Selector */}
             {showAdminStoreSelector && (

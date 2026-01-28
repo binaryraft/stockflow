@@ -5,18 +5,28 @@ import React, { createContext, useContext, useEffect, useRef, useState } from 'r
 import { useInventoryStore } from './use-inventory-store';
 import { v4 as uuidv4 } from 'uuid';
 
+interface PeerInfo {
+    id: string;
+    name: string;
+    lastSeen: number;
+}
+
 interface P2PContextType {
     peerId: string;
-    peers: string[];
+    peers: PeerInfo[];
     isConnected: boolean;
     syncStatus: 'idle' | 'syncing' | 'connected';
+    passcode: string;
+    setPasscode: (passcode: string) => void;
 }
 
 const P2PContext = createContext<P2PContextType | undefined>(undefined);
 
 export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [peerId, setPeerId] = useState<string>('');
-    const [connectedPeers, setConnectedPeers] = useState<string[]>([]);
+    const [passcode, setPasscodeState] = useState<string>('');
+    const [peers, setPeers] = useState<Record<string, PeerInfo>>({});
+    const [connectedPeerIds, setConnectedPeerIds] = useState<string[]>([]);
     const [isConnected, setIsConnected] = useState(false);
     const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'connected'>('idle');
 
@@ -24,7 +34,7 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const dataChannels = useRef<Record<string, RTCDataChannel>>({});
     const isProcessingRemoteUpdate = useRef(false);
 
-    // Initialize Peer ID
+    // Initialize Peer ID and Passcode
     useEffect(() => {
         let id = localStorage.getItem('p2p_peer_id');
         if (!id) {
@@ -32,17 +42,42 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             localStorage.setItem('p2p_peer_id', id);
         }
         setPeerId(id);
+
+        let savedPasscode = localStorage.getItem('p2p_network_passcode');
+        if (!savedPasscode) {
+            savedPasscode = '1234'; // Default fallback
+            localStorage.setItem('p2p_network_passcode', savedPasscode);
+        }
+        setPasscodeState(savedPasscode);
     }, []);
+
+    const setPasscode = (newPasscode: string) => {
+        setPasscodeState(newPasscode);
+        localStorage.setItem('p2p_network_passcode', newPasscode);
+        // Force re-register on next loop
+        setPeers({});
+        Object.values(connections.current).forEach(pc => pc.close());
+        connections.current = {};
+        dataChannels.current = {};
+        setConnectedPeerIds([]);
+        setIsConnected(false);
+    };
 
     // Signaling Loop
     useEffect(() => {
-        if (!peerId) return;
+        if (!peerId || !passcode) return;
 
         const register = async () => {
             try {
+                const storeName = useInventoryStore.getState().stores[0]?.name || 'Unknown Store';
                 await fetch('/api/p2p/signaling', {
                     method: 'POST',
-                    body: JSON.stringify({ peerId, action: 'register', name: typeof window !== 'undefined' ? window.navigator.userAgent.slice(0, 20) : 'Device' })
+                    body: JSON.stringify({
+                        peerId,
+                        action: 'register',
+                        name: storeName,
+                        passcode
+                    })
                 });
             } catch (e) {
                 console.error("P2P Register failed", e);
@@ -58,37 +93,41 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                         handleSignal(signalEntry.from, signalEntry.signal);
                     }
                 }
-            } catch (e) {
-                // Ignore poll errors
-            }
+            } catch (e) { }
         };
 
         const listPeers = async () => {
             try {
-                const res = await fetch('/api/p2p/signaling?action=list');
+                const res = await fetch(`/api/p2p/signaling?action=list&passcode=${passcode}`);
                 const data = await res.json();
                 if (data.success && data.peers) {
-                    const otherPeers = Object.keys(data.peers).filter(id => id !== peerId);
-                    for (const otherId of otherPeers) {
+                    const allPeers = data.peers as Record<string, { name: string, lastSeen: number }>;
+                    const otherPeerIds = Object.keys(allPeers).filter(id => id !== peerId);
+
+                    const newPeerCache: Record<string, PeerInfo> = {};
+                    otherPeerIds.forEach(id => {
+                        newPeerCache[id] = { id, name: allPeers[id].name, lastSeen: allPeers[id].lastSeen };
+                    });
+                    setPeers(newPeerCache);
+
+                    for (const otherId of otherPeerIds) {
                         if (!connections.current[otherId]) {
                             initiateConnection(otherId);
                         }
                     }
                 }
-            } catch (e) {
-                // Ignore list errors
-            }
+            } catch (e) { }
         };
 
         register();
-        const signalInterval = setInterval(pollSignals, 2000);
-        const listInterval = setInterval(listPeers, 10000);
+        const signalInterval = setInterval(pollSignals, 1000); // Poll every 1s
+        const listInterval = setInterval(listPeers, 3000); // Faster discovery every 3s
 
         return () => {
             clearInterval(signalInterval);
             clearInterval(listInterval);
         };
-    }, [peerId]);
+    }, [peerId, passcode]);
 
     const handleSignal = async (fromPeerId: string, signal: any) => {
         let pc = connections.current[fromPeerId];
@@ -143,7 +182,7 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         dc.onopen = () => {
             console.log(`P2P: Connected to ${targetPeerId}`);
             dataChannels.current[targetPeerId] = dc;
-            setConnectedPeers(prev => [...new Set([...prev, targetPeerId])]);
+            setConnectedPeerIds(prev => [...new Set([...prev, targetPeerId])]);
             setIsConnected(true);
             setSyncStatus('connected');
 
@@ -155,7 +194,7 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.log(`P2P: Disconnected from ${targetPeerId}`);
             delete dataChannels.current[targetPeerId];
             delete connections.current[targetPeerId];
-            setConnectedPeers(prev => prev.filter(id => id !== targetPeerId));
+            setConnectedPeerIds(prev => prev.filter(id => id !== targetPeerId));
             if (Object.keys(dataChannels.current).length === 0) {
                 setIsConnected(false);
             }
@@ -180,13 +219,38 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const handleMessage = (message: any) => {
         if (message.type === 'update_state') {
-            console.log("P2P: Received update state from", message.senderId);
+            const remoteState = message.payload;
+            const currentState = useInventoryStore.getState();
+
             isProcessingRemoteUpdate.current = true;
-            useInventoryStore.setState(message.payload);
+
+            // Smart Merge Logic
+            const mergeById = (local: any[], remote: any[]) => {
+                const map = new Map(local.map(item => [item.id, item]));
+                remote.forEach(item => {
+                    const existing = map.get(item.id);
+                    // For bills and simple entities: if it doesn't exist, add it.
+                    // If it exists, we could use timestamps, but for now we'll prioritize 
+                    // keeping both if they are different, but usually IDs are unique.
+                    if (!existing || JSON.stringify(existing) !== JSON.stringify(item)) {
+                        map.set(item.id, item);
+                    }
+                });
+                return Array.from(map.values());
+            };
+
+            useInventoryStore.setState({
+                products: mergeById(currentState.products, remoteState.products),
+                bills: mergeById(currentState.bills, remoteState.bills),
+                categories: mergeById(currentState.categories, remoteState.categories),
+                customers: mergeById(currentState.customers, remoteState.customers),
+                staffs: mergeById(currentState.staffs, remoteState.staffs),
+                stores: mergeById(currentState.stores, remoteState.stores),
+            });
+
             setTimeout(() => { isProcessingRemoteUpdate.current = false; }, 100);
             setSyncStatus('connected');
         } else if (message.type === 'request_sync') {
-            console.log("P2P: Received sync request from", message.senderId);
             broadcastState();
         }
     };
@@ -231,12 +295,20 @@ export const P2PProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return () => unsubscribe();
     }, [peerId]);
 
+    // Format the simplified peer list for the context
+    const connectedPeers = connectedPeerIds.map(id => ({
+        id,
+        name: peers[id]?.name || 'Unknown Device',
+        lastSeen: peers[id]?.lastSeen || Date.now()
+    }));
+
     return (
-        <P2PContext.Provider value={{ peerId, peers: connectedPeers, isConnected, syncStatus }}>
+        <P2PContext.Provider value={{ peerId, peers: connectedPeers, isConnected, syncStatus, passcode, setPasscode }}>
             {children}
         </P2PContext.Provider>
     );
 };
+
 
 export const useP2P = () => {
     const context = useContext(P2PContext);

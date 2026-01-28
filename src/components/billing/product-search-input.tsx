@@ -49,11 +49,12 @@ export function ProductSearchInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const [isSearching, setIsSearching] = useState(false);
 
-  const { searchProductsLocal, searchProductsRemote, getSkuDetails, getSkuIdentifier } = useInventoryStore(state => ({
+  const { searchProductsLocal, searchProductsRemote, getSkuDetails, getSkuIdentifier, allProducts } = useInventoryStore(state => ({
     searchProductsLocal: state.searchProducts,
     searchProductsRemote: state.searchProductsRemote,
     getSkuDetails: state.getSkuDetails,
     getSkuIdentifier: state.getSkuIdentifier,
+    allProducts: state.products,
   }));
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -142,10 +143,6 @@ export function ProductSearchInput({
         const detailedRemote = mapProductsToSuggestions(foundProducts);
 
         setSuggestions(prev => {
-          // Merge unique results, prioritizing detailed ones or just keeping latest?
-          // For simplicity and speed, let's just use the latest comprehensive results from server
-          // But actually, we don't want to lose local matches if the server search is different.
-          // Let's create a unique set by ProductID + SKU ID + LayerID
           const existingKeys = new Set(prev.map(s => `${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
           const newUniqueResults = detailedRemote.filter(s => !existingKeys.has(`${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
           return [...prev, ...newUniqueResults];
@@ -157,6 +154,13 @@ export function ProductSearchInput({
       }
     }
   }, [searchProductsLocal, searchProductsRemote, mapProductsToSuggestions]);
+
+  // Re-search when products change (e.g. after Quick Add)
+  useEffect(() => {
+    if (value && document.activeElement === inputRef?.current) {
+      performSearch(value, false);
+    }
+  }, [allProducts.length, value, performSearch, inputRef]);
 
   // Handle immediate local search
   useEffect(() => {
@@ -299,25 +303,27 @@ export function ProductSearchInput({
                   </li>
                 ))
               ) : (
-                <li
-                  className={cn(
-                    "px-3 py-3 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-3 text-primary",
-                    activeIndex === 0 && "bg-accent text-accent-foreground"
-                  )}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    if (onEnterWithoutSelection) onEnterWithoutSelection(value);
-                    setShowSuggestions(false);
-                  }}
-                >
-                  <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
-                    <CornerDownLeft className="h-4 w-4" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="font-medium">Add "{value}"</span>
-                    <span className="text-xs text-muted-foreground">Press Enter to add new product</span>
-                  </div>
-                </li>
+                !suggestions.some(s => s.product.name.toLowerCase() === value.toLowerCase()) && (
+                  <li
+                    className={cn(
+                      "px-3 py-3 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors flex items-center gap-3 text-primary",
+                      activeIndex === 0 && "bg-accent text-accent-foreground"
+                    )}
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      if (onEnterWithoutSelection) onEnterWithoutSelection(value);
+                      setShowSuggestions(false);
+                    }}
+                  >
+                    <div className="h-8 w-8 rounded-md bg-primary/10 flex items-center justify-center shrink-0">
+                      <CornerDownLeft className="h-4 w-4" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-medium">Add "{value}"</span>
+                      <span className="text-xs text-muted-foreground">Press Enter to add new product</span>
+                    </div>
+                  </li>
+                )
               )}
             </ul>
           </ScrollArea>

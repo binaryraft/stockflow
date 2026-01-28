@@ -1,16 +1,16 @@
-
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { APP_NAME } from '@/lib/constants';
-import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
+import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, SidebarFooter, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package2, ChevronRight, ChevronLeft, LayoutDashboard, DollarSign, Package, BookOpen, Settings as SettingsIcon } from 'lucide-react';
+import { Package2, ChevronRight, ChevronLeft, LayoutDashboard, DollarSign, Package, BookOpen, Settings as SettingsIcon, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import React from 'react';
+import { useP2P } from '@/hooks/use-p2p';
 
 export const LOCAL_NAV_LINKS = [
   {
@@ -34,6 +34,7 @@ export const LOCAL_NAV_LINKS = [
 export function LocalSidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState, toggleSidebar } = useSidebar();
+  const { isConnected, peers } = useP2P();
 
   return (
     <Sidebar className="border-r border-sidebar-border shadow-md" collapsible="icon">
@@ -114,6 +115,64 @@ export function LocalSidebarNav() {
           </SidebarMenu>
         </ScrollArea>
       </SidebarContent>
+      <SidebarFooter className="p-3 border-t bg-sidebar-accent/30">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className={cn(
+              "flex items-center gap-3 px-2 py-2 rounded-lg transition-colors cursor-help",
+              isConnected ? "hover:bg-green-500/10" : "hover:bg-muted"
+            )}>
+              <div className={cn(
+                "h-8 w-8 rounded-full flex items-center justify-center shrink-0",
+                isConnected ? "bg-green-500/20 text-green-600" : "bg-muted text-muted-foreground"
+              )}>
+                {isConnected ? <Wifi className="h-4 w-4 animate-pulse" /> : <WifiOff className="h-4 w-4" />}
+              </div>
+              {sidebarState === 'expanded' && (
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold truncate">Distributed Sync</span>
+                  <span className={cn(
+                    "text-[10px] font-medium truncate",
+                    isConnected ? "text-green-600" : "text-muted-foreground"
+                  )}>
+                    {isConnected ? `${peers.length} active device${peers.length !== 1 ? 's' : ''}` : 'Local Mode Only'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" align="center" className="w-56 p-3 shadow-xl border-primary/20 bg-background/95 backdrop-blur-sm">
+            <div className="space-y-2">
+              <p className="font-semibold text-xs flex items-center gap-2 text-primary">
+                {isConnected ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}
+                P2P Local Network
+              </p>
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Connect other devices on your WiFi to sync bills and inventory in real-time without internet.
+              </p>
+              {isConnected ? (
+                <div className="pt-1.5 border-t mt-1.5 space-y-1.5">
+                  <p className="text-[10px] font-bold text-foreground">Connected Devices:</p>
+                  <ul className="space-y-1">
+                    {peers.slice(0, 3).map(p => (
+                      <li key={p.id} className="text-[10px] truncate flex items-center gap-1.5 py-0.5">
+                        <div className="h-1 w-1 rounded-full bg-green-500 shadow-[0_0_4px_rgba(34,197,94,0.6)]" />
+                        <span className="truncate">{p.name}</span>
+                        <span className="text-[8px] ml-auto bg-green-500/10 text-green-600 px-1 rounded-sm uppercase font-bold">Live</span>
+                      </li>
+                    ))}
+                    {peers.length > 3 && <li className="text-[10px] text-muted-foreground italic pl-2.5">+ {peers.length - 3} more devices</li>}
+                  </ul>
+                </div>
+              ) : (
+                <div className="pt-1.5 border-t mt-1.5">
+                  <p className="text-[10px] text-amber-600 font-medium">No other devices found</p>
+                </div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </SidebarFooter>
     </Sidebar>
   );
 }

@@ -1217,36 +1217,7 @@ export function BillingForm({
 
   return (
     <div className="flex flex-col gap-6">
-      <BillSaveAnimation
-        show={isSavingAnimationVisible}
-        billMode={lastSavedBillMode}
-        isEstimate={lastSavedBillIsEstimate}
-        onClose={handleAnimationClose}
-      />
-      <AlertDialog open={isPrintConfirmDialogOpen} onOpenChange={setIsPrintConfirmDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Bill Saved Successfully!</AlertDialogTitle>
-            <AlertDialogDescription>
-              Would you like to print this bill now?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => handleConfirmPrint(false)}>No</AlertDialogCancel>
-            <AlertDialogAction onClick={() => handleConfirmPrint(true)}>
-              <Printer className="mr-2 h-4 w-4" /> Yes, Print Bill
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      {isNewProductDialogOpen && newProductDialogInitialValues && (
-        <NewProductDialog
-          isOpen={isNewProductDialogOpen}
-          onOpenChange={setIsNewProductDialogOpen}
-          onProductAdded={handleNewProductAddedFromDialog}
-          initialValues={newProductDialogInitialValues}
-        />
-      )}
+      {/* Passkey and Scanner Modals */}
       {(!isAdminContext && storeIdFromProp) && (
         <EmployeePasskeyDialog
           isOpen={isVerifyEmployeeDialogOpen}
