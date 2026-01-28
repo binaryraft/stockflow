@@ -220,8 +220,7 @@ export function ProductSearchInput({
     }, 150);
   };
 
-  const hasExactMatch = suggestions.some(s => s.product.name.toLowerCase() === value.toLowerCase());
-  const showAddNew = !hasExactMatch && value.trim().length > 0;
+  const showAddNew = suggestions.length === 0 && value.trim().length > 0;
   const totalItems = suggestions.length + (showAddNew ? 1 : 0);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
