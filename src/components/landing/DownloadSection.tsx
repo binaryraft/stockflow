@@ -90,7 +90,7 @@ export function DownloadSection() {
                         <span className="text-xs font-bold uppercase tracking-wider">Multi-Platform</span>
                     </div>
                     <h2 className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight text-foreground animate-fadeInDown delay-100">
-                        Install <span className="text-gradient-primary">StockFlow</span> Locally
+                        Install <span className="text-gradient-primary">EcBills</span> Locally
                     </h2>
                     <p className="mt-6 max-w-2xl mx-auto text-lg text-muted-foreground animate-fadeInDown delay-200 leading-relaxed">
                         Experience superior performance, offline access, and native OS integration by downloading the official app for your device.

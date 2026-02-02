@@ -373,11 +373,12 @@ export const useInventoryStore = create<InventoryState>()(
         if (get().userProfile.dataMode === 'local') {
           const billId = uuidv4();
           const timestamp = Date.now();
+          const safeItemsData = Array.isArray(itemsData) ? itemsData : [];
           const newBill: Bill = {
             ...billData,
             id: billId,
             timestamp,
-            items: itemsData.map((item: any) => ({ ...item, id: uuidv4() })),
+            items: safeItemsData.map((item: any) => ({ ...item, id: uuidv4() })),
           };
 
           // Basic Stock Deduction/Addition Logic for Offline Mode
@@ -1363,9 +1364,9 @@ export const useInventoryStore = create<InventoryState>()(
       // #endregion
     }),
     {
-      name: 'stockflow-app-storage',
+      name: 'ecbills-app-storage',
       storage: createJSONStorage(() => localStorage),
-      version: 3, // Incremented version to handle state changes
+      version: 4, // Incremented version for rebranding migration
       migrate: (persistedState: unknown, version: number) => {
         if (version < 3) {
           // If the stored version is old, discard it and return the initial state.

@@ -57,17 +57,17 @@ export const generateBillPrintContent = (
     "  body { font-family: 'Open Sans', Arial, sans-serif; margin: 0; padding: 15px; line-height: 1.35; color: #1f2937; font-size: 9pt; background: #fff; }\n" +
     "  @page { size: auto; margin: 5mm; }\n" +
     "  .print-container { width: 100%; max-width: 100%; margin: 0; border: 1px solid #e5e7eb; }\n" +
-    "  .header { text-align: center; padding: 15px; border-bottom: 2px solid #374151; background-color: #f9fafb; }\n" +
-    "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px; }\n" +
+    "  .header { text-align: center; padding: 15px; border-bottom: 2px solid #1e3a8a; background-color: #f0fdf4; }\n" +
+    "  .header h1 { margin: 0 0 5px 0; font-size: 18pt; font-weight: 700; color: #1e3a8a; text-transform: uppercase; letter-spacing: 0.5px; }\n" +
     "  .header p { margin: 2px 0; font-size: 9pt; color: #4b5563; }\n" +
-    "  .bill-title-box { text-align: center; margin: 10px 0; border-top: 1px dashed #d1d5db; border-bottom: 1px dashed #d1d5db; padding: 5px 0; }\n" +
-    "  .bill-title-box h2 { margin: 0; font-size: 12pt; font-weight: 600; text-transform: uppercase; color: #374151; }\n" +
+    "  .bill-title-box { text-align: center; margin: 10px 0; border-top: 1px dashed #15803d; border-bottom: 1px dashed #15803d; padding: 5px 0; }\n" +
+    "  .bill-title-box h2 { margin: 0; font-size: 12pt; font-weight: 600; text-transform: uppercase; color: #15803d; }\n" +
     "  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 15px; border-bottom: 1px solid #e5e7eb; }\n" +
     "  .info-block h4 { margin: 0 0 5px 0; font-size: 10pt; font-weight: 700; color: #111827; text-transform: uppercase; border-bottom: 1px solid #e5e7eb; padding-bottom: 3px; width: fit-content; }\n" +
     "  .info-block p { margin: 2px 0; font-size: 9pt; }\n" +
     "  table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 9pt; }\n" +
     "  th, td { border: 1px solid #d1d5db; padding: 6px 8px; text-align: left; vertical-align: top; }\n" +
-    "  th { background-color: #f3f4f6; font-weight: 600; color: #374151; text-transform: uppercase; font-size: 8pt; }\n" +
+    "  th { background-color: #eff6ff; font-weight: 600; color: #1e3a8a; text-transform: uppercase; font-size: 8pt; }\n" +
     "  .text-right { text-align: right; }\n" +
     "  .text-center { text-align: center; }\n" +
     "  .font-medium { font-weight: 600; }\n" +

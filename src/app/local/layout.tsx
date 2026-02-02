@@ -23,8 +23,20 @@ export default function LocalLayout({
   const { toast } = useToast();
   const [isInitializing, setIsInitializing] = useState(true);
   const [initStatus, setInitStatus] = useState("Initializing Local Mode...");
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    setHasMounted(true);
+    // Ensure dataMode is local even if hydration overwrites it initially
+    const timer = setTimeout(() => {
+      useInventoryStore.setState((state) => ({
+        userProfile: {
+          ...state.userProfile,
+          dataMode: 'local'
+        }
+      }));
+    }, 500);
+
     const setupLocalEnv = async () => {
       try {
         setInitStatus("Checking Local Data...");
@@ -39,7 +51,7 @@ export default function LocalLayout({
           const userName = "Local User";
 
           creds = {
-            email: `local@stockflow.app`,
+            email: `local@ecbills.app`,
             password: 'local',
             companyId,
             userId,

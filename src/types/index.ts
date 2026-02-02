@@ -100,6 +100,7 @@ export interface Bill {
   isEstimate?: boolean;
   notes?: string;
   paymentStatus?: 'paid' | 'unpaid';
+  paymentMode?: PaymentMode;
   billedByStaffId?: string;
   billedByStaffName?: string;
   storeId?: string;
@@ -137,6 +138,8 @@ export interface Company {
   subscriptionExpiryDate?: string | null;
   pendingSubscriptionId?: string | null;
 }
+
+export type PaymentMode = 'cash' | 'card' | 'upi' | 'netbanking' | 'cheque' | 'other';
 
 export interface User {
   id: string;
@@ -252,6 +255,7 @@ export interface PendingBillPayload {
   date?: string;
   storeIdForBill?: string;
   paymentStatus?: 'paid' | 'unpaid';
+  paymentMode?: PaymentMode;
   gstin?: string; // Added for GST compliance
   placeOfSupply?: string; // Added for GST compliance
   billingAddress?: string; // Added for GST compliance

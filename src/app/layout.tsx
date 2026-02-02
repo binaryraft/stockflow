@@ -1,6 +1,7 @@
 
 import type { Metadata } from 'next';
 import { Inter, Roboto_Mono } from 'next/font/google';
+import '@/lib/i18n';
 import './globals.css';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -19,8 +20,8 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: `${APP_NAME} - Inventory Management & Billing`,
-  description: 'Modern inventory management and billing solution for businesses of all sizes.',
+  title: 'EcBills | Smart Inventory & Billing',
+  description: 'EcBills - The most efficient billing and inventory management software for modern businesses.',
   icons: {
     icon: '/logo.svg',
     shortcut: '/logo.svg',

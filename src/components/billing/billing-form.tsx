@@ -20,6 +20,7 @@ import { BillingProductSelector } from './billing-product-selector';
 import { Textarea } from '@/components/ui/textarea';
 import { v4 as uuidv4 } from 'uuid';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -51,7 +52,8 @@ export function BillingForm({
   isAdminContext = false,
   preselectedStoreId,
   companyId: companyIdFromProp,
-}: BillingFormProps) {
+  redirectBasePath,
+}: BillingFormProps & { redirectBasePath?: string }) {
   const router = useRouter();
   const searchParamsHook = useSearchParams();
   const pathname = usePathname();
@@ -115,7 +117,7 @@ export function BillingForm({
   const [customerVendorName, setCustomerVendorName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [isPaid, setIsPaid] = useState(true);
+  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
   const [taxType, setTaxType] = useState<'intra-state' | 'inter-state'>('intra-state');
   const [customerGstin, setCustomerGstin] = useState('');
@@ -140,6 +142,7 @@ export function BillingForm({
 
   const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
   const [barcodeScanPurpose, setBarcodeScanPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
   const [billDate, setBillDate] = useState<Date | undefined>(new Date());
@@ -203,6 +206,7 @@ export function BillingForm({
           notes,
           isEstimate: isEstimateMode,
           taxType,
+          paymentMode,
           gstin: customerGstin,
           placeOfSupply,
           billingAddress,
@@ -222,6 +226,19 @@ export function BillingForm({
     setAllStores(getAllStores());
     setActivePlan(getActiveSubscriptionPlan());
   }, [getAllStores, getActiveSubscriptionPlan, fetchProducts, fetchCustomers, companyId]);
+
+  useEffect(() => {
+    if (customerGstin && customerGstin.length >= 2 && userProfile?.companyGstNo && userProfile.companyGstNo.length >= 2) {
+      const companyStateCode = userProfile.companyGstNo.substring(0, 2);
+      const customerStateCode = customerGstin.substring(0, 2);
+
+      if (companyStateCode !== customerStateCode) {
+        setTaxType('inter-state');
+      } else {
+        setTaxType('intra-state');
+      }
+    }
+  }, [customerGstin, userProfile?.companyGstNo]);
 
   // Auto-populate customer from phone number
   useEffect(() => {
@@ -1136,7 +1153,7 @@ export function BillingForm({
     if (newMode !== mode) {
       resetFullForm();
       setMode(newMode);
-      const basePath = isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing');
+      const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
       router.push(`${basePath}?mode=${newMode}`, { scroll: false });
     }
   };
@@ -1297,20 +1314,52 @@ export function BillingForm({
           )}
 
           {mode === 'sell' && (
-            <div className="flex items-center space-x-2 pt-2 pb-2 justify-end">
-              {/* Tax Type Switch */}
-              {mode === 'sell' && !isEstimateMode && (
-                <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md border text-sm">
-                  <Switch
-                    id="tax-mode"
-                    checked={taxType === 'inter-state'}
-                    onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
-                  />
-                  <Label htmlFor="tax-mode">Inter-state (IGST)</Label>
-                </div>
-              )}
+            <div className="flex flex-col gap-3 pt-2">
+              <div className="flex items-center space-x-2 justify-end">
+                {/* Tax Type Switch */}
+                {mode === 'sell' && !isEstimateMode && (
+                  <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md border text-sm">
+                    <Switch
+                      id="tax-mode"
+                      checked={taxType === 'inter-state'}
+                      onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
+                    />
+                    <Label htmlFor="tax-mode">Inter-state (IGST)</Label>
+                  </div>
+                )}
 
-              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="paymentStatus"
+                    checked={paymentStatus === 'paid'}
+                    onCheckedChange={(checked) => setPaymentStatus(checked ? 'paid' : 'unpaid')}
+                  />
+                  <Label htmlFor="paymentStatus" className="font-semibold cursor-pointer select-none">Mark as Paid</Label>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {paymentStatus === 'paid' && (
+                  <div className="space-y-1.5">
+                    <Label>Payment Mode</Label>
+                    <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="card">Card</SelectItem>
+                        <SelectItem value="upi">UPI</SelectItem>
+                        <SelectItem value="netbanking">Net Banking</SelectItem>
+                        <SelectItem value="cheque">Cheque</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center space-x-2 justify-end">
                 <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
                 <Label htmlFor="estimate-mode">Estimate/Quotation</Label>
               </div>

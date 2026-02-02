@@ -256,7 +256,7 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
                                                 </button>
                                                 <button
                                                     onClick={() => {
-                                                        setMessages(prev => [...prev, { role: 'ai', content: "Action cancelled. How else can I help?" }]);
+                                                        setMessages(prev => [...prev, { role: 'ai', content: "Hello! I'm your EcBills AI assistant. How can I help you today?" }]);
                                                     }}
                                                     className="px-4 py-2 bg-white/10 text-white/60 rounded-xl text-xs hover:bg-white/20 transition-all"
                                                 >

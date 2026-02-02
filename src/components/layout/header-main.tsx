@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils';
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
 import { P2PStatus } from '../p2p/p2p-status';
+import { LanguageSwitcher } from '../common/language-switcher';
 
 export function HeaderMain() {
   const router = useRouter();
@@ -141,6 +142,7 @@ export function HeaderMain() {
 
       <div className="flex w-full items-center justify-end gap-3 md:ml-auto">
         <P2PStatus />
+        <LanguageSwitcher />
         <ThemeToggle />
         {isUserLoggedIn ? (
           <DropdownMenu>
