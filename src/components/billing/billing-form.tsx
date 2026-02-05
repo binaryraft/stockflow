@@ -12,7 +12,7 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ProductSearchInput, type ProductSearchSuggestion } from './product-search-input';
 import { BillItemRow, BillItemHeader } from './bill-item-row';
-import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition, PendingBillPayload } from '@/types';
+import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition, PendingBillPayload, PaymentMode } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText } from 'lucide-react';
@@ -147,6 +147,7 @@ export function BillingForm({
   const [isLoadingProductSearch, setIsLoadingProductSearch] = useState(false);
   const [billDate, setBillDate] = useState<Date | undefined>(new Date());
   const [isVerifyingGst, setIsVerifyingGst] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   const productNameInputRef = useRef<HTMLInputElement>(null);
   const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -1151,10 +1152,14 @@ export function BillingForm({
     }
 
     if (newMode !== mode) {
-      resetFullForm();
-      setMode(newMode);
-      const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
-      router.push(`${basePath}?mode=${newMode}`, { scroll: false });
+      setIsTransitioning(true);
+      setTimeout(() => {
+        resetFullForm();
+        setMode(newMode);
+        const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
+        router.replace(`${basePath}?mode=${newMode}`, { scroll: false });
+        setTimeout(() => setIsTransitioning(false), 200);
+      }, 200);
     }
   };
 
@@ -1280,7 +1285,18 @@ export function BillingForm({
         </Tabs>
       </div>
 
-      <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary">
+      <Card className={cn(
+        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-all duration-500 ease-in-out relative overflow-hidden",
+        isTransitioning ? "opacity-30 scale-[0.96] blur-sm translate-y-4" : "opacity-100 scale-100 blur-0 translate-y-0"
+      )}>
+        {isTransitioning && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
+              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">Reconfiguring...</div>
+            </div>
+          </div>
+        )}
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
           {showAdminStoreSelector && (
             <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">

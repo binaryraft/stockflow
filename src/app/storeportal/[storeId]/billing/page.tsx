@@ -233,7 +233,7 @@ export default function StoreBillingPage() {
 
       <Suspense fallback={loadingScreen("Loading Billing Interface...")}>
         <BillingForm
-          key={modeFromUrl || currentStore.id}
+          key={currentStore.id}
           initialModeProp={modeFromUrl}
           storeId={currentStore.id}
           allowedModes={currentStore.allowedOperations}
