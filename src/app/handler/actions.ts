@@ -24,7 +24,7 @@ export async function verifyPassword(password: string): Promise<{ success: boole
 export async function getCustomers(): Promise<{ company: Company; admin: User | null }[]> {
   const { db } = await connectToDatabase();
   const companies = await db.collection<Company>('companies').find().sort({ paymentStatus: 1, name: 1 }).toArray();
-  
+
   const results = await Promise.all(companies.map(async (company) => {
     const admin = await db.collection<User>('users').findOne({ companyId: company.id, role: 'admin' });
     return { company, admin };
@@ -37,21 +37,21 @@ export async function markAsPaid(companyId: string, subscriptionType: Subscripti
   try {
     const { db } = await connectToDatabase();
     const now = new Date();
-    
+
     const expiryDate = subscriptionType === 'yearly'
       ? add(now, { years: 1 })
       : add(now, { months: 1 });
-    
+
     expiryDate.setHours(23, 59, 59, 999);
 
     const result = await db.collection<Company>('companies').updateOne(
       { id: companyId },
-      { 
-        $set: { 
+      {
+        $set: {
           paymentStatus: 'paid',
           subscriptionStartDate: now.toISOString(),
           subscriptionExpiryDate: expiryDate.toISOString(),
-        } 
+        }
       }
     );
 
@@ -71,13 +71,13 @@ export async function approveSubscriptionChange(companyId: string): Promise<{ su
   try {
     const { db } = await connectToDatabase();
     const company = await db.collection<Company>('companies').findOne({ id: companyId });
-    
+
     if (!company) return { success: false, error: 'Company not found.' };
     if (!company.pendingSubscriptionId) return { success: false, error: 'No pending subscription to approve.' };
 
     const result = await db.collection<Company>('companies').updateOne(
       { id: companyId },
-      { 
+      {
         $set: { activeSubscriptionId: company.pendingSubscriptionId },
         $unset: { pendingSubscriptionId: "" }
       }
@@ -96,7 +96,7 @@ export async function approveSubscriptionChange(companyId: string): Promise<{ su
 export async function rejectSubscriptionChange(companyId: string): Promise<{ success: boolean; error?: string }> {
   try {
     const { db } = await connectToDatabase();
-    
+
     const result = await db.collection<Company>('companies').updateOne(
       { id: companyId },
       { $unset: { pendingSubscriptionId: "" } }
@@ -109,5 +109,42 @@ export async function rejectSubscriptionChange(companyId: string): Promise<{ suc
     console.error("Failed to reject subscription:", e);
     const message = e instanceof Error ? e.message : "Unknown error";
     return { success: false, error: `Failed to reject: ${message}` };
+  }
+}
+
+export async function extendSubscription(companyId: string, count: number, unit: 'months' | 'years'): Promise<{ success: boolean; error?: string }> {
+  try {
+    const { db } = await connectToDatabase();
+    const company = await db.collection<Company>('companies').findOne({ id: companyId });
+    if (!company) return { success: false, error: 'Company not found.' };
+
+    const now = new Date();
+    let currentExpiry = company.subscriptionExpiryDate ? new Date(company.subscriptionExpiryDate) : now;
+
+    // If expired or missing, start from now
+    if (currentExpiry < now) {
+      currentExpiry = now;
+    }
+
+    const newExpiry = add(currentExpiry, { [unit]: count });
+    newExpiry.setHours(23, 59, 59, 999);
+
+    const result = await db.collection<Company>('companies').updateOne(
+      { id: companyId },
+      {
+        $set: {
+          paymentStatus: 'paid',
+          subscriptionExpiryDate: newExpiry.toISOString(),
+        }
+      }
+    );
+
+    if (result.matchedCount === 0) return { success: false, error: 'Failed to update database.' };
+
+    return { success: true };
+  } catch (e) {
+    console.error("Failed to extend subscription:", e);
+    const message = e instanceof Error ? e.message : "Unknown error";
+    return { success: false, error: `Failed to extend: ${message}` };
   }
 }

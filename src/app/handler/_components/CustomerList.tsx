@@ -3,13 +3,14 @@
 
 import { useState, useEffect, useTransition } from 'react';
 import type { Company, User, SubscriptionType } from '@/types';
-import { getCustomers, markAsPaid, approveSubscriptionChange, rejectSubscriptionChange } from '../actions';
+import { getCustomers, markAsPaid, approveSubscriptionChange, rejectSubscriptionChange, extendSubscription } from '../actions';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isAfter } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { Loader2, Check, X } from 'lucide-react';
+import { Loader2, Check, X, CalendarPlus, Power } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
@@ -22,6 +23,7 @@ export function CustomerList() {
   const [customers, setCustomers] = useState<CustomerData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, startUpdateTransition] = useTransition();
+  const [extensions, setExtensions] = useState<Record<string, { count: number, unit: 'months' | 'years' }>>({});
   const { toast } = useToast();
 
   const fetchAndSetCustomers = async () => {
@@ -33,7 +35,17 @@ export function CustomerList() {
   useEffect(() => {
     fetchAndSetCustomers();
   }, []);
-  
+
+  const handleUpdateExtension = (companyId: string, field: 'count' | 'unit', value: any) => {
+    setExtensions(prev => ({
+      ...prev,
+      [companyId]: {
+        ...(prev[companyId] || { count: 1, unit: 'months' }),
+        [field]: value
+      }
+    }));
+  };
+
   const handleMarkAsPaid = (companyId: string, subscriptionType: SubscriptionType) => {
     startUpdateTransition(async () => {
       const result = await markAsPaid(companyId, subscriptionType);
@@ -46,27 +58,40 @@ export function CustomerList() {
     });
   };
 
+  const handleExtend = (companyId: string) => {
+    const ext = extensions[companyId] || { count: 1, unit: 'months' };
+    startUpdateTransition(async () => {
+      const result = await extendSubscription(companyId, ext.count, ext.unit);
+      if (result.success) {
+        toast({ title: 'Success', description: `Subscription extended by ${ext.count} ${ext.unit}.` });
+        await fetchAndSetCustomers();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+      }
+    });
+  };
+
   const handleApproveSubscription = (companyId: string) => {
     startUpdateTransition(async () => {
-        const result = await approveSubscriptionChange(companyId);
-        if (result.success) {
-            toast({ title: 'Approved', description: 'Subscription change approved.' });
-            await fetchAndSetCustomers();
-        } else {
-            toast({ variant: 'destructive', title: 'Error', description: result.error });
-        }
+      const result = await approveSubscriptionChange(companyId);
+      if (result.success) {
+        toast({ title: 'Approved', description: 'Subscription change approved.' });
+        await fetchAndSetCustomers();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+      }
     });
   };
 
   const handleRejectSubscription = (companyId: string) => {
     startUpdateTransition(async () => {
-        const result = await rejectSubscriptionChange(companyId);
-        if (result.success) {
-            toast({ title: 'Rejected', description: 'Subscription change rejected.' });
-            await fetchAndSetCustomers();
-        } else {
-             toast({ variant: 'destructive', title: 'Error', description: result.error });
-        }
+      const result = await rejectSubscriptionChange(companyId);
+      if (result.success) {
+        toast({ title: 'Rejected', description: 'Subscription change rejected.' });
+        await fetchAndSetCustomers();
+      } else {
+        toast({ variant: 'destructive', title: 'Error', description: result.error });
+      }
     });
   };
 
@@ -88,7 +113,7 @@ export function CustomerList() {
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Company / Admin</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan & Cycle</th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status & Dates</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan Actions</th>
             </tr>
           </thead>
           <tbody className="bg-card divide-y divide-gray-200 dark:divide-gray-700">
@@ -96,75 +121,114 @@ export function CustomerList() {
               const creationDate = company.creationDate ? parseISO(company.creationDate) : null;
               let trialEndDate: Date | null = null;
               if (creationDate) {
-                  trialEndDate = new Date(creationDate);
-                  trialEndDate.setDate(trialEndDate.getDate() + 7);
+                trialEndDate = new Date(creationDate);
+                trialEndDate.setDate(trialEndDate.getDate() + 7);
               }
               const isTrialActive = trialEndDate && new Date() < trialEndDate;
+              const isExpired = company.subscriptionExpiryDate && isAfter(new Date(), parseISO(company.subscriptionExpiryDate));
+
+              const currentExt = extensions[company.id] || { count: 1, unit: 'months' };
 
               return (
-              <tr key={company.id}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{company.name}</div>
-                  <div className="text-sm text-gray-500">{admin?.email || 'No admin found'}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-gray-900 dark:text-white">{company.activeSubscriptionId}</div>
-                  <div className="text-sm text-gray-500 capitalize">{company.subscriptionType}</div>
-                  {company.pendingSubscriptionId && (
+                <tr key={company.id}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900 dark:text-white">{company.name}</div>
+                    <div className="text-sm text-gray-500">{admin?.email || 'No admin found'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900 dark:text-white">{company.activeSubscriptionId}</div>
+                    <div className="text-sm text-gray-500 capitalize">{company.subscriptionType}</div>
+                    {company.pendingSubscriptionId && (
                       <div className="mt-2 p-1.5 bg-amber-100 dark:bg-amber-900/30 rounded border border-amber-200 dark:border-amber-800">
-                          <div className="text-xs font-semibold text-amber-800 dark:text-amber-400">Requesting:</div>
-                          <div className="text-xs text-amber-900 dark:text-amber-300 font-medium">{company.pendingSubscriptionId}</div>
-                          <div className="flex gap-1 mt-1">
-                              <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleApproveSubscription(company.id)} disabled={isUpdating}>
-                                  <Check className="h-3 w-3 text-green-600" />
-                              </Button>
-                               <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleRejectSubscription(company.id)} disabled={isUpdating}>
-                                  <X className="h-3 w-3 text-red-600" />
-                              </Button>
-                          </div>
+                        <div className="text-xs font-semibold text-amber-800 dark:text-amber-400">Requesting:</div>
+                        <div className="text-xs text-amber-900 dark:text-amber-300 font-medium">{company.pendingSubscriptionId}</div>
+                        <div className="flex gap-1 mt-1">
+                          <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleApproveSubscription(company.id)} disabled={isUpdating}>
+                            <Check className="h-3 w-3 text-green-600" />
+                          </Button>
+                          <Button size="icon" variant="outline" className="h-6 w-6" onClick={() => handleRejectSubscription(company.id)} disabled={isUpdating}>
+                            <X className="h-3 w-3 text-red-600" />
+                          </Button>
+                        </div>
                       </div>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                    {company.paymentStatus === 'paid' ? (
-                        <>
-                            <Badge className="bg-green-100 text-green-800">Paid</Badge>
-                            <div className="text-xs text-gray-500 mt-1">
-                                Expires: {company.subscriptionExpiryDate ? format(parseISO(company.subscriptionExpiryDate), 'PP') : 'N/A'}
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            {isTrialActive ? (
-                                <Badge className="bg-blue-100 text-blue-800">7-Day Trial</Badge>
-                            ) : (
-                                <Badge className="bg-yellow-100 text-yellow-800">Payment Pending</Badge>
-                            )}
-                            <div className="text-xs text-gray-500 mt-1">
-                                {isTrialActive ? `Trial Ends: ${format(trialEndDate!, 'PP')}` : 'Trial Expired'}
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                                Signed up: {creationDate ? format(creationDate, 'PP') : 'N/A'}
-                            </div>
-                        </>
                     )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  {company.paymentStatus === 'pending' ? (
-                     <Button
-                        size="sm"
-                        onClick={() => handleMarkAsPaid(company.id, company.subscriptionType || 'monthly')}
-                        disabled={isUpdating}
-                      >
-                         {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Mark as Paid
-                      </Button>
-                  ) : (
-                    <span className="text-green-600 font-semibold">Active</span>
-                  )}
-                </td>
-              </tr>
-            )})}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {company.paymentStatus === 'paid' ? (
+                      <>
+                        <Badge className={cn("px-2 py-0.5", isExpired ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" : "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400")}>
+                          {isExpired ? 'Expired' : 'Paid'}
+                        </Badge>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {isExpired ? 'Expired' : 'Expires'}: {company.subscriptionExpiryDate ? format(parseISO(company.subscriptionExpiryDate), 'PP') : 'N/A'}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {isTrialActive ? (
+                          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5">7-Day Trial</Badge>
+                        ) : (
+                          <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 px-2 py-0.5">Payment Pending</Badge>
+                        )}
+                        <div className="text-xs text-gray-500 mt-1">
+                          {isTrialActive ? `Trial Ends: ${format(trialEndDate!, 'PP')}` : 'Trial Expired'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          Signed up: {creationDate ? format(creationDate, 'PP') : 'N/A'}
+                        </div>
+                      </>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex flex-col gap-2">
+                      {company.paymentStatus === 'pending' && !isExpired && (
+                        <Button
+                          size="sm"
+                          onClick={() => handleMarkAsPaid(company.id, company.subscriptionType || 'monthly')}
+                          disabled={isUpdating}
+                          className="w-full"
+                        >
+                          {isUpdating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                          Activate Initial
+                        </Button>
+                      )}
+
+                      <div className="flex items-center gap-1 bg-muted/30 p-1.5 rounded-lg border border-border/50">
+                        <Input
+                          type="number"
+                          min="1"
+                          className="h-8 w-14 text-center px-1"
+                          value={currentExt.count}
+                          onChange={(e) => handleUpdateExtension(company.id, 'count', parseInt(e.target.value) || 1)}
+                        />
+                        <Select
+                          value={currentExt.unit}
+                          onValueChange={(val) => handleUpdateExtension(company.id, 'unit', val)}
+                        >
+                          <SelectTrigger className="h-8 w-24 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="months">Months</SelectItem>
+                            <SelectItem value="years">Years</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          size="sm"
+                          variant={isExpired ? "default" : "outline"}
+                          className={cn("h-8 ml-1 whitespace-nowrap px-3", isExpired && "bg-primary text-primary-foreground")}
+                          onClick={() => handleExtend(company.id)}
+                          disabled={isUpdating}
+                        >
+                          {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : (isExpired ? <Power className="h-3 w-3 mr-1" /> : <CalendarPlus className="h-3 w-3 mr-1" />)}
+                          {isExpired ? 'Reactivate' : 'Extend'}
+                        </Button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
