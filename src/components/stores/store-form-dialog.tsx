@@ -206,161 +206,160 @@ export function StoreFormDialog({
                 )}
 
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14} />Store Name*</Label>
-                    <Input id="name" {...register("name")} />
-                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
-                    <Input id="username" {...register("username")} placeholder="Unique ID for login" />
-                    {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
-                  </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4"                  <div className="space-y-2">
+                  <Label htmlFor="name" className="flex items-cente gap-1.5"><Building size={14} />Store Name*</Label>
+                  <Input id="name" {...register("name")} />
+                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location (City)*</Label>
-                    <Input id="location" {...register("location")} placeholder="e.g. Mumbai" />
-                    {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="gstin" className="flex items-center gap-1.5"><ReceiptText size={14} />Store GSTIN</Label>
-                    <Input id="gstin" {...register("gstin")} placeholder="Store specific GSTIN (optional)" className="uppercase" onChange={(e) => setValue('gstin', e.target.value.toUpperCase())} />
-                    {errors.gstin && <p className="text-sm text-destructive mt-1">{errors.gstin.message}</p>}
-                  </div>
-                </div>
-
                 <div className="space-y-2">
-                  <Label htmlFor="address" className="flex items-center gap-1.5"><MapPin size={14} />Detailed Address</Label>
-                  <Input id="address" {...register("address")} placeholder="Full address for bills" />
-                  {errors.address && <p className="text-sm text-destructive mt-1">{errors.address.message}</p>}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14} />Email Address*</Label>
-                    <Input id="email" type="email" {...register("email")} />
-                    {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14} />Phone Number*</Label>
-                    <Input id="phone" type="tel" {...register("phone")} />
-                    {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
-                  </div>
+                  <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
+                  <Input id="username" {...register("username")} placeholder="Unique ID for login" />
+                  {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-muted-foreground">SECURITY</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="passkey" className="flex items-center gap-1.5"><KeyRound size={14} />Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
-                  <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"} />
-                  {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
+                  <Label htmlFor="location" className="flex items-center gap-1.5"><MapPin size={14} />Location (City)*</Label>
+                  <Input id="location" {...register("location")} placeholder="e.g. Mumbai" />
+                  {errors.location && <p className="text-sm text-destructive mt-1">{errors.location.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="gstin" className="flex items-center gap-1.5"><ReceiptText size={14} />Store GSTIN</Label>
+                  <Input id="gstin" {...register("gstin")} placeholder="Store specific GSTIN (optional)" className="uppercase" onChange={(e) => setValue('gstin', e.target.value.toUpperCase())} />
+                  {errors.gstin && <p className="text-sm text-destructive mt-1">{errors.gstin.message}</p>}
                 </div>
               </div>
 
-              <Separator />
-
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold text-muted-foreground">PERMISSIONS</h4>
+              <div className="space-y-2">
+                <Label htmlFor="address" className="flex items-center gap-1.5"><MapPin size={14} />Detailed Address</Label>
+                <Input id="address" {...register("address")} placeholder="Full address for bills" />
+                {errors.address && <p className="text-sm text-destructive mt-1">{errors.address.message}</p>}
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-1.5"><Briefcase size={14} />Allowed Operations*</Label>
-                  <p className="text-xs text-muted-foreground -mt-1">Select which transaction types are permitted at this store terminal.</p>
-                  <div className="space-y-2 pt-1">
-                    {operationOptions.map((op) => (
-                      <div key={op.id} className="flex items-center space-x-2">
-                        <Checkbox id={`operation-${op.id}`} checked={selectedOperations.includes(op.id)} onCheckedChange={(checked) => {
-                          const currentOps = selectedOperations;
-                          if (checked) setValue('allowedOperations', [...currentOps, op.id]);
-                          else if (currentOps.length > 1) setValue('allowedOperations', currentOps.filter(id => id !== op.id));
-                          else toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed." });
-                        }} />
-                        <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm flex items-center gap-1.5"><op.icon size={16} />{op.label}</Label>
-                      </div>
-                    ))}
-                  </div>
-                  {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
+                  <Label htmlFor="email" className="flex items-center gap-1.5"><Mail size={14} />Email Address*</Label>
+                  <Input id="email" type="email" {...register("email")} />
+                  {errors.email && <p className="text-sm text-destructive mt-1">{errors.email.message}</p>}
                 </div>
-                {allStaff.length > 0 && (
-                  <div className="space-y-3 pt-2">
-                    <div className="flex flex-col gap-1">
-                      <Label className="flex items-center gap-1.5 font-semibold text-foreground">
-                        <UserIcon size={14} className="text-primary" /> Allowed Staff (Terminal Access)
-                      </Label>
-                      <p className="text-[11px] text-muted-foreground">Select staff members authorized to operate this store terminal. If empty, all authorized staff can access.</p>
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="flex items-center gap-1.5"><Phone size={14} />Phone Number*</Label>
+                  <Input id="phone" type="tel" {...register("phone")} />
+                  {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone.message}</p>}
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-muted-foreground">SECURITY</h4>
+              <div className="space-y-2">
+                <Label htmlFor="passkey" className="flex items-center gap-1.5"><KeyRound size={14} />Store Passkey*{editingStore ? <span className="text-xs text-muted-foreground ml-1"> (Leave blank to keep current)</span> : ''}</Label>
+                <Input id="passkey" type="password" {...register("passkey")} placeholder={editingStore ? "Enter new passkey to change" : "Min. 4 characters"} />
+                {errors.passkey && <p className="text-sm text-destructive mt-1">{errors.passkey.message}</p>}
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-4">
+              <h4 className="text-sm font-semibold text-muted-foreground">PERMISSIONS</h4>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5"><Briefcase size={14} />Allowed Operations*</Label>
+                <p className="text-xs text-muted-foreground -mt-1">Select which transaction types are permitted at this store terminal.</p>
+                <div className="space-y-2 pt-1">
+                  {operationOptions.map((op) => (
+                    <div key={op.id} className="flex items-center space-x-2">
+                      <Checkbox id={`operation-${op.id}`} checked={selectedOperations.includes(op.id)} onCheckedChange={(checked) => {
+                        const currentOps = selectedOperations;
+                        if (checked) setValue('allowedOperations', [...currentOps, op.id]);
+                        else if (currentOps.length > 1) setValue('allowedOperations', currentOps.filter(id => id !== op.id));
+                        else toast({ variant: "destructive", title: "Validation Error", description: "At least one operation must be allowed." });
+                      }} />
+                      <Label htmlFor={`operation-${op.id}`} className="font-normal text-sm flex items-center gap-1.5"><op.icon size={16} />{op.label}</Label>
                     </div>
+                  ))}
+                </div>
+                {errors.allowedOperations && <p className="text-sm text-destructive mt-1">{errors.allowedOperations.message}</p>}
+              </div>
+              {allStaff.length > 0 && (
+                <div className="space-y-3 pt-2">
+                  <div className="flex flex-col gap-1">
+                    <Label className="flex items-center gap-1.5 font-semibold text-foreground">
+                      <UserIcon size={14} className="text-primary" /> Allowed Staff (Terminal Access)
+                    </Label>
+                    <p className="text-[11px] text-muted-foreground">Select staff members authorized to operate this store terminal. If empty, all authorized staff can access.</p>
+                  </div>
 
-                    {selectedStaffIds.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 border border-dashed rounded-lg">
-                        {allStaff.filter(s => selectedStaffIds.includes(s.id)).map(staff => (
-                          <div key={staff.id} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium border border-primary/20">
-                            {staff.name}
-                            <button
-                              type="button"
-                              onClick={() => setValue('allowedStaffIds', selectedStaffIds.filter(id => id !== staff.id))}
-                              className="hover:text-destructive transition-colors ml-0.5"
-                            >
-                              <XCircle className="h-3 w-3" />
-                            </button>
+                  {selectedStaffIds.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 p-2 bg-muted/20 border border-dashed rounded-lg">
+                      {allStaff.filter(s => selectedStaffIds.includes(s.id)).map(staff => (
+                        <div key={staff.id} className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-medium border border-primary/20">
+                          {staff.name}
+                          <button
+                            type="button"
+                            onClick={() => setValue('allowedStaffIds', selectedStaffIds.filter(id => id !== staff.id))}
+                            className="hover:text-destructive transition-colors ml-0.5"
+                          >
+                            <XCircle className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="h-40 border rounded-xl bg-muted/10 overflow-hidden flex flex-col">
+                    <div className="bg-muted/30 px-3 py-1.5 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex justify-between">
+                      <span>Staff Directory</span>
+                      <span>{selectedStaffIds.length} Selected</span>
+                    </div>
+                    <ScrollArea className="flex-1">
+                      <div className="p-2 space-y-1">
+                        {allStaff.map((staff) => (
+                          <div
+                            key={staff.id}
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer hover:bg-muted/50",
+                              selectedStaffIds.includes(staff.id) && "bg-primary/5 border border-primary/10"
+                            )}
+                            onClick={() => {
+                              const checked = selectedStaffIds.includes(staff.id);
+                              setValue('allowedStaffIds', checked ? selectedStaffIds.filter(id => id !== staff.id) : [...selectedStaffIds, staff.id]);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div className={cn("h-2 w-2 rounded-full", selectedStaffIds.includes(staff.id) ? "bg-primary" : "bg-muted-foreground/30")} />
+                              <div className="flex flex-col">
+                                <span className="text-sm font-medium">{staff.name}</span>
+                                <span className="text-[10px] text-muted-foreground">{staff.email}</span>
+                              </div>
+                            </div>
+                            <Checkbox
+                              id={`staff-${staff.id}`}
+                              checked={selectedStaffIds.includes(staff.id)}
+                              onCheckedChange={(checked) => {
+                                setValue('allowedStaffIds', checked ? [...selectedStaffIds, staff.id] : selectedStaffIds.filter(id => id !== staff.id));
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    <div className="h-40 border rounded-xl bg-muted/10 overflow-hidden flex flex-col">
-                      <div className="bg-muted/30 px-3 py-1.5 border-b text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex justify-between">
-                        <span>Staff Directory</span>
-                        <span>{selectedStaffIds.length} Selected</span>
-                      </div>
-                      <ScrollArea className="flex-1">
-                        <div className="p-2 space-y-1">
-                          {allStaff.map((staff) => (
-                            <div
-                              key={staff.id}
-                              className={cn(
-                                "flex items-center justify-between p-2 rounded-lg transition-colors cursor-pointer hover:bg-muted/50",
-                                selectedStaffIds.includes(staff.id) && "bg-primary/5 border border-primary/10"
-                              )}
-                              onClick={() => {
-                                const checked = selectedStaffIds.includes(staff.id);
-                                setValue('allowedStaffIds', checked ? selectedStaffIds.filter(id => id !== staff.id) : [...selectedStaffIds, staff.id]);
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div className={cn("h-2 w-2 rounded-full", selectedStaffIds.includes(staff.id) ? "bg-primary" : "bg-muted-foreground/30")} />
-                                <div className="flex flex-col">
-                                  <span className="text-sm font-medium">{staff.name}</span>
-                                  <span className="text-[10px] text-muted-foreground">{staff.email}</span>
-                                </div>
-                              </div>
-                              <Checkbox
-                                id={`staff-${staff.id}`}
-                                checked={selectedStaffIds.includes(staff.id)}
-                                onCheckedChange={(checked) => {
-                                  setValue('allowedStaffIds', checked ? [...selectedStaffIds, staff.id] : selectedStaffIds.filter(id => id !== staff.id));
-                                }}
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                    {errors.allowedStaffIds && <p className="text-sm text-destructive mt-1">{errors.allowedStaffIds.message}</p>}
+                    </ScrollArea>
                   </div>
-                )}
-              </div>
+                  {errors.allowedStaffIds && <p className="text-sm text-destructive mt-1">{errors.allowedStaffIds.message}</p>}
+                </div>
+              )}
             </div>
           </div>
-          <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
-            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
+        </div>
+        <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
+          <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+          <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+    </Dialog >
   );
 }

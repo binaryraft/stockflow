@@ -137,6 +137,7 @@ export interface Company {
   subscriptionStartDate?: string | null;
   subscriptionExpiryDate?: string | null;
   pendingSubscriptionId?: string | null;
+  email?: string;
 }
 
 export type PaymentMode = 'cash' | 'card' | 'upi' | 'netbanking' | 'cheque' | 'other';
