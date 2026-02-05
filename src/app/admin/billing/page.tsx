@@ -99,17 +99,16 @@ function BillingContent() {
   const [hasMounted, setHasMounted] = useState(false);
   const isAdminContext = true;
 
-  const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('thisMonth');
+  const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('all');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
 
 
   useEffect(() => {
     setHasMounted(true);
     if (currentCompanyIdFromStore) {
-      fetchBills(currentCompanyIdFromStore);
       fetchStores(currentCompanyIdFromStore);
     }
-  }, [currentCompanyIdFromStore, fetchBills, fetchStores]);
+  }, [currentCompanyIdFromStore, fetchStores]);
 
   useEffect(() => {
     if (hasMounted) {

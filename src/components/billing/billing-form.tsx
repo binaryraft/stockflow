@@ -1158,8 +1158,8 @@ export function BillingForm({
         setMode(newMode);
         const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
         router.replace(`${basePath}?mode=${newMode}`, { scroll: false });
-        setTimeout(() => setIsTransitioning(false), 200);
-      }, 200);
+        setTimeout(() => setIsTransitioning(false), 50);
+      }, 50);
     }
   };
 
@@ -1286,14 +1286,14 @@ export function BillingForm({
       </div>
 
       <Card className={cn(
-        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-all duration-500 ease-in-out relative overflow-hidden",
-        isTransitioning ? "opacity-30 scale-[0.96] blur-sm translate-y-4" : "opacity-100 scale-100 blur-0 translate-y-0"
+        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-all duration-200 ease-in-out relative overflow-hidden",
+        isTransitioning ? "opacity-30 scale-[0.98] blur-[2px] translate-y-2" : "opacity-100 scale-100 blur-0 translate-y-0"
       )}>
         {isTransitioning && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/20 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-50" />
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-primary animate-pulse">Reconfiguring...</div>
+          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/10 backdrop-blur-[1px]">
+            <div className="flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary opacity-60" />
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-primary animate-pulse">Switching...</div>
             </div>
           </div>
         )}
@@ -1632,6 +1632,13 @@ export function BillingForm({
               <Label htmlFor="paymentStatus" className={cn("font-medium", isPaid ? "text-green-600 dark:text-green-500" : "text-destructive")}>
                 {isPaid ? 'Paid' : 'Unpaid'}
               </Label>
+            </div>
+          )}
+
+          {isEstimateMode && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
+              <Info size={14} className="text-amber-600 dark:text-amber-400" />
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">Estimate: GST Excluded (Base Price Only)</span>
             </div>
           )}
 
