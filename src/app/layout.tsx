@@ -1,7 +1,6 @@
 
 import type { Metadata } from 'next';
 import { Inter, Roboto_Mono } from 'next/font/google';
-import '@/lib/i18n';
 import './globals.css';
 import { APP_NAME } from '@/lib/constants';
 import { ThemeProvider } from '@/components/theme-provider';
