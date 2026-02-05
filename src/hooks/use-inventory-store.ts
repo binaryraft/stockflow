@@ -689,9 +689,6 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchCompanyProfile: async (companyId) => {
-        if (get().userProfile.dataMode === 'local') {
-          return null;
-        }
         if (!companyId) {
           console.warn("fetchCompanyProfile called without companyId.");
           set({ userProfile: { ...defaultUserProfile, dataMode: 'local' } });
@@ -726,31 +723,76 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateUserProfileFields: async (data, companyId) => {
-        if (get().userProfile.dataMode === 'local') {
+        // If we are strictly local and no companyId, just update local state
+        if (!companyId && get().userProfile.dataMode === 'local') {
           set(state => ({
             userProfile: {
               ...state.userProfile,
               ...data,
-              // Mapping Company fields back to UserProfile if needed
               companyName: (data as any).name || state.userProfile.companyName,
               companyLogoUrl: (data as any).logoUrl || state.userProfile.companyLogoUrl,
               companyCurrency: (data as any).currency || state.userProfile.companyCurrency,
             }
           }));
-          return null; // Return null as Company type locally is hard to mimic perfectly
+          return null;
         }
+
+        if (!companyId) return null;
+
         try {
           const response = await fetch(`/api/companies/${companyId}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           });
+
           const result = await response.json();
           if (!result.success) throw new Error(result.message);
-          get().fetchCompanyProfile(companyId); // Re-fetch to ensure full consistency
-          return result.data;
+
+          const updatedProfile = result.data as Company;
+
+          // Manually update the store instead of doing a second fetch
+          set((state) => ({
+            userProfile: {
+              ...state.userProfile,
+              companyName: updatedProfile.name,
+              companyLogoUrl: updatedProfile.logoUrl,
+              companySlogan: updatedProfile.slogan,
+              companyPhone: updatedProfile.phone,
+              companyAddress: updatedProfile.address,
+              companyGstNo: updatedProfile.gstNo,
+              activeSubscriptionId: updatedProfile.activeSubscriptionId,
+              defaultBillNotes: updatedProfile.defaultBillNotes,
+              defaultSalesPaymentStatus: updatedProfile.defaultSalesPaymentStatus,
+              defaultPurchasePaymentStatus: updatedProfile.defaultPurchasePaymentStatus,
+              companyCurrency: updatedProfile.currency || DEFAULT_CURRENCY_CODE,
+              paymentStatus: updatedProfile.paymentStatus,
+              subscriptionExpiryDate: updatedProfile.subscriptionExpiryDate,
+              pendingSubscriptionId: updatedProfile.pendingSubscriptionId,
+              dataMode: 'global',
+              creationDate: updatedProfile.creationDate,
+              companyEmail: updatedProfile.email || localStorage.getItem('userEmail') || state.userProfile.companyEmail,
+            }
+          }));
+
+          return updatedProfile;
         } catch (error) {
           console.error("Error updating company profile:", error);
-          toast({ variant: "destructive", title: "Error", description: (error as Error).message || "Could not update profile." });
+          if (get().userProfile.dataMode === 'local') {
+            // If recovery failed, we stay in local mode but update the local fields so user doesn't lose input
+            set(state => ({
+              userProfile: {
+                ...state.userProfile,
+                ...data,
+                companyName: (data as any).name || state.userProfile.companyName,
+              }
+            }));
+          }
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: (error as Error).message || "Could not save company profile to server."
+          });
           return null;
         }
       },
