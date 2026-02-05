@@ -117,7 +117,7 @@ export function BillingForm({
   const [customerVendorName, setCustomerVendorName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [notes, setNotes] = useState('');
-  const [paymentStatus, setPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
+  const [isPaid, setIsPaid] = useState(true);
   const [returnItemIsDefective, setReturnItemIsDefective] = useState(false);
   const [taxType, setTaxType] = useState<'intra-state' | 'inter-state'>('intra-state');
   const [customerGstin, setCustomerGstin] = useState('');
@@ -1331,15 +1331,15 @@ export function BillingForm({
                 <div className="flex items-center space-x-2">
                   <Checkbox
                     id="paymentStatus"
-                    checked={paymentStatus === 'paid'}
-                    onCheckedChange={(checked) => setPaymentStatus(checked ? 'paid' : 'unpaid')}
+                    checked={isPaid}
+                    onCheckedChange={(checked) => setIsPaid(!!checked)}
                   />
                   <Label htmlFor="paymentStatus" className="font-semibold cursor-pointer select-none">Mark as Paid</Label>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {paymentStatus === 'paid' && (
+                {isPaid && (
                   <div className="space-y-1.5">
                     <Label>Payment Mode</Label>
                     <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
