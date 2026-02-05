@@ -206,15 +206,17 @@ export function StoreFormDialog({
                 )}
 
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4"                  <div className="space-y-2">
-                  <Label htmlFor="name" className="flex items-cente gap-1.5"><Building size={14} />Store Name*</Label>
-                  <Input id="name" {...register("name")} />
-                  {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
-                  <Input id="username" {...register("username")} placeholder="Unique ID for login" />
-                  {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name" className="flex items-center gap-1.5"><Building size={14} />Store Name*</Label>
+                    <Input id="name" {...register("name")} />
+                    {errors.name && <p className="text-sm text-destructive mt-1">{errors.name.message}</p>}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="username" className="flex items-center gap-1.5"><UserIcon size={14} />Store Username*</Label>
+                    <Input id="username" {...register("username")} placeholder="Unique ID for login" />
+                    {errors.username && <p className="text-sm text-destructive mt-1">{errors.username.message}</p>}
+                  </div>
                 </div>
               </div>
 
@@ -353,13 +355,12 @@ export function StoreFormDialog({
               )}
             </div>
           </div>
-        </div>
-        <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
-          <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-          <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
-    </Dialog >
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
+            <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
+            <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }
