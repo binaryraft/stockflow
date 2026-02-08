@@ -105,11 +105,21 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                             }}
                             onProductSelect={(suggestion) => {
                                 handleProductSelectFromSearch(suggestion);
-                                // Focus quantity input after selection for faster billing
-                                setTimeout(() => {
-                                    quantityInputRef.current?.focus();
-                                    quantityInputRef.current?.select();
-                                }, 50);
+                                // If product has variants, focus/open the first variant dropdown
+                                if (suggestion.product.variants && suggestion.product.variants.length > 0) {
+                                    // The logic to open the dropdown is handled in the parent component via useEffect or handleProductSelectFromSearch
+                                    // but we can ensure focus isn't stolen here.
+                                    // Actually, handleProductSelectFromSearch in parent ALREADY handles variant opening.
+                                    // The issue is this setTimeout below OVERRIDES it and forces focus to quantity.
+                                    // So we only focus quantity if NO variants.
+
+                                    // Wait a bit to let parent state update and decide if variant is needed
+                                } else {
+                                    setTimeout(() => {
+                                        quantityInputRef.current?.focus();
+                                        quantityInputRef.current?.select();
+                                    }, 50);
+                                }
                             }}
                             onEnterWithoutSelection={handleProductNameSubmit}
                             placeholder={mode === 'return' ? 'Scan or type product...' : 'Scan barcode, or type product...'}
@@ -229,26 +239,36 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                     }}
                                     value={selectedVariantOptions[variant.name] || ""}
                                     onValueChange={(val) => {
-                                        setSelectedVariantOptions(prev => ({ ...prev, [variant.name]: val }));
-                                        setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                        const newOptions = { ...selectedVariantOptions, [variant.name]: val };
+                                        setSelectedVariantOptions(newOptions);
+                                        // We don't close immediately to allow visual confirmation, or do we? 
+                                        // Actually better to keep it open briefly or just move focus?
+                                        // Closing it is standard behavior for Select.
 
-                                        // Focus next variant or quantity
-                                        const currentIndex = currentProductForSelection.variants!.findIndex(v => v.id === variant.id);
-                                        if (currentIndex < currentProductForSelection.variants!.length - 1) {
-                                            const nextVariantId = currentProductForSelection.variants![currentIndex + 1].id;
+                                        // Find current index
+                                        const currentIndex = currentProductForSelection.variants?.findIndex(v => v.id === variant.id) ?? -1;
+
+                                        if (currentIndex !== -1 && currentProductForSelection.variants && currentIndex < currentProductForSelection.variants.length - 1) {
+                                            // Move to next variant
+                                            const nextVariant = currentProductForSelection.variants[currentIndex + 1];
+                                            // Use a slight delay to allow the current select to close properly
                                             setTimeout(() => {
-                                                setVariantDropdownOpenState(prev => ({ ...prev, [nextVariantId]: true }));
-                                                variantSelectRefs.current[nextVariantId]?.current?.focus();
-                                            }, 50);
+                                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false, [nextVariant.id]: true }));
+                                            }, 100);
                                         } else {
+                                            // Last variant, move to quantity
                                             setTimeout(() => {
+                                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
                                                 quantityInputRef.current?.focus();
                                                 quantityInputRef.current?.select();
-                                            }, 50);
+                                            }, 100);
                                         }
                                     }}
                                 >
-                                    <SelectTrigger ref={variantSelectRefs.current[variant.id]}>
+                                    <SelectTrigger
+                                        id={`variant-trigger-${variant.id}`}
+                                        ref={variantSelectRefs.current[variant.id]}
+                                    >
                                         <SelectValue placeholder={`Select ${variant.name}`} />
                                     </SelectTrigger>
                                     <SelectContent>
