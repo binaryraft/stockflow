@@ -12,6 +12,7 @@ if (typeof window !== 'undefined') {
         .use(initReactI18next)
         .init({
             fallbackLng: 'en',
+            supportedLngs: ['en', 'hi', 'ar', 'es', 'fr', 'de', 'ja', 'zh', 'ru', 'pt', 'it'],
             debug: false,
             interpolation: {
                 escapeValue: false,

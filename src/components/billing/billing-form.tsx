@@ -1286,17 +1286,9 @@ export function BillingForm({
       </div>
 
       <Card className={cn(
-        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-all duration-200 ease-in-out relative overflow-hidden",
-        isTransitioning ? "opacity-30 scale-[0.98] blur-[2px] translate-y-2" : "opacity-100 scale-100 blur-0 translate-y-0"
+        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-opacity duration-200 ease-in-out relative overflow-hidden",
+        isTransitioning ? "opacity-60" : "opacity-100"
       )}>
-        {isTransitioning && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center bg-background/10 backdrop-blur-[1px]">
-            <div className="flex flex-col items-center gap-2">
-              <Loader2 className="h-8 w-8 animate-spin text-primary opacity-60" />
-              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-primary animate-pulse">Switching...</div>
-            </div>
-          </div>
-        )}
         <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
           {showAdminStoreSelector && (
             <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">

@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { ForgotPasswordDialog } from './ForgotPasswordDialog';
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
@@ -29,6 +30,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
   const [hasMounted, setHasMounted] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   useEffect(() => {
     setHasMounted(true);
@@ -126,9 +128,18 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="admin-password">
-                <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="admin-password">
+                  <KeyRound className="mr-2 h-4 w-4 inline-block text-muted-foreground" /> Password
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => setIsForgotPasswordOpen(true)}
+                  className="text-xs text-primary hover:underline focus:outline-none"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <Input
                 id="admin-password"
                 type="password"
@@ -151,6 +162,11 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
           </CardFooter>
         </form>
       </Card>
+
+      <ForgotPasswordDialog
+        isOpen={isForgotPasswordOpen}
+        onOpenChange={setIsForgotPasswordOpen}
+      />
     </div>
   );
 }

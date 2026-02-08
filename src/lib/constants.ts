@@ -62,6 +62,7 @@ export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@ecbills.a
 export const SUBSCRIPTION_PLAN_IDS = {
   ADMIN_ONLY: 'plan_admin_only_basic',
   STARTER: 'plan_starter',
+  BASIC: 'plan_basic',
   GROWTH: 'plan_growth',
   PRO: 'plan_pro',
   ENTERPRISE: 'plan_enterprise_contact',
@@ -100,46 +101,47 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     maxEmployees: 2,
   },
   {
-    id: SUBSCRIPTION_PLAN_IDS.GROWTH,
-    name: 'Growth',
-    price: 1999,
+    id: 'plan_basic',
+    name: 'Basic',
+    price: 999,
     priceSuffix: '/ month',
     features: [
-      'Up to 3 Stores',
-      'Up to 10 Employees',
+      'Up to 2 Stores',
+      'Up to 5 Employees',
       'All Starter Features',
+      'Standard Reporting',
+      'Email Support'
+    ],
+    maxStores: 2,
+    maxEmployees: 5,
+  },
+  {
+    id: SUBSCRIPTION_PLAN_IDS.GROWTH,
+    name: 'Growth',
+    price: 2999,
+    priceSuffix: '/ month',
+    features: [
+      'Up to 5 Stores',
+      'Up to 15 Employees',
+      'All Basic Features',
       'Advanced Reporting',
       'Priority Support'
     ],
-    maxStores: 3,
-    maxEmployees: 10,
+    maxStores: 5,
+    maxEmployees: 15,
     isPopular: true,
-  },
-  {
-    id: SUBSCRIPTION_PLAN_IDS.PRO,
-    name: 'Pro',
-    price: 9999,
-    priceSuffix: '/ month',
-    features: [
-      'Unlimited Stores',
-      'Unlimited Employees',
-      'All Growth Features',
-      'Premium Support',
-      'API Access (soon)'
-    ],
-    maxStores: Infinity,
-    maxEmployees: Infinity,
   },
   {
     id: SUBSCRIPTION_PLAN_IDS.ENTERPRISE,
     name: 'Enterprise',
     price: -1,
-    priceSuffix: 'Custom Pricing',
+    priceSuffix: 'Contact Us',
     features: [
-      'Custom Store & Employee Limits',
-      'All Pro Features',
+      'Unlimited Stores',
+      'Unlimited Employees',
+      'All Growth Features',
       'Dedicated Account Manager',
-      'Custom Integrations & Features'
+      'Custom Integrations'
     ],
     maxStores: Infinity,
     maxEmployees: Infinity,

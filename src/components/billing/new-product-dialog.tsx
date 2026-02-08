@@ -520,7 +520,19 @@ export function NewProductDialog({
       })) || [],
     };
 
-    if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
+    // For products without variants, we store the base prices directly on the product
+    // or as 'forNonTracked' fields if that's the convention. 
+    // Looking at the store, it seems we use initialStock to create a default SKU in addProduct.
+    // So we pass these values through.
+
+    if (!productVariantsPayload || productVariantsPayload.length === 0) {
+      // It's a simple product
+      productToSaveBase.costPrice = data.costPrice;
+      productToSaveBase.sellPrice = data.sellPrice;
+      productToSaveBase.initialStock = data.initialStock;
+
+      // Legacy support if needed, but the store `addProduct` handles `initialStock` to make a SKU.
+      // We'll also set the non-tracked fields just in case the logic uses them.
       productToSaveBase.costPriceForNonTracked = data.costPrice;
       productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
@@ -613,35 +625,53 @@ export function NewProductDialog({
                   </div>
                 </div>
 
-                {/* Main Cost/Sell Price Defaults - Always Visible */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Main Pricing & Stock Section */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                    <Label htmlFor="dialog-costPrice">Cost Price (Default)</Label>
-                    <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                    <Label htmlFor="dialog-costPrice">Cost Price (₹)</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="dialog-costPrice"
+                        type="number"
+                        step="0.01"
+                        {...register("costPrice")}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
                     {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
                   </div>
+
                   <div className="space-y-1.5">
-                    <Label htmlFor="dialog-sellPrice">Sell Price (Default)</Label>
-                    <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                    <Label htmlFor="dialog-sellPrice">Sell Price (₹)</Label>
+                    <div className="relative">
+                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="dialog-sellPrice"
+                        type="number"
+                        step="0.01"
+                        {...register("sellPrice")}
+                        placeholder="0.00"
+                        className="pl-8"
+                      />
+                    </div>
                     {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
                   </div>
-                </div>
 
-                {trackQuantityValue && hasVariants && (
-                  <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
-                    <Info size={16} className="shrink-0 mt-0.5 text-primary" />
-                    <span>
-                      Default prices above will be used for variants unless overridden below.
-                    </span>
-                  </div>
-                )}
-                {!hasVariants && trackQuantityValue && (
-                  <div className="space-y-1.5 mt-2">
-                    <Label htmlFor="dialog-initialStock">Initial Stock Quantity</Label>
-                    <Input id="dialog-initialStock" type="number" {...register("initialStock")} placeholder="0" />
-                    {errors.initialStock && <p className="text-xs text-destructive mt-1">{errors.initialStock.message}</p>}
-                  </div>
-                )}
+                  {trackQuantityValue && !hasVariants && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-initialStock">Initial Stock</Label>
+                      <Input
+                        id="dialog-initialStock"
+                        type="number"
+                        {...register("initialStock")}
+                        placeholder="0"
+                      />
+                      {errors.initialStock && <p className="text-xs text-destructive mt-1">{errors.initialStock.message}</p>}
+                    </div>
+                  )}
+                </div>
 
                 <Separator className="my-4" />
                 <AdditionalChargesDialogSection control={control} register={register} errors={errors} watch={watch} setValue={setValue} setFocus={setFocus} />
