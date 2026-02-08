@@ -1,9 +1,9 @@
 ﻿
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -1152,14 +1152,13 @@ export function BillingForm({
     }
 
     if (newMode !== mode) {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        resetFullForm();
-        setMode(newMode);
-        const basePath = redirectBasePath || (isAdminContext ? '/admin/billing' : (storeIdFromProp ? `/storeportal/${storeIdFromProp}/billing` : '/admin/billing'));
-        router.replace(`${basePath}?mode=${newMode}`, { scroll: false });
-        setTimeout(() => setIsTransitioning(false), 50);
-      }, 50);
+      resetFullForm();
+      setMode(newMode);
+
+      // Update URL silently without triggering Next.js router refresh
+      const url = new URL(window.location.href);
+      url.searchParams.set('mode', newMode);
+      window.history.pushState({}, '', url);
     }
   };
 
@@ -1285,195 +1284,203 @@ export function BillingForm({
         </Tabs>
       </div>
 
-      <Card className={cn(
-        "w-full shadow-lg flex flex-col border-t-2 border-t-primary transition-opacity duration-200 ease-in-out relative overflow-hidden",
-        isTransitioning ? "opacity-60" : "opacity-100"
-      )}>
-        <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
-          {showAdminStoreSelector && (
-            <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
-              <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium text-primary">
-                <Building size={18} /> Store for this Bill
-              </Label>
-              <Select value={selectedStoreIdForAdmin || ""} onValueChange={setSelectedStoreIdForAdmin}>
-                <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
-                  <SelectValue placeholder="Select a store..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {allStores.map(store => (
-                    <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length > 1 && !selectedStoreIdForAdmin && (
-                <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>
+      <Card className="w-full shadow-lg flex flex-col border-t-2 border-t-primary overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={mode}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            transition={{ duration: 0.2 }}
+            className="flex-1 flex flex-col overflow-hidden"
+          >
+            <CardContent className="flex-1 flex flex-col overflow-hidden space-y-4 p-6">
+              {showAdminStoreSelector && (
+                <div className="space-y-1.5 pb-4 border-b border-dashed mb-4">
+                  <Label htmlFor="adminStoreSelect" className="flex items-center gap-1.5 text-base font-medium text-primary">
+                    <Building size={18} /> Store for this Bill
+                  </Label>
+                  <Select value={selectedStoreIdForAdmin || ""} onValueChange={setSelectedStoreIdForAdmin}>
+                    <SelectTrigger id="adminStoreSelect" className="w-full md:w-1/2 select-trigger-class">
+                      <SelectValue placeholder="Select a store..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allStores.map(store => (
+                        <SelectItem key={store.id} value={store.id}>{store.name} ({store.location})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length > 1 && !selectedStoreIdForAdmin && (
+                    <p className="text-xs text-destructive mt-1">Please select a store before saving the bill.</p>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-          {isAdminContext && activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
-            <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-              No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
-            </p>
-          )}
-          {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
-            <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-              No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
-            </p>
-          )}
+              {isAdminContext && activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
+                <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
+                  No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
+                </p>
+              )}
+              {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
+                <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
+                  No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
+                </p>
+              )}
 
-          {mode === 'sell' && (
-            <div className="flex flex-col gap-3 pt-2">
-              <div className="flex items-center space-x-2 justify-end">
-                {/* Tax Type Switch */}
-                {mode === 'sell' && !isEstimateMode && (
-                  <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md border text-sm">
-                    <Switch
-                      id="tax-mode"
-                      checked={taxType === 'inter-state'}
-                      onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
-                    />
-                    <Label htmlFor="tax-mode">Inter-state (IGST)</Label>
+              {mode === 'sell' && (
+                <div className="flex flex-col gap-3 pt-2">
+                  <div className="flex items-center space-x-2 justify-end">
+                    {/* Tax Type Switch */}
+                    {mode === 'sell' && !isEstimateMode && (
+                      <div className="flex items-center space-x-2 bg-secondary/20 p-2 rounded-md border text-sm">
+                        <Switch
+                          id="tax-mode"
+                          checked={taxType === 'inter-state'}
+                          onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
+                        />
+                        <Label htmlFor="tax-mode">Inter-state (IGST)</Label>
+                      </div>
+                    )}
+
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="paymentStatus"
+                        checked={isPaid}
+                        onCheckedChange={(checked) => setIsPaid(!!checked)}
+                      />
+                      <Label htmlFor="paymentStatus" className="font-semibold cursor-pointer select-none">Mark as Paid</Label>
+                    </div>
                   </div>
-                )}
 
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="paymentStatus"
-                    checked={isPaid}
-                    onCheckedChange={(checked) => setIsPaid(!!checked)}
-                  />
-                  <Label htmlFor="paymentStatus" className="font-semibold cursor-pointer select-none">Mark as Paid</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {isPaid && (
+                      <div className="space-y-1.5">
+                        <Label>Payment Mode</Label>
+                        <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select mode" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="cash">Cash</SelectItem>
+                            <SelectItem value="card">Card</SelectItem>
+                            <SelectItem value="upi">UPI</SelectItem>
+                            <SelectItem value="netbanking">Net Banking</SelectItem>
+                            <SelectItem value="cheque">Cheque</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center space-x-2 justify-end">
+                    <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
+                    <Label htmlFor="estimate-mode">Estimate/Quotation</Label>
+                  </div>
                 </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {isPaid && (
-                  <div className="space-y-1.5">
-                    <Label>Payment Mode</Label>
-                    <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash</SelectItem>
-                        <SelectItem value="card">Card</SelectItem>
-                        <SelectItem value="upi">UPI</SelectItem>
-                        <SelectItem value="netbanking">Net Banking</SelectItem>
-                        <SelectItem value="cheque">Cheque</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center space-x-2 justify-end">
-                <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
-                <Label htmlFor="estimate-mode">Estimate/Quotation</Label>
-              </div>
-            </div>
-          )}
+              )}
 
 
-          <div className="space-y-4 pb-4 border-b border-dashed">
-            <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
-              <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
-            </h3>
-            <BillingProductSelector
-              mode={mode}
-              productNameQuery={productNameQuery}
-              setProductNameQuery={setProductNameQuery}
-              isLoadingProductSearch={isLoadingProductSearch}
-              currentProductForSelection={currentProductForSelection}
-              setCurrentProductForSelection={setCurrentProductForSelection}
-              selectedVariantOptions={selectedVariantOptions}
-              setSelectedVariantOptions={setSelectedVariantOptions}
-              quantity={quantity}
-              setQuantity={setQuantity}
-              costPrice={costPrice}
-              setCostPrice={setCostPrice}
-              sellPrice={sellPrice}
-              setSellPrice={setSellPrice}
-              currentSkuStock={currentSkuStock}
-              currentSkuSellPrice={currentSkuSellPrice}
-              isDisplayingLayerStock={isDisplayingLayerStock}
-              onAddProduct={handleAddNewItem}
-              onScannerClick={handleBarcodeIconClick}
-              onEditProductClick={handleEditProductClick}
-              productNotFoundHint={productNotFoundHint}
-              handleProductSelectFromSearch={handleProductSelectFromSearch}
-              handleProductNameSubmit={handleProductNameSubmit}
-              finalStoreIdForSkuDetails={finalStoreIdForSkuDetails}
-              returnItemIsDefective={returnItemIsDefective}
-              setReturnItemIsDefective={setReturnItemIsDefective}
-              productNameInputRef={productNameInputRef}
-            />
-          </div>
-
-          <div className="flex-grow overflow-hidden">
-            <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
-            <ScrollArea className="flex-1 h-0 min-h-[300px]" ref={scrollAreaRef as any}>
-              <div className="flex flex-col gap-1 pb-2">
-                {currentBillItems.map((item) => (
-                  <BillItemRow
-                    key={item.id}
-                    item={item}
-                    mode={mode}
-                    isEstimateMode={isEstimateMode}
-                    onQuantityChange={updateBillItemQuantity}
-                    onPriceChange={updateBillItemPrice}
-                    onDiscountChange={updateBillItemDiscount}
-                    onRemoveItem={removeBillItem}
-                    onEnterPress={() => productNameInputRef.current?.focus()}
-                    taxType={taxType}
-                  />
-                ))}
-                <div ref={itemsEndRef} className="h-1" />
-              </div>
-            </ScrollArea>
-          </div>
-
-          {
-            (mode === 'sell' || mode === 'buy') && (
-              <div className="pt-4 border-t border-dashed mt-auto space-y-3">
-                <h3 className="text-md font-medium text-foreground flex items-center gap-2">
-                  <CircleDollarSign size={18} className="text-muted-foreground" /> Add Ad-hoc Service / Charge
+              <div className="space-y-4 pb-4 border-b border-dashed">
+                <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                  <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="serviceDescription">Description</Label>
-                    <Input
-                      id="serviceDescription"
-                      ref={serviceDescriptionInputRef}
-                      value={serviceDescription}
-                      onChange={(e) => setServiceDescription(e.target.value)}
-                      placeholder="e.g., Delivery Fee, Repair Service"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceDescription'))}
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="serviceAmount">Amount</Label>
-                    <Input
-                      id="serviceAmount"
-                      ref={serviceAmountInputRef}
-                      type="number"
-                      value={serviceAmount}
-                      onChange={(e) => setServiceAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
-                      placeholder="0.00"
-                      step="0.01"
-                      min="0"
-                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
-                      onFocus={(e) => e.target.select()}
-                    />
-                  </div>
-                  <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service
-                  </Button>
-                </div>
+                <BillingProductSelector
+                  mode={mode}
+                  productNameQuery={productNameQuery}
+                  setProductNameQuery={setProductNameQuery}
+                  isLoadingProductSearch={isLoadingProductSearch}
+                  currentProductForSelection={currentProductForSelection}
+                  setCurrentProductForSelection={setCurrentProductForSelection}
+                  selectedVariantOptions={selectedVariantOptions}
+                  setSelectedVariantOptions={setSelectedVariantOptions}
+                  quantity={quantity}
+                  setQuantity={setQuantity}
+                  costPrice={costPrice}
+                  setCostPrice={setCostPrice}
+                  sellPrice={sellPrice}
+                  setSellPrice={setSellPrice}
+                  currentSkuStock={currentSkuStock}
+                  currentSkuSellPrice={currentSkuSellPrice}
+                  isDisplayingLayerStock={isDisplayingLayerStock}
+                  onAddProduct={handleAddNewItem}
+                  onScannerClick={handleBarcodeIconClick}
+                  onEditProductClick={handleEditProductClick}
+                  productNotFoundHint={productNotFoundHint}
+                  handleProductSelectFromSearch={handleProductSelectFromSearch}
+                  handleProductNameSubmit={handleProductNameSubmit}
+                  finalStoreIdForSkuDetails={finalStoreIdForSkuDetails}
+                  returnItemIsDefective={returnItemIsDefective}
+                  setReturnItemIsDefective={setReturnItemIsDefective}
+                  productNameInputRef={productNameInputRef}
+                />
               </div>
-            )
-          }
-        </CardContent >
+
+              <div className="flex-grow overflow-hidden">
+                <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
+                <ScrollArea className="flex-1 h-0 min-h-[300px]" ref={scrollAreaRef as any}>
+                  <div className="flex flex-col gap-1 pb-2">
+                    {currentBillItems.map((item) => (
+                      <BillItemRow
+                        key={item.id}
+                        item={item}
+                        mode={mode}
+                        isEstimateMode={isEstimateMode}
+                        onQuantityChange={updateBillItemQuantity}
+                        onPriceChange={updateBillItemPrice}
+                        onDiscountChange={updateBillItemDiscount}
+                        onRemoveItem={removeBillItem}
+                        onEnterPress={() => productNameInputRef.current?.focus()}
+                        taxType={taxType}
+                      />
+                    ))}
+                    <div ref={itemsEndRef} className="h-1" />
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {
+                (mode === 'sell' || mode === 'buy') && (
+                  <div className="pt-4 border-t border-dashed mt-auto space-y-3">
+                    <h3 className="text-md font-medium text-foreground flex items-center gap-2">
+                      <CircleDollarSign size={18} className="text-muted-foreground" /> Add Ad-hoc Service / Charge
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-[2fr_1fr_auto] gap-3 items-end">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="serviceDescription">Description</Label>
+                        <Input
+                          id="serviceDescription"
+                          ref={serviceDescriptionInputRef}
+                          value={serviceDescription}
+                          onChange={(e) => setServiceDescription(e.target.value)}
+                          placeholder="e.g., Delivery Fee, Repair Service"
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceDescription'))}
+                        />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="serviceAmount">Amount</Label>
+                        <Input
+                          id="serviceAmount"
+                          ref={serviceAmountInputRef}
+                          type="number"
+                          value={serviceAmount}
+                          onChange={(e) => setServiceAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || '')}
+                          placeholder="0.00"
+                          step="0.01"
+                          min="0"
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('serviceAmount'))}
+                          onFocus={(e) => e.target.select()}
+                        />
+                      </div>
+                      <Button onClick={handleAddServiceItem} variant="outline" className="self-end h-10">
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                      </Button>
+                    </div>
+                  </div>
+                )
+              }
+            </CardContent >
+          </motion.div>
+        </AnimatePresence>
 
         <Separator className="my-0" />
         <CardFooter className="flex-col items-stretch gap-4 pt-6">
