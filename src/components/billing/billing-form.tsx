@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { BillSaveAnimation } from './bill-save-animation';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { EmployeePasskeyDialog } from './employee-passkey-dialog';
+import { BillingExcelView } from './billing-excel-view';
 import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -98,6 +99,7 @@ export function BillingForm({
 
   const [mode, setMode] = useState<BillMode>('sell');
   const [isEstimateMode, setIsEstimateMode] = useState(false);
+  const [isExcelMode, setIsExcelMode] = useState(false);
 
   const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(undefined);
 
@@ -1382,62 +1384,90 @@ export function BillingForm({
 
 
               <div className="space-y-4 pb-4 border-b border-dashed">
-                <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
-                  <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
-                </h3>
-                <BillingProductSelector
-                  mode={mode}
-                  productNameQuery={productNameQuery}
-                  setProductNameQuery={setProductNameQuery}
-                  isLoadingProductSearch={isLoadingProductSearch}
-                  currentProductForSelection={currentProductForSelection}
-                  setCurrentProductForSelection={setCurrentProductForSelection}
-                  selectedVariantOptions={selectedVariantOptions}
-                  setSelectedVariantOptions={setSelectedVariantOptions}
-                  quantity={quantity}
-                  setQuantity={setQuantity}
-                  costPrice={costPrice}
-                  setCostPrice={setCostPrice}
-                  sellPrice={sellPrice}
-                  setSellPrice={setSellPrice}
-                  currentSkuStock={currentSkuStock}
-                  currentSkuSellPrice={currentSkuSellPrice}
-                  isDisplayingLayerStock={isDisplayingLayerStock}
-                  onAddProduct={handleAddNewItem}
-                  onScannerClick={handleBarcodeIconClick}
-                  onEditProductClick={handleEditProductClick}
-                  productNotFoundHint={productNotFoundHint}
-                  handleProductSelectFromSearch={handleProductSelectFromSearch}
-                  handleProductNameSubmit={handleProductNameSubmit}
-                  finalStoreIdForSkuDetails={finalStoreIdForSkuDetails}
-                  returnItemIsDefective={returnItemIsDefective}
-                  setReturnItemIsDefective={setReturnItemIsDefective}
-                  productNameInputRef={productNameInputRef}
-                />
+                <div className="flex items-center justify-between">
+                  {/* Keep the header or adjust it depending on mode */}
+                  {!isExcelMode && (
+                    <h3 className="text-lg font-medium text-foreground flex items-center gap-2">
+                      <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
+                    </h3>
+                  )}
+                  {/* Toggle Switch always visible or just in header? */}
+                  <div className={cn("flex items-center gap-2", isExcelMode && "w-full justify-between")}>
+                    {isExcelMode && <h3 className="text-lg font-medium text-foreground flex items-center gap-2"><Settings2 size={20} className="text-muted-foreground" /> Bulk Entry</h3>}
+                    <div className="flex items-center gap-2 bg-secondary/20 p-1.5 rounded-md border">
+                      <Label htmlFor="excel-mode" className="text-xs font-medium cursor-pointer">Excel / Bulk Mode</Label>
+                      <Switch id="excel-mode" checked={isExcelMode} onCheckedChange={setIsExcelMode} className="scale-75 origin-right" />
+                    </div>
+                  </div>
+                </div>
+
+                {isExcelMode ? (
+                  <BillingExcelView
+                    items={currentBillItems}
+                    onItemsChange={setCurrentBillItems}
+                    currentMode={mode}
+                    isEstimate={isEstimateMode}
+                    taxType={taxType}
+                    defaultDate={billDate}
+                    defaultCustomerName={customerVendorName}
+                  />
+                ) : (
+                  <BillingProductSelector
+                    mode={mode}
+                    productNameQuery={productNameQuery}
+                    setProductNameQuery={setProductNameQuery}
+                    isLoadingProductSearch={isLoadingProductSearch}
+                    currentProductForSelection={currentProductForSelection}
+                    setCurrentProductForSelection={setCurrentProductForSelection}
+                    selectedVariantOptions={selectedVariantOptions}
+                    setSelectedVariantOptions={setSelectedVariantOptions}
+                    quantity={quantity}
+                    setQuantity={setQuantity}
+                    costPrice={costPrice}
+                    setCostPrice={setCostPrice}
+                    sellPrice={sellPrice}
+                    setSellPrice={setSellPrice}
+                    currentSkuStock={currentSkuStock}
+                    currentSkuSellPrice={currentSkuSellPrice}
+                    isDisplayingLayerStock={isDisplayingLayerStock}
+                    onAddProduct={handleAddNewItem}
+                    onScannerClick={handleBarcodeIconClick}
+                    onEditProductClick={handleEditProductClick}
+                    productNotFoundHint={productNotFoundHint}
+                    handleProductSelectFromSearch={handleProductSelectFromSearch}
+                    handleProductNameSubmit={handleProductNameSubmit}
+                    finalStoreIdForSkuDetails={finalStoreIdForSkuDetails}
+                    returnItemIsDefective={returnItemIsDefective}
+                    setReturnItemIsDefective={setReturnItemIsDefective}
+                    productNameInputRef={productNameInputRef}
+                  />
+                )}
               </div>
 
-              <div className="flex-grow overflow-hidden">
-                <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
-                <ScrollArea className="flex-1 h-0 min-h-[300px]" ref={scrollAreaRef as any}>
-                  <div className="flex flex-col gap-1 pb-2">
-                    {currentBillItems.map((item) => (
-                      <BillItemRow
-                        key={item.id}
-                        item={item}
-                        mode={mode}
-                        isEstimateMode={isEstimateMode}
-                        onQuantityChange={updateBillItemQuantity}
-                        onPriceChange={updateBillItemPrice}
-                        onDiscountChange={updateBillItemDiscount}
-                        onRemoveItem={removeBillItem}
-                        onEnterPress={() => productNameInputRef.current?.focus()}
-                        taxType={taxType}
-                      />
-                    ))}
-                    <div ref={itemsEndRef} className="h-1" />
-                  </div>
-                </ScrollArea>
-              </div>
+              {!isExcelMode && (
+                <div className="flex-grow overflow-hidden flex flex-col min-h-0">
+                  <BillItemHeader mode={mode} isEstimateMode={isEstimateMode} taxType={taxType} />
+                  <ScrollArea className="flex-1 h-0 min-h-[200px]" ref={scrollAreaRef as any}>
+                    <div className="flex flex-col gap-1 pb-2">
+                      {currentBillItems.map((item) => (
+                        <BillItemRow
+                          key={item.id}
+                          item={item}
+                          mode={mode}
+                          isEstimateMode={isEstimateMode}
+                          onQuantityChange={updateBillItemQuantity}
+                          onPriceChange={updateBillItemPrice}
+                          onDiscountChange={updateBillItemDiscount}
+                          onRemoveItem={removeBillItem}
+                          onEnterPress={() => productNameInputRef.current?.focus()}
+                          taxType={taxType}
+                        />
+                      ))}
+                      <div ref={itemsEndRef} className="h-1" />
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
 
               {
                 (mode === 'sell' || mode === 'buy') && (
