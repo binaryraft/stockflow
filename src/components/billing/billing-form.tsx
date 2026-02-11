@@ -1223,10 +1223,10 @@ export function BillingForm({
 
     if (isAdminContext) {
       const currentQueryModeInUrl = searchParamsHook.get('mode');
-      const basePath = '/admin/billing';
+      const finalRedirectBasePath = redirectBasePath || (pathname.startsWith('/local') ? '/local/billing' : '/admin/billing');
       if (currentQueryModeInUrl && ['sell', 'buy', 'return'].includes(currentQueryModeInUrl)) {
       } else {
-        router.push(basePath);
+        router.push(finalRedirectBasePath);
       }
     }
   };

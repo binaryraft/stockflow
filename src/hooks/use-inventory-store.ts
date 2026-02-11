@@ -143,7 +143,7 @@ interface InventoryState {
   getPeriodFinancialSummary: (period: TimePeriod, companyId?: string) => TodaysFinancialSummary;
   getTopProfitableProducts: (limit: number, period: TimePeriod, companyId?: string) => ProductRevenueData[];
   getProductAnalytics: (productId: string) => ProductAnalytics;
-  getProductLedgerSummary: (params: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
+  getProductLedgerSummary: (params?: { companyId?: string, startDate?: Date, endDate?: Date }) => ProductLedgerEntry[];
   getProductFinancialsByMonth: (productId: string) => MonthlyProductFinancials[];
   getReportSummaryByDateRange: (startDate?: Date, endDate?: Date, companyId?: string, storeId?: string) => DateRangeReportSummary;
   getSalesBillsByDateRange: (startDate?: Date, endDate?: Date, companyId?: string) => Bill[];
@@ -366,6 +366,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       archiveProduct: async (productId, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set((state) => ({ products: state.products.map(p => p.id === productId ? { ...p, isArchived: true } : p) }));
+          return true;
+        }
         try {
           const response = await fetch(`/api/products/${productId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -379,6 +383,10 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       unarchiveProduct: async (productId, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set((state) => ({ products: state.products.map(p => p.id === productId ? { ...p, isArchived: false } : p) }));
+          return true;
+        }
         try {
           const response = await fetch(`/api/products/${productId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -895,6 +903,7 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       fetchMessagesForStore: async (storeId, companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         try {
           const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch messages: ${response.statusText}`);
@@ -910,6 +919,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addChatMessage: async (storeId, senderId, senderName, text, companyId) => {
+        if (get().userProfile.dataMode === 'local') return;
         try {
           const response = await fetch(`/api/chat/${storeId}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -926,6 +936,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       clearChatForStore: async (storeId, companyId) => {
+        if (get().userProfile.dataMode === 'local') return false;
         try {
           const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -939,6 +950,7 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       fetchDashboardAnalytics: async (companyId, period) => {
+        if (get().userProfile.dataMode === 'local') return;
         try {
           const response = await fetch(`/api/analytics?companyId=${companyId}&period=${period}`);
           if (!response.ok) throw new Error(`Failed to fetch analytics: ${response.statusText}`);

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Table,
   TableBody,
@@ -28,6 +29,9 @@ type SortableLedgerColumns = keyof Omit<ProductLedgerEntry, 'productId' | 'categ
 export function InventoryLedgerTable() {
   const getProductLedgerSummary = useInventoryStore(state => state.getProductLedgerSummary);
   const getProductById = useInventoryStore(state => state.getProductById); // To fetch image URL
+  const pathname = usePathname();
+  const isLocal = pathname.startsWith('/local');
+  const basePath = isLocal ? '/local' : '/admin';
 
   const [ledgerEntries, setLedgerEntries] = useState<ProductLedgerEntry[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,7 +75,7 @@ export function InventoryLedgerTable() {
         } else if (typeof valA === 'number' && valB === 'N/A') {
           comparison = -1; // N/A comes after numbers
         }
-        
+
         return sortConfig.direction === 'ascending' ? comparison : comparison * -1;
       });
     }
@@ -96,7 +100,7 @@ export function InventoryLedgerTable() {
           className="max-w-md w-full md:w-auto bg-background"
         />
       </div>
-      
+
       {/* Desktop Table View */}
       <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
         <Table>
@@ -132,51 +136,52 @@ export function InventoryLedgerTable() {
               filteredAndSortedEntries.map((entry) => {
                 const productDetails = getProductById(entry.productId);
                 return (
-                <TableRow key={entry.productId}>
-                  <TableCell className="py-2 px-3 hidden lg:table-cell">
-                    <Image
-                      src={productDetails?.imageUrl || `https://placehold.co/48x48.png?text=${entry.productName.charAt(0)}`}
-                      alt={entry.productName}
-                      width={32}
-                      height={32}
-                      className="rounded object-cover aspect-square"
-                      data-ai-hint="product item generic"
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium py-3 px-4">
-                     <Tooltip>
+                  <TableRow key={entry.productId}>
+                    <TableCell className="py-2 px-3 hidden lg:table-cell">
+                      <Image
+                        src={productDetails?.imageUrl || `https://placehold.co/48x48.png?text=${entry.productName.charAt(0)}`}
+                        alt={entry.productName}
+                        width={32}
+                        height={32}
+                        className="rounded object-cover aspect-square"
+                        data-ai-hint="product item generic"
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium py-3 px-4">
+                      <Tooltip>
                         <TooltipTrigger asChild>
-                            <Link href={`/admin/products/${entry.productId}`} className="hover:underline hover:text-primary transition-colors">
-                                {entry.productName}
-                            </Link>
+                          <Link href={`${basePath}/products/${entry.productId}`} className="hover:underline hover:text-primary transition-colors">
+                            {entry.productName}
+                          </Link>
                         </TooltipTrigger>
                         <TooltipContent><p>View/Edit Product Details</p></TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                  <TableCell className="py-3 px-4 hidden lg:table-cell">
-                    {entry.category ? <Badge variant="secondary">{entry.category}</Badge> : <span className="text-muted-foreground">-</span>}
-                  </TableCell>
-                  <TableCell className="text-right py-3 px-4 text-blue-600 dark:text-blue-400 hidden sm:table-cell">{entry.totalPurchased}</TableCell>
-                  <TableCell className="text-right py-3 px-4 text-green-600 dark:text-green-400">{entry.totalSold}</TableCell>
-                  <TableCell className="text-right py-3 px-4 text-teal-600 dark:text-teal-400 hidden lg:table-cell">{entry.totalRestockedReturns}</TableCell>
-                  <TableCell className="text-right py-3 px-4 text-orange-600 dark:text-orange-400 hidden lg:table-cell">{entry.totalDefectiveReturns}</TableCell>
-                  <TableCell className={cn("text-right py-3 px-4 font-semibold", entry.currentStock !== 'N/A' && entry.currentStock <= 0 ? "text-destructive" : "text-primary")}>
-                    {entry.currentStock}
-                  </TableCell>
-                  <TableCell className="text-right py-3 px-4">
-                     <Tooltip>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell className="py-3 px-4 hidden lg:table-cell">
+                      {entry.category ? <Badge variant="secondary">{entry.category}</Badge> : <span className="text-muted-foreground">-</span>}
+                    </TableCell>
+                    <TableCell className="text-right py-3 px-4 text-blue-600 dark:text-blue-400 hidden sm:table-cell">{entry.totalPurchased}</TableCell>
+                    <TableCell className="text-right py-3 px-4 text-green-600 dark:text-green-400">{entry.totalSold}</TableCell>
+                    <TableCell className="text-right py-3 px-4 text-teal-600 dark:text-teal-400 hidden lg:table-cell">{entry.totalRestockedReturns}</TableCell>
+                    <TableCell className="text-right py-3 px-4 text-orange-600 dark:text-orange-400 hidden lg:table-cell">{entry.totalDefectiveReturns}</TableCell>
+                    <TableCell className={cn("text-right py-3 px-4 font-semibold", entry.currentStock !== 'N/A' && entry.currentStock <= 0 ? "text-destructive" : "text-primary")}>
+                      {entry.currentStock}
+                    </TableCell>
+                    <TableCell className="text-right py-3 px-4">
+                      <Tooltip>
                         <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" asChild>
-                                <Link href={`/admin/products/${entry.productId}`}>
-                                    <PackageSearch className="h-4 w-4" />
-                                </Link>
-                            </Button>
+                          <Button variant="ghost" size="icon" asChild>
+                            <Link href={`${basePath}/products/${entry.productId}`}>
+                              <PackageSearch className="h-4 w-4" />
+                            </Link>
+                          </Button>
                         </TooltipTrigger>
                         <TooltipContent><p>View Product Details & History</p></TooltipContent>
-                    </Tooltip>
-                  </TableCell>
-                </TableRow>
-              )})
+                      </Tooltip>
+                    </TableCell>
+                  </TableRow>
+                )
+              })
             ) : (
               <TableRow>
                 <TableCell colSpan={9} className="h-24 text-center py-3 px-4">
@@ -205,16 +210,16 @@ export function InventoryLedgerTable() {
                   />
                   <div className="flex-1">
                     <CardTitle className="text-sm font-semibold">
-                       <Link href={`/admin/products/${entry.productId}`} className="hover:underline hover:text-primary transition-colors">
-                         {entry.productName}
-                       </Link>
+                      <Link href={`${basePath}/products/${entry.productId}`} className="hover:underline hover:text-primary transition-colors">
+                        {entry.productName}
+                      </Link>
                     </CardTitle>
                     {entry.category && <Badge variant="secondary" className="text-xs mt-0.5">{entry.category}</Badge>}
                   </div>
-                   <Button variant="ghost" size="icon" asChild className="h-8 w-8">
-                      <Link href={`/admin/products/${entry.productId}`}>
-                          <PackageSearch className="h-4 w-4" />
-                      </Link>
+                  <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                    <Link href={`${basePath}/products/${entry.productId}`}>
+                      <PackageSearch className="h-4 w-4" />
+                    </Link>
                   </Button>
                 </CardHeader>
                 <CardContent className="p-3 grid grid-cols-2 gap-2 text-xs">
@@ -254,4 +259,4 @@ export function InventoryLedgerTable() {
   );
 }
 
-    
+

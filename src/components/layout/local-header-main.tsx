@@ -24,7 +24,18 @@ export function LocalHeaderMain() {
   const router = useRouter();
 
   const handleExitLocalMode = () => {
-    // Optionally clear local session or just redirect
+    // Clear all local/session tokens to properly logout
+    localStorage.removeItem('appAuthToken');
+    localStorage.removeItem('stockflow_local_creds');
+    localStorage.removeItem('companyId');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('userRole');
+
+    // Also clear session storage if any
+    sessionStorage.clear();
+
+    // Redirect to landing
     router.push('/');
   };
 

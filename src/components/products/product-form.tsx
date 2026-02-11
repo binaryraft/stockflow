@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams as useNextSearchParams, usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { v4 as uuidv4 } from 'uuid';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -374,6 +374,9 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
   const { toast } = useToast();
   const router = useRouter();
   const nextSearchParams = useNextSearchParams();
+  const pathname = usePathname();
+  const isLocal = pathname.startsWith('/local');
+  const basePath = isLocal ? '/local' : '/admin';
 
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -539,7 +542,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
           : decodeURIComponent(returnToParam);
         router.push(finalReturnUrl);
       } else {
-        router.push('/admin/products');
+        router.push(`${basePath}/products`);
       }
     }
   };
@@ -783,7 +786,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
             </Card>
 
             <div className="flex justify-end gap-3 pt-4">
-              <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
+              <Button type="button" variant="outline" onClick={() => router.push(`${basePath}/products`)} disabled={isSubmitting || isLoading}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
