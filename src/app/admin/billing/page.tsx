@@ -10,14 +10,14 @@ import { BillHistoryTable, type TimePeriodFilterOption } from '@/components/hist
 import { InventoryLedgerTable } from '@/components/billing/inventory-ledger-table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, Building, ListChecks, BarChart2, CalendarDays, Loader2 } from 'lucide-react';
+import { PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, Building, ListChecks, BarChart2, CalendarDays, FileSpreadsheet } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, subMonths, subYears } from 'date-fns';
+import { format, startOfDay, endOfDay, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
@@ -32,7 +32,7 @@ const HistoryStoreSelector: React.FC<{
 }> = ({ stores, activePlanId, currentStoreId, onStoreChange }) => {
   const isStarterPlan = activePlanId === SUBSCRIPTION_PLAN_IDS.STARTER;
 
-  if ((isStarterPlan && stores.length === 1) || (!isStarterPlan && stores.length === 1)) {
+  if (stores.length === 1) {
     return (
       <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50 w-full sm:w-auto">
         <Building size={16} />
@@ -41,14 +41,13 @@ const HistoryStoreSelector: React.FC<{
     );
   }
 
-  if (!isStarterPlan && stores.length > 1) {
+  if (stores.length > 1) {
     return (
       <Select
-        key={`store-context-select-history-${activePlanId}-${stores.length}`}
         value={currentStoreId || ""}
         onValueChange={(value) => onStoreChange(value || undefined)}
       >
-        <SelectTrigger id="store-context-select-history-trigger" className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+        <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
           <SelectValue placeholder="Select Store..." />
         </SelectTrigger>
         <SelectContent position="popper">
@@ -86,7 +85,7 @@ function BillingContent() {
     fetchBills: state.fetchBills,
     fetchStores: state.fetchStores,
     stores: state.stores,
-    companyId: localStorage.getItem('companyId')
+    companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null
   }));
 
   const [allStoresState, setAllStoresState] = useState<Store[]>([]);
@@ -101,7 +100,7 @@ function BillingContent() {
 
   const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('all');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
-
+  const [viewMode, setViewMode] = useState<'standard' | 'excel'>('standard');
 
   useEffect(() => {
     setHasMounted(true);
@@ -118,19 +117,14 @@ function BillingContent() {
     }
   }, [hasMounted, storesFromZustand, getActiveSubscriptionPlan, currentViewFromUrl]);
 
-
   useEffect(() => {
     if (hasMounted && activePlan && allStoresState.length > 0) {
-      if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER) {
+      if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER || allStoresState.length === 1) {
         setCurrentContextStoreId(allStoresState[0].id);
-      } else if (allStoresState.length === 1) {
-        setCurrentContextStoreId(allStoresState[0].id);
-      } else if (allStoresState.length > 1) {
+      } else {
         const validStoreId = allStoresState.find(s => s.id === storeIdFromUrl) ? storeIdFromUrl : allStoresState[0].id;
         setCurrentContextStoreId(validStoreId || undefined);
       }
-    } else if (hasMounted && activePlan && allStoresState.length === 0) {
-      setCurrentContextStoreId(undefined);
     }
   }, [hasMounted, allStoresState, activePlan, storeIdFromUrl]);
 
@@ -139,13 +133,9 @@ function BillingContent() {
       const defaultStoreId = allStoresState[0]?.id;
       if (storeIdFromUrl && allStoresState.find(s => s.id === storeIdFromUrl)) {
         setSelectedStoreForForm(storeIdFromUrl);
-      } else if (activePlan.id === SUBSCRIPTION_PLAN_IDS.STARTER) {
-        setSelectedStoreForForm(defaultStoreId);
       } else {
         setSelectedStoreForForm(allStoresState.length === 1 ? defaultStoreId : (storeIdFromUrl || defaultStoreId));
       }
-    } else if (hasMounted && activePlan && allStoresState.length === 0) {
-      setSelectedStoreForForm(undefined);
     }
   }, [hasMounted, allStoresState, activePlan, storeIdFromUrl]);
 
@@ -174,6 +164,8 @@ function BillingContent() {
     effectiveModeForTitle = modeFromUrl;
   }
 
+  const newBillHrefPath = `/admin/billing?action=new&mode=sell${currentContextStoreId ? `&storeId=${currentContextStoreId}` : (allStoresState.length === 1 ? `&storeId=${allStoresState[0].id}` : '')}`;
+
   if (isNewBillAction) {
     let title = "New Sales Bill";
     let icon = Send;
@@ -181,47 +173,36 @@ function BillingContent() {
     if (effectiveModeForTitle === 'buy') { title = "New Expense Bill"; icon = ShoppingBag; }
     else if (effectiveModeForTitle === 'return') { title = "New Return Entry"; icon = RotateCcw; }
 
-    if (isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0) {
-      return (
-        <>
-          <PageTitle title="Cannot Create Bill" icon={Building} actions={<Button asChild variant="outline"><Link href="/admin/stores">Add Store</Link></Button>} />
-          <p className="text-center text-destructive">You need to add at least one store before creating bills. Please go to Store Management.</p>
-        </>
-      );
-    }
-
     const newBillPageTitleActions = (
       <>
-        {(hasMounted && isAdminContext && ((!isStarterPlan && allStoresState.length > 1) || ((isStarterPlan || allStoresState.length === 1) && allStoresState.length > 0))) && (
+        {(hasMounted && isAdminContext && allStoresState.length > 0) && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full">
-            <span className="text-sm font-medium whitespace-nowrap text-muted-foreground shrink-0">Billing For Store:</span>
-            {hasMounted && isAdminContext && !isStarterPlan && allStoresState.length > 1 && (
+            <span className="text-sm font-medium whitespace-nowrap text-muted-foreground shrink-0">Store:</span>
+            {!isStarterPlan && allStoresState.length > 1 ? (
               <Select
-                key={`store-select-new-bill-${activePlan?.id}-${allStoresState.length}-${selectedStoreForForm}`}
                 value={selectedStoreForForm || ""}
                 onValueChange={(value) => setSelectedStoreForForm(value || undefined)}
               >
-                <SelectTrigger id="store-select-new-bill-trigger" className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+                <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9">
                   <SelectValue placeholder="Select Store..." />
                 </SelectTrigger>
-                <SelectContent position="popper">
+                <SelectContent>
                   {allStoresState.map(store => (<SelectItem key={store.id} value={store.id}>{store.name}</SelectItem>))}
                 </SelectContent>
               </Select>
-            )}
-            {hasMounted && isAdminContext && (isStarterPlan || allStoresState.length === 1) && allStoresState.length > 0 && (
-              <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50 w-full sm:w-auto">
+            ) : (
+              <span className="text-sm font-semibold text-primary flex items-center gap-1 p-2 border border-input rounded-md h-9 bg-muted/50">
                 <Building size={16} />
                 {allStoresState.find(s => s.id === selectedStoreForForm)?.name || allStoresState[0]?.name}
               </span>
             )}
           </div>
         )}
-        <Button variant="outline" onClick={() => handleViewToggle('history')} className="w-full md:w-auto">
-          <HistoryIcon className="mr-2 h-4 w-4" /> Bill History
+        <Button variant="outline" onClick={() => handleViewToggle('history')}>
+          <HistoryIcon className="mr-2 h-4 w-4" /> History
         </Button>
-        <Button variant="outline" onClick={() => handleViewToggle('ledger')} className="w-full md:w-auto">
-          <ListChecks className="mr-2 h-4 w-4" /> Inventory Ledger
+        <Button variant="outline" onClick={() => handleViewToggle('ledger')}>
+          <ListChecks className="mr-2 h-4 w-4" /> Ledger
         </Button>
       </>
     );
@@ -239,80 +220,75 @@ function BillingContent() {
     );
   }
 
-  const newBillHrefPath = `/admin/billing?action=new&mode=sell${currentContextStoreId ? `&storeId=${currentContextStoreId}` : (allStoresState.length === 1 ? `&storeId=${allStoresState[0].id}` : '')}`;
-
   const mainPageActions = (
     <>
-      {(hasMounted && isAdminContext && allStoresState.length > 0 && activeBillingView === 'history' || activeBillingView === 'history') && (
+      {activeBillingView === 'history' && (
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full">
-          {hasMounted && isAdminContext && allStoresState.length > 0 && activeBillingView === 'history' && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-              <span className="text-sm font-medium whitespace-nowrap text-muted-foreground shrink-0">New Bill Store:</span>
-              <HistoryStoreSelector stores={allStoresState} activePlanId={activePlan?.id} currentStoreId={currentContextStoreId} onStoreChange={setCurrentContextStoreId} />
-            </div>
-          )}
-          {activeBillingView === 'history' && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-              <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
-                <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
-                  <SelectValue placeholder="Filter by time" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="today">Today</SelectItem>
-                  <SelectItem value="thisWeek">This Week</SelectItem>
-                  <SelectItem value="thisMonth">This Month</SelectItem>
-                  <SelectItem value="lastMonth">Last Month</SelectItem>
-                  <SelectItem value="thisYear">This Year</SelectItem>
-                  <SelectItem value="lastYear">Last Year</SelectItem>
-                  <SelectItem value="all">All Time</SelectItem>
-                  <SelectItem value="custom">Custom Range</SelectItem>
-                </SelectContent>
-              </Select>
-              {timePeriodFilter === 'custom' && (
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !customDateRange && "text-muted-foreground")}>
-                      <CalendarDays className="mr-2 h-4 w-4" />
-                      {customDateRange?.from ? (
-                        customDateRange.to ? (
-                          <>{format(customDateRange.from, "LLL dd, y")} - {format(customDateRange.to, "LLL dd, y")}</>
-                        ) : (format(customDateRange.from, "LLL dd, y"))
-                      ) : (<span>Pick a date range</span>)}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar initialFocus mode="range" defaultMonth={customDateRange?.from} selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
-                  </PopoverContent>
-                </Popover>
-              )}
-            </div>
-          )}
+          <div className="flex bg-muted p-1 rounded-md border text-xs h-9">
+            <Button variant={viewMode === 'standard' ? "secondary" : "ghost"} size="sm" className="h-full gap-2" onClick={() => setViewMode('standard')}>
+              <ListChecks size={14} /> Standard
+            </Button>
+            <Button variant={viewMode === 'excel' ? "secondary" : "ghost"} size="sm" className="h-full gap-2" onClick={() => setViewMode('excel')}>
+              <FileSpreadsheet size={14} /> Bulk View
+            </Button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Store:</span>
+            <HistoryStoreSelector stores={allStoresState} activePlanId={activePlan?.id} currentStoreId={currentContextStoreId} onStoreChange={setCurrentContextStoreId} />
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
+              <SelectTrigger className="w-[140px] h-9">
+                <SelectValue placeholder="Time filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="thisWeek">This Week</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="lastMonth">Last Month</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+            {timePeriodFilter === 'custom' && (
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-[240px] h-9 text-left font-normal">
+                    <CalendarDays className="mr-2 h-4 w-4" />
+                    {customDateRange?.from ? (customDateRange.to ? `${format(customDateRange.from, "LLL dd")} - ${format(customDateRange.to, "LLL dd")}` : format(customDateRange.from, "LLL dd")) : "Pick dates"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar mode="range" selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
+                </PopoverContent>
+              </Popover>
+            )}
+          </div>
         </div>
       )}
-      <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline" className="w-full md:w-auto">
-        {activeBillingView === 'history' ? <ListChecks className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
-        {activeBillingView === 'history' ? 'Inventory Ledger' : 'Bill History'}
+      <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline">
+        {activeBillingView === 'history' ? <BarChart2 className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
+        {activeBillingView === 'history' ? 'Ledger' : 'History'}
       </Button>
-      <Button asChild disabled={isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0} className="w-full md:w-auto">
-        <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> Create New Bill</Link>
+      <Button asChild>
+        <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> New Bill</Link>
       </Button>
-      {isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0 && (<p className="text-xs text-muted-foreground text-center md:text-left">Add a store first</p>)}
     </>
   );
 
-  const pageTitleText = activeBillingView === 'ledger' ? 'Inventory Ledger' : 'Bill History';
-  const pageTitleIcon = activeBillingView === 'ledger' ? BarChart2 : HistoryIcon;
-
   return (
     <>
-      <PageTitle title={pageTitleText} icon={pageTitleIcon} actions={mainPageActions} />
+      <PageTitle title={activeBillingView === 'ledger' ? 'Inventory Ledger' : 'Bill History'} icon={activeBillingView === 'ledger' ? BarChart2 : HistoryIcon} actions={mainPageActions} />
       {activeBillingView === 'ledger' ? <InventoryLedgerTable /> :
         <BillHistoryTable
-          key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}-${currentContextStoreId || 'all-stores'}`}
+          key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${currentContextStoreId}`}
           filterByStoreId={currentContextStoreId}
           timePeriodFilter={timePeriodFilter}
           customStartDate={customDateRange?.from}
           customEndDate={customDateRange?.to}
+          viewMode={viewMode}
         />
       }
     </>

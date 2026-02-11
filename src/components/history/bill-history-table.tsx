@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileSpreadsheet, ListChecks } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -46,11 +46,11 @@ function useDebounce<T>(value: T, delay: number): T {
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
-  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
-  if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-blue-500 text-blue-50 hover:bg-blue-600 dark:bg-blue-600 dark:text-blue-50 dark:hover:bg-blue-700', name: 'Estimate', titleColor: 'text-blue-600 dark:text-blue-500' };
-  if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
-  if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
-  return { icon: <RotateCcw />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return', titleColor: 'text-amber-600 dark:text-amber-500' };
+  if (billType === 'buy') return { icon: <ShoppingBag size={14} />, className: 'bg-destructive/10 text-destructive hover:bg-destructive/20 border-destructive/20', name: 'Expense', titleColor: 'text-destructive' };
+  if (billType === 'sell' && isEstimate) return { icon: <Send size={14} />, className: 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/40 dark:text-blue-400 border-blue-200 dark:border-blue-800', name: 'Estimate', titleColor: 'text-blue-600 dark:text-blue-400' };
+  if (billType === 'sell') return { icon: <Send size={14} />, className: 'bg-primary/10 text-primary hover:bg-primary/20 border-primary/20', name: 'Sales Invoice', titleColor: 'text-primary' };
+  if (isDefectiveReturn) return { icon: <AlertTriangle size={14} className="text-destructive" />, className: 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-300', name: 'Return (Defective)', titleColor: 'text-amber-700' };
+  return { icon: <RotateCcw size={14} />, className: 'bg-amber-100 text-amber-700 hover:bg-amber-200 border-amber-300', name: 'Return', titleColor: 'text-amber-700' };
 };
 
 const getBillTypeName = (bill: Bill): string => {
@@ -69,7 +69,6 @@ const getPartyNameLabel = (billType?: BillMode): string => {
   return 'Name';
 };
 
-
 export type TimePeriodFilterOption = 'all' | 'today' | 'thisWeek' | 'thisMonth' | 'lastMonth' | 'thisYear' | 'lastYear' | 'custom';
 
 interface BillHistoryTableProps {
@@ -77,10 +76,10 @@ interface BillHistoryTableProps {
   timePeriodFilter: TimePeriodFilterOption;
   customStartDate?: Date;
   customEndDate?: Date;
+  viewMode?: 'standard' | 'excel';
 }
 
-
-export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate }: BillHistoryTableProps) {
+export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStartDate, customEndDate, viewMode = 'standard' }: BillHistoryTableProps) {
   const {
     bills,
     billsPagination,
@@ -122,7 +121,6 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Date Range Calculation for API
   const dateParams = useMemo(() => {
     const now = new Date();
     let start: Date | undefined;
@@ -139,13 +137,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       default: break;
     }
 
-    return {
-      startDate: start?.toISOString(),
-      endDate: end?.toISOString()
-    };
+    return { startDate: start?.toISOString(), endDate: end?.toISOString() };
   }, [timePeriodFilter, customStartDate, customEndDate]);
 
-  // Fetch Bills Effect
   useEffect(() => {
     if (currentCompanyId) {
       setIsLoading(true);
@@ -157,16 +151,11 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         type: billTypeFilter === 'all' ? undefined : (billTypeFilter === 'estimate' ? 'sell' : billTypeFilter),
         isEstimate: billTypeFilter === 'estimate' ? true : (billTypeFilter === 'all' ? undefined : false)
       };
-      fetchBillsPaginated(currentCompanyId, currentPage, 50, options)
-        .finally(() => setIsLoading(false));
+      fetchBillsPaginated(currentCompanyId, currentPage, 50, options).finally(() => setIsLoading(false));
     }
   }, [currentCompanyId, currentPage, debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams, fetchBillsPaginated]);
 
-  // Reset page on filter changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams]);
-
+  useEffect(() => { setCurrentPage(1); }, [debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams]);
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
@@ -180,9 +169,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    }
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') direction = 'descending';
     setSortConfig({ key, direction });
   };
 
@@ -229,7 +216,6 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     }
   };
 
-
   const handlePrintSelectedBill = (bill: Bill | null) => {
     if (!bill || !userProfile) return;
     const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
@@ -241,13 +227,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     const res = [...bills];
     if (sortConfig) {
       res.sort((a, b) => {
-        // Handle nested properties or specific keys if needed
         let aValue: any = a[sortConfig.key as keyof Bill];
         let bValue: any = b[sortConfig.key as keyof Bill];
-
-        // Specific handling for 'storeName' if it's not directly on bill or we want to sort by it
-        // The type SortableBillColumns includes storeName and billedByStaffName which are on the Bill object as per my previous read (lines 118)
-
         if (aValue < bValue) return sortConfig.direction === 'ascending' ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === 'ascending' ? 1 : -1;
         return 0;
@@ -256,393 +237,78 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     return res;
   }, [bills, sortConfig]);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center p-12">
-        <LoadingSpinner text="Loading bill history..." />
-      </div>
-    );
-  }
-
-  if (!currentCompanyId && !isLoading) {
-    return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found. Cannot load bills.</div>;
-  }
+  if (isLoading) return (<div className="flex-1 flex items-center justify-center p-12"><LoadingSpinner text="Loading bill history..." /></div>);
+  if (!currentCompanyId && !isLoading) return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found.</div>;
 
   return (
     <>
       {selectedBill && (
         <Dialog open={isViewDialogOpen} onOpenChange={(open) => {
-          if (!open) {
-            setIsEditingBillDetails(false);
-            setSelectedBill(null);
-          }
+          if (!open) { setIsEditingBillDetails(false); setSelectedBill(null); }
           setIsViewDialogOpen(open);
         }}>
           <DialogContent className="sm:max-w-3xl max-h-[90vh] border-t-4 border-t-primary shadow-lg">
             <DialogHeader className="border-b pb-4 mb-4">
-              <DialogTitle className={cn(
-                "flex items-center gap-2 text-xl",
-                getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor
-              )}>
-                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon, { className: cn(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon.props.className, "h-6 w-6") })}
+              <DialogTitle className={cn("flex items-center gap-2 text-xl", getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor)}>
+                {React.cloneElement(getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).icon, { className: "h-6 w-6" })}
                 Bill Details {selectedBill.type === 'sell' && selectedBill.isEstimate && "(Estimate)"}
               </DialogTitle>
-              <DialogDescription>
-                {getBillTypeName(selectedBill)} (ID: <span className="font-mono text-muted-foreground">{selectedBill.id}</span>)
-              </DialogDescription>
+              <DialogDescription>{getBillTypeName(selectedBill)} (ID: <span className="font-mono text-muted-foreground">{selectedBill.id}</span>)</DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[65vh] p-1 -mx-1">
+            <ScrollArea className="max-h-[65vh] p-1">
               <div className="space-y-6 py-2 px-2">
                 <div className="p-4 border rounded-md bg-card shadow-sm">
                   <h3 className="text-lg font-semibold text-primary mb-2">{userProfile?.companyName}</h3>
                   {userProfile?.companyAddress && <p className="text-sm text-muted-foreground">{userProfile.companyAddress}</p>}
-                  {(userProfile?.companyPhone || userProfile?.companyGstNo) && (
-                    <p className="text-sm text-muted-foreground">
-                      {userProfile.companyPhone && `Phone: ${userProfile.companyPhone}`}
-                      {userProfile.companyPhone && userProfile.companyGstNo && " | "}
-                      {userProfile.companyGstNo && `GSTIN: ${userProfile.companyGstNo}`}
-                    </p>
-                  )}
                 </div>
-                <Separator />
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && (
-                    <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                      <h4 className="text-md font-semibold text-foreground mb-1">
-                        {getPartyDetailsTitle(selectedBill.type)}
-                      </h4>
-                      {selectedBill.vendorOrCustomerName && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">{getPartyNameLabel(selectedBill.type)}</p>
-                          <p className="font-medium text-sm">{selectedBill.vendorOrCustomerName}</p>
-                        </div>
-                      )}
-                      {selectedBill.customerPhone && (
-                        <div>
-                          <p className="text-xs text-muted-foreground">Phone</p>
-                          <p className="font-medium text-sm">{selectedBill.customerPhone}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <div className={cn("p-4 border rounded-md bg-card space-y-2 shadow-sm", !(selectedBill.vendorOrCustomerName || selectedBill.customerPhone) && "md:col-span-2")}>
-                    <h4 className="text-md font-semibold text-foreground mb-1">Bill Information</h4>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Bill ID</p>
-                      <p className="font-mono text-sm text-muted-foreground">{selectedBill.id}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Date & Time</p>
-                      <p className="font-medium text-sm">{format(new Date(selectedBill.date), 'PPpp')}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Bill Type</p>
-                      <p className="font-medium text-sm">{getBillTypeName(selectedBill)}</p>
-                    </div>
-                    {(selectedBill.type === 'sell' || selectedBill.type === 'buy') && !selectedBill.isEstimate && (
-                      <div className="space-y-1">
-                        <Label htmlFor="paymentStatusView" className="text-xs text-muted-foreground">Payment Status</Label>
-                        {isEditingBillDetails ? (
-                          <Select
-                            value={editablePaymentStatus || undefined}
-                            onValueChange={(value) => setEditablePaymentStatus(value as Bill['paymentStatus'])}
-                          >
-                            <SelectTrigger id="paymentStatusView" className="h-9 text-sm select-trigger-class">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="unpaid">Unpaid</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          selectedBill.paymentStatus ? (
-                            <Badge
-                              className={cn(
-                                "capitalize text-xs",
-                                selectedBill.paymentStatus === 'paid'
-                                  ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600"
-                                  : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                              )}
-                            >
-                              {selectedBill.paymentStatus}
-                            </Badge>
-                          ) : <p className="text-sm font-medium text-muted-foreground">-</p>
-                        )}
-                      </div>
-                    )}
+                  <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                    <h4 className="text-md font-semibold mb-1">{getPartyDetailsTitle(selectedBill.type)}</h4>
+                    <p className="text-sm font-medium">{selectedBill.vendorOrCustomerName || 'Walk-in'}</p>
+                    {selectedBill.customerPhone && <p className="text-xs text-muted-foreground">{selectedBill.customerPhone}</p>}
+                  </div>
+                  <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                    <h4 className="text-md font-semibold mb-1">Bill Info</h4>
+                    <p className="text-xs text-muted-foreground">Date: {format(new Date(selectedBill.date), 'PPpp')}</p>
+                    <Badge variant={selectedBill.paymentStatus === 'paid' ? 'default' : 'destructive'}>{selectedBill.paymentStatus || 'unpaid'}</Badge>
                   </div>
                 </div>
-
-                {(selectedBill.billedByStaffName || selectedBill.storeName) && (
-                  <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
-                    <h4 className="text-md font-semibold text-foreground mb-1">Transaction Origin</h4>
-                    {selectedBill.storeName && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Store</p>
-                        <p className="font-medium text-sm flex items-center gap-1.5">
-                          <BuildingIcon size={14} className="text-muted-foreground" /> {selectedBill.storeName}
-                        </p>
-                      </div>
-                    )}
-                    {selectedBill.billedByStaffName && (
-                      <div>
-                        <p className="text-xs text-muted-foreground">Billed by</p>
-                        <p className="font-medium text-sm flex items-center gap-1.5">
-                          <Users size={14} className="text-muted-foreground" /> {selectedBill.billedByStaffName}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <Accordion type="single" collapsible className="w-full" defaultValue="bill-items">
                   <AccordionItem value="bill-items">
-                    <AccordionTrigger className="p-4 border rounded-md bg-card shadow-sm hover:no-underline hover:bg-muted/50 data-[state=open]:border-primary data-[state=open]:ring-1 data-[state=open]:ring-primary">
-                      <h4 className="text-md font-semibold text-foreground">
-                        Bill Items ({selectedBill.items.length} item(s))
-                      </h4>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-0">
-                      <div className="p-4 border border-t-0 rounded-b-md bg-card shadow-sm">
-                        <Table className="mt-0">
-                          {selectedBill.type === 'buy' ? (
-                            <>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="align-top w-[35%]">Product Details</TableHead>
-                                  <TableHead className="text-right align-top">Purch. Qty</TableHead>
-                                  <TableHead className="text-right align-top">Sold Qty</TableHead>
-                                  <TableHead className="text-right align-top">Rem. Qty</TableHead>
-                                  <TableHead className="text-right align-top">Cost/Unit</TableHead>
-                                  <TableHead className="text-right align-top">Sell Price (Set)</TableHead>
-                                  <TableHead className="text-right align-top">Item Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {selectedBill.items.map(item => {
-                                  const sku = findProductSKUfromStore(item.productId, item.selectedVariantOptions);
-                                  const skuDetails = getSkuDetails(sku);
-                                  const layerForThisBillItem = sku?.stockLayers.find(
-                                    l => l.purchaseBillId === selectedBill.id &&
-                                      l.costPrice === item.costPrice &&
-                                      Math.abs(l.initialQuantity - item.quantity) < 0.001
-                                  );
-
-                                  const purchasedQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity : item.quantity;
-                                  const soldQty = layerForThisBillItem ? layerForThisBillItem.initialQuantity - layerForThisBillItem.quantity : 0;
-                                  const remainingQty = layerForThisBillItem ? layerForThisBillItem.quantity : 0;
-                                  const costPrice = typeof item.costPrice === 'number' ? item.costPrice : 0;
-                                  const sellPriceSet = typeof (layerForThisBillItem?.sellPrice ?? item.sellPrice) === 'number' ? (layerForThisBillItem?.sellPrice ?? item.sellPrice) : 0;
-
-
-                                  return (
-                                    <TableRow key={item.id || item.productId}>
-                                      <TableCell className="py-2 align-top w-[35%]">
-                                        <div>{item.productName}</div>
-                                        {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                          <div className="text-xs text-muted-foreground mt-0.5">
-                                            {Object.entries(item.selectedVariantOptions)
-                                              .map(([key, value]) => `${key}: ${value}`)
-                                              .join('; ')}
-                                          </div>
-                                        )}
-                                        {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
-                                        {sku && skuDetails && typeof skuDetails.totalStock === 'number' && !item.isAdditionalCharge && (
-                                          <div className="text-xs text-muted-foreground mt-0.5">
-                                            Current Total SKU Stock: {skuDetails.totalStock.toFixed(2)}
-                                          </div>
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="text-right py-2 align-top">{purchasedQty.toFixed(2)}</TableCell>
-                                      <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top font-semibold">{remainingQty.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{costPrice.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{sellPriceSet.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * costPrice).toFixed(2)}</TableCell>
-                                    </TableRow>
-                                  );
-                                })}
-                              </TableBody>
-                            </>
-                          ) : (
-                            <>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-[40%]">Product/Charge</TableHead>
-                                  <TableHead className="text-right">Qty</TableHead>
-                                  <TableHead className="text-right">Price/Unit</TableHead>
-                                  {selectedBill.type === 'sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_')) && (
-                                    <>
-                                      <TableHead className="text-right">SGST</TableHead>
-                                      <TableHead className="text-right">CGST</TableHead>
-                                    </>
-                                  )}
-                                  <TableHead className="text-right">Item Total</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {selectedBill.items.map(item => {
-                                  const sellPrice = typeof item.sellPrice === 'number' ? item.sellPrice : 0;
-                                  const itemPreTaxSubtotal = item.quantity * sellPrice;
-                                  const itemSgst = item.sgstAmount || 0;
-                                  const itemCgst = item.cgstAmount || 0;
-                                  const itemTotalWithTax = itemPreTaxSubtotal + itemSgst + itemCgst;
-                                  const showItemTaxCols = selectedBill.type === 'sell' && !selectedBill.isEstimate && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_');
-                                  return (
-                                    <TableRow key={item.id || item.productId}>
-                                      <TableCell className="py-2 align-top w-[40%]">
-                                        <div>{item.productName}</div>
-                                        {item.selectedVariantOptions && Object.keys(item.selectedVariantOptions).length > 0 && (
-                                          <div className="text-xs text-muted-foreground mt-0.5">
-                                            {Object.entries(item.selectedVariantOptions)
-                                              .map(([key, value]) => `${key}: ${value}`)
-                                              .join('; ')}
-                                          </div>
-                                        )}
-                                        {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
-                                        {selectedBill.type === 'return' && item.isDefective && !item.isAdditionalCharge && (
-                                          <Badge variant="destructive" className="text-xs mt-1">Defective</Badge>
-                                        )}
-                                        {selectedBill.type === 'return' && !item.isDefective && !item.isAdditionalCharge && (
-                                          <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
-                                        )}
-                                      </TableCell>
-                                      <TableCell className="text-right py-2 align-top">{item.quantity.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
-                                      {selectedBill.type === 'sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_')) && (
-                                        <>
-                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemSgst.toFixed(2)}` : '-'}</TableCell>
-                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemCgst.toFixed(2)}` : '-'}</TableCell>
-                                        </>
-                                      )}
-                                      <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
-                                    </TableRow>
-                                  )
-                                })}
-                              </TableBody>
-                            </>
-                          )}
-                        </Table>
-                      </div>
+                    <AccordionTrigger className="p-4 bg-muted/50">Items ({selectedBill.items.length})</AccordionTrigger>
+                    <AccordionContent>
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Product</TableHead>
+                            <TableHead className="text-right">Qty</TableHead>
+                            <TableHead className="text-right">Price</TableHead>
+                            <TableHead className="text-right">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {selectedBill.items.map(item => (
+                            <TableRow key={item.id}>
+                              <TableCell>{item.productName}</TableCell>
+                              <TableCell className="text-right">{item.quantity}</TableCell>
+                              <TableCell className="text-right">₹{item.sellPrice.toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-medium">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </AccordionContent>
                   </AccordionItem>
                 </Accordion>
-
-                <div className={cn("p-4 border rounded-md shadow-sm", isEditingBillDetails ? "bg-card" : "bg-tertiary")}>
-                  <Label htmlFor="notesView" className="text-md font-semibold text-foreground mb-1 block">Notes</Label>
-                  {isEditingBillDetails ? (
-                    <Textarea
-                      id="notesView"
-                      value={editableNotes}
-                      onChange={(e) => setEditableNotes(e.target.value)}
-                      placeholder="Add notes for this bill..."
-                      rows={3}
-                      className="text-sm"
-                    />
-                  ) : (
-                    selectedBill.notes ? (
-                      <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                        {selectedBill.notes}
-                      </p>
-                    ) : <p className="text-sm text-muted-foreground italic">No notes for this bill.</p>
-                  )}
-                </div>
-
-                <div className="p-4 border rounded-md bg-card shadow-sm">
-                  <h4 className="text-md font-semibold text-foreground mb-2 border-b pb-2">Summary</h4>
-                  <div className="space-y-1 text-sm">
-                    {selectedBill.type === 'buy' && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Cost (Expense Bill):</span>
-                        <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
-                      </div>
-                    )}
-                    {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && ((selectedBill.totalSGST ?? 0) > 0 || (selectedBill.totalCGST ?? 0) > 0 || selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
-                      <>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Subtotal (Before Tax):</span>
-                          <span className="font-medium">₹{(selectedBill.subTotal || 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total SGST:</span>
-                          <span className="font-medium">₹{(selectedBill.totalSGST || 0).toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Total CGST:</span>
-                          <span className="font-medium">₹{(selectedBill.totalCGST || 0).toFixed(2)}</span>
-                        </div>
-                        <Separator className="my-1.5" />
-                      </>
-                    )}
-                    <div className="flex justify-between font-semibold text-lg">
-                      <span>{selectedBill.type === 'sell' && selectedBill.isEstimate ? 'Estimate Total:' : 'Grand Total:'}</span>
-                      <span className={getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor}>₹{selectedBill.totalAmount.toFixed(2)}</span>
-                    </div>
-                  </div>
+                <div className="p-4 border rounded-md bg-card shadow-sm text-right">
+                  <span className="text-lg font-bold">Total: ₹{selectedBill.totalAmount.toFixed(2)}</span>
                 </div>
               </div>
             </ScrollArea>
-            <DialogFooter className="pt-4 border-t mt-4 flex flex-col-reverse sm:flex-row sm:justify-between items-center">
-              <div className="flex gap-2 mt-2 sm:mt-0">
-                {!isEditingBillDetails && (
-                  <Button variant="outline" onClick={handleEnterEditMode} disabled={(selectedBill.type === 'sell' && selectedBill.isEstimate) || selectedBill.type === 'return'}>
-                    <Edit2 className="mr-2 h-4 w-4" /> Edit
-                  </Button>
-                )}
-                {isEditingBillDetails && (
-                  <>
-                    <Button variant="default" onClick={handleSaveBillDetails}>
-                      <Save className="mr-2 h-4 w-4" /> Save Changes
-                    </Button>
-                    <Button variant="outline" onClick={handleCancelEditMode}>
-                      Cancel
-                    </Button>
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2">
-                {!isEditingBillDetails && (
-                  <>
-                    <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}>
-                      <Printer className="mr-2 h-4 w-4" /> Print
-                    </Button>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
-                        </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHead>
-                          <AlertDialogTit>Are you sure?</AlertDialogTit>
-                          <AlertDialogDesc>
-                            This action cannot be undone. This will permanently delete bill ID: {selectedBill.id}.
-                            Stock levels will NOT be automatically readjusted.
-                          </AlertDialogDesc>
-                        </AlertDialogHead>
-                        <AlertDialogFoot>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={() => {
-                              handleDeleteBillClick(selectedBill.id, selectedBill.id);
-                              setIsViewDialogOpen(false);
-                            }}
-                            className="bg-destructive hover:bg-destructive/90"
-                          >
-                            Delete Bill
-                          </AlertDialogAction>
-                        </AlertDialogFoot>
-                      </AlertDialogContent>
-                    </AlertDialog>
-                  </>
-                )}
-                <DialogClose asChild>
-                  <Button type="button" variant={isEditingBillDetails ? "ghost" : "default"}>Close</Button>
-                </DialogClose>
-              </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}><Printer size={14} className="mr-2" /> Print</Button>
+              <Button variant="destructive" onClick={() => handleDeleteBillClick(selectedBill.id, selectedBill.id)}><Trash2 size={14} className="mr-2" /> Delete</Button>
+              <DialogClose asChild><Button>Close</Button></DialogClose>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -650,311 +316,126 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
         <Input
-          placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Payment Status, Product, Staff, Store)..."
+          placeholder="Search bills..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md w-full md:w-auto bg-background"
+          className="max-w-md bg-background"
         />
         <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
-          <SelectTrigger className="w-full md:w-[180px] select-trigger-class bg-background">
-            <SelectValue placeholder="Filter by type" />
+          <SelectTrigger className="w-[180px] bg-background">
+            <SelectValue placeholder="Filter type" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Bill Types</SelectItem>
-            <SelectItem value="sell">Sales Invoices</SelectItem>
-            <SelectItem value="estimate">Estimates</SelectItem>
-            <SelectItem value="buy">Expense Bills</SelectItem>
-            <SelectItem value="return">Return Bills</SelectItem>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="sell">Sales</SelectItem>
+            <SelectItem value="buy">Expenses</SelectItem>
+            <SelectItem value="return">Returns</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      {/* Desktop Table View */}
-      <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="py-2 px-3 w-[90px] md:w-[120px]">Date / ID</TableHead>
-              <TableHead onClick={() => requestSort('type')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 w-[150px]">
-                Type <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead onClick={() => requestSort('billedByStaffName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[160px]">
-                Billed By <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead onClick={() => requestSort('storeName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4 hidden lg:table-cell w-[160px]">
-                Store <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead onClick={() => requestSort('vendorOrCustomerName')} className="cursor-pointer hover:bg-muted/50 py-3 px-4">
-                Name/Phone <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead className="text-right py-3 px-4 w-[70px]">Items</TableHead>
-              <TableHead className="text-right cursor-pointer hover:bg-muted/50 py-3 px-4 w-[110px]" onClick={() => requestSort('totalAmount')} >
-                Total <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead className="text-center cursor-pointer hover:bg-muted/50 py-3 px-4 w-[100px]" onClick={() => requestSort('paymentStatus')}>
-                Payment <ArrowUpDown className="ml-2 h-3 w-3 inline" />
-              </TableHead>
-              <TableHead className="text-right py-3 px-4 w-[70px]">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
+      {viewMode === 'standard' && (
+        <div className="hidden md:block border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card">
+          <Table>
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableCell colSpan={9} className="h-48 text-center">
-                  <LoadingSpinner text="Loading bills..." size={40} />
-                </TableCell>
+                <TableHead className="w-[120px]">Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Party</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
-            ) : filteredAndSortedBills.length > 0 ? (
-              filteredAndSortedBills.map((bill) => {
-                const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
-                const billDate = new Date(bill.date);
+            </TableHeader>
+            <TableBody>
+              {filteredAndSortedBills.length > 0 ? filteredAndSortedBills.map((bill) => {
+                const info = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
                 return (
                   <TableRow key={bill.id}>
-                    <TableCell className="py-2 px-3 w-[90px] md:w-[120px]">
-                      <div className="flex flex-col items-start leading-tight">
-                        <span className="text-xl font-bold text-primary">{getDate(billDate)}</span>
-                        <span className="text-xs text-muted-foreground">{format(billDate, 'MMM yyyy')}</span>
-                        <span className="text-xs text-muted-foreground mt-0.5">{format(billDate, 'p')}</span>
-                        <span className="text-xs text-muted-foreground font-mono mt-0.5 opacity-80">{bill.id.slice(-6)}</span>
-                      </div>
+                    <TableCell className="font-medium">{format(new Date(bill.date), 'dd/MM/yy')}</TableCell>
+                    <TableCell><Badge className={cn("gap-1.5", info.className)}>{info.icon}{info.name}</Badge></TableCell>
+                    <TableCell>{bill.vendorOrCustomerName || 'Walk-in'}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={bill.paymentStatus === 'paid' ? 'default' : 'destructive'}>{bill.paymentStatus || 'unpaid'}</Badge>
                     </TableCell>
-                    <TableCell className="py-3 px-4 w-[150px]">
-                      <div className="flex flex-col items-start gap-0.5">
-                        <Badge
-                          className={cn(
-                            "capitalize flex items-center gap-1.5 w-fit min-w-[100px] justify-center px-2.5 py-1 text-xs",
-                            billDisplayInfo.className
-                          )}
-                        >
-                          {React.cloneElement(billDisplayInfo.icon, { className: cn(billDisplayInfo.icon.props.className, "mr-1 h-4 w-4") })}
-                          {billDisplayInfo.name}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="py-3 px-4 hidden lg:table-cell w-[160px]">
-                      {bill.billedByStaffName ? (
-                        <div className="text-sm flex items-center gap-1">
-                          <Users size={14} className="text-muted-foreground shrink-0" />
-                          {bill.billedByStaffName}
-                        </div>
-                      ) : <span className="text-muted-foreground">-</span>}
-                    </TableCell>
-                    <TableCell className="py-3 px-4 hidden lg:table-cell w-[160px]">
-                      {bill.storeName ? (
-                        <div className="text-sm flex items-center gap-1">
-                          <BuildingIcon size={14} className="text-muted-foreground shrink-0" />
-                          {bill.storeName}
-                        </div>
-                      ) : <span className="text-muted-foreground">-</span>}
-                    </TableCell>
-                    <TableCell className="py-3 px-4">
-                      <div>{bill.vendorOrCustomerName || <span className="text-muted-foreground">-</span>}</div>
-                      {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
-                    </TableCell>
-                    <TableCell className="text-right py-3 px-4 w-[70px]">{bill.items.length}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[110px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
-                    <TableCell className="text-center py-3 px-4 w-[100px]">
-                      {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate ? (
-                        <Badge
-                          className={cn(
-                            "capitalize text-xs",
-                            bill.paymentStatus === 'paid'
-                              ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600"
-                              : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                          )}
-                        >
-                          {bill.paymentStatus}
-                        </Badge>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right py-3 px-4 w-[70px]">
+                    <TableCell className="text-right">
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><MoreHorizontal size={14} /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                            <Eye className="mr-2 h-4 w-4" /> View / Edit Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
-                            <Printer className="mr-2 h-4 w-4" /> Print Bill
-                          </DropdownMenuItem>
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHead>
-                                <AlertDialogTit>Are you sure?</AlertDialogTit>
-                                <AlertDialogDesc>
-                                  This action cannot be undone. This will permanently delete bill ID: {bill.id}.
-                                  Stock levels will NOT be automatically readjusted.
-                                </AlertDialogDesc>
-                              </AlertDialogHead>
-                              <AlertDialogFoot>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => { handleDeleteBillClick(bill.id, bill.id); setIsViewDialogOpen(false); }} className="bg-destructive hover:bg-destructive/90">
-                                  Delete Bill
-                                </AlertDialogAction>
-                              </AlertDialogFoot>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <DropdownMenuItem onClick={() => handleViewBill(bill)}><Eye size={14} className="mr-2" /> View</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}><Printer size={14} className="mr-2" /> Print</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                )
-              })
-            ) : (
-              <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                  No bills found for the selected filters.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Mobile Card View */}
-      <div className="md:hidden space-y-3">
-        {isLoading ? (
-          <div className="flex justify-center items-center py-10">
-            <LoadingSpinner text="Loading bills..." size={40} />
-          </div>
-        ) : filteredAndSortedBills.length > 0 ? (
-          filteredAndSortedBills.map((bill) => {
-            const billDisplayInfo = getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate);
-            const billDate = new Date(bill.date);
-            return (
-              <Card key={bill.id} className="shadow-md border-t-2 border-t-primary overflow-hidden">
-                <CardHeader className="p-4 flex flex-row items-start justify-between bg-muted/30">
-                  <div>
-                    <CardTitle className={cn("text-md flex items-center gap-1.5", billDisplayInfo.titleColor)}>
-                      {React.cloneElement(billDisplayInfo.icon, { className: "h-4 w-4" })}
-                      {billDisplayInfo.name}
-                    </CardTitle>
-                    <CardDescription className="text-xs font-mono text-muted-foreground mt-1">
-                      ID: {bill.id}
-                    </CardDescription>
-                  </div>
-                  <div className="text-right text-xs">
-                    <p className="font-medium">{format(billDate, 'MMM d, yyyy')}</p>
-                    <p className="text-muted-foreground">{format(billDate, 'p')}</p>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-4 space-y-1.5 text-sm">
-                  {bill.vendorOrCustomerName && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Party:</span>
-                      <span className="font-medium truncate text-right">{bill.vendorOrCustomerName}</span>
-                    </div>
-                  )}
-                  {bill.customerPhone && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Phone:</span>
-                      <span className="font-medium text-right">{bill.customerPhone}</span>
-                    </div>
-                  )}
-                  {bill.storeName && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Store:</span>
-                      <span className="font-medium text-right">{bill.storeName}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Items:</span>
-                    <span className="font-medium text-right">{bill.items.length}</span>
-                  </div>
-                  {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Payment:</span>
-                      <Badge
-                        className={cn(
-                          "capitalize text-xs py-0.5 px-1.5",
-                          bill.paymentStatus === 'paid'
-                            ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600"
-                            : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border-red-300 dark:border-red-600"
-                        )}
-                      >
-                        {bill.paymentStatus}
-                      </Badge>
-                    </div>
-                  )}
-                </CardContent>
-                <CardFooter className="p-4 bg-muted/30 flex justify-between items-center">
-                  <p className="text-lg font-bold">
-                    <span className={cn(billDisplayInfo.titleColor === 'text-destructive' ? 'text-destructive' : 'text-primary')}>
-                      ₹{bill.totalAmount.toFixed(2)}
-                    </span>
-                  </p>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <span className="sr-only">Open menu</span>
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem onClick={() => handleViewBill(bill)}>
-                        <Eye className="mr-2 h-4 w-4" /> View / Edit Details
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
-                        <Printer className="mr-2 h-4 w-4" /> Print Bill
-                      </DropdownMenuItem>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:text-destructive focus:bg-destructive/10">
-                            <Trash2 className="mr-2 h-4 w-4" /> Delete Bill
-                          </DropdownMenuItem>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHead>
-                            <AlertDialogTit>Are you sure?</AlertDialogTit>
-                            <AlertDialogDesc>
-                              This action cannot be undone. This will permanently delete bill ID: {bill.id}.
-                              Stock levels will NOT be automatically readjusted.
-                            </AlertDialogDesc>
-                          </AlertDialogHead>
-                          <AlertDialogFoot>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={() => { handleDeleteBillClick(bill.id, bill.id); setIsViewDialogOpen(false); }} className="bg-destructive hover:bg-destructive/90">
-                              Delete Bill
-                            </AlertDialogAction>
-                          </AlertDialogFoot>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </CardFooter>
-              </Card>
-            );
-          })
-        ) : (
-          <p className="text-center text-muted-foreground py-10">No bills found for the selected filters.</p>
-        )}
-      </div>
-      {/* Pagination Controls */}
-      {billsPagination && billsPagination.totalPages > 1 && (
-        <div className="flex items-center justify-end space-x-2 py-4">
-          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-            <ChevronLeft className="h-4 w-4 mr-1" /> Previous
-          </Button>
-          <div className="text-sm font-medium">Page {currentPage} of {billsPagination.totalPages}</div>
-          <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(billsPagination.totalPages, p + 1))} disabled={currentPage === billsPagination.totalPages}>
-            Next <ChevronRight className="h-4 w-4 ml-1" />
-          </Button>
+                );
+              }) : <TableRow><TableCell colSpan={6} className="h-24 text-center">No bills found.</TableCell></TableRow>}
+            </TableBody>
+          </Table>
         </div>
       )}
+
+      {viewMode === 'excel' && (
+        <div className="hidden md:flex flex-col border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card min-h-[400px]">
+          <div className="flex w-full bg-muted border-b text-[10px] font-bold text-muted-foreground uppercase sticky top-0 z-10">
+            <div className="w-10 p-2 text-center border-r">#</div>
+            <div className="w-24 p-2 border-r">Time</div>
+            <div className="w-32 p-2 border-r">Party / Store</div>
+            <div className="flex-1 p-2 border-r">Product Description</div>
+            <div className="w-20 p-2 border-r text-right">Qty</div>
+            <div className="w-24 p-2 border-r text-right">Rate</div>
+            <div className="w-28 p-2 text-right">Total</div>
+            <div className="w-10 p-2"></div>
+          </div>
+          <div className="flex-1 overflow-auto max-h-[600px]">
+            {filteredAndSortedBills.map((bill, bIdx) => (
+              <div key={bill.id} className="border-b last:border-0">
+                <div className="bg-muted/30 px-3 py-1.5 flex items-center justify-between text-[11px] font-bold border-b">
+                  <div className="flex gap-3 items-center">
+                    <span className="text-primary">BILL #{bIdx + 1}</span>
+                    <span className="opacity-60">{format(new Date(bill.date), 'dd/MM/yy hh:mm a')}</span>
+                    <span className="opacity-60">|</span>
+                    <span>{getBillTypeName(bill)}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handleViewBill(bill)}><Eye size={12} className="mr-1" />View</Button>
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handlePrintSelectedBill(bill)}><Printer size={12} className="mr-1" />Print</Button>
+                  </div>
+                </div>
+                {bill.items.map((item, iIdx) => (
+                  <div key={item.id} className="flex w-full text-[11px] hover:bg-muted/5 border-b last:border-0 border-dashed">
+                    <div className="w-10 p-2 text-center border-r bg-muted/5 opacity-50">{iIdx + 1}</div>
+                    <div className="w-24 p-2 border-r bg-muted/5 opacity-0">--</div>
+                    <div className="w-32 p-2 border-r bg-muted/5 truncate">
+                      {iIdx === 0 ? bill.vendorOrCustomerName || 'Walk-in' : ''}
+                    </div>
+                    <div className="flex-1 p-2 border-r font-medium">{item.productName}</div>
+                    <div className="w-20 p-2 border-r text-right font-mono">{item.quantity}</div>
+                    <div className="w-24 p-2 border-r text-right font-mono">₹{item.sellPrice.toFixed(2)}</div>
+                    <div className="w-28 p-2 text-right font-mono font-bold">₹{(item.quantity * item.sellPrice).toFixed(2)}</div>
+                    <div className="w-10 p-2"></div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="md:hidden grid grid-cols-1 gap-4">
+        {filteredAndSortedBills.map(bill => (
+          <Card key={bill.id} className="shadow-sm">
+            <CardHeader className="p-4 flex flex-row justify-between items-center">
+              <CardTitle className="text-sm">{getBillTypeName(bill)}</CardTitle>
+              <Badge>₹{bill.totalAmount.toFixed(2)}</Badge>
+            </CardHeader>
+            <CardFooter className="p-4 pt-0 text-xs text-muted-foreground">
+              {format(new Date(bill.date), 'PPpp')}
+            </CardFooter>
+          </Card>
+        ))}
+      </div>
     </>
   );
 }

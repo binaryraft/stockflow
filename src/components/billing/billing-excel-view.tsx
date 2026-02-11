@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button';
 import { ProductSearchInput, type ProductSearchSuggestion } from '@/components/billing/product-search-input';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { cn } from '@/lib/utils';
-import { Trash2, Plus, Calendar, User, Search, Calculator, Check, AlertCircle } from 'lucide-react';
+import { Trash2, Search, Calculator } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { NewProductDialog } from './new-product-dialog';
+import { format } from 'date-fns';
 
 interface BillingExcelViewProps {
     items: BillItem[];
@@ -41,11 +42,9 @@ export function BillingExcelView({
         findOrCreateProductSKU: state.findOrCreateProductSKU,
     }));
 
-    // Ref grid for navigation: [rowIndex][colIndex]
     const cellRefs = useRef<(HTMLInputElement | HTMLButtonElement | null)[][]>([]);
     const productRefObjects = useRef<{ current: HTMLInputElement | null }[]>([]);
 
-    // Helper to get safe ref
     const getRef = (rowIndex: number, colIndex: number) => {
         if (colIndex === 0) {
             return productRefObjects.current[rowIndex]?.current || null;
@@ -72,19 +71,6 @@ export function BillingExcelView({
     };
 
     const handleKeyDown = (e: React.KeyboardEvent, rowIndex: number, colType: string) => {
-        // Current layout columns:
-        // 0: Product (Search)
-        // 1: Quantity
-        // 2: Discount
-        // 3: Tax (If not estimate)
-        // 4: Total (If override)
-
-        // Map colType to index for navigation
-        const colOrder = ['product', 'quantity', 'discount', 'tax', 'total'];
-        let colIndex = colOrder.indexOf(colType);
-        if (isEstimate && colType === 'tax') colIndex = -1; // Skip tax
-
-        // Adjust for skipped columns
         const visualOrder = isEstimate
             ? ['product', 'quantity', 'discount', 'total']
             : ['product', 'quantity', 'discount', 'tax', 'total'];
@@ -93,23 +79,13 @@ export function BillingExcelView({
 
         if (e.key === 'Enter') {
             e.preventDefault();
-
-            if (e.shiftKey) {
-                // Shift+Enter special logic
-                if (colType === 'quantity') {
-                    // Move to Discount
-                    const nextCol = 'discount';
-                    const nextVisualIndex = visualOrder.indexOf(nextCol);
-                    focusCell(rowIndex, nextVisualIndex);
-                    return;
-                }
+            if (e.shiftKey && colType === 'quantity') {
+                focusCell(rowIndex, visualOrder.indexOf('discount'));
+                return;
             }
-
-            // Standard Enter: Move to next cell
             if (currentVisualIndex < visualOrder.length - 1) {
                 focusCell(rowIndex, currentVisualIndex + 1);
             } else {
-                // Next row, first column
                 focusCell(rowIndex + 1, 0);
             }
         } else if (e.key === 'ArrowUp') {
@@ -119,26 +95,24 @@ export function BillingExcelView({
         }
     };
 
+    const [rowSearchTexts, setRowSearchTexts] = useState<Record<number, string>>({});
 
-    // Logic for updating an item
     const updateItem = (index: number, updates: Partial<BillItem>) => {
         const newItems = [...items];
         const item = newItems[index];
-        const updatedItem = { ...item, ...updates };
+        if (!item) return;
 
-        // Stock Validation
+        const updatedItem = { ...item, ...updates };
         const product = products.find(p => p.id === updatedItem.productId);
+
         if (product && currentMode === 'sell' && product.trackQuantity) {
-            // Calculate total quantity for this product in the bill (including this update)
             const otherItemsQuantity = newItems.reduce((sum, i, idx) => {
                 if (idx === index) return sum;
                 if (i.productId !== product.id) return sum;
-
                 const itemOpts = i.selectedVariantOptions || {};
                 const currentOpts = updatedItem.selectedVariantOptions || {};
                 const itemKeys = Object.keys(itemOpts).sort();
                 const currentKeys = Object.keys(currentOpts).sort();
-
                 if (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) {
                     return sum + i.quantity;
                 }
@@ -146,39 +120,22 @@ export function BillingExcelView({
             }, 0);
 
             const totalRequested = (updatedItem.quantity || 0) + otherItemsQuantity;
-
-            // Get available stock
-            // We need to know which SKU/Layer. 
-            // In Excel view, we might not have full SKU/Layer info in item directly unless we stored it?
-            // Item has productId. We can try to find SKU based on options (if any).
-            // For now, let's use getSkuDetails on the default SKU or try to match options.
-            let stockAvailable = 0;
             const targetSku = findOrCreateProductSKU(product.id, updatedItem.selectedVariantOptions || {});
+            let stockAvailable = 0;
             if (targetSku) {
-                const details = getSkuDetails(targetSku);
-                stockAvailable = details.totalStock ?? 0;
+                stockAvailable = getSkuDetails(targetSku).totalStock ?? 0;
             }
 
             if (totalRequested > stockAvailable) {
-                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available. You have ${otherItemsQuantity} already in bill + ${(updatedItem.quantity || 0)} requested.` });
-                // Revert quantity change if it was the update
-                if (updates.quantity !== undefined) {
-                    return;
-                }
-                // If price update caused no issue, we proceed? 
-                // But strictly if state is invalid we might block? 
-                // Let's just block the update if it results in invalid state?
-                // Or just warn? User asked "fail to prevent". So we should prevent.
-                return;
+                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available.` });
+                if (updates.quantity !== undefined) return;
             }
         }
 
-        // 1. Base Logic
         let quantity = updatedItem.quantity || 0;
         let sellPrice = updatedItem.sellPrice || 0;
-
-        // Apply Discount
         let discountAmount = updatedItem.discountAmount || 0;
+
         if (updatedItem.discountType === 'percentage') {
             discountAmount = (sellPrice * quantity * (updatedItem.discountValue || 0)) / 100;
             updatedItem.discountAmount = discountAmount;
@@ -188,19 +145,16 @@ export function BillingExcelView({
 
         const taxableValue = (sellPrice * quantity) - (updatedItem.discountAmount || 0);
 
-        // Apply Tax if not estimate
-        if (!isEstimate && taxableValue > 0) {
-            if (product) {
-                if (taxType === 'intra-state') {
-                    updatedItem.sgstAmount = (taxableValue * (product.sgstRate || 0)) / 100;
-                    updatedItem.cgstAmount = (taxableValue * (product.cgstRate || 0)) / 100;
-                    updatedItem.igstAmount = 0;
-                } else {
-                    const igst = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
-                    updatedItem.igstAmount = (taxableValue * igst) / 100;
-                    updatedItem.sgstAmount = 0;
-                    updatedItem.cgstAmount = 0;
-                }
+        if (!isEstimate && taxableValue > 0 && product) {
+            if (taxType === 'intra-state') {
+                updatedItem.sgstAmount = (taxableValue * (product.sgstRate || 0)) / 100;
+                updatedItem.cgstAmount = (taxableValue * (product.cgstRate || 0)) / 100;
+                updatedItem.igstAmount = 0;
+            } else {
+                const igst = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
+                updatedItem.igstAmount = (taxableValue * igst) / 100;
+                updatedItem.sgstAmount = 0;
+                updatedItem.cgstAmount = 0;
             }
         } else {
             updatedItem.sgstAmount = 0;
@@ -214,16 +168,16 @@ export function BillingExcelView({
 
     const handleProductSelect = (rowIndex: number, suggestion: ProductSearchSuggestion) => {
         const { product, sku, layer } = suggestion;
+        const skuDetails = getSkuDetails(sku);
 
-        // Create new item
         const newItem: BillItem = {
             id: rowIndex === items.length ? uuidv4() : items[rowIndex].id,
             productId: product.id,
             productName: suggestion.displayInfo.name,
             quantity: 1,
             selectedVariantOptions: sku.optionValues,
-            costPrice: 0, // Fill from SKU/Layer
-            sellPrice: 0, // Fill from SKU/Layer
+            costPrice: 0,
+            sellPrice: layer ? layer.sellPrice : (skuDetails.currentSellPrice || 0),
             sgstAmount: 0,
             cgstAmount: 0,
             igstAmount: 0,
@@ -232,125 +186,84 @@ export function BillingExcelView({
             discountType: 'amount',
         };
 
-        const skuDetails = getSkuDetails(sku);
-
-        if (currentMode === 'sell') {
-            if (layer) {
-                newItem.sellPrice = layer.sellPrice;
-                // newItem.costPrice = layer.costPrice; // Hidden usually
-            } else {
-                newItem.sellPrice = skuDetails.currentSellPrice || 0;
-            }
-        } else if (currentMode === 'buy') {
-            newItem.costPrice = 0;
-            newItem.sellPrice = skuDetails.currentSellPrice || 0;
-        } else {
-            newItem.sellPrice = skuDetails.currentSellPrice || 0;
-        }
-
-        // Validate Stock for New Item
         if (currentMode === 'sell' && product.trackQuantity) {
-            const existingQuantityInBill = items.reduce((sum, item) => {
-                if (item.productId !== product.id) return sum;
-
+            const existingQuantity = items.reduce((sum, item, idx) => {
+                if (idx === rowIndex || item.productId !== product.id) return sum;
                 const itemOpts = item.selectedVariantOptions || {};
                 const currentOpts = sku.optionValues || {};
                 const itemKeys = Object.keys(itemOpts).sort();
                 const currentKeys = Object.keys(currentOpts).sort();
-
-                if (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) {
-                    return sum + item.quantity;
-                }
-                return sum;
+                return (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) ? sum + item.quantity : sum;
             }, 0);
 
-            const totalRequested = 1 + existingQuantityInBill; // Default quantity 1
-            const skuInfo = getSkuDetails(sku);
-            const stockAvailable = skuInfo.totalStock ?? 0;
-
-            if (totalRequested > stockAvailable) {
-                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available. You have ${existingQuantityInBill} already in bill.` });
-                return; // Do not add the item
+            if (1 + existingQuantity > (skuDetails.totalStock ?? 0)) {
+                toast({ variant: "destructive", title: "Insufficient Stock", description: "Not enough stock for this variant." });
+                return;
             }
         }
 
-        // Add or Update
+        setRowSearchTexts(prev => {
+            const next = { ...prev };
+            delete next[rowIndex];
+            return next;
+        });
+
         if (rowIndex === items.length) {
-            // Adding new row
             onItemsChange([...items, newItem]);
-            // Focus quantity of the new row next
-            setTimeout(() => focusCell(rowIndex, 1), 50); // 1 is Quantity
         } else {
-            // Replacing existing
             const newItems = [...items];
             newItems[rowIndex] = newItem;
             onItemsChange(newItems);
-            setTimeout(() => focusCell(rowIndex, 1), 50);
         }
+        setTimeout(() => focusCell(rowIndex, 1), 50);
     };
 
     const removeItem = (index: number) => {
-        const newItems = items.filter((_, i) => i !== index);
-        onItemsChange(newItems);
+        onItemsChange(items.filter((_, i) => i !== index));
+        setRowSearchTexts(prev => {
+            const next = { ...prev };
+            delete next[index];
+            return next;
+        });
     };
 
-    // State for Quick Add Popup
     const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
     const [quickAddInitialName, setQuickAddInitialName] = useState('');
-
     const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
 
-
     return (
-        <div className="w-full bg-card rounded-md border shadow-sm overflow-hidden flex flex-col h-[calc(100vh-200px)]">
-            {/* Header */}
+        <div className="w-full bg-card rounded-md border shadow-sm overflow-hidden flex flex-col h-[600px]">
             <div className="bg-muted/50 p-2 border-b flex items-center justify-between">
                 <h3 className="font-semibold text-sm flex items-center gap-2">
-                    <Calculator className="h-4 w-4" />
-                    Excel Bulk Entry Mode
+                    <Calculator className="h-4 w-4 text-emerald-600" />
+                    Continuous Excel Entry Mode
                 </h3>
-                <div className="text-xs text-muted-foreground flex gap-4">
-                    <span className="flex items-center gap-1"><span className="border rounded px-1 min-w-[20px] text-center inline-block">↵</span> Next Cell</span>
-                    <span className="flex items-center gap-1"><span className="border rounded px-1 min-w-[20px] text-center inline-block">⇧+↵</span> Quantity to Discount</span>
-                </div>
             </div>
 
-            {/* Grid Header */}
-            <div className="flex w-full bg-muted border-b text-xs font-medium text-muted-foreground sticky top-0 z-10">
+            <div className="flex w-full bg-muted border-b text-[10px] font-medium text-muted-foreground sticky top-0 z-10 uppercase tracking-wider">
                 <div className="w-10 p-2 text-center border-r">#</div>
-                <div className="w-32 p-2 border-r flex items-center gap-1"><Calendar className="h-3 w-3" /> Date</div>
-                <div className="w-32 p-2 border-r flex items-center gap-1"><User className="h-3 w-3" /> Customer</div>
-                <div className="flex-1 p-2 border-r flex items-center gap-1"><Search className="h-3 w-3" /> Product Name</div>
+                <div className="w-24 p-2 border-r">Date</div>
+                <div className="w-32 p-2 border-r">Party</div>
+                <div className="flex-1 p-2 border-r"><Search className="h-3 w-3 inline mr-1" /> Product</div>
                 <div className="w-20 p-2 border-r text-right">Qty</div>
                 <div className="w-24 p-2 border-r text-right">Rate</div>
-                <div className="w-24 p-2 border-r text-right">Disc.</div>
-                {!isEstimate && <div className="w-24 p-2 border-r text-right">Tax</div>}
-                <div className="w-28 p-2 text-right font-bold">Total</div>
+                <div className="w-20 p-2 border-r text-right">Disc</div>
+                {!isEstimate && <div className="w-20 p-2 border-r text-right">Tax</div>}
+                <div className="w-28 p-2 text-right font-bold border-r">Total</div>
                 <div className="w-10 p-2"></div>
             </div>
 
-            {/* Grid Body */}
-            <div className="flex-1 overflow-auto">
-                {items.map((item, index) => (
-                    <React.Fragment key={item.id}>
-                        {renderRow(index, item)}
-                    </React.Fragment>
-                ))}
-                {/* Placeholder Row for New Item */}
+            <div className="flex-1 overflow-auto bg-slate-50/20">
+                {items.map((item, index) => renderRow(index, item))}
                 {renderRow(items.length, null)}
             </div>
 
-            {/* Quick Add Dialog Handler */}
             {isQuickAddOpen && (
                 <NewProductDialog
                     isOpen={isQuickAddOpen}
                     onOpenChange={setIsQuickAddOpen}
                     initialValues={{ name: quickAddInitialName }}
-                    onProductAdded={(product) => {
-                        // Toast is handled by dialog
-                        setIsQuickAddOpen(false);
-                        // Optionally we could auto-select here, but that requires more logic
-                    }}
+                    onProductAdded={() => setIsQuickAddOpen(false)}
                 />
             )}
         </div>
@@ -360,164 +273,110 @@ export function BillingExcelView({
         const isNew = item === null;
         const highlight = activeRowIndex === index;
 
-        // Calculations for display
         const amount = item ? (item.sellPrice * item.quantity) : 0;
         const discount = item ? (item.discountAmount || 0) : 0;
         const tax = item ? ((item.sgstAmount || 0) + (item.cgstAmount || 0) + (item.igstAmount || 0)) : 0;
         const total = amount - discount + tax;
 
+        const currentText = rowSearchTexts[index] !== undefined ? rowSearchTexts[index] : (item?.productName || '');
+
         return (
             <div
-                key={index}
+                key={isNew ? 'new-row' : item.id}
                 className={cn(
-                    "flex w-full border-b group transition-colors hover:bg-muted/30",
-                    highlight && "bg-muted/50"
+                    "flex w-full border-b group transition-colors hover:bg-emerald-50/20",
+                    highlight && "bg-emerald-50/40"
                 )}
                 onClick={() => setActiveRowIndex(index)}
             >
-                {/* Index */}
-                <div className="w-10 p-2 text-center text-xs text-muted-foreground flex items-center justify-center border-r bg-muted/10">
-                    {index + 1}
+                <div className="w-10 p-2 text-center text-[10px] text-muted-foreground flex items-center justify-center border-r bg-muted/5 font-mono">
+                    {(index + 1).toString().padStart(2, '0')}
                 </div>
 
-                {/* Date (Read Only) */}
-                <div className="w-32 p-1 border-r">
-                    <Input
-                        disabled
-                        className="h-8 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 px-1 disabled:opacity-90"
-                        value={defaultDate ? defaultDate.toLocaleDateString() : new Date().toLocaleDateString()}
-                    />
+                <div className="w-24 p-1 border-r bg-muted/5 flex items-center text-[10px] text-muted-foreground justify-center">
+                    {format(defaultDate || new Date(), 'dd/MM/yy')}
                 </div>
 
-                {/* Customer (Read Only) */}
-                <div className="w-32 p-1 border-r">
-                    <Input
-                        disabled
-                        className="h-8 text-xs bg-transparent border-none shadow-none focus-visible:ring-0 px-1 disabled:opacity-90"
-                        value={defaultCustomerName || "Walk-in"}
-                    />
+                <div className="w-32 p-1 border-r bg-muted/5 flex items-center text-[10px] text-muted-foreground px-2 truncate">
+                    {defaultCustomerName || "Walk-in"}
                 </div>
 
-                {/* Product Search */}
-                <div className="flex-1 p-1 border-r relative">
-                    {/* We map cellRefs[index][0] to this input inside ProductSearchInput */}
+                <div className="flex-1 p-0 border-r relative h-9">
                     <ProductSearchInput
-                        value={isNew ? '' : item.productName}
-                        onValueChange={() => { }}
-                        placeholder={isNew ? "Scan / Search Product (Enter)..." : ""}
-                        className="h-8 text-sm focus-within:ring-0 border-0 shadow-none px-0"
-                        onProductSelect={(suggestion) => handleProductSelect(index, suggestion)}
+                        value={currentText}
+                        onValueChange={(val) => setRowSearchTexts(prev => ({ ...prev, [index]: val }))}
+                        onProductSelect={(s) => handleProductSelect(index, s)}
                         onEnterWithoutSelection={(val) => {
-                            // Quick Add Trigger
                             setQuickAddInitialName(val);
                             setIsQuickAddOpen(true);
-                            setActiveRowIndex(index);
                         }}
-                        currentMode={currentMode}
+                        placeholder={isNew ? "Search product..." : ""}
+                        className="h-full border-none shadow-none focus-within:ring-0 text-sm"
                         inputRef={getProductRef(index)}
+                        currentMode={currentMode}
                     />
                 </div>
 
-                {/* Quantity */}
-                <div className="w-20 p-1 border-r">
+                <div className="w-20 p-0 border-r">
                     <Input
                         type="number"
-                        className="h-8 text-xs border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-right"
+                        className="h-9 text-xs border-none shadow-none text-right focus-visible:ring-1 focus-visible:ring-primary"
                         value={isNew ? '' : item.quantity}
-                        onChange={(e) => !isNew && updateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
+                        onChange={(e) => updateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
                         onKeyDown={(e) => handleKeyDown(e, index, 'quantity')}
-                        ref={(el) => {
-                            if (!cellRefs.current[index]) cellRefs.current[index] = [];
-                            cellRefs.current[index][1] = el;
-                        }}
                         disabled={isNew}
+                        ref={(el) => { if (!cellRefs.current[index]) cellRefs.current[index] = []; cellRefs.current[index][1] = el; }}
                     />
                 </div>
 
-                {/* Rate (Sell Price) */}
-                <div className="w-24 p-1 border-r">
+                <div className="w-24 p-0 border-r">
                     <Input
                         type="number"
-                        className="h-8 text-xs border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-right"
+                        className="h-9 text-xs border-none shadow-none text-right"
                         value={isNew ? '' : item.sellPrice}
-                        onChange={(e) => !isNew && updateItem(index, { sellPrice: parseFloat(e.target.value) || 0 })}
-                        onKeyDown={(e) => handleKeyDown(e, index, 'rate')} // Wait, navigation map? Rate not in standard flow?
+                        onChange={(e) => updateItem(index, { sellPrice: parseFloat(e.target.value) || 0 })}
+                        onKeyDown={(e) => handleKeyDown(e, index, 'rate')}
                         disabled={isNew}
                     />
                 </div>
 
-                {/* Discount */}
-                <div className="w-24 p-1 border-r">
+                <div className="w-20 p-0 border-r">
                     <Input
                         type="number"
-                        className="h-8 text-xs border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-right"
+                        className="h-9 text-xs border-none shadow-none text-right"
                         value={isNew ? '' : item.discountValue || ''}
-                        placeholder="0"
-                        onChange={(e) => !isNew && updateItem(index, { discountValue: parseFloat(e.target.value) || 0, discountType: 'amount' })}
+                        onChange={(e) => updateItem(index, { discountValue: parseFloat(e.target.value) || 0, discountType: 'amount' })}
                         onKeyDown={(e) => handleKeyDown(e, index, 'discount')}
-                        ref={(el) => {
-                            if (!cellRefs.current[index]) cellRefs.current[index] = [];
-                            cellRefs.current[index][2] = el; // index 2 usually
-                        }}
                         disabled={isNew}
+                        ref={(el) => { if (!cellRefs.current[index]) cellRefs.current[index] = []; cellRefs.current[index][2] = el; }}
                     />
                 </div>
 
-                {/* Tax (If not Estimate) */}
                 {!isEstimate && (
-                    <div className="w-24 p-1 border-r">
-                        {/* Read Only Tax Display but technically we could allow edit? User said "tax variable can be changed" causing recalc.
-                       For now, let's keep it read-only calculated. */}
-                        <Input
-                            disabled
-                            className="h-8 text-xs bg-transparent border-none shadow-none text-right"
-                            value={isNew ? '' : tax.toFixed(2)}
-                        />
+                    <div className="w-20 p-1 border-r bg-muted/5 flex items-center justify-end text-[10px] text-muted-foreground px-2">
+                        {isNew ? '' : tax.toFixed(2)}
                     </div>
                 )}
 
-                {/* Total */}
-                <div className="w-28 p-1 border-r">
+                <div className="w-28 p-0 border-r">
                     <Input
                         type="number"
-                        className={cn(
-                            "h-8 text-xs border-none shadow-none focus-visible:ring-1 focus-visible:ring-primary text-right font-bold",
-                            !isNew && "bg-primary/5"
-                        )}
+                        className="h-9 text-xs border-none shadow-none text-right font-bold bg-emerald-50/10"
                         value={isNew ? '' : total.toFixed(2)}
                         onChange={(e) => {
-                            if (isNew) return;
-                            const newTotal = parseFloat(e.target.value) || 0;
-                            // Reverse Calc
-                            if (total > 0) {
-                                const ratio = newTotal / total;
-                                updateItem(index, { sellPrice: item.sellPrice * ratio });
-                            } else {
-                                updateItem(index, { sellPrice: newTotal / item.quantity });
-                            }
+                            const val = parseFloat(e.target.value) || 0;
+                            if (total > 0) updateItem(index, { sellPrice: item!.sellPrice * (val / total) });
                         }}
                         onKeyDown={(e) => handleKeyDown(e, index, 'total')}
-                        ref={(el) => {
-                            if (!cellRefs.current[index]) cellRefs.current[index] = [];
-                            // Index depends on isEstimate
-                            const idx = isEstimate ? 3 : 4;
-                            cellRefs.current[index][idx] = el;
-                        }}
                         disabled={isNew}
+                        ref={(el) => { if (!cellRefs.current[index]) cellRefs.current[index] = []; cellRefs.current[index][isEstimate ? 3 : 4] = el; }}
                     />
                 </div>
 
-                {/* Actions */}
-                <div className="w-10 p-1 flex items-center justify-center">
+                <div className="w-10 p-0 flex items-center justify-center">
                     {!isNew && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-6 w-6 text-destructive hover:bg-destructive/10"
-                            onClick={() => removeItem(index)}
-                            tabIndex={-1}
-                        >
-                            <Trash2 className="h-3 w-3" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => removeItem(index)}>
+                            <Trash2 size={14} />
                         </Button>
                     )}
                 </div>
