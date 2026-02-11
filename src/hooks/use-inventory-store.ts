@@ -225,36 +225,96 @@ export const useInventoryStore = create<InventoryState>()(
       addProduct: async (productData, companyId) => {
         if (get().userProfile.dataMode === 'local') {
           const productId = uuidv4();
+          const productSKUs: ProductSKU[] = [];
+
+          if (!productData.variants || productData.variants.length === 0) {
+            const initialStock = Number(productData.initialStock || 0);
+            const skuCost = Number(productData.costPrice || 0);
+            const skuSell = Number(productData.sellPrice || 0);
+
+            const defaultSku: ProductSKU = {
+              id: uuidv4(),
+              optionValues: {},
+              skuIdentifier: productData.name,
+              stockLayers: [],
+            };
+
+            if (initialStock > 0 && productData.trackQuantity) {
+              defaultSku.stockLayers.push({
+                id: uuidv4(),
+                purchaseBillId: 'INITIAL_STOCK',
+                purchaseDate: new Date().toISOString(),
+                initialQuantity: initialStock,
+                quantity: initialStock,
+                costPrice: skuCost,
+                sellPrice: skuSell,
+              });
+            }
+            productSKUs.push(defaultSku);
+          } else {
+            const generateCombinations = (variants: any[]): { optionValues: Record<string, string>, metadata: any }[] => {
+              if (variants.length === 0) return [{ optionValues: {}, metadata: {} }];
+              const firstVariant = variants[0];
+              const restCombinations = generateCombinations(variants.slice(1));
+              const combinations: { optionValues: Record<string, string>, metadata: any }[] = [];
+
+              firstVariant.options.forEach((option: any) => {
+                restCombinations.forEach(combination => {
+                  const meta = {
+                    costPrice: option.costPrice !== undefined ? option.costPrice : combination.metadata.costPrice,
+                    sellPrice: option.sellPrice !== undefined ? option.sellPrice : combination.metadata.sellPrice,
+                    initialStock: option.initialStock !== undefined ? option.initialStock : combination.metadata.initialStock,
+                  };
+                  combinations.push({
+                    optionValues: { [firstVariant.name]: option.value, ...combination.optionValues },
+                    metadata: meta
+                  });
+                });
+              });
+              return combinations;
+            };
+
+            const combinations = generateCombinations(productData.variants);
+            combinations.forEach(combination => {
+              const skuCost = Number(combination.metadata.costPrice !== undefined ? combination.metadata.costPrice : (productData.costPrice || 0));
+              const skuSell = Number(combination.metadata.sellPrice !== undefined ? combination.metadata.sellPrice : (productData.sellPrice || 0));
+              const skuStock = Number(combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0);
+
+              const sku: ProductSKU = {
+                id: uuidv4(),
+                optionValues: combination.optionValues,
+                skuIdentifier: `${productData.name} (${Object.values(combination.optionValues).join(' - ')})`,
+                stockLayers: []
+              };
+
+              if (productData.trackQuantity && skuStock > 0) {
+                sku.stockLayers.push({
+                  id: uuidv4(),
+                  purchaseBillId: 'INITIAL_STOCK',
+                  purchaseDate: new Date().toISOString(),
+                  initialQuantity: skuStock,
+                  quantity: skuStock,
+                  costPrice: skuCost,
+                  sellPrice: skuSell,
+                });
+              }
+              productSKUs.push(sku);
+            });
+          }
+
           const newProduct: Product = {
             ...productData as any,
             id: productId,
             companyId,
-            productSKUs: (productData as any).productSKUs || [],
+            productSKUs,
             isArchived: false,
           };
-
-          // If simple initial stock provided (standard form)
-          if (productData.initialStock && productData.costPrice && productData.sellPrice) {
-            const defaultSku: ProductSKU = {
-              id: uuidv4(),
-              optionValues: {},
-              stockLayers: [{
-                id: uuidv4(),
-                purchaseBillId: 'INITIAL_STOCK',
-                purchaseDate: new Date().toISOString(),
-                initialQuantity: Number(productData.initialStock),
-                quantity: Number(productData.initialStock),
-                costPrice: Number(productData.costPrice),
-                sellPrice: Number(productData.sellPrice),
-              }]
-            };
-            newProduct.productSKUs.push(defaultSku);
-          }
 
           set((state) => ({ products: [...state.products, newProduct] }));
           if (productData.category) get().addCategory(productData.category, companyId);
           return newProduct;
         }
+
         try {
           const response = await fetch('/api/products', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },

@@ -77,24 +77,39 @@ export async function POST(req: NextRequest) {
 
     if (!productData.variants || productData.variants.length === 0) {
       const skuId = generateId();
-      newProduct.productSKUs.push({
+      const initialStock = productData.initialStock || 0;
+      const skuCost = productData.costPrice || 0;
+      const skuSell = productData.sellPrice || 0;
+
+      const defaultSku: ProductSKU = {
         id: skuId,
         optionValues: {},
         skuIdentifier: productData.name,
         stockLayers: [],
-      });
-      // Handle single product initial stock
-      if (productData.trackQuantity && productData.initialStock && productData.initialStock > 0) {
+      };
+
+      if (initialStock > 0 && productData.trackQuantity) {
+        defaultSku.stockLayers.push({
+          id: generateId(),
+          purchaseBillId: 'INITIAL_STOCK',
+          purchaseDate: new Date().toISOString(),
+          initialQuantity: initialStock,
+          quantity: initialStock,
+          costPrice: skuCost,
+          sellPrice: skuSell,
+        });
+
         initialBillItems.push({
           id: uuidv4(),
           productId: newProduct.id,
           productName: newProduct.name,
-          quantity: productData.initialStock,
-          costPrice: productData.costPrice || 0,
-          sellPrice: productData.sellPrice || 0,
+          quantity: initialStock,
+          costPrice: skuCost,
+          sellPrice: skuSell,
           selectedVariantOptions: {}
         });
       }
+      newProduct.productSKUs.push(defaultSku);
     } else {
       // Generate all possible SKU combinations from variants, capturing metadata
       const generateCombinations = (variants: any[]): { optionValues: Record<string, string>, metadata: any }[] => {
@@ -105,9 +120,6 @@ export async function POST(req: NextRequest) {
 
         firstVariant.options.forEach((option: any) => {
           restCombinations.forEach(combination => {
-            // Logic: Variant 0 (Top level) takes precedence for price/stock if defined, otherwise inherit from lower levels
-            // Actually, usually the 'lowest' specific level might override? 
-            // But here, let's assume if you set price on Color (Var 1), it applies.
             const meta = {
               costPrice: option.costPrice !== undefined ? option.costPrice : combination.metadata.costPrice,
               sellPrice: option.sellPrice !== undefined ? option.sellPrice : combination.metadata.sellPrice,
@@ -132,10 +144,26 @@ export async function POST(req: NextRequest) {
         const skuId = generateId();
         const skuCost = combination.metadata.costPrice !== undefined ? combination.metadata.costPrice : (productData.costPrice || 0);
         const skuSell = combination.metadata.sellPrice !== undefined ? combination.metadata.sellPrice : (productData.sellPrice || 0);
-        const skuStock = combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0; // Default to 0 if not set on variant
+        const skuStock = combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0;
 
-        // Create bill item if this variant/SKU has stock
+        const sku: ProductSKU = {
+          id: skuId,
+          optionValues: combination.optionValues,
+          skuIdentifier: `${newProduct.name} (${Object.values(combination.optionValues).join(' - ')})`,
+          stockLayers: []
+        };
+
         if (productData.trackQuantity && skuStock > 0) {
+          sku.stockLayers.push({
+            id: generateId(),
+            purchaseBillId: 'INITIAL_STOCK',
+            purchaseDate: new Date().toISOString(),
+            initialQuantity: skuStock,
+            quantity: skuStock,
+            costPrice: skuCost,
+            sellPrice: skuSell,
+          });
+
           initialBillItems.push({
             id: uuidv4(),
             productId: newProduct.id,
@@ -147,12 +175,7 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        return {
-          id: skuId,
-          optionValues: combination.optionValues,
-          skuIdentifier: `${newProduct.name} (${Object.values(combination.optionValues).join(' - ')})`,
-          stockLayers: [] // Stock layers are built from bills, so initially empty check for bill creation below
-        };
+        return sku;
       });
     }
 
