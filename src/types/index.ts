@@ -2,6 +2,9 @@
 export interface ProductOption {
   id: string;
   value: string;
+  costPrice?: number;
+  sellPrice?: number;
+  initialStock?: number;
 }
 
 export interface ProductVariant {

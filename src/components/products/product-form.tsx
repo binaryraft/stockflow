@@ -47,6 +47,18 @@ const additionalChargeDefinitionSchema = z.object({
 const productOptionSchema = z.object({
   id: z.string().optional(),
   value: z.string().min(1, "Option value cannot be empty"),
+  costPrice: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Cost price must be a number" }).optional()
+  ),
+  sellPrice: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Sell price must be a number" }).optional()
+  ),
+  initialStock: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+    z.number({ invalid_type_error: "Initial stock must be a number" }).min(0).optional()
+  ),
 });
 
 const productVariantFormSchema = z.object({
@@ -160,45 +172,96 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
 
       <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant Type ${variantIndex + 1}`}</Label>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {optionFields.map((optionValueField, optionIndex) => (
-          <div key={optionValueField.id} className="flex items-center gap-2">
-            <Input
-              {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
-              placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
-              aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
-            />
-            {optionFields.length > 1 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Remove this option value</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+          <div key={optionValueField.id} className="border border-border/50 p-3 rounded-lg bg-background/50 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Option {optionIndex + 1} Name (e.g. Red, Small, Roll)</Label>
+                <Input
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
+                  placeholder={`Red, Small...`}
+                  aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
+                  onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
+                />
+              </div>
+              {optionFields.length > 1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8 mt-6" aria-label="Remove Option Value">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Remove this option value</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                  <PackageSearch size={10} /> Initial Qty
+                </Label>
+                <Input
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock`)}
+                  type="number"
+                  placeholder="0"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                  <Info size={10} /> Cost Price
+                </Label>
+                <Input
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.costPrice`)}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[10px] uppercase font-bold text-muted-foreground flex items-center gap-1">
+                  <Percent size={10} /> Sell Price
+                </Label>
+                <Input
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.sellPrice`)}
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Error displays for this option */}
+            {errors.variants?.[variantIndex]?.options?.[optionIndex] && (
+              <div className="text-[10px] text-destructive italic">
+                {(errors.variants[variantIndex]?.options as any)[optionIndex]?.value?.message ||
+                  (errors.variants[variantIndex]?.options as any)[optionIndex]?.costPrice?.message ||
+                  (errors.variants[variantIndex]?.options as any)[optionIndex]?.sellPrice?.message}
+              </div>
             )}
           </div>
         ))}
         {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.options?.root?.message}</p>}
-        {Array.isArray(errors.variants?.[variantIndex]?.options) && (errors.variants?.[variantIndex]?.options as any).map((err: any, i: number) => err?.value?.message && <p key={i} className="text-sm text-destructive mt-1">{err.value.message}</p>)}
       </div>
       <Button
         type="button"
         variant="outline"
         size="sm"
-        className="text-xs"
+        className="w-full sm:w-auto h-9"
         onClick={() => {
-          appendOption({ value: '' });
+          appendOption({ value: '', costPrice: undefined, sellPrice: undefined, initialStock: undefined });
           setTimeout(() => {
             setFocus(`variants.${variantIndex}.options.${optionFields.length}.value`);
           }, 50);
         }}
       >
-        <PlusCircle className="mr-1.5 h-3.5 w-3.5" /> Add Option Value
+        <PlusCircle className="mr-1.5 h-4 w-4" /> Add Option {variantName ? `to ${variantName}` : ''}
       </Button>
     </div>
   );
@@ -452,7 +515,13 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         hsnCode: initialData.hsnCode || '',
         variants: initialData.variants?.map(v => ({
           id: v.id, name: v.name,
-          options: v.options.map(o => ({ id: o.id, value: o.value }))
+          options: v.options.map(o => ({
+            id: o.id,
+            value: o.value,
+            costPrice: o.costPrice,
+            sellPrice: o.sellPrice,
+            initialStock: o.initialStock
+          }))
         })) || [],
         additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({
           id: ac.id || uuidv4(),
@@ -498,7 +567,10 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         name: v_form.name,
         options: v_form.options.map(opt_form => ({
           id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          value: opt_form.value
+          value: opt_form.value,
+          costPrice: opt_form.costPrice,
+          sellPrice: opt_form.sellPrice,
+          initialStock: opt_form.initialStock
         }))
       })),
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({

@@ -226,6 +226,7 @@ export const useInventoryStore = create<InventoryState>()(
         if (get().userProfile.dataMode === 'local') {
           const productId = uuidv4();
           const productSKUs: ProductSKU[] = [];
+          const localStoreId = get().stores[0]?.id || 'local_warehouse';
 
           if (!productData.variants || productData.variants.length === 0) {
             const initialStock = Number(productData.initialStock || 0);
@@ -248,6 +249,7 @@ export const useInventoryStore = create<InventoryState>()(
                 quantity: initialStock > 0 ? initialStock : 0,
                 costPrice: skuCost,
                 sellPrice: skuSell,
+                storeId: localStoreId,
               });
             }
             productSKUs.push(defaultSku);
@@ -306,6 +308,7 @@ export const useInventoryStore = create<InventoryState>()(
                   quantity: skuStock > 0 ? skuStock : 0,
                   costPrice: skuCost,
                   sellPrice: skuSell,
+                  storeId: localStoreId,
                 });
               }
               productSKUs.push(sku);
@@ -343,11 +346,95 @@ export const useInventoryStore = create<InventoryState>()(
       },
       updateProduct: async (productId, productData, companyId) => {
         if (get().userProfile.dataMode === 'local') {
+          const state = get();
+          const existingProduct = state.products.find(p => p.id === productId);
+          if (!existingProduct) return null;
+
+          const updatedProduct: Product = { ...existingProduct, ...productData as any };
+
+          // If variants are provided, sync SKUs
+          if (productData.variants) {
+            const pData = productData as any;
+            const baseCost = Number(pData.costPrice || 0);
+            const baseSell = Number(pData.sellPrice || 0);
+            const localStoreId = state.stores[0]?.id || 'local_warehouse';
+
+            const generateCombinations = (variants: any[]): { optionValues: Record<string, string>, metadata: any }[] => {
+              if (variants.length === 0) return [{ optionValues: {}, metadata: { costDelta: 0, sellDelta: 0, stock: undefined } }];
+              const firstVariant = variants[0];
+              const restCombinations = generateCombinations(variants.slice(1));
+              const combinations: { optionValues: Record<string, string>, metadata: any }[] = [];
+
+              firstVariant.options.forEach((option: any) => {
+                restCombinations.forEach(combination => {
+                  const optionCostDelta = option.costPrice !== undefined ? (Number(option.costPrice) - baseCost) : 0;
+                  const optionSellDelta = option.sellPrice !== undefined ? (Number(option.sellPrice) - baseSell) : 0;
+                  const meta = {
+                    costDelta: optionCostDelta + (combination.metadata.costDelta || 0),
+                    sellDelta: optionSellDelta + (combination.metadata.sellDelta || 0),
+                    stock: option.initialStock !== undefined && Number(option.initialStock) > 0
+                      ? Number(option.initialStock)
+                      : combination.metadata.stock,
+                  };
+                  combinations.push({
+                    optionValues: { [firstVariant.name]: option.value, ...combination.optionValues },
+                    metadata: meta
+                  });
+                });
+              });
+              return combinations;
+            };
+
+            const combinations = generateCombinations(productData.variants);
+            const updatedSKUs: ProductSKU[] = [];
+
+            combinations.forEach(combination => {
+              const skuCost = baseCost + (combination.metadata.costDelta || 0);
+              const skuSell = baseSell + (combination.metadata.sellDelta || 0);
+              const skuStock = Number(combination.metadata.stock !== undefined ? combination.metadata.stock : (pData.initialStock || 0));
+
+              const stringifiedTargetOptions = JSON.stringify(Object.entries(combination.optionValues).sort());
+              let sku = existingProduct.productSKUs.find(s => {
+                const stringifiedSkuOptions = JSON.stringify(Object.entries(s.optionValues || {}).sort());
+                return stringifiedSkuOptions === stringifiedTargetOptions;
+              });
+
+              if (sku) {
+                // Update existing SKU price in initial layer
+                const initialLayer = sku.stockLayers.find(l => l.purchaseBillId === 'INITIAL_STOCK');
+                if (initialLayer) {
+                  initialLayer.costPrice = skuCost;
+                  initialLayer.sellPrice = skuSell;
+                } else if (updatedProduct.trackQuantity) {
+                  sku.stockLayers.push({
+                    id: uuidv4(), purchaseBillId: 'INITIAL_STOCK', purchaseDate: new Date().toISOString(),
+                    initialQuantity: skuStock, quantity: skuStock, costPrice: skuCost, sellPrice: skuSell, storeId: localStoreId
+                  });
+                }
+                updatedSKUs.push({ ...sku, skuIdentifier: get().getSkuIdentifier(updatedProduct.name, combination.optionValues) });
+              } else {
+                const newSku: ProductSKU = {
+                  id: uuidv4(), optionValues: combination.optionValues,
+                  skuIdentifier: get().getSkuIdentifier(updatedProduct.name, combination.optionValues),
+                  stockLayers: []
+                };
+                if (updatedProduct.trackQuantity) {
+                  newSku.stockLayers.push({
+                    id: uuidv4(), purchaseBillId: 'INITIAL_STOCK', purchaseDate: new Date().toISOString(),
+                    initialQuantity: skuStock, quantity: skuStock, costPrice: skuCost, sellPrice: skuSell, storeId: localStoreId
+                  });
+                }
+                updatedSKUs.push(newSku);
+              }
+            });
+            updatedProduct.productSKUs = updatedSKUs;
+          }
+
           set((state) => ({
-            products: state.products.map(p => p.id === productId ? { ...p, ...productData } as Product : p)
+            products: state.products.map(p => p.id === productId ? updatedProduct : p)
           }));
           if (productData.category) get().addCategory(productData.category, companyId);
-          return get().products.find(p => p.id === productId) || null;
+          return updatedProduct;
         }
         try {
           const response = await fetch(`/api/products/${productId}`, {
@@ -991,7 +1078,13 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (!sku || !product) return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };
 
-        const relevantLayers = targetStoreId ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId) : sku.stockLayers;
+        let relevantLayers = targetStoreId ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId) : sku.stockLayers;
+
+        // In local mode, if we specifically asked for a store but found nothing, 
+        // fallback to whatever we have (since there's usually just one local store anyway)
+        if (targetStoreId && relevantLayers.length === 0 && get().userProfile.dataMode === 'local') {
+          relevantLayers = sku.stockLayers;
+        }
 
         if (!product.trackQuantity) {
           // Fallback to product-level non-tracked prices if stock layers are missing
