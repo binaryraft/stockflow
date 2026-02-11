@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -116,7 +116,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   const router = useRouter();
   const { setDraftBill } = useInventoryStore(state => ({ setDraftBill: state.setDraftBill }));
 
-  const handleEditBill = (bill: Bill) => {
+  const handleEditBill = (bill: Bill, openInExcel: boolean = false) => {
     // Convert bill to draft format
     const draftItems: BillItem[] = bill.items.map(item => ({
       ...item,
@@ -133,8 +133,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     });
 
     const targetUrl = filterByStoreId
-      ? `/storeportal/${filterByStoreId}/billing?mode=${bill.type}`
-      : `/admin/billing?mode=${bill.type}`;
+      ? `/storeportal/${filterByStoreId}/billing?mode=${bill.type}${openInExcel ? '&view=excel' : ''}`
+      : `/admin/billing?mode=${bill.type}${openInExcel ? '&view=excel' : ''}`;
 
     router.push(targetUrl);
   };
@@ -691,6 +691,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
               <div className="flex gap-2">
                 {!isEditingBillDetails && (
                   <>
+                    <Button variant="outline" size="sm" onClick={() => handleEditBill(selectedBill, true)} disabled={(selectedBill.type === 'sell' && selectedBill.isEstimate) || selectedBill.type === 'return'}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Edit (Bulk)
+                    </Button>
                     <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}>
                       <Printer className="mr-2 h-4 w-4" /> Print
                     </Button>
@@ -867,6 +870,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEditBill(bill)}>
                             <Edit2 className="mr-2 h-4 w-4" /> Edit Bill
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditBill(bill, true)}>
+                            <FileSpreadsheet className="mr-2 h-4 w-4" /> Edit (Bulk / Excel)
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handlePrintSelectedBill(bill)}>
                             <Printer className="mr-2 h-4 w-4" /> Print Bill

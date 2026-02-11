@@ -124,13 +124,54 @@ export function BillingExcelView({
     const updateItem = (index: number, updates: Partial<BillItem>) => {
         const newItems = [...items];
         const item = newItems[index];
-
-        // Recalculate if critical fields change
         const updatedItem = { ...item, ...updates };
 
-        // Recalculate Taxes/Totals
-        // Note: If Total changed, we handle that separately (reverse calc)
-        // Here we handle standard forward calc
+        // Stock Validation
+        const product = products.find(p => p.id === updatedItem.productId);
+        if (product && currentMode === 'sell' && product.trackQuantity) {
+            // Calculate total quantity for this product in the bill (including this update)
+            const otherItemsQuantity = newItems.reduce((sum, i, idx) => {
+                if (idx === index) return sum;
+                if (i.productId !== product.id) return sum;
+
+                const itemOpts = i.selectedVariantOptions || {};
+                const currentOpts = updatedItem.selectedVariantOptions || {};
+                const itemKeys = Object.keys(itemOpts).sort();
+                const currentKeys = Object.keys(currentOpts).sort();
+
+                if (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) {
+                    return sum + i.quantity;
+                }
+                return sum;
+            }, 0);
+
+            const totalRequested = (updatedItem.quantity || 0) + otherItemsQuantity;
+
+            // Get available stock
+            // We need to know which SKU/Layer. 
+            // In Excel view, we might not have full SKU/Layer info in item directly unless we stored it?
+            // Item has productId. We can try to find SKU based on options (if any).
+            // For now, let's use getSkuDetails on the default SKU or try to match options.
+            let stockAvailable = 0;
+            const targetSku = findOrCreateProductSKU(product.id, updatedItem.selectedVariantOptions || {});
+            if (targetSku) {
+                const details = getSkuDetails(targetSku);
+                stockAvailable = details.totalStock ?? 0;
+            }
+
+            if (totalRequested > stockAvailable) {
+                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available. You have ${otherItemsQuantity} already in bill + ${(updatedItem.quantity || 0)} requested.` });
+                // Revert quantity change if it was the update
+                if (updates.quantity !== undefined) {
+                    return;
+                }
+                // If price update caused no issue, we proceed? 
+                // But strictly if state is invalid we might block? 
+                // Let's just block the update if it results in invalid state?
+                // Or just warn? User asked "fail to prevent". So we should prevent.
+                return;
+            }
+        }
 
         // 1. Base Logic
         let quantity = updatedItem.quantity || 0;
@@ -149,11 +190,6 @@ export function BillingExcelView({
 
         // Apply Tax if not estimate
         if (!isEstimate && taxableValue > 0) {
-            // We need product rates. 
-            // Assuming we have them in item (we don't store rates in item usually, but we have calculated amounts)
-            // We should re-fetch product to get rates? Or store rates in item?
-            // For now, let's look up the product from store
-            const product = products.find(p => p.id === updatedItem.productId);
             if (product) {
                 if (taxType === 'intra-state') {
                     updatedItem.sgstAmount = (taxableValue * (product.sgstRate || 0)) / 100;
@@ -185,6 +221,7 @@ export function BillingExcelView({
             productId: product.id,
             productName: suggestion.displayInfo.name,
             quantity: 1,
+            selectedVariantOptions: sku.optionValues,
             costPrice: 0, // Fill from SKU/Layer
             sellPrice: 0, // Fill from SKU/Layer
             sgstAmount: 0,
@@ -209,6 +246,32 @@ export function BillingExcelView({
             newItem.sellPrice = skuDetails.currentSellPrice || 0;
         } else {
             newItem.sellPrice = skuDetails.currentSellPrice || 0;
+        }
+
+        // Validate Stock for New Item
+        if (currentMode === 'sell' && product.trackQuantity) {
+            const existingQuantityInBill = items.reduce((sum, item) => {
+                if (item.productId !== product.id) return sum;
+
+                const itemOpts = item.selectedVariantOptions || {};
+                const currentOpts = sku.optionValues || {};
+                const itemKeys = Object.keys(itemOpts).sort();
+                const currentKeys = Object.keys(currentOpts).sort();
+
+                if (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) {
+                    return sum + item.quantity;
+                }
+                return sum;
+            }, 0);
+
+            const totalRequested = 1 + existingQuantityInBill; // Default quantity 1
+            const skuInfo = getSkuDetails(sku);
+            const stockAvailable = skuInfo.totalStock ?? 0;
+
+            if (totalRequested > stockAvailable) {
+                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available. You have ${existingQuantityInBill} already in bill.` });
+                return; // Do not add the item
+            }
         }
 
         // Add or Update

@@ -16,7 +16,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition, PendingBillPayload, PaymentMode } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText, FileSpreadsheet, List } from 'lucide-react';
 import { BillingProductSelector } from './billing-product-selector';
 import { Textarea } from '@/components/ui/textarea';
 import { v4 as uuidv4 } from 'uuid';
@@ -100,6 +100,15 @@ export function BillingForm({
   const [mode, setMode] = useState<BillMode>('sell');
   const [isEstimateMode, setIsEstimateMode] = useState(false);
   const [isExcelMode, setIsExcelMode] = useState(false);
+
+  useEffect(() => {
+    if (searchParamsHook) {
+      const viewParam = searchParamsHook.get('view');
+      if (viewParam === 'excel') {
+        setIsExcelMode(true);
+      }
+    }
+  }, [searchParamsHook]);
 
   const [selectedStoreIdForAdmin, setSelectedStoreIdForAdmin] = useState<string | undefined>(undefined);
 
@@ -561,8 +570,24 @@ export function BillingForm({
         ? currentSkuStock
         : (skuDetails.totalStock ?? 0);
 
-      if (stockToCheck < currentQuantity) {
-        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store.` });
+      // Check existing quantity of this SKU in the current bill (only for same SKU)
+      const existingQuantityInBill = currentBillItems
+        .filter(item => {
+          if (item.productId !== product.id) return false;
+
+          const itemOpts = item.selectedVariantOptions || {};
+          const currentOpts = selectedOpts || {};
+
+          const itemKeys = Object.keys(itemOpts).sort();
+          const currentKeys = Object.keys(currentOpts).sort();
+
+          if (itemKeys.length !== currentKeys.length) return false;
+          return itemKeys.every(k => itemOpts[k] === currentOpts[k]);
+        })
+        .reduce((sum, item) => sum + item.quantity, 0);
+
+      if (stockToCheck < (currentQuantity + existingQuantityInBill)) {
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store. You already have ${existingQuantityInBill} in bill.` });
         return;
       }
     }
@@ -843,10 +868,51 @@ export function BillingForm({
   };
 
   const updateBillItemQuantity = (itemId: string, newQuantity: number) => {
-    setCurrentBillItems(prevItems =>
-      prevItems.map(item => {
+    setCurrentBillItems(prevItems => {
+      const itemToUpdate = prevItems.find(i => i.id === itemId);
+      if (!itemToUpdate) return prevItems;
+
+      const qty = Math.max(0, newQuantity);
+
+      // Stock Validation for Sell/Return Mode
+      if ((mode === 'sell' || (mode === 'return' && !itemToUpdate.isDefective)) && !isEstimateMode && !itemToUpdate.isAdditionalCharge && !itemToUpdate.productId.startsWith('SERVICE_ITEM_')) {
+        const product = getProductById(itemToUpdate.productId);
+        if (product && product.trackQuantity) {
+          const targetSku = findOrCreateProductSKU(product.id, itemToUpdate.selectedVariantOptions || {});
+          if (targetSku) {
+            const skuDetails = getSkuDetails(targetSku, finalStoreIdForSkuDetails);
+            const stockAvailable = skuDetails.totalStock ?? 0;
+
+            // Calculate total quantity of this SKU in the bill excluding current item
+            const otherItemsQuantity = prevItems.reduce((sum, i) => {
+              if (i.id === itemId) return sum;
+              if (i.productId !== itemToUpdate.productId) return sum;
+
+              const itemOpts = i.selectedVariantOptions || {};
+              const currentOpts = itemToUpdate.selectedVariantOptions || {};
+              const itemKeys = Object.keys(itemOpts).sort();
+              const currentKeys = Object.keys(currentOpts).sort();
+
+              if (itemKeys.length === currentKeys.length && itemKeys.every(k => itemOpts[k] === currentOpts[k])) {
+                return sum + i.quantity;
+              }
+              return sum;
+            }, 0);
+
+            if (stockAvailable < (qty + otherItemsQuantity)) {
+              toast({
+                variant: "destructive",
+                title: "Insufficient Stock",
+                description: `Only ${stockAvailable.toFixed(2)} available. You have ${otherItemsQuantity} already in bill + ${qty} requested.`
+              });
+              return prevItems;
+            }
+          }
+        }
+      }
+
+      return prevItems.map(item => {
         if (item.id === itemId) {
-          const qty = Math.max(0, newQuantity);
           let updatedItem = { ...item, quantity: qty };
 
           if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
@@ -859,8 +925,8 @@ export function BillingForm({
           return updatedItem;
         }
         return item;
-      }).filter(item => item.quantity > 0 || item.isAdditionalCharge)
-    );
+      }).filter(item => item.quantity > 0 || item.isAdditionalCharge);
+    });
   };
 
   const updateBillItemDiscount = (itemId: string, value: number, type: 'amount' | 'percentage') => {
@@ -1391,13 +1457,18 @@ export function BillingForm({
                       <Settings2 size={20} className="text-muted-foreground" /> Add Item / Product
                     </h3>
                   )}
-                  {/* Toggle Switch always visible or just in header? */}
+                  {/* Toggle Button */}
                   <div className={cn("flex items-center gap-2", isExcelMode && "w-full justify-between")}>
                     {isExcelMode && <h3 className="text-lg font-medium text-foreground flex items-center gap-2"><Settings2 size={20} className="text-muted-foreground" /> Bulk Entry</h3>}
-                    <div className="flex items-center gap-2 bg-secondary/20 p-1.5 rounded-md border">
-                      <Label htmlFor="excel-mode" className="text-xs font-medium cursor-pointer">Excel / Bulk Mode</Label>
-                      <Switch id="excel-mode" checked={isExcelMode} onCheckedChange={setIsExcelMode} className="scale-75 origin-right" />
-                    </div>
+                    <Button
+                      variant={isExcelMode ? "secondary" : "outline"}
+                      size="sm"
+                      onClick={() => setIsExcelMode(!isExcelMode)}
+                      className="gap-2 transition-all"
+                    >
+                      {isExcelMode ? <List className="h-4 w-4" /> : <FileSpreadsheet className="h-4 w-4" />}
+                      {isExcelMode ? "Standard View" : "Excel / Bulk View"}
+                    </Button>
                   </div>
                 </div>
 
