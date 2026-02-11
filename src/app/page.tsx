@@ -41,7 +41,10 @@ export default function HomePage() {
       const isStoreStillAuthenticated = lastAuthStoreId && sessionStorage.getItem(`authenticatedStore_${lastAuthStoreId}`) === 'true';
 
       let redirected = false;
-      if (adminToken && adminRole === ADMIN_ROLE) {
+      if (adminToken === "offline_token") {
+        router.replace('/local');
+        redirected = true;
+      } else if (adminToken && adminRole === ADMIN_ROLE) {
         router.replace('/admin');
         redirected = true;
       } else if (isStoreStillAuthenticated && lastAuthStoreId) {

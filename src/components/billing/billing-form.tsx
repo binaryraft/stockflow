@@ -981,11 +981,29 @@ export function BillingForm({
   }, [taxType, mode, isEstimateMode, getProductById]);
 
   const updateBillItemPrice = (itemId: string, newPrice: number, priceType: 'cost' | 'sell') => {
-    if (mode !== 'buy') return;
     setCurrentBillItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) } : item
-      )
+      prevItems.map(item => {
+        if (item.id !== itemId) return item;
+
+        let updatedItem = { ...item, [priceType === 'cost' ? 'costPrice' : 'sellPrice']: Math.max(0, newPrice) };
+
+        // Recalculate taxes and discounts if in sell/return mode
+        if ((mode === 'sell' || mode === 'return') && !isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+          const { sgst, cgst, igst, discountAmount } = calculateItemTax(
+            updatedItem,
+            updatedItem.quantity,
+            updatedItem.sellPrice,
+            updatedItem.discountValue,
+            updatedItem.discountType
+          );
+          updatedItem.sgstAmount = sgst;
+          updatedItem.cgstAmount = cgst;
+          updatedItem.igstAmount = igst;
+          updatedItem.discountAmount = discountAmount;
+        }
+
+        return updatedItem;
+      })
     );
   };
 

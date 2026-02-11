@@ -399,6 +399,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     <span>{getBillTypeName(bill)}</span>
                   </div>
                   <div className="flex gap-2">
+                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => { handleViewBill(bill); setTimeout(() => setIsEditingBillDetails(true), 50); }}><Edit2 size={12} className="mr-1" />Edit</Button>
                     <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handleViewBill(bill)}><Eye size={12} className="mr-1" />View</Button>
                     <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handlePrintSelectedBill(bill)}><Printer size={12} className="mr-1" />Print</Button>
                   </div>

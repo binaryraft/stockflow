@@ -252,18 +252,28 @@ export const useInventoryStore = create<InventoryState>()(
             }
             productSKUs.push(defaultSku);
           } else {
+            const baseCost = Number(productData.costPrice || 0);
+            const baseSell = Number(productData.sellPrice || 0);
+
             const generateCombinations = (variants: any[]): { optionValues: Record<string, string>, metadata: any }[] => {
-              if (variants.length === 0) return [{ optionValues: {}, metadata: {} }];
+              if (variants.length === 0) return [{ optionValues: {}, metadata: { costDelta: 0, sellDelta: 0, stock: undefined } }];
               const firstVariant = variants[0];
               const restCombinations = generateCombinations(variants.slice(1));
               const combinations: { optionValues: Record<string, string>, metadata: any }[] = [];
 
               firstVariant.options.forEach((option: any) => {
                 restCombinations.forEach(combination => {
+                  // Calculate deltas from base prices
+                  const optionCostDelta = option.costPrice !== undefined ? (Number(option.costPrice) - baseCost) : 0;
+                  const optionSellDelta = option.sellPrice !== undefined ? (Number(option.sellPrice) - baseSell) : 0;
+
                   const meta = {
-                    costPrice: option.costPrice !== undefined ? option.costPrice : combination.metadata.costPrice,
-                    sellPrice: option.sellPrice !== undefined ? option.sellPrice : combination.metadata.sellPrice,
-                    initialStock: option.initialStock !== undefined ? option.initialStock : combination.metadata.initialStock,
+                    costDelta: optionCostDelta + (combination.metadata.costDelta || 0),
+                    sellDelta: optionSellDelta + (combination.metadata.sellDelta || 0),
+                    // For stock, we take the first defined non-zero value we find in the hierarchy
+                    stock: option.initialStock !== undefined && Number(option.initialStock) > 0
+                      ? Number(option.initialStock)
+                      : combination.metadata.stock,
                   };
                   combinations.push({
                     optionValues: { [firstVariant.name]: option.value, ...combination.optionValues },
@@ -276,14 +286,14 @@ export const useInventoryStore = create<InventoryState>()(
 
             const combinations = generateCombinations(productData.variants);
             combinations.forEach(combination => {
-              const skuCost = Number(combination.metadata.costPrice !== undefined ? combination.metadata.costPrice : (productData.costPrice || 0));
-              const skuSell = Number(combination.metadata.sellPrice !== undefined ? combination.metadata.sellPrice : (productData.sellPrice || 0));
-              const skuStock = Number(combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0);
+              const skuCost = baseCost + (combination.metadata.costDelta || 0);
+              const skuSell = baseSell + (combination.metadata.sellDelta || 0);
+              const skuStock = Number(combination.metadata.stock !== undefined ? combination.metadata.stock : (productData.initialStock || 0));
 
               const sku: ProductSKU = {
                 id: uuidv4(),
                 optionValues: combination.optionValues,
-                skuIdentifier: `${productData.name} (${Object.values(combination.optionValues).join(' - ')})`,
+                skuIdentifier: get().getSkuIdentifier(productData.name, combination.optionValues),
                 stockLayers: []
               };
 
