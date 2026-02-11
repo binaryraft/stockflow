@@ -1254,7 +1254,11 @@ export function BillingForm({
       const params = new URLSearchParams();
       const currentBillingUrl = `${pathname}?${searchParamsHook.toString()}`;
       params.set('returnTo', encodeURIComponent(currentBillingUrl));
-      router.push(`/admin/products/${currentProductForSelection.id}?${params.toString()}`);
+
+      const isLocal = pathname.startsWith('/local');
+      const baseProductPath = isLocal ? '/local/products' : '/admin/products';
+
+      router.push(`${baseProductPath}/${currentProductForSelection.id}?${params.toString()}`);
     }
   };
 
@@ -1404,12 +1408,12 @@ export function BillingForm({
               )}
               {isAdminContext && activePlan?.id === SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
                 <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-                  No store configured for your Starter plan. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
+                  No store configured for your Starter plan. Please <Link href={pathname.startsWith('/local') ? "/local/settings" : "/admin/stores"} className="font-semibold underline hover:text-destructive/80">add your store</Link> in Store Management.
                 </p>
               )}
               {isAdminContext && activePlan && activePlan.id !== SUBSCRIPTION_PLAN_IDS.STARTER && allStores.length === 0 && (
                 <p className="text-sm text-destructive text-center p-4 border border-dashed rounded-md bg-destructive/10">
-                  No stores configured. Please <Link href="/admin/stores" className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
+                  No stores configured. Please <Link href={pathname.startsWith('/local') ? "/local/settings" : "/admin/stores"} className="font-semibold underline hover:text-destructive/80">add stores</Link> in Store Management.
                 </p>
               )}
 

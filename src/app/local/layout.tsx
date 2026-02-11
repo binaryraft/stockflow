@@ -27,15 +27,13 @@ export default function LocalLayout({
 
   useEffect(() => {
     setHasMounted(true);
-    // Ensure dataMode is local even if hydration overwrites it initially
-    const timer = setTimeout(() => {
-      useInventoryStore.setState((state) => ({
-        userProfile: {
-          ...state.userProfile,
-          dataMode: 'local'
-        }
-      }));
-    }, 500);
+    // Ensure dataMode is local immediately on mount
+    useInventoryStore.setState((state) => ({
+      userProfile: {
+        ...state.userProfile,
+        dataMode: 'local'
+      }
+    }));
 
     const setupLocalEnv = async () => {
       try {

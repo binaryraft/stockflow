@@ -270,9 +270,36 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                   <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
                     <h4 className="text-md font-semibold mb-1">Bill Info</h4>
                     <p className="text-xs text-muted-foreground">Date: {format(new Date(selectedBill.date), 'PPpp')}</p>
-                    <Badge variant={selectedBill.paymentStatus === 'paid' ? 'default' : 'destructive'}>{selectedBill.paymentStatus || 'unpaid'}</Badge>
+                    {isEditingBillDetails ? (
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-[10px] uppercase font-bold text-muted-foreground">Payment Status</Label>
+                        <Select value={editablePaymentStatus} onValueChange={(val) => setEditablePaymentStatus(val as any)}>
+                          <SelectTrigger className="w-full h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="paid">Paid</SelectItem>
+                            <SelectItem value="unpaid">Unpaid</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    ) : (
+                      <Badge variant={selectedBill.paymentStatus === 'paid' ? 'default' : 'destructive'}>{selectedBill.paymentStatus || 'unpaid'}</Badge>
+                    )}
                   </div>
                 </div>
+
+                {isEditingBillDetails && (
+                  <div className="p-4 border rounded-md bg-card space-y-2 shadow-sm">
+                    <Label className="text-[10px] uppercase font-bold text-muted-foreground">Internal Notes / Remarks</Label>
+                    <Textarea
+                      value={editableNotes}
+                      onChange={(e) => setEditableNotes(e.target.value)}
+                      placeholder="Add notes about this bill..."
+                      className="min-h-[80px] text-sm"
+                    />
+                  </div>
+                )}
                 <Accordion type="single" collapsible className="w-full" defaultValue="bill-items">
                   <AccordionItem value="bill-items">
                     <AccordionTrigger className="p-4 bg-muted/50">Items ({selectedBill.items.length})</AccordionTrigger>
@@ -305,10 +332,20 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                 </div>
               </div>
             </ScrollArea>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}><Printer size={14} className="mr-2" /> Print</Button>
-              <Button variant="destructive" onClick={() => handleDeleteBillClick(selectedBill.id, selectedBill.id)}><Trash2 size={14} className="mr-2" /> Delete</Button>
-              <DialogClose asChild><Button>Close</Button></DialogClose>
+            <DialogFooter className="gap-2">
+              {isEditingBillDetails ? (
+                <>
+                  <Button variant="outline" onClick={handleCancelEditMode}>Cancel</Button>
+                  <Button onClick={handleSaveBillDetails}><Save size={14} className="mr-2" /> Save Changes</Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={handleEnterEditMode}><Edit2 size={14} className="mr-2" /> Edit</Button>
+                  <Button variant="outline" onClick={() => handlePrintSelectedBill(selectedBill)}><Printer size={14} className="mr-2" /> Print</Button>
+                  <Button variant="destructive" onClick={() => handleDeleteBillClick(selectedBill.id, selectedBill.id)}><Trash2 size={14} className="mr-2" /> Delete</Button>
+                  <DialogClose asChild><Button>Close</Button></DialogClose>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>

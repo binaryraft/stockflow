@@ -239,13 +239,13 @@ export const useInventoryStore = create<InventoryState>()(
               stockLayers: [],
             };
 
-            if (initialStock > 0 && productData.trackQuantity) {
+            if (productData.trackQuantity) {
               defaultSku.stockLayers.push({
                 id: uuidv4(),
                 purchaseBillId: 'INITIAL_STOCK',
                 purchaseDate: new Date().toISOString(),
-                initialQuantity: initialStock,
-                quantity: initialStock,
+                initialQuantity: initialStock > 0 ? initialStock : 0,
+                quantity: initialStock > 0 ? initialStock : 0,
                 costPrice: skuCost,
                 sellPrice: skuSell,
               });
@@ -297,13 +297,13 @@ export const useInventoryStore = create<InventoryState>()(
                 stockLayers: []
               };
 
-              if (productData.trackQuantity && skuStock > 0) {
+              if (productData.trackQuantity) {
                 sku.stockLayers.push({
                   id: uuidv4(),
                   purchaseBillId: 'INITIAL_STOCK',
                   purchaseDate: new Date().toISOString(),
-                  initialQuantity: skuStock,
-                  quantity: skuStock,
+                  initialQuantity: skuStock > 0 ? skuStock : 0,
+                  quantity: skuStock > 0 ? skuStock : 0,
                   costPrice: skuCost,
                   sellPrice: skuSell,
                 });
@@ -458,7 +458,6 @@ export const useInventoryStore = create<InventoryState>()(
                 const updatedSKUs = p.productSKUs.map(sku => {
                   const itemForSku = itemsData.find((i: any) => i.productId === p.id && JSON.stringify(i.selectedVariantOptions || {}) === JSON.stringify(sku.optionValues || {}));
                   if (itemForSku && p.trackQuantity) {
-                    // Deduct from stock layers (First In First Out)
                     let remainingToDeduct = itemForSku.quantity;
                     const updatedLayers = sku.stockLayers.map(layer => {
                       if (remainingToDeduct <= 0) return layer;
@@ -475,9 +474,29 @@ export const useInventoryStore = create<InventoryState>()(
               bills: [newBill, ...state.bills]
             }));
           } else if (billData.type === 'buy') {
-            // Logic for adding stock layers for buy bills would go here
-            // For now, keep it simple: just add the bill
-            set(state => ({ bills: [newBill, ...state.bills] }));
+            // Update stock layers for buy bills locally
+            set(state => ({
+              products: state.products.map(p => {
+                const updatedSKUs = p.productSKUs.map(sku => {
+                  const itemForSku = itemsData.find((i: any) => i.productId === p.id && JSON.stringify(i.selectedVariantOptions || {}) === JSON.stringify(sku.optionValues || {}));
+                  if (itemForSku && p.trackQuantity) {
+                    const newLayer: StockLayer = {
+                      id: uuidv4(),
+                      purchaseBillId: newBill.id,
+                      purchaseDate: newBill.date,
+                      initialQuantity: itemForSku.quantity,
+                      quantity: itemForSku.quantity,
+                      costPrice: itemForSku.costPrice,
+                      sellPrice: itemForSku.sellPrice,
+                    };
+                    return { ...sku, stockLayers: [...sku.stockLayers, newLayer] };
+                  }
+                  return sku;
+                });
+                return { ...p, productSKUs: updatedSKUs };
+              }),
+              bills: [newBill, ...state.bills]
+            }));
           } else {
             set(state => ({ bills: [newBill, ...state.bills] }));
           }
@@ -522,13 +541,15 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteBill: async (billId, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set((state) => ({ bills: state.bills.filter(b => b.id !== billId) }));
+          return true;
+        }
         try {
           const response = await fetch(`/api/bills/${billId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
           if (!result.success) throw new Error(result.message);
           set((state) => ({ bills: state.bills.filter(b => b.id !== billId) }));
-          set((state) => ({ bills: state.bills.filter(b => b.id !== billId) }));
-          // get().fetchProducts(companyId); // See above
           return true;
         } catch (error) {
           console.error("Error deleting bill:", error);
@@ -537,6 +558,12 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateBillNonCriticalDetails: async (billId, details, companyId) => {
+        if (get().userProfile.dataMode === 'local') {
+          set((state) => ({
+            bills: state.bills.map(b => b.id === billId ? { ...b, ...details } : b)
+          }));
+          return get().bills.find(b => b.id === billId) || null;
+        }
         try {
           const response = await fetch(`/api/bills/${billId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
