@@ -1,1 +1,0 @@
-1) when we had 20 apples, i tried to bill 21, which the system prevented because of insufficient quantity. the same failed to prevent when i added 20 and then 10 as the next product. 
