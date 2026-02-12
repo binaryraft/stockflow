@@ -503,7 +503,13 @@ export function NewProductDialog({
       await addCategoryToStore(data.category!, currentCompanyId);
     }
 
-    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
+    const productToSaveBase: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & {
+      costPrice?: number,
+      sellPrice?: number,
+      initialStock?: number,
+      costPriceForNonTracked?: number,
+      sellPriceForNonTracked?: number
+    } = {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -518,24 +524,13 @@ export function NewProductDialog({
         id: ac.id || uuidv4(),
         type: ac.type || 'fixed',
       })) || [],
+      // Always provide these for consistent pricing & non-tracked support
+      costPrice: data.costPrice,
+      sellPrice: data.sellPrice,
+      initialStock: data.initialStock,
+      costPriceForNonTracked: data.costPrice,
+      sellPriceForNonTracked: data.sellPrice,
     };
-
-    // For products without variants, we store the base prices directly on the product
-    // or as 'forNonTracked' fields if that's the convention. 
-    // Looking at the store, it seems we use initialStock to create a default SKU in addProduct.
-    // So we pass these values through.
-
-    if (!productVariantsPayload || productVariantsPayload.length === 0) {
-      // It's a simple product
-      productToSaveBase.costPrice = data.costPrice;
-      productToSaveBase.sellPrice = data.sellPrice;
-      productToSaveBase.initialStock = data.initialStock;
-
-      // Legacy support if needed, but the store `addProduct` handles `initialStock` to make a SKU.
-      // We'll also set the non-tracked fields just in case the logic uses them.
-      productToSaveBase.costPriceForNonTracked = data.costPrice;
-      productToSaveBase.sellPriceForNonTracked = data.sellPrice;
-    }
 
     const newProduct = await addProduct(productToSaveBase, currentCompanyId);
     if (newProduct) {

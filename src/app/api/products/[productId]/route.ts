@@ -40,27 +40,35 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     const existingProduct = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
     if (!existingProduct) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
 
-    const { costPriceForNonTracked, sellPriceForNonTracked, ...updateableData } = productData;
+    const { id: _, costPriceForNonTracked: cpnt, sellPriceForNonTracked: spnt, ...updateableData } = productData;
 
-    // Handle price updates for non-tracked, single-SKU products
-    if (productData.trackQuantity === false && (!productData.variants || productData.variants.length === 0)) {
+    // Handle price updates for non-tracked products or products where we want to update the base price layer
+    if (!productData.variants || productData.variants.length === 0) {
+      const { costPriceForNonTracked, sellPriceForNonTracked, costPrice, sellPrice } = productData;
+      const targetCost = costPrice !== undefined ? costPrice : costPriceForNonTracked;
+      const targetSell = sellPrice !== undefined ? sellPrice : sellPriceForNonTracked;
+
       let skuToUpdate = existingProduct.productSKUs[0];
-      if (skuToUpdate) {
+      if (skuToUpdate && (targetCost !== undefined || targetSell !== undefined)) {
         if (!skuToUpdate.stockLayers || skuToUpdate.stockLayers.length === 0) {
           skuToUpdate.stockLayers = [{
             id: uuidv4(),
-            purchaseBillId: 'STANDARD_PRICE_LAYER',
+            purchaseBillId: 'PRICE_ENTRY',
             purchaseDate: new Date().toISOString(),
-            initialQuantity: 1000,
-            quantity: 1000,
+            initialQuantity: 0,
+            quantity: 0,
             costPrice: 0,
             sellPrice: 0
           }];
         }
-        if (costPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].costPrice = costPriceForNonTracked;
-        if (sellPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].sellPrice = sellPriceForNonTracked;
+        if (targetCost !== undefined) skuToUpdate.stockLayers[0].costPrice = targetCost;
+        if (targetSell !== undefined) skuToUpdate.stockLayers[0].sellPrice = targetSell;
         updateableData.productSKUs = [skuToUpdate];
       }
+    } else if (productData.variants) {
+      // If variants are provided in the update, the existing logic in addProduct style combination 
+      // is usually handled better by the store, but here we just ensure we don't lose productSKUs 
+      // if they aren't explicitly recalculated here. 
     }
 
     const { id, ...dataToSet } = updateableData;

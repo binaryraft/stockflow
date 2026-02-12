@@ -90,30 +90,28 @@ export async function POST(req: NextRequest) {
         stockLayers: [],
       };
 
-      // Always create a layer if tracked, even if stock is 0, to store the current price
-      if (productData.trackQuantity) {
-        defaultSku.stockLayers.push({
-          id: generateId(),
-          purchaseBillId: 'INITIAL_STOCK',
-          purchaseDate: new Date().toISOString(),
-          initialQuantity: initialStock,
+      // Always create a layer (tracked or not) to store the prices for display/billing purposes
+      defaultSku.stockLayers.push({
+        id: generateId(),
+        purchaseBillId: productData.trackQuantity && initialStock > 0 ? 'INITIAL_STOCK' : 'PRICE_ENTRY',
+        purchaseDate: new Date().toISOString(),
+        initialQuantity: initialStock,
+        quantity: initialStock,
+        costPrice: skuCost,
+        sellPrice: skuSell,
+        storeId: localStoreId,
+      });
+
+      if (productData.trackQuantity && initialStock > 0) {
+        initialBillItems.push({
+          id: uuidv4(),
+          productId: newProduct.id,
+          productName: newProduct.name,
           quantity: initialStock,
           costPrice: skuCost,
           sellPrice: skuSell,
-          storeId: localStoreId,
+          selectedVariantOptions: {}
         });
-
-        if (initialStock > 0) {
-          initialBillItems.push({
-            id: uuidv4(),
-            productId: newProduct.id,
-            productName: newProduct.name,
-            quantity: initialStock,
-            costPrice: skuCost,
-            sellPrice: skuSell,
-            selectedVariantOptions: {}
-          });
-        }
       }
       newProduct.productSKUs.push(defaultSku);
     } else {
@@ -163,29 +161,28 @@ export async function POST(req: NextRequest) {
           stockLayers: []
         };
 
-        if (productData.trackQuantity) {
-          sku.stockLayers.push({
-            id: generateId(),
-            purchaseBillId: 'INITIAL_STOCK',
-            purchaseDate: new Date().toISOString(),
-            initialQuantity: skuStock,
+        // Always create a layer (tracked or not) to store the prices
+        sku.stockLayers.push({
+          id: generateId(),
+          purchaseBillId: productData.trackQuantity && skuStock > 0 ? 'INITIAL_STOCK' : 'PRICE_ENTRY',
+          purchaseDate: new Date().toISOString(),
+          initialQuantity: skuStock,
+          quantity: skuStock,
+          costPrice: skuCost,
+          sellPrice: skuSell,
+          storeId: localStoreId,
+        });
+
+        if (productData.trackQuantity && skuStock > 0) {
+          initialBillItems.push({
+            id: uuidv4(),
+            productId: newProduct.id,
+            productName: newProduct.name,
             quantity: skuStock,
             costPrice: skuCost,
             sellPrice: skuSell,
-            storeId: localStoreId,
+            selectedVariantOptions: combination.optionValues
           });
-
-          if (skuStock > 0) {
-            initialBillItems.push({
-              id: uuidv4(),
-              productId: newProduct.id,
-              productName: newProduct.name,
-              quantity: skuStock,
-              costPrice: skuCost,
-              sellPrice: skuSell,
-              selectedVariantOptions: combination.optionValues
-            });
-          }
         }
 
         return sku;
@@ -194,6 +191,7 @@ export async function POST(req: NextRequest) {
 
     await db.collection<Product>('products').insertOne(newProduct);
 
+    let initialBill: Bill | null = null;
     // Create Initial Purchase Bill if items exist
     if (initialBillItems.length > 0) {
       const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0, 8)}`;
@@ -202,7 +200,7 @@ export async function POST(req: NextRequest) {
         totalAmount += (item.quantity * item.costPrice);
       });
 
-      const conceptualBill: Bill = {
+      initialBill = {
         id: initialBillId,
         type: 'buy',
         date: new Date().toISOString(),
@@ -216,11 +214,11 @@ export async function POST(req: NextRequest) {
         paymentStatus: company.defaultPurchasePaymentStatus || 'paid',
         notes: 'Initial stock entry from product creation.'
       };
-      await db.collection<Bill>('bills').insertOne(conceptualBill);
+      await db.collection<Bill>('bills').insertOne(initialBill);
     }
 
 
-    return NextResponse.json({ success: true, data: newProduct }, { status: 201 });
+    return NextResponse.json({ success: true, data: { product: newProduct, initialBill } }, { status: 201 });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
     return NextResponse.json({ success: false, message }, { status: 500 });

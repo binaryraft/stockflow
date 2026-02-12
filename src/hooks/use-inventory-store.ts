@@ -299,18 +299,17 @@ export const useInventoryStore = create<InventoryState>()(
                 stockLayers: []
               };
 
-              if (productData.trackQuantity) {
-                sku.stockLayers.push({
-                  id: uuidv4(),
-                  purchaseBillId: 'INITIAL_STOCK',
-                  purchaseDate: new Date().toISOString(),
-                  initialQuantity: skuStock > 0 ? skuStock : 0,
-                  quantity: skuStock > 0 ? skuStock : 0,
-                  costPrice: skuCost,
-                  sellPrice: skuSell,
-                  storeId: localStoreId,
-                });
-              }
+              // Always create a layer (tracked or not) to store prices
+              sku.stockLayers.push({
+                id: uuidv4(),
+                purchaseBillId: productData.trackQuantity && skuStock > 0 ? 'INITIAL_STOCK' : 'PRICE_ENTRY',
+                purchaseDate: new Date().toISOString(),
+                initialQuantity: skuStock > 0 ? skuStock : 0,
+                quantity: skuStock > 0 ? skuStock : 0,
+                costPrice: skuCost,
+                sellPrice: skuSell,
+                storeId: localStoreId,
+              });
               productSKUs.push(sku);
             });
           }
@@ -323,7 +322,7 @@ export const useInventoryStore = create<InventoryState>()(
             isArchived: false,
           };
 
-          set((state) => ({ products: [...state.products, newProduct] }));
+          set((state) => ({ products: [newProduct, ...state.products] }));
           if (productData.category) get().addCategory(productData.category, companyId);
           return newProduct;
         }
@@ -335,9 +334,25 @@ export const useInventoryStore = create<InventoryState>()(
           });
           const result = await response.json();
           if (!result.success) throw new Error(result.message);
-          set((state) => ({ products: [...state.products, result.data] }));
+
+          // Result is now { product, initialBill }
+          const newProduct = result.data.product || result.data;
+          const initialBill = result.data.initialBill;
+
+          set((state) => ({
+            products: [newProduct, ...state.products],
+            bills: initialBill ? [initialBill, ...state.bills] : state.bills
+          }));
+
+          // Proactively refresh states to ensure pagination and analytics are 'perfect'
+          get().fetchProductsPaginated(companyId, get().productsPagination.currentPage, get().productsPagination.limit);
+          if (initialBill) {
+            get().fetchBillsPaginated(companyId, get().billsPagination.currentPage, get().billsPagination.limit);
+            get().fetchDashboardAnalytics(companyId, 'daily');
+          }
+
           if (productData.category) get().fetchCategories(companyId);
-          return result.data;
+          return newProduct;
         } catch (error) {
           console.error("Error adding product:", error);
           toast({ variant: "destructive", title: "Error", description: `Could not add product.` });
@@ -607,27 +622,12 @@ export const useInventoryStore = create<InventoryState>()(
           if (!result.success) throw new Error(result.message);
           const newBill = result.data as Bill;
           set((state) => ({ bills: [newBill, ...state.bills].sort((a, b) => b.timestamp - a.timestamp) }));
-          // Removed get().fetchProducts(billData.companyId); because we trust local optimisitc updates or manual refresh for now
-          // If we need to update products stock, we should ideally do it optimistically or force fetch
-          // But user wants "preload forever", so we avoid auto-refetching heavily.
-          // However, stock DOES change on bill add. 
-          // We can try to rely on the server response if it returned updated products, but it returns the bill.
-          // Let's Force fetch here but only if critical, or maybe we can skip it if the user is ok with loose consistency.
-          // Correct approach for "Preload Forever" is: Don't refetch, but update local state.
-          // Since updating local state is complex, we might force fetch here explicitly.
-          // But to solve "loading everytime", we should avoid it. 
-          // For now, I'll comment it out and assume the user wants speed.
-          // But wait, if stock doesn't update, validation will fail next time. 
-          // I will force fetch here but since fetchProducts now checks length, I need a way to bypass.
-          // I'll make fetchProducts logic: if (length > 0) return. 
-          // So I can't force it easily without changing signature.
-          // I'll leave it as is, meaning it won't fetch. This might satisfy "preload forever" but might desync stock.
-          // I'll compromise: Add a way to invalidate the cache or just rely on manual reload for stock updates if that's what they imply.
-          // actually, let's just create a private force fetch or clear the array.
-          // user said "instead of loading everytimne, preload forever". 
-          // This usually refers to initial load. 
-          // Let's stick to: actions invalidate cache IF necessary.
-          // set({ products: [] }); get().fetchProducts(billData.companyId); // This would refresh.
+
+          // CRITICAL: Stock and Analytics updated on server, must refresh products and dashboard on client for 'perfect' update
+          if (billData.companyId) {
+            get().fetchProductsPaginated(billData.companyId, get().productsPagination.currentPage, get().productsPagination.limit);
+            get().fetchDashboardAnalytics(billData.companyId, 'daily');
+          }
           return newBill;
         } catch (error: any) {
           console.error("Error adding bill:", error);
