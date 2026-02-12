@@ -16,7 +16,7 @@ import { BillItemRow, BillItemHeader } from './bill-item-row';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, ProductVariant as ProductVariantType, AdditionalChargeDefinition, PendingBillPayload, PaymentMode } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText, FileSpreadsheet, List } from 'lucide-react';
+import { PlusCircle, Save, Eraser, ShoppingBag, Send, RotateCcw, Edit3, CornerDownLeft, Info, CircleDollarSign, Settings2, Building, LogInIcon, Percent, Printer, Barcode as BarcodeIconLucide, Loader2, MapPin, ReceiptText } from 'lucide-react';
 import { BillingProductSelector } from './billing-product-selector';
 import { Textarea } from '@/components/ui/textarea';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,7 +28,6 @@ import { cn } from '@/lib/utils';
 import { BillSaveAnimation } from './bill-save-animation';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { EmployeePasskeyDialog } from './employee-passkey-dialog';
-import { BillingExcelView } from './billing-excel-view';
 import { NewProductDialog } from './new-product-dialog';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -98,7 +97,6 @@ export function BillingForm({
   const [hasMounted, setHasMounted] = useState(false);
 
   const [mode, setMode] = useState<BillMode>('sell');
-  const [isEstimateMode, setIsEstimateMode] = useState(false);
   const [isEstimateMode, setIsEstimateMode] = useState(false);
 
   useEffect(() => {
