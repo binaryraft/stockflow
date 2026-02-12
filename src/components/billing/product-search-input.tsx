@@ -62,6 +62,20 @@ export function ProductSearchInput({
     const detailedSuggestions: ProductSearchSuggestion[] = [];
 
     foundProducts.forEach(product => {
+      // If product has variants, add a generic suggestion to allow manual variant selection
+      if (product.variants && product.variants.length > 0) {
+        detailedSuggestions.push({
+          product,
+          sku: undefined as any,
+          displayInfo: {
+            name: `${product.name} (Select Variants)`,
+            stock: 'N/A',
+            price: 'Price varies',
+            category: product.category,
+          },
+        });
+      }
+
       // Ensure we show the product even if it has no SKUs (e.g. newly added without stock)
       if (!product.productSKUs || product.productSKUs.length === 0) {
         detailedSuggestions.push({

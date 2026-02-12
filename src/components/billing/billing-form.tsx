@@ -719,24 +719,43 @@ export function BillingForm({
       }
       if (foundProduct) break;
     }
+
+    // If not found by SKU/Barcode, try exact name match
+    if (!foundProduct) {
+      for (const p of allProductsStoreHook) {
+        if (p.name && p.name.toLowerCase() === barcodeValue.trim().toLowerCase()) {
+          foundProduct = p;
+          // If it has variants, we don't pick a specific SKU yet to force variant selection
+          if (p.variants && p.variants.length > 0) {
+            foundSkuForProduct = undefined;
+          } else {
+            foundSkuForProduct = p.productSKUs[0];
+          }
+          break;
+        }
+      }
+    }
+
     setIsLoadingProductSearch(false);
 
     if (foundProduct) {
       const skuToUse = foundSkuForProduct || (foundProduct.productSKUs.length > 0 ? foundProduct.productSKUs[0] : { id: foundProduct.id + '_default_barcode_scan', optionValues: {}, stockLayers: [], skuIdentifier: foundProduct.name });
+
+      // If we found it by name and it has variants, we want to trigger variant selection helper
+      const isGenericProductSelection = !foundSkuForProduct && foundProduct.variants && foundProduct.variants.length > 0;
+
       const skuDetails = getSkuDetails(skuToUse, finalStoreIdForSkuDetails);
       const suggestion: ProductSearchSuggestion = {
         product: foundProduct,
-        sku: skuToUse,
+        sku: isGenericProductSelection ? undefined as any : skuToUse,
         displayInfo: {
-          name: skuDetails.skuIdentifier || foundProduct.name,
+          name: isGenericProductSelection ? `${foundProduct.name} (Select Variants)` : (skuDetails.skuIdentifier || foundProduct.name),
           stock: foundProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
           price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
         }
       };
       handleProductSelectFromSearch(suggestion);
-      toast({ title: "Product Found", description: `${suggestion.displayInfo.name} selected for billing.` });
-      // Removed resetFormFields(false) so the input stays populated
-      setTimeout(() => quantityInputRef.current?.focus(), 50);
+      toast({ title: "Product Found", description: `${foundProduct.name} selected.` });
       return true;
     } else {
       if (showErrorToast) {
