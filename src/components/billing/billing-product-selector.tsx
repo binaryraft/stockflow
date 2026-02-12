@@ -213,6 +213,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
             {currentProductForSelection?.variants && currentProductForSelection.variants.length > 0 && (
                 <div className="grid md:grid-cols-3 gap-4 mt-3">
                     {currentProductForSelection.variants.map((variant, index) => {
+                        if (!variant || !variant.id) return null;
                         if (!variantSelectRefs.current[variant.id]) {
                             variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
                         }
@@ -233,15 +234,17 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                         // Closing it is standard behavior for Select.
 
                                         // Find current index
-                                        const currentIndex = currentProductForSelection.variants?.findIndex(v => v.id === variant.id) ?? -1;
+                                        const currentIndex = currentProductForSelection.variants?.findIndex(v => v?.id === variant.id) ?? -1;
 
                                         if (currentIndex !== -1 && currentProductForSelection.variants && currentIndex < currentProductForSelection.variants.length - 1) {
                                             // Move to next variant
                                             const nextVariant = currentProductForSelection.variants[currentIndex + 1];
-                                            // Use a slight delay to allow the current select to close properly
-                                            setTimeout(() => {
-                                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false, [nextVariant.id]: true }));
-                                            }, 100);
+                                            if (nextVariant) {
+                                                // Use a slight delay to allow the current select to close properly
+                                                setTimeout(() => {
+                                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false, [nextVariant.id]: true }));
+                                                }, 100);
+                                            }
                                         } else {
                                             // Last variant, move to quantity
                                             setTimeout(() => {
@@ -259,7 +262,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                         <SelectValue placeholder={`Select ${variant.name}`} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {variant.options.map(opt => (
+                                        {variant.options?.map(opt => (
                                             <SelectItem key={opt.id} value={opt.value}>{opt.value}</SelectItem>
                                         ))}
                                     </SelectContent>

@@ -170,8 +170,8 @@ export function ProductSearchInput({
         const detailedRemote = mapProductsToSuggestions(foundProducts);
 
         setSuggestions(prev => {
-          const existingKeys = new Set(prev.map(s => `${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
-          const newUniqueResults = detailedRemote.filter(s => !existingKeys.has(`${s.product.id}-${s.sku.id}-${s.layer?.id || 'none'}`));
+          const existingKeys = new Set(prev.map(s => `${s.product.id}-${s.sku?.id || 'generic'}-${s.layer?.id || 'none'}`));
+          const newUniqueResults = detailedRemote.filter(s => !existingKeys.has(`${s.product.id}-${s.sku?.id || 'generic'}-${s.layer?.id || 'none'}`));
           return [...prev, ...newUniqueResults];
         });
       } catch (err) {
@@ -307,7 +307,7 @@ export function ProductSearchInput({
             <ul className="py-1">
               {suggestions.map((suggestion, index) => (
                 <li
-                  key={`${suggestion.product.id}-${suggestion.sku.id}-${suggestion.layer?.id || 'no-layer'}-${index}`}
+                  key={`${suggestion.product.id}-${suggestion.sku?.id || 'generic'}-${suggestion.layer?.id || 'no-layer'}-${index}`}
                   id={`suggestion-${index}`}
                   className={cn(
                     "px-3 py-2 text-sm cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors",
