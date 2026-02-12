@@ -51,6 +51,12 @@ interface BillingProductSelectorProps {
     setReturnItemIsDefective: (val: boolean) => void;
 
     productNameInputRef: React.RefObject<HTMLInputElement>;
+    quantityInputRef: React.RefObject<HTMLInputElement>;
+    costPriceInputRef: React.RefObject<HTMLInputElement>;
+    sellPriceBatchInputRef: React.RefObject<HTMLInputElement>;
+    variantSelectRefs: React.MutableRefObject<Record<string, React.RefObject<HTMLButtonElement>>>;
+    variantDropdownOpenState: Record<string, boolean>;
+    setVariantDropdownOpenState: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
 export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
@@ -62,14 +68,10 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
     onAddProduct, onScannerClick, onEditProductClick,
     productNotFoundHint, handleProductSelectFromSearch, handleProductNameSubmit,
     finalStoreIdForSkuDetails, returnItemIsDefective, setReturnItemIsDefective,
-    productNameInputRef
+    productNameInputRef, quantityInputRef, costPriceInputRef, sellPriceBatchInputRef,
+    variantSelectRefs, variantDropdownOpenState, setVariantDropdownOpenState
 }) => {
     const { getSkuDetails } = useInventoryStore();
-    const quantityInputRef = useRef<HTMLInputElement>(null);
-    const costPriceInputRef = useRef<HTMLInputElement>(null);
-    const sellPriceBatchInputRef = useRef<HTMLInputElement>(null);
-    const variantSelectRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
-    const [variantDropdownOpenState, setVariantDropdownOpenState] = useState<Record<string, boolean>>({});
 
     const handleEnterNavigation = (currentField: 'quantity' | 'costPrice' | 'sellPrice') => {
         if (currentField === 'quantity') {
@@ -105,21 +107,6 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                             }}
                             onProductSelect={(suggestion) => {
                                 handleProductSelectFromSearch(suggestion);
-                                // If product has variants, focus/open the first variant dropdown
-                                if (suggestion.product.variants && suggestion.product.variants.length > 0) {
-                                    // The logic to open the dropdown is handled in the parent component via useEffect or handleProductSelectFromSearch
-                                    // but we can ensure focus isn't stolen here.
-                                    // Actually, handleProductSelectFromSearch in parent ALREADY handles variant opening.
-                                    // The issue is this setTimeout below OVERRIDES it and forces focus to quantity.
-                                    // So we only focus quantity if NO variants.
-
-                                    // Wait a bit to let parent state update and decide if variant is needed
-                                } else {
-                                    setTimeout(() => {
-                                        quantityInputRef.current?.focus();
-                                        quantityInputRef.current?.select();
-                                    }, 50);
-                                }
                             }}
                             onEnterWithoutSelection={handleProductNameSubmit}
                             placeholder={mode === 'return' ? 'Scan or type product...' : 'Scan barcode, or type product...'}

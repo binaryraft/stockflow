@@ -412,10 +412,12 @@ export function BillingForm({
     const { product, sku, layer } = suggestion;
     setCurrentProductForSelection(product);
 
+    const optionsToUse = sku ? (sku.optionValues || {}) : {};
+    setSelectedVariantOptions(optionsToUse);
+
     if (sku) {
       const skuDetailsToUse = getSkuDetails(sku, finalStoreIdForSkuDetails);
       setProductNameQuery(skuDetailsToUse.skuIdentifier || product.name);
-      setSelectedVariantOptions(sku.optionValues || {});
 
       if (mode === 'sell' && product.trackQuantity && layer && typeof layer.quantity === 'number') {
         setCurrentSkuStock(layer.quantity);
@@ -433,30 +435,29 @@ export function BillingForm({
       }
     } else {
       setProductNameQuery(product.name);
-      setSelectedVariantOptions({});
       updateSkuDisplayInfo(undefined);
     }
 
     setProductNotFoundHint('');
 
     if (product.variants && product.variants.length > 0 && (!sku || Object.keys(sku.optionValues || {}).length < product.variants.length)) {
-      const firstUnselectedVariant = product.variants.find(v => !(selectedVariantOptions[v.name]));
+      const firstUnselectedVariant = product.variants.find(v => !(optionsToUse[v.name]));
       if (firstUnselectedVariant) {
         setTimeout(() => {
           setVariantDropdownOpenState({ [firstUnselectedVariant.id]: true });
           variantSelectRefs.current[firstUnselectedVariant.id]?.current?.focus();
-        }, 50);
-      } else if (Object.keys(selectedVariantOptions).length === product.variants.length) {
+        }, 100);
+      } else {
         setTimeout(() => {
           quantityInputRef.current?.focus();
           quantityInputRef.current?.select();
-        }, 50);
+        }, 100);
       }
     } else {
       setTimeout(() => {
         quantityInputRef.current?.focus();
         quantityInputRef.current?.select();
-      }, 50);
+      }, 100);
     }
   }, [getSkuDetails, mode, updateSkuDisplayInfo, finalStoreIdForSkuDetails, selectedVariantOptions]);
 
@@ -1531,6 +1532,12 @@ export function BillingForm({
                     returnItemIsDefective={returnItemIsDefective}
                     setReturnItemIsDefective={setReturnItemIsDefective}
                     productNameInputRef={productNameInputRef}
+                    quantityInputRef={quantityInputRef}
+                    costPriceInputRef={costPriceInputRef}
+                    sellPriceBatchInputRef={sellPriceBatchInputRef}
+                    variantSelectRefs={variantSelectRefs}
+                    variantDropdownOpenState={variantDropdownOpenState}
+                    setVariantDropdownOpenState={setVariantDropdownOpenState}
                   />
                 )}
               </div>
