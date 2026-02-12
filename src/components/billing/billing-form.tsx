@@ -749,19 +749,17 @@ export function BillingForm({
   };
 
   const handleProductNameSubmit = async (inputValue: string) => {
-    // If we have a hint already, it means we already tried once and user confirmed they want to add it?
-    // Actually, as per the new requirement, we want to go straight to add product dialog.
-
     // First, try to find it (as SKU or Barcode)
     const found = await findAndPopulateProductByBarcode(inputValue, false);
 
     if (!found && inputValue.trim() !== '') {
       // Directly open the add product dialog
+      // For sell mode, we still want to pre-fill sell price and potentially quantity as initial stock
       const billingFormPreFill = {
         name: inputValue,
-        quantity: mode === 'buy' ? (typeof quantity === 'string' ? quantity : quantity.toString()) : undefined,
-        costPrice: mode === 'buy' ? (typeof costPrice === 'string' ? costPrice : costPrice.toString()) : undefined,
-        sellPrice: mode === 'buy' ? (typeof sellPrice === 'string' ? sellPrice : sellPrice.toString()) : undefined,
+        quantity: typeof quantity === 'string' ? quantity : quantity.toString(),
+        costPrice: typeof costPrice === 'string' ? costPrice : costPrice.toString(),
+        sellPrice: typeof sellPrice === 'string' ? sellPrice : sellPrice.toString(),
       };
       setNewProductDialogInitialValues(billingFormPreFill);
       setIsNewProductDialogOpen(true);
