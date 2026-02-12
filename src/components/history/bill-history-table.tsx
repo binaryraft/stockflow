@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -33,6 +33,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { BillingExcelView } from '@/components/billing/billing-excel-view';
+import { Plus } from 'lucide-react';
 
 // Debounce hook
 function useDebounce<T>(value: T, delay: number): T {
@@ -112,7 +114,13 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
   const [selectedBill, setSelectedBill] = useState<Bill | null>(null);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [quickAddItems, setQuickAddItems] = useState<BillItem[]>([]);
+  const [quickAddMode, setQuickAddMode] = useState<BillMode>('sell');
   const [sortConfig, setSortConfig] = useState<{ key: SortableBillColumns; direction: 'ascending' | 'descending' } | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const billRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   type SortableBillColumns = keyof Pick<Bill, 'date' | 'type' | 'totalAmount' | 'vendorOrCustomerName' | 'paymentStatus' | 'billedByStaffName' | 'storeName'> | 'id';
 
@@ -156,6 +164,31 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
   }, [currentCompanyId, currentPage, debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams, fetchBillsPaginated]);
 
   useEffect(() => { setCurrentPage(1); }, [debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams]);
+
+  // Scroll to search match
+  useEffect(() => {
+    if (debouncedSearchTerm && viewMode === 'excel' && bills) {
+      const firstMatch = bills.find(b =>
+        b.id.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        b.vendorOrCustomerName?.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        b.items.some(i => i.productName.toLowerCase().includes(debouncedSearchTerm.toLowerCase()))
+      );
+      if (firstMatch && billRefs.current[firstMatch.id]) {
+        billRefs.current[firstMatch.id]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  }, [debouncedSearchTerm, viewMode, bills]);
+
+  const matchesSearch = useCallback((bill: Bill) => {
+    if (!searchTerm) return false;
+    const s = searchTerm.toLowerCase();
+    return (
+      bill.id.toLowerCase().includes(s) ||
+      bill.vendorOrCustomerName?.toLowerCase().includes(s) ||
+      bill.customerPhone?.toLowerCase().includes(s) ||
+      bill.items.some(i => i.productName.toLowerCase().includes(s))
+    );
+  }, [searchTerm]);
 
   const findProductSKUfromStore = useCallback((productId: string, selectedOptions?: Record<string, string>): ProductSKU | undefined => {
     const product = getProductById(productId);
@@ -414,49 +447,143 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       )}
 
       {viewMode === 'excel' && (
-        <div className="hidden md:flex flex-col border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card min-h-[400px]">
+        <div className="hidden md:flex flex-col border rounded-lg overflow-hidden shadow-lg border-t-2 border-t-primary bg-card min-h-[500px]">
           <div className="flex w-full bg-muted border-b text-[10px] font-bold text-muted-foreground uppercase sticky top-0 z-10">
             <div className="w-10 p-2 text-center border-r">#</div>
-            <div className="w-24 p-2 border-r">Time</div>
-            <div className="w-32 p-2 border-r">Party / Store</div>
+            <div className="w-24 p-2 border-r flex items-center gap-1 cursor-pointer hover:bg-muted-foreground/10" onClick={() => requestSort('date')}>Time <ArrowUpDown size={10} /></div>
+            <div className="w-32 p-2 border-r flex items-center gap-1 cursor-pointer hover:bg-muted-foreground/10" onClick={() => requestSort('vendorOrCustomerName')}>Party / Store <ArrowUpDown size={10} /></div>
             <div className="flex-1 p-2 border-r">Product Description</div>
             <div className="w-20 p-2 border-r text-right">Qty</div>
             <div className="w-24 p-2 border-r text-right">Rate</div>
-            <div className="w-28 p-2 text-right">Total</div>
+            <div className="w-28 p-2 text-right flex items-center justify-end gap-1 cursor-pointer hover:bg-muted-foreground/10" onClick={() => requestSort('totalAmount')}>Total <ArrowUpDown size={10} /></div>
             <div className="w-10 p-2"></div>
           </div>
-          <div className="flex-1 overflow-auto max-h-[600px]">
-            {filteredAndSortedBills.map((bill, bIdx) => (
-              <div key={bill.id} className="border-b last:border-0">
-                <div className="bg-muted/30 px-3 py-1.5 flex items-center justify-between text-[11px] font-bold border-b">
-                  <div className="flex gap-3 items-center">
-                    <span className="text-primary">BILL #{bIdx + 1}</span>
-                    <span className="opacity-60">{format(new Date(bill.date), 'dd/MM/yy hh:mm a')}</span>
-                    <span className="opacity-60">|</span>
-                    <span>{getBillTypeName(bill)}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => { handleViewBill(bill); setTimeout(() => setIsEditingBillDetails(true), 50); }}><Edit2 size={12} className="mr-1" />Edit</Button>
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handleViewBill(bill)}><Eye size={12} className="mr-1" />View</Button>
-                    <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => handlePrintSelectedBill(bill)}><Printer size={12} className="mr-1" />Print</Button>
-                  </div>
+
+          <div className="flex-1 overflow-auto max-h-[700px]" ref={scrollContainerRef}>
+            {/* Quick Add Row */}
+            <div className={cn("border-b transition-all duration-300", isQuickAddOpen ? "bg-emerald-50/30" : "bg-muted/10")}>
+              <div className="px-3 py-2 flex items-center justify-between border-b">
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant={isQuickAddOpen ? "default" : "outline"}
+                    size="sm"
+                    className={cn("h-7 gap-2 px-3", isQuickAddOpen && "bg-emerald-600 hover:bg-emerald-700")}
+                    onClick={() => setIsQuickAddOpen(!isQuickAddOpen)}
+                  >
+                    {isQuickAddOpen ? <Plus size={14} className="rotate-45" /> : <Plus size={14} />}
+                    {isQuickAddOpen ? "Cancel Quick Bill" : "Quick Add New Bill"}
+                  </Button>
+                  {isQuickAddOpen && (
+                    <Select value={quickAddMode} onValueChange={(v) => setQuickAddMode(v as BillMode)}>
+                      <SelectTrigger className="h-7 text-[10px] w-24">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="sell">Sales</SelectItem>
+                        <SelectItem value="buy">Expense</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
-                {bill.items.map((item, iIdx) => (
-                  <div key={item.id} className="flex w-full text-[11px] hover:bg-muted/5 border-b last:border-0 border-dashed">
-                    <div className="w-10 p-2 text-center border-r bg-muted/5 opacity-50">{iIdx + 1}</div>
-                    <div className="w-24 p-2 border-r bg-muted/5 opacity-0">--</div>
-                    <div className="w-32 p-2 border-r bg-muted/5 truncate">
-                      {iIdx === 0 ? bill.vendorOrCustomerName || 'Walk-in' : ''}
-                    </div>
-                    <div className="flex-1 p-2 border-r font-medium">{item.productName}</div>
-                    <div className="w-20 p-2 border-r text-right font-mono">{item.quantity}</div>
-                    <div className="w-24 p-2 border-r text-right font-mono">₹{item.sellPrice.toFixed(2)}</div>
-                    <div className="w-28 p-2 text-right font-mono font-bold">₹{(item.quantity * item.sellPrice).toFixed(2)}</div>
-                    <div className="w-10 p-2"></div>
-                  </div>
-                ))}
+                {isQuickAddOpen && quickAddItems.length > 0 && (
+                  <Button size="sm" className="h-7 bg-emerald-600 hover:bg-emerald-700 text-[10px]" onClick={() => {
+                    // Normally we'd save here, but for now we'll send to standard form with draft
+                    const lastItem = quickAddItems[quickAddItems.length - 1];
+                    handlePrintSelectedBill({
+                      id: 'temp',
+                      items: quickAddItems as any,
+                      totalAmount: quickAddItems.reduce((s, i) => s + (i.sellPrice * i.quantity), 0),
+                      date: new Date().toISOString(),
+                      timestamp: Date.now(),
+                      type: quickAddMode,
+                    } as any);
+                    toast({ title: "Quick Bill Template", description: "You can print this or use standard billing for full GST/Party details." });
+                  }}>
+                    <Printer size={12} className="mr-1" /> Print & Draft
+                  </Button>
+                )}
               </div>
-            ))}
+
+              {isQuickAddOpen && (
+                <div className="p-4 border-b border-emerald-100 bg-emerald-50/10">
+                  <BillingExcelView
+                    items={quickAddItems}
+                    onItemsChange={setQuickAddItems}
+                    currentMode={quickAddMode}
+                    isEstimate={false}
+                    taxType="intra-state"
+                    defaultDate={new Date()}
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-2 italic">* This is a fast-entry mode. For full accounting (GST, Credit, etc.), use the "New Bill" button.</p>
+                </div>
+              )}
+            </div>
+
+            {filteredAndSortedBills.map((bill, bIdx) => {
+              const isMatched = matchesSearch(bill);
+              return (
+                <div
+                  key={bill.id}
+                  ref={el => { billRefs.current[bill.id] = el; }}
+                  className={cn(
+                    "border-b last:border-0 transition-all duration-500",
+                    isMatched ? "ring-2 ring-emerald-500 ring-inset bg-emerald-50/20" : ""
+                  )}
+                >
+                  <div className={cn(
+                    "px-3 py-1.5 flex items-center justify-between text-[11px] font-bold border-b transition-colors",
+                    isMatched ? "bg-emerald-100/50" : "bg-muted/30"
+                  )}>
+                    <div className="flex gap-3 items-center">
+                      <span className={cn("font-mono", isMatched ? "text-emerald-700" : "text-primary")}>
+                        BILL #{filteredAndSortedBills.length - bIdx}
+                      </span>
+                      <span className="opacity-60">{format(new Date(bill.date), 'dd/MM/yy hh:mm a')}</span>
+                      <span className="opacity-40">|</span>
+                      <Badge variant="outline" className={cn("h-4 text-[9px] px-1 py-0", getBillTypeIconAndColor(bill.type, bill.items, bill.isEstimate).className)}>
+                        {getBillTypeName(bill)}
+                      </Badge>
+                      <span className="opacity-60 px-2 font-mono text-[10px]">{bill.id.slice(0, 8)}...</span>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] hover:bg-primary/10" onClick={() => { handleViewBill(bill); setTimeout(() => handleEnterEditMode(), 50); }}><Edit2 size={12} className="mr-1" />Edit</Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] hover:bg-primary/10" onClick={() => handleViewBill(bill)}><Eye size={12} className="mr-1" />View</Button>
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px] hover:bg-emerald-600/10" onClick={() => handlePrintSelectedBill(bill)}><Printer size={12} className="mr-1" />Print</Button>
+                    </div>
+                  </div>
+                  {bill.items.map((item, iIdx) => (
+                    <div key={item.id || iIdx} className={cn(
+                      "flex w-full text-[11px] hover:bg-muted/5 border-b last:border-0 border-dashed transition-colors",
+                      isMatched && item.productName.toLowerCase().includes(searchTerm.toLowerCase()) && searchTerm.length > 2 ? "bg-emerald-50/50" : ""
+                    )}>
+                      <div className="w-10 p-2 text-center border-r bg-muted/5 opacity-50 font-mono">{iIdx + 1}</div>
+                      <div className="w-24 p-2 border-r bg-muted/5 opacity-0">--</div>
+                      <div className="w-32 p-2 border-r bg-muted/5 truncate px-3">
+                        {iIdx === 0 ? (bill.vendorOrCustomerName || 'Walk-in') : <span className="opacity-20">"</span>}
+                      </div>
+                      <div className="flex-1 p-2 border-r font-medium px-3 flex items-center gap-2">
+                        {item.productName}
+                        {isMatched && item.productName.toLowerCase().includes(searchTerm.toLowerCase()) && searchTerm.length > 2 && (
+                          <Badge className="h-3 text-[8px] bg-emerald-500 hover:bg-emerald-500">Match</Badge>
+                        )}
+                      </div>
+                      <div className="w-20 p-2 border-r text-right font-mono px-3">{item.quantity}</div>
+                      <div className="w-24 p-2 border-r text-right font-mono px-3">₹{item.sellPrice.toFixed(2)}</div>
+                      <div className="w-28 p-2 text-right font-mono font-bold px-3 text-emerald-700">₹{(item.quantity * item.sellPrice).toFixed(2)}</div>
+                      <div className="w-10 p-2"></div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })}
+
+            {filteredAndSortedBills.length === 0 && !isLoading && (
+              <div className="flex flex-col items-center justify-center p-20 text-muted-foreground bg-muted/5">
+                <FileSpreadsheet size={48} className="opacity-20 mb-4" />
+                <p>No bills found for the selected period.</p>
+                <Button variant="link" onClick={() => setIsQuickAddOpen(true)}>Create a quick bill now</Button>
+              </div>
+            )}
           </div>
         </div>
       )}

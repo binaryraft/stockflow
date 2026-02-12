@@ -2,15 +2,15 @@
 "use client";
 
 import React, { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'; 
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { BillMode, Store } from '@/types';
 import { PageTitle } from '@/components/common/page-title';
 import { BillingForm } from '@/components/billing/billing-form';
-import { BillHistoryTable, type TimePeriodFilterOption } from '@/components/history/bill-history-table'; 
+import { BillHistoryTable, type TimePeriodFilterOption } from '@/components/history/bill-history-table';
 import { InventoryLedgerTable } from '@/components/billing/inventory-ledger-table';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, ListChecks, BarChart2, CalendarDays, Loader2 } from 'lucide-react';
+import { PlusCircle, History as HistoryIcon, ShoppingBag, Send, RotateCcw, ListChecks, BarChart2, CalendarDays, Loader2, FileSpreadsheet } from 'lucide-react';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -30,42 +30,43 @@ function BillingContent() {
   const modeFromUrl = searchParams.get('mode') as BillMode | null;
   const currentViewFromUrl = searchParams.get('view') as BillingView | null;
 
-  const { 
-    fetchBills, 
-    fetchStores, 
-    stores: storesFromZustand, 
-    companyId: currentCompanyIdFromStore, 
+  const {
+    fetchBills,
+    fetchStores,
+    stores: storesFromZustand,
+    companyId: currentCompanyIdFromStore,
   } = useInventoryStore(state => ({
     fetchBills: state.fetchBills,
-    fetchStores: state.fetchStores, 
-    stores: state.stores, 
-    companyId: localStorage.getItem('companyId') 
+    fetchStores: state.fetchStores,
+    stores: state.stores,
+    companyId: localStorage.getItem('companyId')
   }));
 
   const [allStoresState, setAllStoresState] = useState<Store[]>([]);
   const [activeBillingView, setActiveBillingView] = useState<BillingView>(currentViewFromUrl || 'history');
   const [hasMounted, setHasMounted] = useState(false);
-  
+
   // Local mode always treats usage as Admin/Owner but restricted to local context
-  const isAdminContext = true; 
+  const isAdminContext = true;
 
   const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('thisMonth');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
+  const [viewMode, setViewMode] = useState<'standard' | 'excel'>('standard');
 
   useEffect(() => {
     setHasMounted(true);
     if (currentCompanyIdFromStore) {
       fetchBills(currentCompanyIdFromStore);
-      fetchStores(currentCompanyIdFromStore); 
+      fetchStores(currentCompanyIdFromStore);
     }
-  }, [currentCompanyIdFromStore, fetchBills, fetchStores]); 
+  }, [currentCompanyIdFromStore, fetchBills, fetchStores]);
 
   useEffect(() => {
     if (hasMounted) {
-      setAllStoresState(storesFromZustand); 
+      setAllStoresState(storesFromZustand);
       setActiveBillingView(currentViewFromUrl || 'history');
     }
-  }, [hasMounted, storesFromZustand, currentViewFromUrl]); 
+  }, [hasMounted, storesFromZustand, currentViewFromUrl]);
 
   const handleViewToggle = (view: BillingView) => {
     setActiveBillingView(view);
@@ -80,13 +81,13 @@ function BillingContent() {
   const handleTimePeriodChange = (period: TimePeriodFilterOption) => {
     setTimePeriodFilter(period);
     if (period !== 'custom') {
-      setCustomDateRange(undefined); 
+      setCustomDateRange(undefined);
     }
   };
 
   const isNewBillAction = action === 'new' || !!modeFromUrl;
 
-  let effectiveModeForTitle: BillMode = 'sell'; 
+  let effectiveModeForTitle: BillMode = 'sell';
   if (modeFromUrl && ['sell', 'buy', 'return'].includes(modeFromUrl)) {
     effectiveModeForTitle = modeFromUrl;
   }
@@ -97,25 +98,25 @@ function BillingContent() {
 
     if (effectiveModeForTitle === 'buy') { title = "New Expense Bill"; icon = ShoppingBag; }
     else if (effectiveModeForTitle === 'return') { title = "New Return Entry"; icon = RotateCcw; }
-    
+
     // In local mode, we assume a store is created. If not, the form will complain, but Layout should ensure it.
-    
+
     const newBillPageTitleActions = (
-        <>
-            <Button variant="outline" onClick={() => handleViewToggle('history')} className="w-full md:w-auto">
-              <HistoryIcon className="mr-2 h-4 w-4" /> Bill History
-            </Button>
-            <Button variant="outline" onClick={() => handleViewToggle('ledger')} className="w-full md:w-auto">
-              <ListChecks className="mr-2 h-4 w-4" /> Inventory Ledger
-            </Button>
-        </>
+      <>
+        <Button variant="outline" onClick={() => handleViewToggle('history')} className="w-full md:w-auto">
+          <HistoryIcon className="mr-2 h-4 w-4" /> Bill History
+        </Button>
+        <Button variant="outline" onClick={() => handleViewToggle('ledger')} className="w-full md:w-auto">
+          <ListChecks className="mr-2 h-4 w-4" /> Inventory Ledger
+        </Button>
+      </>
     );
 
     return (
       <>
         <PageTitle title={title} icon={icon} actions={newBillPageTitleActions} />
         <BillingForm
-          key={`new-bill-form-${effectiveModeForTitle}`} 
+          key={`new-bill-form-${effectiveModeForTitle}`}
           initialModeProp={modeFromUrl}
           isAdminContext={true}
           redirectBasePath="/local/billing"
@@ -126,52 +127,63 @@ function BillingContent() {
   }
 
   const newBillHrefPath = `/local/billing?action=new&mode=sell`;
-  
+
   const mainPageActions = (
     <>
       {activeBillingView === 'history' && (
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 w-full sm:w-auto">
-              <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
-                  <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
-                      <SelectValue placeholder="Filter by time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="thisWeek">This Week</SelectItem>
-                      <SelectItem value="thisMonth">This Month</SelectItem>
-                      <SelectItem value="lastMonth">Last Month</SelectItem>
-                      <SelectItem value="thisYear">This Year</SelectItem>
-                      <SelectItem value="lastYear">Last Year</SelectItem>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="custom">Custom Range</SelectItem>
-                  </SelectContent>
-              </Select>
-              {timePeriodFilter === 'custom' && (
-                  <Popover>
-                      <PopoverTrigger asChild>
-                          <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !customDateRange && "text-muted-foreground" )}>
-                              <CalendarDays className="mr-2 h-4 w-4" />
-                              {customDateRange?.from ? (
-                                  customDateRange.to ? (
-                                      <>{format(customDateRange.from, "LLL dd, y")} - {format(customDateRange.to, "LLL dd, y")}</>
-                                  ) : ( format(customDateRange.from, "LLL dd, y") )
-                              ) : ( <span>Pick a date range</span> )}
-                          </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar initialFocus mode="range" defaultMonth={customDateRange?.from} selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
-                      </PopoverContent>
-                  </Popover>
-              )}
+        <div className="flex flex-col sm:flex-row lg:flex-row items-stretch lg:items-center gap-3 w-full sm:w-auto">
+          <div className="flex bg-muted p-1 rounded-md border text-xs h-9">
+            <Button variant={viewMode === 'standard' ? "secondary" : "ghost"} size="sm" className="h-full gap-2" onClick={() => setViewMode('standard')}>
+              <ListChecks size={14} /> Standard
+            </Button>
+            <Button variant={viewMode === 'excel' ? "secondary" : "ghost"} size="sm" className="h-full gap-2" onClick={() => setViewMode('excel')}>
+              <FileSpreadsheet size={14} /> Bulk View
+            </Button>
           </div>
+
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+            <Select value={timePeriodFilter} onValueChange={(value) => handleTimePeriodChange(value as TimePeriodFilterOption)}>
+              <SelectTrigger className="w-full sm:w-auto sm:min-w-[180px] h-9 select-trigger-class">
+                <SelectValue placeholder="Filter by time" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="thisWeek">This Week</SelectItem>
+                <SelectItem value="thisMonth">This Month</SelectItem>
+                <SelectItem value="lastMonth">Last Month</SelectItem>
+                <SelectItem value="thisYear">This Year</SelectItem>
+                <SelectItem value="lastYear">Last Year</SelectItem>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {timePeriodFilter === 'custom' && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button id="date" variant={"outline"} className={cn("w-full sm:w-auto sm:min-w-[260px] justify-start text-left font-normal h-9", !customDateRange && "text-muted-foreground")}>
+                  <CalendarDays className="mr-2 h-4 w-4" />
+                  {customDateRange?.from ? (
+                    customDateRange.to ? (
+                      <>{format(customDateRange.from, "LLL dd, y")} - {format(customDateRange.to, "LLL dd, y")}</>
+                    ) : (format(customDateRange.from, "LLL dd, y"))
+                  ) : (<span>Pick a date range</span>)}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar initialFocus mode="range" defaultMonth={customDateRange?.from} selected={customDateRange} onSelect={setCustomDateRange} numberOfMonths={2} />
+              </PopoverContent>
+            </Popover>
+          )}
+        </div>
       )}
-        <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline" className="w-full md:w-auto">
-            {activeBillingView === 'history' ? <ListChecks className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
-            {activeBillingView === 'history' ? 'Inventory Ledger' : 'Bill History'}
-        </Button>
-        <Button asChild className="w-full md:w-auto">
-            <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> Create New Bill</Link>
-        </Button>
+      <Button onClick={() => handleViewToggle(activeBillingView === 'history' ? 'ledger' : 'history')} variant="outline" className="w-full md:w-auto">
+        {activeBillingView === 'history' ? <ListChecks className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
+        {activeBillingView === 'history' ? 'Inventory Ledger' : 'Bill History'}
+      </Button>
+      <Button asChild className="w-full md:w-auto">
+        <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> Create New Bill</Link>
+      </Button>
     </>
   );
 
@@ -181,12 +193,13 @@ function BillingContent() {
   return (
     <>
       <PageTitle title={pageTitleText} icon={pageTitleIcon} actions={mainPageActions} />
-      {activeBillingView === 'ledger' ? <InventoryLedgerTable /> : 
-        <BillHistoryTable 
-            key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}`}
-            timePeriodFilter={timePeriodFilter} 
-            customStartDate={customDateRange?.from} 
-            customEndDate={customDateRange?.to}
+      {activeBillingView === 'ledger' ? <InventoryLedgerTable /> :
+        <BillHistoryTable
+          key={`${timePeriodFilter}-${customDateRange?.from?.toISOString()}-${customDateRange?.to?.toISOString()}`}
+          timePeriodFilter={timePeriodFilter}
+          customStartDate={customDateRange?.from}
+          customEndDate={customDateRange?.to}
+          viewMode={viewMode}
         />
       }
     </>
