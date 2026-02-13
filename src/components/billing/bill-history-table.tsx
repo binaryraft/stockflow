@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileSpreadsheet } from 'lucide-react';
+import { MoreHorizontal, Eye, Printer, ArrowUpDown, ShoppingBag, Send, RotateCcw, AlertTriangle, Users, Building as BuildingIcon, Trash2, Edit2, Save, Calendar as CalendarIcon, ChevronLeft, ChevronRight, FileSpreadsheet, Plus, X, CheckCircle2 } from 'lucide-react';
 import { format, isToday, isThisWeek, isThisMonth, isThisYear, startOfDay, endOfDay, isValid, parseISO, isWithinInterval, subMonths, subYears, startOfWeek, endOfWeek, getDate, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 import type { Bill, ProductSKU, BillMode, BillItem, StockLayer, Product } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -33,6 +33,8 @@ import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { BillingExcelView } from './billing-excel-view';
+import { v4 as uuidv4 } from 'uuid';
 
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
@@ -93,6 +95,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     products: allProductsStore,
     fetchBillsPaginated,
     companyId: currentCompanyId,
+    addBill,
   } = useInventoryStore(
     (state) => ({
       bills: state.bills,
@@ -105,6 +108,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       products: state.products,
       fetchBillsPaginated: state.fetchBillsPaginated,
       companyId: typeof window !== 'undefined' ? localStorage.getItem('companyId') : null,
+      addBill: state.addBill,
     })
   );
   const { toast } = useToast();
@@ -345,6 +349,75 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
     triggerPrint(printContent);
   };
+
+  /* Quick Add Logic */
+  const [isQuickAddMode, setIsQuickAddMode] = useState(false);
+  const [quickAddItems, setQuickAddItems] = useState<BillItem[]>([]);
+  const [quickAddBillType, setQuickAddBillType] = useState<BillMode>('sell');
+  const [quickAddDate, setQuickAddDate] = useState<Date | undefined>(new Date());
+  const [quickAddPartyName, setQuickAddPartyName] = useState('');
+  const [quickAddPhone, setQuickAddPhone] = useState('');
+  const [quickAddTaxType, setQuickAddTaxType] = useState<'intra-state' | 'inter-state'>('intra-state');
+
+  const handleStartQuickAdd = () => {
+    setIsQuickAddMode(true);
+    setQuickAddItems([]);
+    setQuickAddBillType('sell');
+    setQuickAddDate(new Date());
+    setQuickAddPartyName('');
+    setQuickAddPhone('');
+  };
+
+  const handleCancelQuickAdd = () => {
+    setIsQuickAddMode(false);
+    setQuickAddItems([]);
+  };
+
+  const handleSaveQuickBill = async () => {
+    if (quickAddItems.length === 0) {
+      toast({ variant: "destructive", title: "Empty Bill", description: "Please add at least one item." });
+      return;
+    }
+    if (!currentCompanyId) {
+      toast({ variant: "destructive", title: "Error", description: "Company ID missing. Refresh page." });
+      return;
+    }
+
+    const subTotal = quickAddItems.reduce((sum, item) => sum + (item.quantity * item.sellPrice), 0);
+    const totalTax = quickAddItems.reduce((sum, item) => sum + (item.sgstAmount || 0) + (item.cgstAmount || 0) + (item.igstAmount || 0), 0);
+    const totalDiscount = quickAddItems.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
+    const totalAmount = subTotal + totalTax - totalDiscount;
+
+    const newBillPayload: Bill = {
+      id: uuidv4(),
+      companyId: currentCompanyId,
+      date: quickAddDate ? quickAddDate.toISOString() : new Date().toISOString(),
+      timestamp: quickAddDate ? quickAddDate.getTime() : Date.now(),
+      type: quickAddBillType as Bill['type'],
+      items: quickAddItems,
+      totalAmount,
+      subTotal,
+      totalSGST: quickAddItems.reduce((sum, item) => sum + (item.sgstAmount || 0), 0),
+      totalCGST: quickAddItems.reduce((sum, item) => sum + (item.cgstAmount || 0), 0),
+      totalIGST: quickAddItems.reduce((sum, item) => sum + (item.igstAmount || 0), 0),
+      vendorOrCustomerName: quickAddPartyName,
+      customerPhone: quickAddPhone,
+      paymentStatus: 'paid', // Default to paid
+      taxType: quickAddTaxType,
+      isEstimate: false,
+    };
+
+    try {
+      await addBill(newBillPayload, currentCompanyId);
+      toast({ title: "Bill Created", description: "New quick bill added successfully." });
+      setIsQuickAddMode(false);
+      setQuickAddItems([]);
+    } catch (error) {
+      console.error("Failed to save bill", error);
+      toast({ variant: "destructive", title: "Error", description: "Failed to save bill." });
+    }
+  };
+  /* End Quick Add Logic */
 
   if (isLoading) {
     return <div className="flex-1 flex items-center justify-center p-6">Loading bill history...</div>;
@@ -735,6 +808,102 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           </DialogContent>
         </Dialog>
       )}
+
+      {!isQuickAddMode && (
+        <div className="mb-4">
+          <Button
+            onClick={handleStartQuickAdd}
+            className="w-full md:w-auto h-12 text-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-md border-2 border-emerald-500/50 transition-all hover:scale-[1.01]"
+          >
+            <Plus className="mr-2 h-6 w-6" /> Quick Add New Bill
+          </Button>
+        </div>
+      )}
+
+      {isQuickAddMode ? (
+        <div className="bg-card border rounded-lg shadow-lg overflow-hidden mb-6 flex flex-col animate-in fade-in zoom-in-95 duration-200">
+          <div className="p-4 border-b bg-muted/40 flex flex-col md:flex-row gap-4 items-end md:items-center justify-between">
+            <div className="flex flex-col gap-1 w-full md:w-auto">
+              <h3 className="font-bold text-lg flex items-center gap-2 text-emerald-700">
+                <FileSpreadsheet className="h-5 w-5" /> Quick Bill Entry
+              </h3>
+              <p className="text-xs text-muted-foreground p-0 m-0 leading-none">Rapidly enter items in an Excel-like grid.</p>
+            </div>
+
+            <div className="flex flex-wrap gap-3 items-center w-full md:w-auto">
+              <div className="flex flex-col gap-1">
+                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Date</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant={"outline"} className={cn("w-[130px] pl-3 text-left font-normal h-8 text-xs", !quickAddDate && "text-muted-foreground")}>
+                      {quickAddDate ? format(quickAddDate, "PPP") : <span>Pick a date</span>}
+                      <CalendarIcon className="ml-auto h-3 w-3 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={quickAddDate}
+                      onSelect={setQuickAddDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Type</Label>
+                <Select value={quickAddBillType} onValueChange={(v) => setQuickAddBillType(v as BillMode)}>
+                  <SelectTrigger className="w-[100px] h-8 text-xs">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="sell">Sell</SelectItem>
+                    <SelectItem value="buy">Buy</SelectItem>
+                    <SelectItem value="return">Return</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label className="text-[10px] uppercase text-muted-foreground font-bold">Party Name</Label>
+                <Input
+                  value={quickAddPartyName}
+                  onChange={e => setQuickAddPartyName(e.target.value)}
+                  placeholder={quickAddBillType === 'buy' ? "Vendor Name" : "Customer Name"}
+                  className="h-8 text-xs w-[140px]"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="p-0">
+            <BillingExcelView
+              items={quickAddItems}
+              currentMode={quickAddBillType}
+              isEstimate={false}
+              taxType={quickAddTaxType}
+              onItemsChange={setQuickAddItems}
+              defaultDate={quickAddDate}
+              defaultCustomerName={quickAddPartyName}
+            />
+          </div>
+
+          <div className="p-4 bg-muted/20 border-t flex justify-between items-center">
+            <Button variant="ghost" onClick={handleCancelQuickAdd} className="text-muted-foreground hover:text-destructive">
+              <X className="mr-2 h-4 w-4" /> Cancel
+            </Button>
+            <div className="flex gap-2 items-center">
+              <div className="mr-4 text-right">
+                <span className="text-xs text-muted-foreground block">Total Items: {quickAddItems.length}</span>
+                <span className="text-lg font-bold text-emerald-700">₹{quickAddItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0).toFixed(2)}</span>
+              </div>
+              <Button onClick={handleSaveQuickBill} className="bg-emerald-600 hover:bg-emerald-700 text-white w-48 shadow-md h-10 text-md font-semibold">
+                <Save className="mr-2 h-4 w-4" /> Save New Bill
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
         <Input
