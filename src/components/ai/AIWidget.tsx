@@ -1,7 +1,13 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react'
-import { X, Send, Camera, Image as ImageIcon, Sparkles, BookOpen, ChevronRight, Activity, ShoppingCart, DollarSign, RefreshCcw, LayoutDashboard, Search, Command, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
+import {
+    X, Send, Camera, Image as ImageIcon, Sparkles, BookOpen, Activity,
+    ShoppingCart, DollarSign, RefreshCcw, LayoutDashboard, Search,
+    Command, ArrowRight, CheckCircle2, AlertCircle, ChevronRight,
+    TrendingUp, Package, Users, Store, ArrowUpRight, ArrowDownRight,
+    MessageSquare, Cpu, Layers, Zap, Info, Play
+} from 'lucide-react'
 import { analyzeIntent } from '@/lib/ai/algorithm'
 import { cn } from '@/lib/utils'
 import { useInventoryStore } from '@/hooks/use-inventory-store'
@@ -12,44 +18,60 @@ interface AIWidgetProps {
     onClose: () => void;
 }
 
+type FlowType = 'none' | 'sale' | 'purchase' | 'return' | 'product_add' | 'dashboard';
+type StepType = 'idle' | 'asking_product' | 'asking_quantity' | 'asking_variant' | 'asking_price' | 'confirming';
+
 export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
+    // Basic State
     const [input, setInput] = useState('')
     const [isThinking, setIsThinking] = useState(false)
     const [messages, setMessages] = useState<Array<{
         role: 'user' | 'ai',
         content: string,
-        type?: 'system' | 'split',
-        requiresConfirmation?: boolean,
-        action?: string,
         data?: any,
-        status?: 'pending' | 'success' | 'executing'
+        status?: 'pending' | 'success' | 'executing' | 'info'
     }>>([
-        { role: 'ai', content: 'Welcome to StockFlow Intelligence. How can I assist you with your inventory today?' }
+        { role: 'ai', content: 'Neural Engine initialized. Ready for command execution.' }
     ])
+
+    // UI State
     const [isFocused, setIsFocused] = useState(false)
-    const [showTutorial, setShowTutorial] = useState(false)
-    const [activeView, setActiveView] = useState<'chat' | 'split'>('chat')
+    const [activeSidebarTab, setActiveSidebarTab] = useState<'ops' | 'stats' | 'help'>('ops')
+
+    // Logic Flow State
+    const [currentFlow, setCurrentFlow] = useState<FlowType>('none')
+    const [flowStep, setFlowStep] = useState<StepType>('idle')
+    const [flowData, setFlowData] = useState<any>({})
+
     const scrollRef = useRef<HTMLDivElement>(null)
 
-    const addBill = useInventoryStore((state) => state.addBill);
-    const userProfile = useInventoryStore((state) => state.userProfile);
-    const products = useInventoryStore((state) => state.products);
+    // Store Hooks
+    const {
+        products,
+        bills,
+        dashboardAnalytics,
+        userProfile,
+        addBill,
+        fetchDashboardAnalytics
+    } = useInventoryStore()
 
+    // Auto-scroll
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
     }, [messages, isThinking])
 
-    // Tutorial check
+    // Load Analytics if missing
     useEffect(() => {
-        const tutorialDone = localStorage.getItem('ai_tutorial_v7')
-        if (!tutorialDone && isOpen) {
-            setShowTutorial(true)
+        if (isOpen && !dashboardAnalytics && (userProfile as any)?.companyId) {
+            fetchDashboardAnalytics((userProfile as any).companyId, 'daily')
         }
     }, [isOpen])
 
     if (!isOpen) return null
+
+    // --- Conversational Intelligence ---
 
     const handleSend = (textOverride?: string) => {
         const userMsg = textOverride || input.trim()
@@ -59,188 +81,321 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
         setInput('')
         setIsThinking(true)
 
-        // Process intent
+        // Process thinking
         setTimeout(() => {
-            const response = analyzeIntent(userMsg)
-
-            if (response.intent === 'tutorial') {
-                setShowTutorial(true)
-                setMessages(prev => [...prev, { role: 'ai', content: "Starting walkthrough..." }])
-            } else if (response.intent === 'sales' && response.action === 'scan_bill') {
-                setActiveView('split')
-                setMessages(prev => [...prev, { role: 'ai', content: "Scanner mode activated. Please point your camera at the bill." }])
-            } else {
-                setMessages(prev => [...prev, {
-                    role: 'ai',
-                    content: response.message,
-                    requiresConfirmation: response.requiresConfirmation,
-                    action: response.action,
-                    data: response.data,
-                    status: response.requiresConfirmation ? 'pending' : undefined
-                }])
-            }
-
+            processIntelligence(userMsg)
             setIsThinking(false)
-        }, 1200)
+        }, 800)
+    }
+
+    const processIntelligence = (msg: string) => {
+        const p = msg.toLowerCase();
+
+        // Check for specific Quick Command initiations
+        if (p === 'sale' || p === 'sell' || p === 'billing') {
+            startFlow('sale');
+            return;
+        }
+        if (p === 'purchase' || p === 'buy' || p === 'restock') {
+            startFlow('purchase');
+            return;
+        }
+        if (p === 'dashboard' || p === 'analytics') {
+            handleDashboardAI();
+            return;
+        }
+
+        // Handle active flows
+        if (currentFlow !== 'none') {
+            handleFlowInput(msg);
+            return;
+        }
+
+        // Fallback to standard algorithm
+        const response = analyzeIntent(msg)
+        setMessages(prev => [...prev, {
+            role: 'ai',
+            content: response.message,
+            data: response.data,
+            status: response.requiresConfirmation ? 'pending' : undefined
+        }])
+    }
+
+    const startFlow = (type: FlowType) => {
+        setCurrentFlow(type);
+        setFlowStep('asking_product');
+        setFlowData({});
+
+        const prompt = type === 'sale'
+            ? "Sure, let's start a sale. Which product are we selling?"
+            : "Starting a purchase entry. Which product did we buy?";
+
+        setMessages(prev => [...prev, { role: 'ai', content: prompt }]);
+    }
+
+    const handleFlowInput = (msg: string) => {
+        switch (flowStep) {
+            case 'asking_product':
+                const foundProduct = products.find(p => p.name.toLowerCase().includes(msg.toLowerCase()));
+                if (foundProduct) {
+                    setFlowData({ ...flowData, product: foundProduct, productName: foundProduct.name });
+
+                    if (foundProduct.variants && foundProduct.variants.length > 0) {
+                        setFlowStep('asking_variant');
+                        setMessages(prev => [...prev, {
+                            role: 'ai',
+                            content: `Great choice: ${foundProduct.name}. Which variant? (${foundProduct.variants.map(v => v.name).join(', ')})`
+                        }]);
+                    } else {
+                        setFlowStep('asking_quantity');
+                        setMessages(prev => [...prev, { role: 'ai', content: `How many ${foundProduct.name}?` }]);
+                    }
+                } else {
+                    setMessages(prev => [...prev, { role: 'ai', content: `I couldn't find "${msg}" in your inventory. Please check the name or say "cancel".` }]);
+                }
+                break;
+
+            case 'asking_variant':
+                // For simplicity, just store the variant name in this version
+                setFlowData({ ...flowData, variant: msg });
+                setFlowStep('asking_quantity');
+                setMessages(prev => [...prev, { role: 'ai', content: `Understood, ${msg} variant. What is the quantity?` }]);
+                break;
+
+            case 'asking_quantity':
+                const qty = parseInt(msg);
+                if (!isNaN(qty)) {
+                    setFlowData({ ...flowData, qty });
+                    setFlowStep('asking_price');
+                    const pricePrompt = currentFlow === 'sale' ? "At what price per unit?" : "What was the cost price per unit?";
+                    setMessages(prev => [...prev, { role: 'ai', content: pricePrompt }]);
+                } else {
+                    setMessages(prev => [...prev, { role: 'ai', content: "Please provide a valid number for quantity." }]);
+                }
+                break;
+
+            case 'asking_price':
+                const price = parseFloat(msg.replace(/[^0-9.]/g, ''));
+                if (!isNaN(price)) {
+                    const finalData = { ...flowData, price };
+                    setFlowData(finalData);
+                    setFlowStep('confirming');
+                    setMessages(prev => [...prev, {
+                        role: 'ai',
+                        content: `Excellent. I have prepared a ${currentFlow} for ${finalData.qty} x ${finalData.productName}${finalData.variant ? ` (${finalData.variant})` : ''} at ₹${price}.`,
+                        data: { qty: finalData.qty, productName: finalData.productName, price: finalData.price, action: currentFlow === 'sale' ? 'add_to_bill' : 'purchase' },
+                        status: 'pending'
+                    }]);
+                } else {
+                    setMessages(prev => [...prev, { role: 'ai', content: "Please provide a valid numeric price." }]);
+                }
+                break;
+        }
+    }
+
+    const handleDashboardAI = () => {
+        const stats = dashboardAnalytics?.summary;
+        if (!stats) {
+            setMessages(prev => [...prev, { role: 'ai', content: "Dashboard data is currently syncing. One moment..." }]);
+            return;
+        }
+
+        const report = `Neural Overview for Today:\n\n` +
+            `💰 Revenue: ₹${stats.totalRevenue.toLocaleString()}\n` +
+            `📈 Gross Profit: ₹${stats.grossProfit.toLocaleString()}\n` +
+            `🛒 Transactions: ${stats.transactionsToday}\n` +
+            `📉 Expenses: ₹${stats.totalExpenses.toLocaleString()}\n\n` +
+            `Your profit margin is currently ${((stats.grossProfit / (stats.totalRevenue || 1)) * 100).toFixed(1)}%.`;
+
+        setMessages(prev => [...prev, { role: 'ai', content: report, status: 'info' }]);
     }
 
     const executeAction = async (msgIndex: number) => {
         const msg = messages[msgIndex];
-        if (!msg.data || !msg.action) return;
+        if (!msg.data) return;
 
-        // Update status to executing
         setMessages(prev => prev.map((m, i) => i === msgIndex ? { ...m, status: 'executing' as const } : m));
 
         try {
-            if (msg.action === 'add_to_bill') {
-                const { qty, productName, price } = msg.data;
+            const { qty, productName, price, action } = msg.data;
+            const product = products.find(p => p.name === productName);
 
-                // Find product
-                const product = products.find(p => p.name.toLowerCase().includes(productName.toLowerCase()));
-                if (!product) throw new Error(`Product "${productName}" not found. Please add it to inventory first.`);
+            if (!product) throw new Error("Product verification failed.");
 
-                const billData: any = {
-                    type: 'sell',
-                    date: new Date().toISOString().split('T')[0],
-                    timestamp: Date.now(),
-                    companyId: (userProfile as any).companyId || 'local',
-                    items: [],
-                    totalAmount: (price || 0) * qty
-                };
+            const billData: any = {
+                type: action === 'add_to_bill' ? 'sell' : 'buy',
+                date: new Date().toISOString().split('T')[0],
+                timestamp: Date.now(),
+                companyId: (userProfile as any).companyId || 'local',
+                items: [],
+                totalAmount: price * qty
+            };
 
-                const itemData: any = {
-                    productId: product.id,
-                    productName: product.name,
-                    quantity: qty,
-                    costPrice: 0, // Should ideally be fetched
-                    sellPrice: price || 0,
-                };
+            const itemData: any = {
+                productId: product.id,
+                productName: product.name,
+                quantity: qty,
+                costPrice: action === 'purchase' ? price : 0,
+                sellPrice: action === 'add_to_bill' ? price : 0,
+            };
 
-                await addBill(billData, [itemData]);
+            await addBill(billData, [itemData]);
 
-                setMessages(prev => [
-                    ...prev.map((m, i) => i === msgIndex ? { ...m, status: 'success' as const } : m),
-                    { role: 'ai', content: `✅ Successfully added ${qty} x ${product.name} to a new sale bill.` }
-                ]);
+            setMessages(prev => [
+                ...prev.map((m, i) => i === msgIndex ? { ...m, status: 'success' as const } : m),
+                { role: 'ai', content: `✅ Atomic operation complete. ${qty} units processed for ${productName}.` }
+            ]);
 
-                toast({
-                    title: "Action Executed",
-                    description: `Added ${qty} ${product.name} to sales.`
-                });
-            }
+            // Success reset
+            setCurrentFlow('none');
+            setFlowStep('idle');
+
         } catch (error: any) {
             setMessages(prev => [
                 ...prev.map((m, i) => i === msgIndex ? { ...m, status: 'pending' as const } : m),
-                { role: 'ai', content: `❌ Error: ${error.message}` }
+                { role: 'ai', content: `🛑 Transaction Blocked: ${error.message}` }
             ]);
         }
     }
 
-    const quickCommands = [
-        { label: 'Sale', icon: <DollarSign className="w-4 h-4" />, id: 'sales', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' },
-        { label: 'Purchase', icon: <ShoppingCart className="w-4 h-4" />, id: 'purchase', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
-        { label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" />, id: 'dashboard', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
-        { label: 'Returns', icon: <RefreshCcw className="w-4 h-4" />, id: 'returns', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-    ]
+    // --- Computed Components ---
 
-    const finishTutorial = () => {
-        localStorage.setItem('ai_tutorial_v7', 'true')
-        setShowTutorial(false)
+    const QuickStats = () => {
+        const stats = dashboardAnalytics?.summary;
+        if (!stats) return <div className="text-white/20 text-xs animate-pulse p-4">Neural data pending...</div>;
+
+        return (
+            <div className="space-y-4 p-4">
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-2xl">
+                        <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">Revenue Today</p>
+                        <p className="text-lg font-black text-white">₹{stats.totalRevenue.toLocaleString()}</p>
+                    </div>
+                    <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-2xl">
+                        <p className="text-[10px] text-blue-400 font-black uppercase tracking-widest">Orders</p>
+                        <p className="text-lg font-black text-white">{stats.transactionsToday}</p>
+                    </div>
+                </div>
+                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-[10px] text-white/40 font-bold uppercase tracking-widest">System Health</span>
+                        <span className="text-[10px] text-emerald-500 font-bold">OPTIMAL</span>
+                    </div>
+                    <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+                        <div className="h-full bg-emerald-500 w-[92%] shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (
-        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-6 sm:pt-10 px-0 sm:px-4 leading-normal">
-            {/* Background Blur */}
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-start pt-4 sm:pt-6 px-0 sm:px-4 leading-normal font-sans">
+            {/* Ultra Dark Background */}
             <div
-                className="absolute inset-0 bg-black/70 backdrop-blur-xl animate-in fade-in duration-500"
+                className="absolute inset-0 bg-[#000000]/80 backdrop-blur-3xl animate-in fade-in duration-500"
                 onClick={onClose}
             />
 
             {/* Close Button */}
             <button
                 onClick={onClose}
-                className="fixed top-6 right-6 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/80 hover:text-white hover:scale-110 active:scale-95 transition-all z-[110] backdrop-blur-md"
+                className="fixed top-6 right-6 w-12 h-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white hover:scale-110 active:scale-95 transition-all z-[110] backdrop-blur-md"
             >
                 <X className="w-6 h-6" />
             </button>
 
-            {/* Main Container */}
+            {/* COMMAND CENTER CONTAINER */}
             <div className={cn(
-                "w-full max-w-2xl bg-[#0a0a0b] relative rounded-t-[2.5rem] sm:rounded-[2.5rem] overflow-hidden flex flex-col transition-all duration-700 animate-slideDown shadow-[0_0_80px_-20px_rgba(0,0,0,0.8)] border border-white/10",
-                isThinking && "border-emerald-500/30"
+                "w-full max-w-5xl bg-[#080809] border border-white/10 relative rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden flex flex-col sm:flex-row shadow-[0_0_100px_-20px_rgba(16,185,129,0.15)] transition-all duration-700 animate-slideDown",
+                isThinking && "ring-1 ring-emerald-500/20"
             )}>
-                {/* Decorative Elements */}
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/2 h-1 bg-gradient-to-r from-transparent via-emerald-500 to-transparent opacity-50" />
 
-                {/* Tutorial Overlay */}
-                {showTutorial && (
-                    <div className="absolute inset-0 z-50 bg-[#0a0a0b]/95 backdrop-blur-3xl flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 duration-500">
-                        <div className="relative mb-8">
-                            <div className="w-24 h-24 rounded-3xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
-                                <Sparkles className="w-12 h-12 text-emerald-400 animate-pulse" />
+                {/* 1. LEFT SIDEBAR/DASHBOARD (Desktop Only, Tabs on Mobile) */}
+                <div className="hidden sm:flex w-72 border-r border-white/5 flex-col bg-white/[0.01]">
+                    <div className="p-6 border-b border-white/5">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                <Cpu className="w-4 h-4 text-emerald-950" />
                             </div>
-                            <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-emerald-950 font-black text-xs shadow-lg shadow-emerald-500/50">V7</div>
-                        </div>
-                        <h3 className="text-3xl font-black text-white mb-4 tracking-tight uppercase">Intelligence v7</h3>
-                        <p className="text-white/60 mb-10 max-w-sm leading-relaxed">
-                            Natural language execution is here. Simply tell me what happens in your store, and I'll update everything in real-time.
-                        </p>
-                        <div className="space-y-4 w-full max-w-xs">
-                            <button
-                                onClick={() => { setInput("Add 10 apples to sales at 50 rs"); setShowTutorial(false); }}
-                                className="group w-full py-4 bg-emerald-500 text-emerald-950 font-black rounded-2xl hover:bg-emerald-400 active:scale-95 transition-all flex items-center justify-center gap-2"
-                            >
-                                Try Now <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                            </button>
-                            <button
-                                onClick={finishTutorial}
-                                className="w-full py-4 bg-white/5 text-white/50 rounded-2xl hover:bg-white/10 transition-all font-bold"
-                            >
-                                Enter Assistant
-                            </button>
+                            <h3 className="text-xs font-black text-white uppercase tracking-[0.2em]">Neural Core</h3>
                         </div>
                     </div>
-                )}
 
-                {/* Header */}
-                <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between bg-white/[0.01]">
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "w-12 h-12 rounded-2xl flex items-center justify-center bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-inner",
-                            isThinking && "animate-pulse"
-                        )}>
-                            <Activity className="w-6 h-6" />
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <h2 className="text-xl font-black text-white tracking-tight uppercase italic">StockFlow AI</h2>
-                                <div className="flex gap-1">
-                                    <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                                    <div className="w-1 h-1 rounded-full bg-blue-500 animate-pulse delay-100" />
-                                    <div className="w-1 h-1 rounded-full bg-purple-500 animate-pulse delay-200" />
+                    <div className="flex-1 overflow-y-auto custom-scrollbar">
+                        <div className="p-6 space-y-8">
+                            {/* Operational Stats */}
+                            <section>
+                                <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest mb-4">Real-time Metrics</h4>
+                                <QuickStats />
+                            </section>
+
+                            {/* Quick Executables */}
+                            <section>
+                                <h4 className="text-[10px] text-white/30 font-black uppercase tracking-widest mb-4">Command Presets</h4>
+                                <div className="space-y-2">
+                                    {[
+                                        { label: 'Sale Entry', icon: <DollarSign className="w-4 h-4" />, action: () => startFlow('sale') },
+                                        { label: 'Purchase Order', icon: <ShoppingCart className="w-4 h-4" />, action: () => startFlow('purchase') },
+                                        { label: 'View Dashboard', icon: <LayoutDashboard className="w-4 h-4" />, action: handleDashboardAI },
+                                        { label: 'Stock Audit', icon: <Package className="w-4 h-4" />, action: () => handleSend('Show me low stock items') }
+                                    ].map((btn, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={btn.action}
+                                            className="w-full flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/10 transition-all group"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-white/40 group-hover:text-emerald-400">
+                                                    {btn.icon}
+                                                </div>
+                                                <span className="text-xs font-bold text-white/70 group-hover:text-white transition-colors uppercase tracking-tight">{btn.label}</span>
+                                            </div>
+                                            <ArrowUpRight className="w-3 h-3 text-white/20 group-hover:text-emerald-500" />
+                                        </button>
+                                    ))}
                                 </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                <p className="text-[10px] uppercase font-bold tracking-widest text-emerald-500/70">Neural Engine Active</p>
-                            </div>
+                            </section>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                        <div className="hidden sm:flex flex-col items-end mr-2">
-                            <span className="text-[10px] text-white/20 font-black tracking-widest uppercase">Memory</span>
-                            <span className="text-xs text-white/60 font-mono tracking-tighter">0.8s Latency</span>
-                        </div>
-                        <div className="w-10 h-10 rounded-full border border-white/10 bg-white/5 flex items-center justify-center text-white/60 hover:text-white cursor-pointer transition-colors">
-                            <Command className="w-4 h-4" />
+                    <div className="p-6 bg-black/20 border-t border-white/5">
+                        <div className="flex items-center gap-2 opacity-30">
+                            <Layers className="w-3 h-3 text-emerald-500" />
+                            <span className="text-[9px] font-black tracking-widest text-white">SYSTEM UPTIME: 99.9%</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Main Content Area */}
-                <div className="flex-1 overflow-hidden flex flex-col h-[75vh] sm:h-[65vh]">
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto px-8 py-8 space-y-8 scrollbar-hide">
+                {/* 2. MAIN CONVERSATION ENGINE (Scrollable) */}
+                <div className="flex-1 flex flex-col min-h-0 bg-transparent">
+                    {/* Header */}
+                    <div className="px-6 sm:px-8 py-6 border-b border-white/5 flex items-center justify-between backdrop-blur-md bg-white/[0.01] sticky top-0 z-20">
+                        <div className="flex items-center gap-4">
+                            <div className="sm:hidden w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20">
+                                <MessageSquare className="w-5 h-5 text-emerald-400" />
+                            </div>
+                            <div>
+                                <h1 className="text-lg font-black text-white tracking-tight italic uppercase">EcBills Artificial Intelligence</h1>
+                                <div className="flex items-center gap-3 mt-0.5">
+                                    <div className="flex gap-0.5">
+                                        {[1, 2, 3].map(i => <div key={i} className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />)}
+                                    </div>
+                                    <span className="text-[10px] text-white/30 font-bold uppercase tracking-widest">Processing Layer 7</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Mobile Stats Indicator */}
+                        <div className="sm:hidden flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <TrendingUp className="w-4 h-4" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Scrollable Conversation */}
+                    <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 sm:px-8 py-8 space-y-10 scroll-smooth custom-scrollbar">
                         {messages.map((m, i) => (
                             <div key={i} className={cn(
                                 "flex flex-col animate-in slide-in-from-bottom-4 fade-in duration-500",
@@ -248,216 +403,180 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
                             )}>
                                 {m.role === 'ai' && (
                                     <div className="flex items-center gap-2 mb-2 ml-1">
-                                        <div className="w-5 h-5 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                                            <Sparkles className="w-3 h-3 text-emerald-400" />
-                                        </div>
-                                        <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em]">Assistant</span>
+                                        <Zap className="w-3.5 h-3.5 text-emerald-400 fill-emerald-500/20" />
+                                        <span className="text-[10px] text-emerald-500/60 font-black uppercase tracking-[0.2em]">Neural Output</span>
                                     </div>
                                 )}
 
                                 <div className={cn(
-                                    "max-w-[85%] p-5 rounded-[1.5rem] text-sm sm:text-base leading-relaxed group relative",
+                                    "max-w-[90%] sm:max-w-[80%] p-5 sm:p-6 rounded-[1.75rem] text-sm sm:text-base leading-relaxed group shadow-2xl transition-all",
                                     m.role === 'user'
-                                        ? "bg-white/5 text-white font-medium border border-white/10 rounded-tr-none shadow-2xl"
-                                        : "bg-white/[0.03] text-white/90 rounded-tl-none border border-white/5"
+                                        ? "bg-white/[0.08] text-white font-medium border border-white/20 rounded-tr-none"
+                                        : m.status === 'info'
+                                            ? "bg-emerald-500/5 text-white/90 border border-emerald-500/20 rounded-tl-none font-mono"
+                                            : "bg-white/[0.02] text-white/90 border border-white/5 rounded-tl-none"
                                 )}>
-                                    {m.role === 'user' && (
-                                        <div className="absolute -left-12 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
-                                                <Search className="w-4 h-4" />
-                                            </div>
-                                        </div>
-                                    )}
+                                    {m.content.split('\n').map((line, idx) => (
+                                        <p key={idx} className={idx > 0 ? "mt-1" : ""}>{line}</p>
+                                    ))}
 
-                                    {m.content}
-
-                                    {/* Action UI */}
-                                    {m.requiresConfirmation && m.status !== 'success' && (
-                                        <div className="mt-6 p-4 rounded-3xl bg-black/40 border border-white/10 animate-in zoom-in-95 duration-500 overflow-hidden relative">
-                                            <div className="absolute top-0 right-0 p-3">
-                                                <Activity className="w-4 h-4 text-emerald-400/20" />
-                                            </div>
-
-                                            <div className="flex items-center gap-3 mb-4">
-                                                <div className="w-10 h-10 rounded-2xl bg-emerald-500 text-emerald-950 flex items-center justify-center">
-                                                    <ShoppingCart className="w-5 h-5" />
+                                    {/* Verification & Action UI */}
+                                    {m.status === 'pending' && (
+                                        <div className="mt-8 p-6 rounded-[2rem] bg-black/60 border border-white/10 animate-in zoom-in-95 duration-500">
+                                            <div className="flex items-center gap-4 mb-6">
+                                                <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-emerald-950 flex items-center justify-center shadow-lg shadow-emerald-500/20">
+                                                    <Play className="w-6 h-6 fill-emerald-950" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="text-xs font-black uppercase tracking-widest text-white/80">Pending Action</h4>
-                                                    <p className="text-[10px] text-white/40 uppercase font-medium">Verify data before execution</p>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2 mb-6">
-                                                <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-white/5 border border-white/5 group/row hover:bg-white/10 transition-all">
-                                                    <span className="text-xs text-white/40 font-medium">Product</span>
-                                                    <span className="text-sm text-white font-bold group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{m.data?.productName}</span>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-white/5 border border-white/5">
-                                                        <span className="text-[10px] text-white/40 font-medium uppercase">Qty</span>
-                                                        <span className="text-sm text-white font-black">{m.data?.qty}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center px-4 py-3 rounded-xl bg-white/5 border border-white/5">
-                                                        <span className="text-[10px] text-white/40 font-medium uppercase">Rate</span>
-                                                        <span className="text-sm text-white font-black">₹{m.data?.price || 0}</span>
+                                                    <h4 className="text-xs font-black uppercase tracking-widest text-white/80">Operation Verification</h4>
+                                                    <div className="flex items-center gap-2">
+                                                        <Activity className="w-3 h-3 text-emerald-500" />
+                                                        <p className="text-[10px] text-white/40 uppercase font-medium">Validation Success</p>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            <div className="flex gap-2">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
+                                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
+                                                    <span className="text-[10px] text-white/20 font-black uppercase tracking-tighter">Identity</span>
+                                                    <p className="text-sm font-black text-white truncate">{m.data?.productName}</p>
+                                                </div>
+                                                <div className="bg-white/5 p-4 rounded-2xl border border-white/5 flex flex-col justify-between">
+                                                    <span className="text-[10px] text-white/20 font-black uppercase tracking-tighter">Payload</span>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-sm font-bold text-white">x{m.data?.qty}</span>
+                                                        <span className="text-sm font-black text-emerald-400">₹{m.data?.price}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex gap-3">
                                                 <button
-                                                    disabled={m.status === 'executing'}
                                                     onClick={() => executeAction(i)}
-                                                    className={cn(
-                                                        "flex-1 py-4 px-6 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 shadow-lg",
-                                                        m.status === 'executing'
-                                                            ? "bg-white/10 text-white/30 cursor-not-allowed"
-                                                            : "bg-emerald-500 text-emerald-950 hover:bg-emerald-400 shadow-emerald-500/20"
-                                                    )}
+                                                    className="flex-1 h-14 rounded-2xl bg-emerald-500 text-emerald-950 font-black text-xs uppercase tracking-widest hover:bg-emerald-400 active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xl shadow-emerald-500/10"
                                                 >
-                                                    {m.status === 'executing' ? (
-                                                        <>
-                                                            <div className="w-4 h-4 border-2 border-emerald-950/30 border-t-emerald-950 rounded-full animate-spin" />
-                                                            Executing...
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <CheckCircle2 className="w-5 h-5" />
-                                                            Confirm Sale
-                                                        </>
-                                                    )}
+                                                    Execute Transaction <ArrowRight className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => {
-                                                        setMessages(prev => prev.filter((_, idx) => idx !== i));
-                                                    }}
-                                                    className="w-14 h-14 flex items-center justify-center rounded-2xl bg-white/5 text-white/40 hover:text-rose-400 hover:bg-rose-400/10 transition-all"
+                                                    onClick={() => setMessages(p => p.filter((_, idx) => idx !== i))}
+                                                    className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/10 transition-all active:scale-95"
                                                 >
                                                     <X className="w-6 h-6" />
                                                 </button>
                                             </div>
                                         </div>
                                     )}
+
+                                    {m.status === 'executing' && (
+                                        <div className="mt-4 flex items-center gap-4 bg-emerald-500/10 p-4 rounded-2xl border border-emerald-500/20">
+                                            <div className="w-4 h-4 border-2 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+                                            <span className="text-xs font-black uppercase tracking-widest text-emerald-400">Transacting on mainnet...</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         ))}
-
-                        {isThinking && (
-                            <div className="flex flex-col items-start animate-in fade-in">
-                                <span className="text-[10px] text-emerald-400 font-bold mb-3 ml-1 uppercase tracking-[0.3em]">Processing</span>
-                                <div className="bg-white/5 px-6 py-4 rounded-3xl rounded-tl-none border border-white/10 flex gap-2">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce" />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce delay-150" />
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-bounce delay-300" />
-                                </div>
-                            </div>
-                        )}
                     </div>
-                </div>
 
-                {/* Footer Input Area */}
-                <div className="px-8 pb-8 pt-4 bg-white/[0.01] border-t border-white/5">
-                    {/* Guidance / Quick Commands */}
-                    <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar">
-                        <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-3 py-2 rounded-xl border border-emerald-500/20 mr-2 shrink-0">
-                            <Command className="w-4 h-4" />
-                            <span className="text-[10px] font-black uppercase tracking-widest">Global Ops</span>
-                        </div>
-                        {quickCommands.map(cmd => (
+                    {/* Advanced Input System */}
+                    <div className="px-6 sm:px-8 pb-8 pt-4 bg-white/[0.01] border-t border-white/5 z-20">
+                        {/* Intelligent Guidance */}
+                        <div className="flex gap-2 overflow-x-auto pb-6 no-scrollbar">
+                            <div className="sm:hidden flex items-center gap-2 pr-2 border-r border-white/10 mr-2 shrink-0">
+                                <button
+                                    onClick={() => startFlow('sale')}
+                                    className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                                    <DollarSign className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => startFlow('purchase')}
+                                    className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                                    <ShoppingCart className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/5 text-white/30 italic text-xs shrink-0">
+                                <Info className="w-3.5 h-3.5" />
+                                <span>Try "I sold 15 Red T-Shirts"</span>
+                            </div>
+
                             <button
-                                key={cmd.id}
-                                onClick={() => handleSend(cmd.label)}
+                                onClick={() => startFlow('sale')}
+                                className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-black uppercase tracking-widest hover:bg-emerald-500/20 transition-all"
+                            >
+                                <DollarSign className="w-3.5 h-3.5" /> Start Sale
+                            </button>
+
+                            <button
+                                onClick={() => startFlow('purchase')}
+                                className="hidden sm:flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-blue-500/10 text-blue-400 border border-blue-500/20 text-xs font-black uppercase tracking-widest hover:bg-blue-500/20 transition-all"
+                            >
+                                <ShoppingCart className="w-3.5 h-3.5" /> Buy Entry
+                            </button>
+                        </div>
+
+                        {/* Quantum Input Bar */}
+                        <div className={cn(
+                            "relative flex items-center gap-3 bg-white/[0.03] border border-white/10 rounded-[2rem] p-3 transition-all duration-700",
+                            isFocused && "bg-black border-emerald-500/50 shadow-[0_0_60px_rgba(16,185,129,0.1)]"
+                        )}>
+                            <div className="flex items-center ml-2 border-r border-white/10 pr-3">
+                                <Cpu className={cn("w-5 h-5 transition-colors", isFocused ? "text-emerald-500" : "text-white/20")} />
+                            </div>
+
+                            <input
+                                type="text"
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onFocus={() => setIsFocused(true)}
+                                onBlur={() => setIsFocused(false)}
+                                placeholder={currentFlow === 'none' ? "Tell AI your store activity..." : "Answer the question above..."}
+                                className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder:text-white/10 text-base sm:text-lg py-1 font-medium italic"
+                                onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                            />
+
+                            <button
+                                onClick={() => handleSend()}
+                                disabled={!input.trim() || isThinking}
                                 className={cn(
-                                    "flex items-center gap-2.5 px-5 py-2.5 rounded-2xl whitespace-nowrap border transition-all active:scale-95 text-xs font-bold uppercase tracking-tight",
-                                    cmd.color, "hover:brightness-125"
+                                    "w-12 h-12 flex items-center justify-center rounded-[1.25rem] transition-all overflow-hidden relative group/send shadow-2xl",
+                                    input.trim() ? "bg-emerald-500 scale-105" : "bg-white/5 opacity-40"
                                 )}
                             >
-                                {cmd.icon}
-                                {cmd.label}
-                            </button>
-                        ))}
-                        <div className="px-5 py-2.5 rounded-2xl bg-white/5 border border-white/5 text-white/20 text-xs flex items-center gap-2 italic">
-                            <Sparkles className="w-3 h-3" />
-                            Try "Add 10 jackets at 1500"
-                        </div>
-                    </div>
-
-                    {/* Enhanced Input Bar */}
-                    <div className={cn(
-                        "relative flex items-center gap-3 bg-white/5 border border-white/10 rounded-[2rem] p-3 transition-all duration-700 group",
-                        isFocused && "ring-0 bg-[#121214] border-emerald-500/50 shadow-[0_0_50px_rgba(16,185,129,0.1)]"
-                    )}>
-                        <div className="flex gap-1 ml-2">
-                            <button className="w-10 h-10 flex items-center justify-center rounded-2xl text-white/30 hover:text-emerald-400 hover:bg-emerald-400/10 transition-all">
-                                <Camera className="w-5 h-5" />
+                                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-600 to-emerald-400 opacity-0 group-hover/send:opacity-100 transition-opacity" />
+                                <Send className={cn(
+                                    "w-6 h-6 relative z-10 transition-all duration-500",
+                                    input.trim() ? "text-emerald-950 scale-110 -rotate-[15deg] group-hover/send:rotate-0" : "text-white/60"
+                                )} />
                             </button>
                         </div>
 
-                        <input
-                            type="text"
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onFocus={() => setIsFocused(true)}
-                            onBlur={() => setIsFocused(false)}
-                            placeholder="Type a command (ex: 'Sell 5 Red Shirts')"
-                            className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder:text-white/20 text-base sm:text-lg py-1 font-medium italic tracking-tight"
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        />
-
-                        <button
-                            onClick={() => handleSend()}
-                            disabled={!input.trim() || isThinking}
-                            className={cn(
-                                "w-12 h-12 flex items-center justify-center rounded-[1.25rem] transition-all active:scale-90 shadow-2xl overflow-hidden group/send relative",
-                                input.trim()
-                                    ? "bg-emerald-500 scale-110"
-                                    : "bg-white/5 grayscale"
-                            )}
-                        >
-                            {input.trim() && (
-                                <div className="absolute inset-0 bg-gradient-to-tr from-emerald-600 to-emerald-400 group-hover/send:scale-110 transition-transform" />
-                            )}
-                            <Send className={cn(
-                                "w-6 h-6 relative z-10 transition-all",
-                                input.trim() ? "text-emerald-950 scale-110 rotate-[15deg] group-hover/send:rotate-0" : "text-white/20"
-                            )} />
-                        </button>
-                    </div>
-
-                    <div className="mt-6 flex items-center justify-between px-2 opacity-30 group-hover:opacity-100 transition-opacity">
-                        <div className="flex gap-4">
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/60">Voice Mode Ready</span>
-                            </div>
-                            <div className="flex items-center gap-1.5">
-                                <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
-                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-white/60">Secure RSA-4096</span>
-                            </div>
+                        <div className="mt-6 flex items-center justify-between px-3 text-[10px] uppercase font-black tracking-[0.3em] opacity-30">
+                            <span className="flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                Voice Analysis Ready
+                            </span>
+                            <span className="text-white/50">V7.2 Quantum AI</span>
                         </div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/40">Powered by EcBills v7</span>
                     </div>
                 </div>
             </div>
 
             <style jsx global>{`
+                .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+                .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+                .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.05); border-radius: 20px; }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(16,185,129,0.2); }
+                
                 .no-scrollbar::-webkit-scrollbar { display: none; }
                 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-                
-                .glass-ai-panel {
-                    background: linear-gradient(145deg, rgba(10,10,11,0.9), rgba(15,15,18,0.9));
-                    box-shadow: 
-                        0 20px 40px -10px rgba(0,0,0,0.5),
-                        inset 0 1px 1px 0 rgba(255,255,255,0.05);
-                }
 
                 @keyframes slideDown {
                     from { transform: translateY(-20px); opacity: 0; }
                     to { transform: translateY(0); opacity: 1; }
                 }
                 .animate-slideDown {
-                    animation: slideDown 0.6s cubic-bezier(0.23, 1, 0.32, 1) forwards;
+                    animation: slideDown 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
                 }
             `}</style>
         </div>
