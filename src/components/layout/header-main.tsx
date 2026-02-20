@@ -6,7 +6,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/co
 import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon, ChevronDown } from 'lucide-react';
 import { NAV_LINK_GROUPS, APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
-import { Package2 } from 'lucide-react';
+import { BrandLogo } from '../common/BrandLogo';
 import { ThemeToggle } from './theme-toggle';
 import {
   DropdownMenu,
@@ -119,7 +119,7 @@ export function HeaderMain() {
                   href={userRole === 'admin' ? "/admin" : "/"}
                   className="flex items-center gap-2.5 text-lg font-semibold text-primary hover:opacity-90"
                 >
-                  <Package2 className="h-7 w-7" />
+                  <BrandLogo className="h-7 w-7" />
                   <span className="">{APP_NAME}</span>
                 </Link>
               </SheetTitle>

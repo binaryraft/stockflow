@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { APP_NAME } from '@/lib/constants';
 import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, SidebarFooter, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { BrandLogo } from '../common/BrandLogo';
 import { Package2, ChevronRight, ChevronLeft, LayoutDashboard, DollarSign, Package, BookOpen, Settings as SettingsIcon, Wifi, WifiOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -44,7 +45,7 @@ export function LocalSidebarNav() {
         <div className={cn("flex items-center h-full", sidebarState === 'expanded' ? "justify-between pl-3 pr-2" : "justify-center")}>
           {sidebarState === 'expanded' ? (
             <Link href="/local" className="flex items-center gap-2.5 font-bold text-xl text-primary hover:opacity-80 transition-opacity">
-              <Package2 className="h-7 w-7" />
+              <BrandLogo className="h-7 w-7" />
               <span className="truncate">{APP_NAME} <span className="text-xs font-normal text-muted-foreground">(Local)</span></span>
             </Link>
           ) : (

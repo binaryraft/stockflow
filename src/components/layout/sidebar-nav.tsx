@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { NAV_LINK_GROUPS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { BrandLogo } from '../common/BrandLogo';
 import { Package2, ChevronRight, PanelLeftOpen, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
@@ -40,7 +41,7 @@ export function SidebarNav() {
         <div className={cn("flex items-center h-full", sidebarState === 'expanded' ? "justify-between pl-3 pr-2" : "justify-center")}>
           {sidebarState === 'expanded' ? (
             <Link href="/admin" className="flex items-center gap-2.5 font-bold text-xl text-primary hover:opacity-80 transition-opacity">
-              <Package2 className="h-7 w-7" />
+              <BrandLogo className="h-7 w-7" />
               <span className="truncate">{APP_NAME}</span>
             </Link>
           ) : (

@@ -3,7 +3,8 @@
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { Menu, UserCircle, LogOut, Settings as SettingsIcon, Package2 } from 'lucide-react';
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon } from 'lucide-react';
+import { BrandLogo } from '../common/BrandLogo';
 import { LOCAL_NAV_LINKS } from './local-sidebar-nav';
 import { APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
@@ -58,7 +59,7 @@ export function LocalHeaderMain() {
                   href="/local"
                   className="flex items-center gap-2.5 text-lg font-semibold text-primary hover:opacity-90"
                 >
-                  <Package2 className="h-7 w-7" />
+                  <BrandLogo className="h-7 w-7" />
                   <span className="">{APP_NAME} (Local)</span>
                 </Link>
               </SheetTitle>
