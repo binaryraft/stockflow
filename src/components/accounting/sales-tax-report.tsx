@@ -12,10 +12,13 @@ import { Separator } from '../ui/separator';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+import { ExportConfig } from './report-export-dialog';
+
 interface GstReportProps {
   startDate?: Date;
   endDate?: Date;
   storeId?: string;
+  config?: ExportConfig;
 }
 
 const TaxReportTable: React.FC<{
@@ -24,7 +27,8 @@ const TaxReportTable: React.FC<{
   bills: Bill[];
   currencySymbol: string;
   type: 'sales' | 'purchases';
-}> = ({ title, description, bills, currencySymbol, type }) => {
+  config?: ExportConfig;
+}> = ({ title, description, bills, currencySymbol, type, config }) => {
 
   const totals = useMemo(() => {
     return bills.reduce((acc, bill) => {
@@ -43,8 +47,8 @@ const TaxReportTable: React.FC<{
     <Card className="shadow-md">
       <CardHeader>
         <CardTitle className={cn("flex items-center gap-2", titleColor)}>
-            {headerIcon}
-            {title}
+          {headerIcon}
+          {title}
         </CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
@@ -67,15 +71,15 @@ const TaxReportTable: React.FC<{
               {bills.length > 0 ? bills.map(bill => {
                 const totalTaxOnBill = (bill.totalSGST || 0) + (bill.totalCGST || 0);
                 return (
-                  <TableRow key={bill.id}>
-                    <TableCell className="text-xs">{format(new Date(bill.date), 'PP')}</TableCell>
-                    <TableCell className="font-mono text-xs">{bill.id}</TableCell>
-                    <TableCell>{bill.vendorOrCustomerName || '-'}</TableCell>
-                    <TableCell className="text-right">{currencySymbol}{(bill.subTotal || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currencySymbol}{(bill.totalSGST || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right">{currencySymbol}{(bill.totalCGST || 0).toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-medium">{currencySymbol}{totalTaxOnBill.toFixed(2)}</TableCell>
-                    <TableCell className={cn("text-right font-semibold", titleColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
+                  <TableRow key={bill.id} className={cn(config?.compactMode ? "h-6" : "")}>
+                    <TableCell className={cn("text-xs", config?.compactMode ? "py-1" : "")}>{format(new Date(bill.date), 'PP')}</TableCell>
+                    <TableCell className={cn("font-mono text-xs", config?.compactMode ? "py-1" : "")}>{bill.id.substring(0, 8)}</TableCell>
+                    <TableCell className={config?.compactMode ? "py-1" : ""}>{bill.vendorOrCustomerName || '-'}</TableCell>
+                    <TableCell className={cn("text-right", config?.compactMode ? "py-1 font-mono" : "")}>{currencySymbol}{(bill.subTotal || 0).toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right", config?.compactMode ? "py-1" : "")}>{currencySymbol}{(bill.totalSGST || 0).toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right", config?.compactMode ? "py-1" : "")}>{currencySymbol}{(bill.totalCGST || 0).toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-medium", config?.compactMode ? "py-1" : "")}>{currencySymbol}{totalTaxOnBill.toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-semibold", titleColor, config?.compactMode ? "py-1" : "")}>{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
                   </TableRow>
                 );
               }) : (
@@ -102,80 +106,108 @@ const TaxReportTable: React.FC<{
 };
 
 
-export function GstReport({ startDate, endDate, storeId }: GstReportProps) {
-  const { getSalesBillsByDateRange, getExpenseBillsByDateRange, userProfile } = useInventoryStore(state => ({
-    getSalesBillsByDateRange: state.getSalesBillsByDateRange,
-    getExpenseBillsByDateRange: state.getExpenseBillsByDateRange,
+export function GstReport({ startDate, endDate, storeId, config }: GstReportProps) {
+  const { fetchAccountingReport, accountingReport, accountingLoading, userProfile } = useInventoryStore(state => ({
+    fetchAccountingReport: state.fetchAccountingReport,
+    accountingReport: state.accountingReport,
+    accountingLoading: state.accountingLoading,
     userProfile: state.userProfile
   }));
+
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
-  const salesBills = useMemo(() => {
-    return getSalesBillsByDateRange(startDate, endDate, companyId, storeId);
-  }, [startDate, endDate, companyId, storeId, getSalesBillsByDateRange]);
-
-  const expenseBills = useMemo(() => {
-    return getExpenseBillsByDateRange(startDate, endDate, companyId, storeId);
-  }, [startDate, endDate, companyId, storeId, getExpenseBillsByDateRange]);
+  React.useEffect(() => {
+    if (companyId) {
+      fetchAccountingReport({
+        companyId,
+        storeId,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        reportType: 'gst'
+      });
+    }
+  }, [startDate, endDate, storeId, companyId, fetchAccountingReport]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
-  const outputTaxTotal = useMemo(() => {
-    return salesBills.reduce((acc, bill) => acc + (bill.totalSGST || 0) + (bill.totalCGST || 0), 0);
-  }, [salesBills]);
+  if (accountingLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground font-medium">Generating standard GST report...</p>
+      </div>
+    );
+  }
 
-  const inputTaxTotal = useMemo(() => {
-    return expenseBills.reduce((acc, bill) => acc + (bill.totalSGST || 0) + (bill.totalCGST || 0), 0);
-  }, [expenseBills]);
+  if (!accountingReport || !accountingReport.summary) {
+    return (
+      <div className="text-center p-12 bg-muted/30 rounded-lg border-2 border-dashed">
+        <p className="text-muted-foreground">No GST data found for the selected period.</p>
+      </div>
+    );
+  }
 
+  const { summary, detailed } = accountingReport;
+
+  const salesSummary = summary.find((s: any) => s._id === 'sell') || { taxableValue: 0, sgst: 0, cgst: 0, totalAmount: 0 };
+  const purchaseSummary = summary.find((s: any) => s._id === 'buy') || { taxableValue: 0, sgst: 0, cgst: 0, totalAmount: 0 };
+
+  const outputTaxTotal = (salesSummary.sgst || 0) + (salesSummary.cgst || 0);
+  const inputTaxTotal = (purchaseSummary.sgst || 0) + (purchaseSummary.cgst || 0);
   const netGstPayable = outputTaxTotal - inputTaxTotal;
 
+  // Split detailed bills for the tables
+  const salesBills = detailed?.filter((b: any) => b.type === 'sell') || [];
+  const expenseBills = detailed?.filter((b: any) => b.type === 'buy') || [];
+
   return (
-    <div className="space-y-6">
-      <TaxReportTable 
+    <div className={cn("space-y-6", config?.compactMode ? "space-y-2" : "")}>
+      <TaxReportTable
         title="Output Tax (on Sales)"
-        description="Tax collected from customers on sales invoices."
+        description={`Summary of tax collected from customers. ${salesBills.length > 0 ? `Showing latest ${salesBills.length} records.` : ''}`}
         bills={salesBills}
         currencySymbol={currencySymbol}
         type="sales"
+        config={config}
       />
-      <TaxReportTable 
+      <TaxReportTable
         title="Input Tax Credit (on Purchases)"
-        description="Tax paid to suppliers on expense bills, available for credit."
+        description={`Summary of tax paid to suppliers. ${expenseBills.length > 0 ? `Showing latest ${expenseBills.length} records.` : ''}`}
         bills={expenseBills}
         currencySymbol={currencySymbol}
         type="purchases"
+        config={config}
       />
-       <Card className="shadow-lg border-t-2 border-t-primary">
-          <CardHeader>
-            <CardTitle>Net GST Liability Summary</CardTitle>
-            <CardDescription>
-              Calculation of your net tax obligation for the selected period.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-lg">
-             <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Total Output Tax (A)</span>
-                <span className="font-medium text-foreground">{currencySymbol}{outputTaxTotal.toFixed(2)}</span>
-            </div>
-             <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Less: Input Tax Credit (B)</span>
-                <span className="font-medium text-foreground">({currencySymbol}{inputTaxTotal.toFixed(2)})</span>
-            </div>
-            <Separator className="my-2" />
-            <div className="flex justify-between items-center font-bold text-xl p-4 rounded-md bg-tertiary">
-                <span>Net GST Payable (A - B)</span>
-                <span className={netGstPayable >= 0 ? "text-green-600" : "text-destructive"}>
-                    {currencySymbol}{netGstPayable.toFixed(2)}
-                </span>
-            </div>
-          </CardContent>
-           <CardFooter>
-            <p className="text-xs text-muted-foreground">
-                This is a summary based on recorded bills. Please consult with a tax professional for final tax filing.
-            </p>
-           </CardFooter>
-        </Card>
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle>Net GST Liability Summary</CardTitle>
+          <CardDescription>
+            Calculation of your net tax obligation for the selected period.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 text-lg">
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Total Output Tax (A)</span>
+            <span className="font-medium text-foreground">{currencySymbol}{outputTaxTotal.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between items-center">
+            <span className="text-muted-foreground">Less: Input Tax Credit (B)</span>
+            <span className="font-medium text-foreground">({currencySymbol}{inputTaxTotal.toFixed(2)})</span>
+          </div>
+          <Separator className="my-2" />
+          <div className="flex justify-between items-center font-bold text-xl p-4 rounded-md bg-tertiary">
+            <span>Net GST Payable (A - B)</span>
+            <span className={netGstPayable >= 0 ? "text-green-600" : "text-destructive"}>
+              {currencySymbol}{netGstPayable.toFixed(2)}
+            </span>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <p className="text-xs text-muted-foreground">
+            This report is optimized for large datasets and uses server-side aggregation.
+          </p>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

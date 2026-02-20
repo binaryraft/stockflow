@@ -25,6 +25,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import type { Store } from '@/types';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 import { AccountingSummaryCards } from '@/components/accounting/accounting-summary-cards';
+import { ReportExportDialog, type ExportConfig } from '@/components/accounting/report-export-dialog';
 
 type TimePeriodPreset = 'thisMonth' | 'lastMonth' | 'thisQuarter' | 'lastQuarter' | 'thisYear' | 'lastYear' | 'thisFY' | 'lastFY' | 'all' | 'custom';
 type AccountingTab = 'pnl' | 'cashflow' | 'balance-sheet' | 'gst';
@@ -82,6 +83,13 @@ function AccountingPageContent() {
 
   const stores = useMemo(() => getAllStores(), [getAllStores]);
   const [selectedStoreId, setSelectedStoreId] = useState<string>('all');
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [exportConfig, setExportConfig] = useState<ExportConfig>({
+    templateId: 'standard',
+    includeHeader: true,
+    includeSignature: true,
+    compactMode: false
+  });
 
   const handlePresetChange = (preset: TimePeriodPreset) => {
     setTimePeriodPreset(preset);
@@ -95,7 +103,11 @@ function AccountingPageContent() {
     setDateRange(newRange);
   }
 
-  const handlePrintReport = () => {
+  const handlePrintClick = () => {
+    setIsExportDialogOpen(true);
+  };
+
+  const handleExportConfirm = (config: ExportConfig) => {
     const reportContentEl = document.getElementById(`${activeTab}-report-content`);
     if (!reportContentEl) {
       console.error('Could not find report content element to print.');
@@ -114,8 +126,16 @@ function AccountingPageContent() {
     const storeName = selectedStoreId === 'all' ? 'All Stores' : stores.find(s => s.id === selectedStoreId)?.name || '';
     reportTitle += ` (${storeName})`;
 
-    const printContent = generateReportPrintContent(reportContentEl.innerHTML, reportTitle, userProfile);
-    triggerPrint(printContent);
+    setExportConfig(config);
+
+    // We need to wait for a re-render if the template changes the DOM.
+    // For now, let's just trigger the print. 
+    // In a more complex setup, we'd use a specific print-preview component.
+    setTimeout(() => {
+      const updatedReportContentEl = document.getElementById(`${activeTab}-report-content`);
+      const printContent = generateReportPrintContent(updatedReportContentEl?.innerHTML || reportContentEl.innerHTML, reportTitle, userProfile);
+      triggerPrint(printContent);
+    }, 100);
   };
 
 
@@ -168,7 +188,7 @@ function AccountingPageContent() {
           </PopoverContent>
         </Popover>
       )}
-      <Button variant="outline" onClick={handlePrintReport} className="h-9">
+      <Button variant="outline" onClick={handlePrintClick} className="h-9">
         <PrinterIcon className="mr-2 h-4 w-4" /> Print Report
       </Button>
     </div>
@@ -194,7 +214,12 @@ function AccountingPageContent() {
         </TabsList>
         <div id="pnl-report-content">
           <TabsContent value="pnl" className="mt-6">
-            <ProfitLossStatement startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
+            <ProfitLossStatement
+              startDate={dateRange?.from}
+              endDate={dateRange?.to}
+              storeId={selectedStoreId}
+              config={exportConfig}
+            />
           </TabsContent>
         </div>
         <div id="cashflow-report-content">
@@ -209,7 +234,12 @@ function AccountingPageContent() {
         </div>
         <div id="gst-report-content">
           <TabsContent value="gst" className="mt-6">
-            <GstReport startDate={dateRange?.from} endDate={dateRange?.to} storeId={selectedStoreId} />
+            <GstReport
+              startDate={dateRange?.from}
+              endDate={dateRange?.to}
+              storeId={selectedStoreId}
+              config={exportConfig}
+            />
           </TabsContent>
         </div>
       </Tabs>
@@ -230,6 +260,12 @@ function AccountingPageContent() {
         <AccountsPayableCard storeId={selectedStoreId} />
       </div>
 
+      <ReportExportDialog
+        isOpen={isExportDialogOpen}
+        onClose={() => setIsExportDialogOpen(false)}
+        onConfirm={handleExportConfirm}
+        reportType={activeTab}
+      />
     </div>
   );
 }

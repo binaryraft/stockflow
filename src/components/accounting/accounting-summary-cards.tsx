@@ -15,69 +15,57 @@ interface AccountingSummaryCardsProps {
 }
 
 export function AccountingSummaryCards({ startDate, endDate, storeId }: AccountingSummaryCardsProps) {
-    const { bills, userProfile } = useInventoryStore((state) => ({
-        bills: state.bills,
+    const { fetchAccountingReport, userProfile } = useInventoryStore((state) => ({
+        fetchAccountingReport: state.fetchAccountingReport,
         userProfile: state.userProfile
     }));
 
-    const metrics = useMemo(() => {
-        if (!startDate || !endDate || !bills) return null;
+    const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
+    const [overviewData, setOverviewData] = React.useState<any[] | null>(null);
+    const [loading, setLoading] = React.useState(false);
 
-        const relevantBills = bills.filter(bill => {
-            // 1. Filter by Store
-            if (storeId !== 'all' && bill.storeId !== storeId) {
-                // strict check on storeId
-                if (bill.storeId !== storeId) return false;
-            }
-
-            // 2. Filter by Date
-            const billDate = new Date(bill.date);
-            return isWithinInterval(billDate, { start: startOfDay(startDate), end: endOfDay(endDate) });
-        });
-
-        let totalSales = 0;
-        let totalExpenses = 0;
-        let totalGSTCollected = 0;
-        let totalGSTPaid = 0;
-        let pendingCollections = 0;
-
-        relevantBills.forEach(bill => {
-            // Sales
-            if (bill.type === 'sell' && !bill.isEstimate) {
-                totalSales += bill.totalAmount;
-                totalGSTCollected += (bill.totalSGST || 0) + (bill.totalCGST || 0) + (bill.totalIGST || 0);
-
-                if (bill.paymentStatus === 'unpaid') {
-                    pendingCollections += bill.totalAmount;
+    React.useEffect(() => {
+        const loadOverview = async () => {
+            if (!companyId) return;
+            setLoading(true);
+            try {
+                const response = await fetch(`/api/accounting?companyId=${companyId}&reportType=overview&storeId=${storeId}&startDate=${startDate?.toISOString() || ''}&endDate=${endDate?.toISOString() || ''}`);
+                const result = await response.json();
+                if (result.success) {
+                    setOverviewData(result.data);
                 }
+            } catch (err) {
+                console.error("Failed to load accounting overview:", err);
+            } finally {
+                setLoading(false);
             }
+        };
 
-            // Expenses (Purchases)
-            if (bill.type === 'buy') {
-                totalExpenses += bill.totalAmount;
-                // Assuming expense bills record tax paid similarly, or derived from items
-                // Simplified: assuming input tax is captured in bill totals if structured that way.
-                // For now, if buy bill has tax fields, add them.
-                totalGSTPaid += (bill.totalSGST || 0) + (bill.totalCGST || 0) + (bill.totalIGST || 0);
-            }
-        });
+        loadOverview();
+    }, [startDate, endDate, storeId, companyId]);
 
-        const netProfit = totalSales - totalExpenses; // Very simplified gross profit
+    const metrics = useMemo(() => {
+        if (!overviewData) return null;
+
+        const sales = overviewData.find(d => d._id === 'sell') || { totalAmount: 0, sgst: 0, cgst: 0, igst: 0, totalCOGS: 0 };
+        const buy = overviewData.find(d => d._id === 'buy') || { totalAmount: 0, sgst: 0, cgst: 0, igst: 0 };
+
+        const totalSales = sales.totalAmount;
+        const totalExpenses = buy.totalAmount;
+        const totalGSTCollected = (sales.sgst || 0) + (sales.cgst || 0) + (sales.igst || 0);
+        const totalGSTPaid = (buy.sgst || 0) + (buy.cgst || 0) + (buy.igst || 0);
         const netGST = totalGSTCollected - totalGSTPaid;
+        const netProfit = totalSales - sales.totalCOGS - totalExpenses;
 
         return {
             totalSales,
             totalExpenses,
             netProfit,
-            totalGSTCollected,
-            totalGSTPaid,
             netGST,
-            pendingCollections,
-            txCount: relevantBills.length
         };
-    }, [bills, startDate, endDate, storeId]);
+    }, [overviewData]);
 
-    if (!metrics) {
+    if (loading || !metrics) {
         return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-pulse">
             {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-muted/40 rounded-xl"></div>)}
         </div>;
@@ -106,7 +94,7 @@ export function AccountingSummaryCards({ startDate, endDate, storeId }: Accounti
             icon: metrics.netProfit >= 0 ? DollarSign : AlertCircle,
             color: metrics.netProfit >= 0 ? "text-primary" : "text-orange-600",
             bg: "bg-primary/10",
-            desc: "Sales - Expenses"
+            desc: "Sales - COGS - Expenses"
         },
         {
             title: "GST Payable (Net)",

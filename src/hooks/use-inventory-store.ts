@@ -104,9 +104,12 @@ interface InventoryState {
   addChatMessage: (storeId: string, senderId: 'admin' | string, senderName: string, text: string, companyId: string) => Promise<void>;
   clearChatForStore: (storeId: string, companyId: string) => Promise<boolean>;
 
-  // Analytics Actions
+  // Analytics & Accounting Actions
   fetchDashboardAnalytics: (companyId: string, period: TimePeriod) => Promise<void>;
   dashboardAnalytics: DashboardAnalytics | null;
+  fetchAccountingReport: (params: { companyId: string, storeId?: string, startDate?: string, endDate?: string, reportType: string }) => Promise<void>;
+  accountingReport: any | null;
+  accountingLoading: boolean;
 
   // Simple Getters (Client-side helpers)
   getProductById: (productId: string) => Product | undefined;
@@ -179,6 +182,8 @@ const storeInitialState = {
   messagesByStore: {},
   draftBill: null,
   dashboardAnalytics: null,
+  accountingReport: null,
+  accountingLoading: false,
 };
 // #endregion
 
@@ -1050,6 +1055,29 @@ export const useInventoryStore = create<InventoryState>()(
         } catch (error) {
           console.error("Error fetching dashboard analytics:", error);
           set({ dashboardAnalytics: null });
+        }
+      },
+      fetchAccountingReport: async (params) => {
+        if (get().userProfile.dataMode === 'local') return;
+        set({ accountingLoading: true });
+        try {
+          const { companyId, storeId, startDate, endDate, reportType } = params;
+          let url = `/api/accounting?companyId=${companyId}&reportType=${reportType}`;
+          if (storeId && storeId !== 'all') url += `&storeId=${storeId}`;
+          if (startDate) url += `&startDate=${startDate}`;
+          if (endDate) url += `&endDate=${endDate}`;
+
+          const response = await fetch(url);
+          const result = await response.json();
+          if (result.success) {
+            set({ accountingReport: result.data, accountingLoading: false });
+          } else {
+            console.error("Failed to fetch accounting report:", result.message);
+            set({ accountingReport: null, accountingLoading: false });
+          }
+        } catch (error) {
+          console.error("Error fetching accounting report:", error);
+          set({ accountingReport: null, accountingLoading: false });
         }
       },
       // #endregion

@@ -8,63 +8,91 @@ import { getCurrencySymbol } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 
+import { ExportConfig } from './report-export-dialog';
+
 interface ProfitLossStatementProps {
   startDate?: Date;
   endDate?: Date;
   storeId?: string;
+  config?: ExportConfig;
 }
 
 export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossStatementProps) {
-  const { getReportSummaryByDateRange, userProfile } = useInventoryStore(state => ({
-    getReportSummaryByDateRange: state.getReportSummaryByDateRange,
+  const { fetchAccountingReport, accountingReport, accountingLoading, userProfile } = useInventoryStore(state => ({
+    fetchAccountingReport: state.fetchAccountingReport,
+    accountingReport: state.accountingReport,
+    accountingLoading: state.accountingLoading,
     userProfile: state.userProfile
   }));
+
   const companyId = typeof window !== 'undefined' ? localStorage.getItem('companyId') : undefined;
 
-  const summary = useMemo(() => {
-    return getReportSummaryByDateRange(startDate, endDate, companyId || undefined, storeId);
-  }, [startDate, endDate, companyId, storeId, getReportSummaryByDateRange]);
+  React.useEffect(() => {
+    if (companyId) {
+      fetchAccountingReport({
+        companyId,
+        storeId,
+        startDate: startDate?.toISOString(),
+        endDate: endDate?.toISOString(),
+        reportType: 'pnl'
+      });
+    }
+  }, [startDate, endDate, storeId, companyId, fetchAccountingReport]);
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
   const formatValue = (value: number) => {
-    return `${currencySymbol}${value.toFixed(2)}`;
+    return `${currencySymbol}${(value || 0).toFixed(2)}`;
   };
 
+  if (accountingLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12 space-y-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <p className="text-sm text-muted-foreground font-medium">Crunching financial data...</p>
+      </div>
+    );
+  }
+
+  if (!accountingReport || !Array.isArray(accountingReport)) {
+    return (
+      <div className="text-center p-12 bg-muted/30 rounded-lg border-2 border-dashed">
+        <p className="text-muted-foreground">No financial data found for the selected period.</p>
+      </div>
+    );
+  }
+
+  const salesData = accountingReport.find((s: any) => s._id === 'sell') || { subTotal: 0, totalAmount: 0, totalCOGS: 0 };
+  const expenseData = accountingReport.find((s: any) => s._id === 'buy') || { subTotal: 0, totalAmount: 0, totalCOGS: 0 };
+
+  const totalRevenue = salesData.subTotal || 0;
+  const totalCOGS = salesData.totalCOGS || 0;
+  const grossProfit = totalRevenue - totalCOGS;
+  const totalExpenses = expenseData.totalAmount || 0;
+  const netProfit = grossProfit - totalExpenses;
+
   return (
-    <Card className="shadow-lg border-t-2 border-t-primary w-full max-w-4xl mx-auto">
+    <Card className="shadow-lg w-full max-w-4xl mx-auto">
       <CardHeader>
         <CardTitle>Profit &amp; Loss Statement</CardTitle>
         <CardDescription>
-          Summary of revenues, costs, and expenses during the selected period.
+          Summary of revenues, costs, and expenses during the selected period. Optimized for massive datasets.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4 text-sm">
           {/* Revenue Section */}
-          {/* Revenue Section */}
           <div className="space-y-2 mb-4">
             <div className="flex justify-between items-center">
-              <span className="text-foreground">Revenue from Product Sales</span>
-              <span className="text-foreground">{formatValue(summary.totalRevenue - (summary.totalAdditionalCharges || 0))}</span>
-            </div>
-            {(summary.totalAdditionalCharges || 0) > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="pl-4 text-emerald-600 dark:text-emerald-400">Additional Charges (Profit)</span>
-                <span className="text-emerald-600 dark:text-emerald-400">{formatValue(summary.totalAdditionalCharges || 0)}</span>
-              </div>
-            )}
-            <Separator className="my-2" />
-            <div className="flex justify-between items-center font-semibold">
-              <span className="text-foreground">Total Revenue</span>
-              <span className="text-foreground">{formatValue(summary.totalRevenue)}</span>
+              <span className="text-foreground">Total Revenue from Sales</span>
+              <span className="text-foreground font-semibold">{formatValue(totalRevenue)}</span>
             </div>
           </div>
 
           {/* COGS Section */}
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground pl-4">Less: Cost of Goods Sold (COGS)</span>
-            <span className="text-muted-foreground">({formatValue(summary.totalCOGS)})</span>
+            <span className="text-muted-foreground">({formatValue(totalCOGS)})</span>
           </div>
 
           <Separator />
@@ -72,7 +100,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
           {/* Gross Profit */}
           <div className="flex justify-between items-center font-bold text-lg">
             <span className="text-foreground">Gross Profit</span>
-            <span className={cn(summary.grossProfit >= 0 ? "text-green-600" : "text-destructive")}>{formatValue(summary.grossProfit)}</span>
+            <span className={cn(grossProfit >= 0 ? "text-green-600" : "text-destructive")}>{formatValue(grossProfit)}</span>
           </div>
 
           <Separator className="my-4" />
@@ -84,7 +112,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground pl-4">Purchases &amp; Other Expenses</span>
-            <span className="text-muted-foreground">({formatValue(summary.totalExpenses)})</span>
+            <span className="text-muted-foreground">({formatValue(totalExpenses)})</span>
           </div>
 
           <Separator />
@@ -92,10 +120,10 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
           {/* Net Profit */}
           <div className={cn(
             "flex justify-between items-center font-bold text-xl p-4 rounded-md",
-            summary.netProfit >= 0 ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+            netProfit >= 0 ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300" : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
           )}>
             <span>Net Profit / (Loss)</span>
-            <span>{formatValue(summary.netProfit)}</span>
+            <span>{formatValue(netProfit)}</span>
           </div>
         </div>
       </CardContent>

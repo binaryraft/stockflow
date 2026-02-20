@@ -14,6 +14,8 @@ import type { UserProfile, Company, CurrencyOption } from '@/types';
 import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages, Check } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { useTranslation } from 'react-i18next';
+import '@/lib/i18n'; // Ensure i18n is initialized
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -84,19 +86,20 @@ function ThemeSelector() {
 
 
 export default function SettingsPage() {
-  const { 
-    userProfile, 
-    updateUserProfileFields, 
-    fetchCompanyProfile 
+  const {
+    userProfile,
+    updateUserProfileFields,
+    fetchCompanyProfile
   } = useInventoryStore();
   const { toast } = useToast();
   const { theme } = useTheme();
+  const { t, i18n } = useTranslation();
 
   const [defaultBillNotes, setDefaultBillNotes] = useState('');
   const [defaultSalesPaymentStatus, setDefaultSalesPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [defaultPurchasePaymentStatus, setDefaultPurchasePaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [selectedCurrency, setSelectedCurrency] = useState<string>(DEFAULT_CURRENCY_CODE);
-  
+
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
@@ -107,14 +110,14 @@ export default function SettingsPage() {
     if (companyIdFromStorage) {
       setCurrentCompanyId(companyIdFromStorage);
       setIsLoading(true);
-      fetchCompanyProfile(companyIdFromStorage) 
+      fetchCompanyProfile(companyIdFromStorage)
         .then(() => setIsLoading(false))
         .catch(() => {
           toast({ variant: "destructive", title: "Error", description: "Could not load company settings." });
           setIsLoading(false);
         });
     } else {
-      toast({ variant: "destructive", title: "Error", description: "Company context not found."});
+      toast({ variant: "destructive", title: "Error", description: "Company context not found." });
       setIsLoading(false);
     }
   }, [fetchCompanyProfile, toast]);
@@ -129,16 +132,16 @@ export default function SettingsPage() {
   }, [hasMounted, isLoading, userProfile]);
 
   const handleSaveSetting = async (
-    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus' | 'currency'>, 
-    value: any, 
+    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus' | 'currency'>,
+    value: any,
     successMessage: string
   ) => {
     if (!currentCompanyId) {
-      toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot save settings."});
+      toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot save settings." });
       return;
     }
     try {
-      await updateUserProfileFields({ [field]: value } as Partial<Omit<Company, 'id'|'token'>>, currentCompanyId);
+      await updateUserProfileFields({ [field]: value } as Partial<Omit<Company, 'id' | 'token'>>, currentCompanyId);
       toast({ title: 'Setting Saved', description: successMessage });
     } catch (error) {
       toast({ variant: "destructive", title: "Save Failed", description: "Could not save setting." });
@@ -160,7 +163,7 @@ export default function SettingsPage() {
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary"/>Appearance</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Palette className="h-5 w-5 text-primary" />Appearance</CardTitle>
           <CardDescription>Manage application theme and color preferences.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -170,13 +173,13 @@ export default function SettingsPage() {
             <ThemeSelector />
           </div>
           <div className="flex items-center justify-between p-3 border rounded-md bg-muted/30">
-              <div className="space-y-0.5">
-                  <Label className="text-sm">Light/Dark Mode</Label>
-                  <p className="text-xs text-muted-foreground">
-                      Current mode: <span className="font-semibold capitalize text-foreground">{theme}</span>.
-                  </p>
-              </div>
-              <ThemeToggle />
+            <div className="space-y-0.5">
+              <Label className="text-sm">Light/Dark Mode</Label>
+              <p className="text-xs text-muted-foreground">
+                Current mode: <span className="font-semibold capitalize text-foreground">{theme}</span>.
+              </p>
+            </div>
+            <ThemeToggle />
           </div>
         </CardContent>
       </Card>
@@ -184,7 +187,7 @@ export default function SettingsPage() {
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-primary"/>Billing Defaults</CardTitle>
+          <CardTitle className="flex items-center gap-2"><StickyNote className="h-5 w-5 text-primary" />Billing Defaults</CardTitle>
           <CardDescription>Set default values for new bills to speed up your workflow.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -197,12 +200,12 @@ export default function SettingsPage() {
               placeholder="e.g., Thank you for your business!"
               rows={3}
             />
-             <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => handleSaveSetting('defaultBillNotes', defaultBillNotes, 'Default bill notes updated.')}
               className="mt-2"
             >
-              <Save className="mr-2 h-4 w-4"/> Save Notes
+              <Save className="mr-2 h-4 w-4" /> Save Notes
             </Button>
           </div>
 
@@ -212,7 +215,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultSalesPaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultSalesPaymentStatus(value); 
+                  setDefaultSalesPaymentStatus(value);
                   handleSaveSetting('defaultSalesPaymentStatus', value, 'Default sales payment status updated.');
                 }}
               >
@@ -231,7 +234,7 @@ export default function SettingsPage() {
               <Select
                 value={defaultPurchasePaymentStatus}
                 onValueChange={(value: 'paid' | 'unpaid') => {
-                  setDefaultPurchasePaymentStatus(value); 
+                  setDefaultPurchasePaymentStatus(value);
                   handleSaveSetting('defaultPurchasePaymentStatus', value, 'Default purchase payment status updated.');
                 }}
               >
@@ -250,56 +253,80 @@ export default function SettingsPage() {
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary"/>Localization</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Globe className="h-5 w-5 text-primary" />Localization</CardTitle>
           <CardDescription>Manage currency and language preferences for the application.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="currencySelect">Default Currency</Label>
-              <Select
-                value={selectedCurrency}
-                onValueChange={(value: string) => {
-                  setSelectedCurrency(value);
-                  handleSaveSetting('currency', value, `Default currency updated to ${value}.`);
-                }}
-              >
-                <SelectTrigger id="currencySelect" className="select-trigger-class w-full md:w-1/2">
-                  <SelectValue placeholder="Select default currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CURRENCIES.map((currency: CurrencyOption) => (
-                    <SelectItem key={currency.code} value={currency.code}>
-                      {currency.name} ({currency.symbol} - {currency.code})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Selected currency will be used for displaying monetary values across the application.
-              </p>
-            </div>
-             <div className="space-y-1.5">
-                <Label htmlFor="languageSelect" className="flex items-center gap-1.5">
-                    <Languages className="h-4 w-4 text-muted-foreground"/> Application Language
-                </Label>
-                <Select disabled value="en">
-                    <SelectTrigger id="languageSelect" className="select-trigger-class w-full md:w-1/2">
-                        <SelectValue placeholder="Select language" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="en">English (United States)</SelectItem>
-                    </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground mt-1">
-                    Multi-language support is planned for a future update. Currently, only English is available.
-                </p>
-            </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="currencySelect">Default Currency</Label>
+            <Select
+              value={selectedCurrency}
+              onValueChange={(value: string) => {
+                setSelectedCurrency(value);
+                handleSaveSetting('currency', value, `Default currency updated to ${value}.`);
+              }}
+            >
+              <SelectTrigger id="currencySelect" className="select-trigger-class w-full md:w-1/2">
+                <SelectValue placeholder="Select default currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map((currency: CurrencyOption) => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {currency.name} ({currency.symbol} - {currency.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Selected currency will be used for displaying monetary values across the application.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="languageSelect" className="flex items-center gap-1.5">
+              <Languages className="h-4 w-4 text-muted-foreground" /> Application Language
+            </Label>
+            <Select
+              value={i18n.language}
+              onValueChange={(value) => {
+                i18n.changeLanguage(value);
+                toast({ title: 'Language Changed', description: `Application language set to ${value}.` });
+              }}
+            >
+              <SelectTrigger id="languageSelect" className="select-trigger-class w-full md:w-1/2">
+                <SelectValue placeholder="Select language" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English (United States)</SelectItem>
+                <SelectItem value="hi">हिन्दी (Hindi)</SelectItem>
+                <SelectItem value="te">తెలుగు (Telugu)</SelectItem>
+                <SelectItem value="ta">தமிழ் (Tamil)</SelectItem>
+                <SelectItem value="kn">ಕನ್ನಡ (Kannada)</SelectItem>
+                <SelectItem value="ml">മലയാളം (Malayalam)</SelectItem>
+                <SelectItem value="mr">मराठी (Marathi)</SelectItem>
+                <SelectItem value="gu">ગુજરાતી (Gujarati)</SelectItem>
+                <SelectItem value="bn">বাংলা (Bengali)</SelectItem>
+                <SelectItem value="pa">ਪੰਜਾਬੀ (Punjabi)</SelectItem>
+                <SelectItem value="ar">العربية (Arabic)</SelectItem>
+                <SelectItem value="es">Español (Spanish)</SelectItem>
+                <SelectItem value="fr">Français (French)</SelectItem>
+                <SelectItem value="de">Deutsch (German)</SelectItem>
+                <SelectItem value="ja">日本語 (Japanese)</SelectItem>
+                <SelectItem value="zh">中文 (Chinese)</SelectItem>
+                <SelectItem value="ru">Русский (Russian)</SelectItem>
+                <SelectItem value="pt">Português (Portuguese)</SelectItem>
+                <SelectItem value="it">Italiano (Italian)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Select your preferred language for the application interface.
+            </p>
+          </div>
         </CardContent>
       </Card>
-      
-       <Card className="shadow-md border-t-2 border-t-primary">
+
+      <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary"/>More Settings</CardTitle>
+          <CardTitle className="flex items-center gap-2"><Info className="h-5 w-5 text-primary" />More Settings</CardTitle>
           <CardDescription>
             This section can be expanded with more application-wide settings as needed.
           </CardDescription>

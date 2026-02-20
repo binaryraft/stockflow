@@ -19,8 +19,23 @@ const robotoMono = Roboto_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'EcBills | Smart Inventory & Billing',
-  description: 'EcBills - The most efficient billing and inventory management software for modern businesses.',
+  title: 'StockFlow | Free Smart Inventory & Billing Management System',
+  description: 'Experience the best free inventory management system. StockFlow helps businesses handle billing, stock tracking, and professional reports with ease. Cloud-ready and local-first.',
+  keywords: ['free inventory management system', 'billing software', 'stock tracking', 'open source erp', 'inventory app', 'gst billing software'],
+  authors: [{ name: 'StockFlow Team' }],
+  openGraph: {
+    title: 'StockFlow | Smart Free Inventory & Billing',
+    description: 'The ultimate free tool for small businesses to manage stock and billing.',
+    url: 'https://stockflow.tech',
+    siteName: 'StockFlow',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'StockFlow | Free Inventory Management',
+    description: 'Manage your business stock and billing for free.',
+  },
   icons: {
     icon: '/logo.svg',
     shortcut: '/logo.svg',

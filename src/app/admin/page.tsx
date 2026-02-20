@@ -19,6 +19,7 @@ import { OverallFinancialSummaryStats } from '@/components/dashboard/OverallFina
 import { TopProfitableProductsChart } from '@/components/dashboard/TopProfitableProductsChart';
 import { getCurrencySymbol } from '@/lib/utils';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTranslation } from 'react-i18next';
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
@@ -34,6 +35,7 @@ export default function DashboardPage() {
     fetchDashboardAnalytics: state.fetchDashboardAnalytics,
     userProfile: state.userProfile,
   }));
+  const { t } = useTranslation();
 
   const [hasMounted, setHasMounted] = useState(false);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
@@ -56,7 +58,7 @@ export default function DashboardPage() {
   return (
     <div className="flex flex-col gap-8 page-transition">
       <PageTitle
-        title="Admin Dashboard"
+        title={t('dashboard.title')}
         actions={
           <Tabs defaultValue={timePeriod} onValueChange={(v) => setTimePeriod(v as TimePeriod)} className="w-full md:w-auto">
             <TabsList className="grid w-full grid-cols-4">
@@ -122,24 +124,24 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <PlusCircle className="h-5 w-5 text-primary" />
-              Quick Actions
+              {t('dashboard.quickActions')}
             </CardTitle>
-            <CardDescription>Start common tasks quickly.</CardDescription>
+            <CardDescription>{t('dashboard.quickActionsDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3 pt-4">
             <Button asChild variant="default" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02]">
               <Link href="/admin/billing?mode=sell">
-                <Send className="mr-2 h-4 w-4" /> New Sales Bill
+                <Send className="mr-2 h-4 w-4" /> {t('dashboard.newSalesBill')}
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">
               <Link href="/admin/billing?mode=buy">
-                <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
+                <ShoppingBag className="mr-2 h-4 w-4" /> {t('dashboard.newExpenseBill')}
               </Link>
             </Button>
             <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">
               <Link href="/admin/products/add">
-                <PackageSearch className="mr-2 h-4 w-4" /> Add New Product
+                <PackageSearch className="mr-2 h-4 w-4" /> {t('dashboard.addNewProduct')}
               </Link>
             </Button>
           </CardContent>
@@ -149,9 +151,9 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-5 w-5 text-primary" />
-              Recent Activity
+              {t('dashboard.recentActivity')}
             </CardTitle>
-            <CardDescription>Latest 5 bills processed.</CardDescription>
+            <CardDescription>{t('dashboard.recentActivityDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
             {!hasMounted || recentBills.length === 0 ? (
@@ -188,25 +190,25 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <DollarSign className="h-5 w-5 text-primary" />
-              Quick Links
+              {t('dashboard.quickLinks')}
             </CardTitle>
-            <CardDescription>Navigate to important sections.</CardDescription>
+            <CardDescription>{t('dashboard.quickLinksDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 pt-4">
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
-              <Link href="/admin/products">View All Products</Link>
+              <Link href="/admin/products">{t('common.products')}</Link>
             </Button>
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
-              <Link href="/admin/billing">View Bill History</Link>
+              <Link href="/admin/billing">{t('common.billing')}</Link>
             </Button>
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
-              <Link href="/admin/staff">Manage Staff</Link>
+              <Link href="/admin/staff">{t('common.staff')}</Link>
             </Button>
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
-              <Link href="/admin/stores">Manage Stores</Link>
+              <Link href="/admin/stores">{t('common.stores')}</Link>
             </Button>
             <Button asChild variant="link" className="text-base w-full justify-start p-1 h-auto text-muted-foreground hover:text-primary hover:no-underline hover:translate-x-1 transition-all-fast">
-              <Link href="/admin/chat">Store Chat</Link>
+              <Link href="/admin/chat">{t('common.chat')}</Link>
             </Button>
           </CardContent>
         </Card>

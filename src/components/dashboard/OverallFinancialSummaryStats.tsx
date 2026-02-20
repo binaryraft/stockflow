@@ -48,7 +48,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
 
   if (!hasMounted || !summary) {
     return (
-      <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-primary">
+      <Card className="shadow-md hover:shadow-lg transition-shadow">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-primary">
             <BarChart className="h-5 w-5" />
@@ -103,7 +103,6 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
 
   return (
     <Card className="overflow-hidden border-none shadow-xl bg-gradient-to-br from-card to-muted/30">
-      <div className="absolute top-0 left-0 w-1 h-full bg-primary" />
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>

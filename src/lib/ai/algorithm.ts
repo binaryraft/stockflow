@@ -21,7 +21,8 @@ export const analyzeIntent = (prompt: string): AIResponse => {
     if (p === 'dashboard' || p.includes('show dashboard') || p.includes('overview'))
         return handleDashboardIntent(p);
 
-    if (p.includes('sales') || p.includes('bill') || p.includes('add'))
+    // Check for sales patterns (billing, adding, or just "10 apples")
+    if (p.includes('sales') || p.includes('bill') || p.includes('add') || p.includes('sold') || /^\d+\s+\w+/.test(p))
         return handleSalesIntent(p);
 
     if (p.includes('purchase') || p.includes('buy') || p.includes('stock in'))

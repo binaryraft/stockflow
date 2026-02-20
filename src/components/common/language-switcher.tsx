@@ -13,11 +13,24 @@ import {
 
 const LANGUAGES = [
     { code: 'en', label: 'English' },
-    { code: 'hi', label: 'Hindi' },
-    { code: 'te', label: 'Telugu' },
-    { code: 'ta', label: 'Tamil' },
-    { code: 'kn', label: 'Kannada' },
-    { code: 'ml', label: 'Malayalam' },
+    { code: 'hi', label: 'हिन्दी (Hindi)' },
+    { code: 'te', label: 'తెలుగు (Telugu)' },
+    { code: 'ta', label: 'தமிழ் (Tamil)' },
+    { code: 'kn', label: 'ಕನ್ನಡ (Kannada)' },
+    { code: 'ml', label: 'മലയാളം (Malayalam)' },
+    { code: 'mr', label: 'मराठी (Marathi)' },
+    { code: 'gu', label: 'ગુજરાતી (Gujarati)' },
+    { code: 'bn', label: 'বাংলা (Bengali)' },
+    { code: 'pa', label: 'ਪੰਜਾਬੀ (Punjabi)' },
+    { code: 'ar', label: 'العربية (Arabic)' },
+    { code: 'es', label: 'Español (Spanish)' },
+    { code: 'fr', label: 'Français (French)' },
+    { code: 'de', label: 'Deutsch (German)' },
+    { code: 'ja', label: '日本語 (Japanese)' },
+    { code: 'zh', label: '中文 (Chinese)' },
+    { code: 'ru', label: 'Русский (Russian)' },
+    { code: 'pt', label: 'Português (Portuguese)' },
+    { code: 'it', label: 'Italiano (Italian)' },
 ];
 
 export function LanguageSwitcher() {

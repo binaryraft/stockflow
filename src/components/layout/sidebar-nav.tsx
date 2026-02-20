@@ -12,11 +12,13 @@ import { Button } from '@/components/ui/button';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export function SidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState, toggleSidebar, isMobile, setOpenMobile } = useSidebar();
   const getActiveSubscriptionPlan = useInventoryStore((state) => state.getActiveSubscriptionPlan);
+  const { t } = useTranslation();
 
   const [hasMounted, setHasMounted] = useState(false);
   const [activePlanId, setActivePlanId] = useState<string | undefined>(undefined);
@@ -96,7 +98,7 @@ export function SidebarNav() {
                       asChild
                       size="default"
                       isActive={pathname === link.href || (link.href !== "/admin" && pathname.startsWith(link.href))}
-                      tooltip={isDisabledBySubscription ? 'Upgrade to access this feature' : link.label}
+                      tooltip={isDisabledBySubscription ? 'Upgrade to access this feature' : t(`common.${link.label.toLowerCase()}`, link.label)}
                       aria-disabled={isDisabledBySubscription}
                       className={cn(
                         "h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold",
@@ -118,7 +120,7 @@ export function SidebarNav() {
                         }}
                       >
                         <link.icon className={cn("h-5 w-5 shrink-0")} />
-                        {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
+                        {sidebarState === 'expanded' && <span className="truncate">{t(`common.${link.label.toLowerCase()}`, link.label)}</span>}
                       </Link>
                     </SidebarMenuButton>
                   );

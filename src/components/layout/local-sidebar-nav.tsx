@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import React from 'react';
 import { useP2P } from '@/hooks/use-p2p';
+import { useTranslation } from 'react-i18next';
 
 export const LOCAL_NAV_LINKS = [
   {
@@ -35,6 +36,7 @@ export function LocalSidebarNav() {
   const pathname = usePathname();
   const { state: sidebarState, toggleSidebar } = useSidebar();
   const { isConnected, peers } = useP2P();
+  const { t } = useTranslation();
 
   return (
     <Sidebar className="border-r border-sidebar-border shadow-md" collapsible="icon">
@@ -98,12 +100,12 @@ export function LocalSidebarNav() {
                         asChild
                         size="default"
                         isActive={isActive}
-                        tooltip={link.label}
+                        tooltip={t(`common.${link.label.toLowerCase()}`, link.label)}
                         className="h-11 text-base font-medium text-sidebar-foreground/80 hover:text-primary data-[active=true]:text-primary data-[active=true]:bg-primary/10 data-[active=true]:font-semibold"
                       >
                         <Link href={link.href} className="flex items-center gap-3">
                           <link.icon className="h-5 w-5 shrink-0" />
-                          {sidebarState === 'expanded' && <span className="truncate">{link.label}</span>}
+                          {sidebarState === 'expanded' && <span className="truncate">{t(`common.${link.label.toLowerCase()}`, link.label)}</span>}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
