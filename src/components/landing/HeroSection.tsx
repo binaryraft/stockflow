@@ -9,6 +9,7 @@ import { LogIn, Building, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '../common/BrandLogo';
 
 interface HeroSectionProps {
   onAdminLoginClick: () => void;
@@ -65,15 +66,8 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
       </div>
       <div className="section-container text-center relative z-10">
         <div className="flex flex-col items-center mb-12 md:mb-16">
-          <div className="animate-fadeInDown delay-100 mb-10 transform transition-transform duration-500 hover:scale-105">
-            <Image
-              src="/logo.svg"
-              alt={`${APP_NAME} Logo`}
-              width={160}
-              height={160}
-              className="rounded-3xl shadow-2xl border-4 border-card/80 bg-background"
-              priority
-            />
+          <div className="animate-fadeInDown delay-100 mb-10 transform transition-transform duration-500 hover:scale-110">
+            <BrandLogo size={180} className="shadow-[0_0_50px_rgba(0,200,83,0.3)] bg-background/50 rounded-full p-4 border border-white/10 backdrop-blur-sm" />
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter text-foreground animate-fadeInDown delay-300">
             Manage Your Business with <span className="text-gradient-primary">{APP_NAME}</span>

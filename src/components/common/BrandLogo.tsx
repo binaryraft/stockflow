@@ -18,76 +18,93 @@ export function BrandLogo({ className, size = 40 }: BrandLogoProps) {
                 viewBox="0 0 100 100"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full drop-shadow-xl"
+                className="w-full h-full drop-shadow-2xl overflow-visible"
             >
                 <defs>
-                    {/* Main Diamond Gradient */}
-                    <linearGradient id="diamondGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stopColor="#004d40" /> {/* Deep Emerald Green */}
-                        <stop offset="50%" stopColor="#00c853" /> {/* Royal Emerald */}
-                        <stop offset="100%" stopColor="#004d40" />
+                    {/* Royal Black Metallic Gradient for the 'E' */}
+                    <linearGradient id="blackMetallic" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#1a1a1a" />
+                        <stop offset="50%" stopColor="#000000" />
+                        <stop offset="100%" stopColor="#333333" />
                     </linearGradient>
 
-                    {/* Blue Accent Gradient */}
-                    <linearGradient id="blueAccent" x1="100%" y1="0%" x2="0%" y2="100%">
-                        <stop offset="0%" stopColor="#2962ff" /> {/* Royal Blue */}
-                        <stop offset="100%" stopColor="#0039cb" />
+                    {/* Mesmerizing Emerald Gradient for the 'C' */}
+                    <linearGradient id="emeraldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#2e7d32" /> {/* Dark Green */}
+                        <stop offset="50%" stopColor="#1B854A" /> {/* User's Green */}
+                        <stop offset="100%" stopColor="#a5d6a7" /> {/* Light Shine */}
                     </linearGradient>
 
-                    {/* Gold highlight */}
-                    <linearGradient id="goldEdge" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" stopColor="#ffd600" />
-                        <stop offset="100%" stopColor="#ffab00" />
+                    {/* Gold Filigree Line */}
+                    <linearGradient id="goldLine" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#ffd700" />
+                        <stop offset="50%" stopColor="#ffffff" />
+                        <stop offset="100%" stopColor="#ffd700" />
                     </linearGradient>
 
-                    <filter id="innerGlow" x="-20%" y="-20%" width="140%" height="140%">
-                        <feGaussianBlur stdDeviation="2" result="blur" />
+                    <filter id="nanoGlow" x="-20%" y="-20%" width="140%" height="140%">
+                        <feGaussianBlur stdDeviation="1.5" result="blur" />
                         <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                    </filter>
+
+                    <filter id="emeraldAura" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="4" result="glow" />
+                        <feColorMatrix type="matrix" values="0 0 0 0 0.1   0 0 0 0 0.52   0 0 0 0 0.29   0 0 0 0.4 0" />
                     </filter>
                 </defs>
 
-                {/* The Diamond Silhouette */}
-                {/* Left Side: 'E' */}
-                <path
-                    d="M50 10 L20 50 L50 90 V75 H35 V60 H45 V50 H35 V35 H50 Z"
-                    fill="url(#diamondGradient)"
-                />
+                {/* The "E" Structure - Optimized from Image geometry */}
+                <g filter="url(#nanoGlow)">
+                    {/* The Black 'E' Body */}
+                    <path
+                        d="M20 2 Q10 2 5 15 V85 L20 100 V95 Q20 80 20 80 H20 V75 H20 V25 H95 V2 H20 Z M20 40 H50 V55 H20 V40 Z"
+                        fill="url(#blackMetallic)"
+                        className="logo-e transition-all duration-500"
+                    />
 
-                {/* Right Side: 'C' (Mirrored side of diamond) */}
-                <path
-                    d="M50 10 L80 50 L50 90 V75 C65 75 70 65 70 50 C70 35 65 25 50 25 V10 Z"
-                    fill="url(#blueAccent)"
-                />
+                    {/* The Green Inverted 'C' Body */}
+                    <g filter="url(#emeraldAura)">
+                        <path
+                            d="M95 95 H25 V80 H80 V50 Q80 35 60 35 Q45 35 45 55 V70 H70 V60 H55 V55 Q55 45 60 45 Q65 45 65 55 V80 H95 V95 Z"
+                            fill="url(#emeraldGradient)"
+                            className="logo-c animate-pulse-subtle"
+                        />
+                    </g>
 
-                {/* Center Vertical "Facet" / Shine */}
-                <rect x="49" y="10" width="2" height="80" fill="url(#goldEdge)" opacity="0.6" />
+                    {/* Refined Gold Filigree Accent on the 'E' top edge */}
+                    <path
+                        d="M20 2 H95"
+                        stroke="url(#goldLine)"
+                        strokeWidth="1"
+                        strokeLinecap="round"
+                    />
 
-                {/* Top & Bottom Sparkle Points */}
-                <circle cx="50" cy="10" r="1.5" fill="#ffffff" />
-                <circle cx="50" cy="90" r="1.5" fill="#ffffff" />
+                    {/* Mesmerizing Sparkle point */}
+                    <circle cx="92" cy="7" r="1.5" fill="white">
+                        <animate attributeName="opacity" values="0;1;0" dur="2s" repeatCount="indefinite" />
+                    </circle>
+                </g>
 
-                {/* Floating Facets for extra 'Diamond' depth */}
-                <path
-                    d="M50 25 L65 40 L50 55 Z"
-                    fill="white"
-                    fillOpacity="0.1"
-                />
-                <path
-                    d="M50 75 L65 60 L50 45 Z"
-                    fill="white"
-                    fillOpacity="0.05"
-                />
+                <style jsx>{`
+                    .logo-e:hover {
+                        filter: brightness(1.3);
+                        transform: translate(-1px, -1px);
+                    }
+                    .logo-c {
+                        transition: filter 0.3s ease;
+                    }
+                    div:hover .logo-c {
+                        filter: brightness(1.2) drop-shadow(0 0 8px #1B854A);
+                    }
+                    @keyframes pulse-subtle {
+                        0%, 100% { filter: brightness(1); }
+                        50% { filter: brightness(1.1); }
+                    }
+                    .animate-pulse-subtle {
+                        animation: pulse-subtle 4s ease-in-out infinite;
+                    }
+                `}</style>
             </svg>
-
-            <style jsx>{`
-        svg {
-          filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
-          transition: transform 0.3s ease;
-        }
-        div:hover svg {
-          transform: scale(1.05) rotate(2deg);
-        }
-      `}</style>
         </div>
     );
 }
