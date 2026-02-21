@@ -3,13 +3,18 @@
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
 >
-    {/* Simplified but accurate version for global logo.svg asset */}
+    {/* Minimalist Luxury EC Symbol */}
     <path
-        d="M20 2 Q10 2 5 15 V85 L20 100 V95 Q20 80 20 80 H20 V75 H20 V25 H95 V2 H20 Z M20 40 H50 V55 H20 V40 Z"
-        fill="#000000"
+        d="M85 25 H25 V75 H85 M25 50 H65"
+        stroke="#D4AF37"
+        strokeWidth="10"
+        strokeLinecap="round"
+        strokeLinejoin="round"
     />
     <path
-        d="M95 95 H25 V80 H80 V50 Q80 35 60 35 Q45 35 45 55 V70 H70 V60 H55 V55 Q55 45 60 45 Q65 45 65 55 V80 H95 V95 Z"
-        fill="#1B854A"
+        d="M75 35 Q55 35 55 50 Q55 65 75 65"
+        stroke="#000000"
+        strokeWidth="4"
+        strokeLinecap="round"
     />
 </svg>
