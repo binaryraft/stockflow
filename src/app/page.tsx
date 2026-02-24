@@ -14,7 +14,7 @@ import { CallToActionSection } from '@/components/landing/CallToActionSection';
 import { DownloadSection } from '@/components/landing/DownloadSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
@@ -79,13 +79,7 @@ export default function HomePage() {
   if (!hasMounted || isRedirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
-        <Image
-          src="/logo.svg"
-          alt={`${APP_NAME} Logo`}
-          width={80}
-          height={80}
-          className="mb-6 animate-pulse"
-        />
+        <BrandLogo size={100} glow className="mb-6 animate-pulse rounded-3xl p-3 bg-primary/5 border border-primary/20" />
         <div className="flex items-center gap-2 text-lg text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
           <span>Loading Application...</span>

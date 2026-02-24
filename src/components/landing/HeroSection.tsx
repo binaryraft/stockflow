@@ -67,7 +67,7 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
       <div className="section-container text-center relative z-10">
         <div className="flex flex-col items-center mb-12 md:mb-16">
           <div className="animate-fadeInDown delay-100 mb-10 transform transition-transform duration-500 hover:scale-110">
-            <BrandLogo size={180} className="shadow-[0_0_50px_rgba(0,200,83,0.3)] bg-background/50 rounded-full p-4 border border-white/10 backdrop-blur-sm" />
+            <BrandLogo size={200} glow className="shadow-[0_0_80px_rgba(22,163,74,0.4)] bg-background/50 rounded-3xl p-5 border border-green-500/20 backdrop-blur-sm" />
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter text-foreground animate-fadeInDown delay-300">
             Manage Your Business with <span className="text-gradient-primary">{APP_NAME}</span>

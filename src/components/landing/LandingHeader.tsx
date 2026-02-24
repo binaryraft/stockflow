@@ -2,12 +2,12 @@
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { LogIn, Store as StoreIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 interface LandingHeaderProps {
   onAdminLoginClick: () => void;
@@ -19,7 +19,7 @@ export function LandingHeader({ onAdminLoginClick, onStoreLoginClick }: LandingH
     <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur-lg shadow-sm">
       <div className="section-container flex h-20 items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5 transition-opacity hover:opacity-80 group">
-          <Image src="/logo.svg" alt="logo" width={32} height={32} className="h-8 w-8 group-hover:scale-105 transition-transform" />
+          <BrandLogo size={36} className="group-hover:scale-105 transition-transform" />
           <span className="text-2xl font-bold text-primary">{APP_NAME}</span>
         </Link>
         <nav className="hidden items-center gap-8 text-sm md:flex">

@@ -10,7 +10,7 @@ import { PageTitle } from '@/components/common/page-title';
 import { Button } from '@/components/ui/button';
 import { LogOut, ShoppingCart, MessageSquare, Trash2, AlertTriangle, Loader2 } from 'lucide-react';
 import { APP_NAME } from '@/lib/constants';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ChatInterface } from '@/components/chat/ChatInterface';
 import {
@@ -154,7 +154,7 @@ export default function StoreBillingPage() {
 
   const loadingScreen = (message: string) => (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
-      <Image src="https://placehold.co/64x64.png" alt={`${APP_NAME} Logo`} width={48} height={48} className="mb-2 rounded-lg animate-pulse" data-ai-hint="logo company" />
+      <BrandLogo size={64} glow className="mb-4 animate-pulse rounded-2xl" />
       <p className="text-lg text-muted-foreground">{message}</p>
     </div>
   );

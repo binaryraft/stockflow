@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { LogIn, XCircle, Mail, KeyRound, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -95,14 +95,9 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
         </Button>
       </div>
       <div className="flex flex-col items-center mb-8">
-        <Image
-          src="https://placehold.co/128x128.png"
-          alt={`${APP_NAME} Logo`}
-          width={64}
-          height={64}
-          className="mb-3 rounded-lg shadow-md"
-          data-ai-hint="logo company"
-        />
+        <div className="relative mb-5">
+          <BrandLogo size={96} glow className="rounded-2xl p-3 bg-primary/5 border border-primary/20 shadow-[0_0_40px_rgba(22,163,74,0.25)]" />
+        </div>
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Admin Portal</p>
       </div>

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { APP_NAME } from '@/lib/constants';
 import { CreditCard, LogOut, ShieldAlert } from 'lucide-react';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { useRouter } from 'next/navigation';
 
 interface AppBlockerProps {
@@ -34,13 +34,7 @@ export function AppBlocker({ reason }: AppBlockerProps) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
       <div className="flex flex-col items-center mb-8">
-        <Image
-          src="/logo.svg"
-          alt={`${APP_NAME} Logo`}
-          width={64}
-          height={64}
-          className="mb-3 animate-pulse"
-        />
+        <BrandLogo size={72} glow className="mb-4 rounded-2xl p-2 bg-primary/5 border border-primary/20" />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
       </div>
       <Card className="w-full max-w-lg shadow-xl border-t-4 border-t-destructive">

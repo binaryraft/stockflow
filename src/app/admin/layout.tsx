@@ -3,7 +3,7 @@
 import { AppShell } from '@/components/layout/app-shell';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { APP_NAME } from '@/lib/constants';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { AppBlocker } from '@/components/layout/AppBlocker';
@@ -119,13 +119,7 @@ export default function AdminLayout({
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <Image
-        src="/logo.svg"
-        alt={`${APP_NAME} Logo`}
-        width={80}
-        height={80}
-        className="mb-8 animate-pulse"
-      />
+      <BrandLogo size={90} glow className="mb-8 animate-pulse rounded-3xl p-3 bg-primary/5 border border-primary/20" />
       <LoadingSpinner text={message} size={60} />
     </div>
   );

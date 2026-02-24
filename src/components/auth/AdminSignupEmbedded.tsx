@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
-import Image from 'next/image';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { UserPlus, XCircle, Mail, KeyRound, Building, User as UserIcon, Loader2, CreditCard, Calendar, ArrowRight, CheckCircle, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
@@ -248,9 +248,9 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
         <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Close signup"><XCircle className="h-6 w-6 text-muted-foreground hover:text-foreground" /></Button>
       </div>
       <div className="w-full flex flex-col items-center pt-8 pb-6">
-        <Image src="https://placehold.co/128x128.png" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" data-ai-hint="logo company" />
+        <BrandLogo size={80} glow className="mb-4 rounded-2xl p-3 bg-primary/5 border border-primary/20 shadow-[0_0_40px_rgba(22,163,74,0.25)]" />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
-        <p className="text-muted-foreground">Admin & Company Registration</p>
+        <p className="text-muted-foreground">Admin &amp; Company Registration</p>
       </div>
       {step === 1 ? renderStep1() : renderStep2()}
       <div className="w-full h-8 flex-shrink-0"></div>
