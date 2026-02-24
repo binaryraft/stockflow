@@ -50,9 +50,9 @@ export function TopProductsChart({ period }: { period: TimePeriod }) {
   }, [userProfile.companyCurrency]);
 
   const chartData = dashboardAnalytics?.topProducts || [];
-  const isLoading = !dashboardAnalytics;
+  const hasData = chartData.length > 0;
 
-  if (isLoading) {
+  if (!hasData && !dashboardAnalytics) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <AIInsightLoading context="products" />

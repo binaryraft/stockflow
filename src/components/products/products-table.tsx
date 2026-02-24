@@ -104,13 +104,17 @@ export function ProductsTable() {
   // Fetch Data Effect
   useEffect(() => {
     if (hasMounted && companyId) {
-      setIsLoading(true);
+      const hasData = products.length > 0;
+      if (!hasData) setIsLoading(true);
+
       const sortParams = sortConfig ? { field: sortConfig.key, order: sortConfig.direction === 'ascending' ? 'asc' : 'desc' as 'asc' | 'desc' } : undefined;
 
       fetchProductsPaginated(companyId, requestedPage, 50, debouncedSearchTerm, sortParams)
         .finally(() => setIsLoading(false));
     }
-  }, [hasMounted, companyId, requestedPage, debouncedSearchTerm, sortConfig, fetchProductsPaginated]);
+  }, [hasMounted, companyId, requestedPage, debouncedSearchTerm, sortConfig, fetchProductsPaginated, products.length]);
+
+  const showLoading = isLoading && products.length === 0;
 
   // Reset page on search
   useEffect(() => {
@@ -231,7 +235,7 @@ export function ProductsTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {showLoading ? (
               <TableRow><TableCell colSpan={9} className="h-48 text-center"><LoadingSpinner context="products" text="Analyzing catalog..." /></TableCell></TableRow>
             ) : products.length > 0 ? (
               products.map((product) => {

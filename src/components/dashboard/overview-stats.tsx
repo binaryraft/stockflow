@@ -47,10 +47,11 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
   useEffect(() => {
     const companyId = localStorage.getItem('companyId');
     if (companyId) {
-      setIsLoading(true);
+      const hasData = !!dashboardAnalytics;
+      if (!hasData) setIsLoading(true);
       fetchDashboardAnalytics(companyId, period).finally(() => setIsLoading(false));
     }
-  }, [fetchDashboardAnalytics, period]);
+  }, [fetchDashboardAnalytics, period, dashboardAnalytics]);
 
   const stats = {
     sales: `${currencySymbol}${(dashboardAnalytics?.summary.totalRevenue || 0).toFixed(2)}`,
@@ -61,7 +62,9 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     grossProfitValue: dashboardAnalytics?.summary.grossProfit || 0,
   };
 
-  if (isLoading) {
+  const showLoading = isLoading && !dashboardAnalytics;
+
+  if (showLoading) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 col-span-4">
         {[1, 2, 3, 4].map(i => (

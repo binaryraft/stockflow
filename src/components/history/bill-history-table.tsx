@@ -150,7 +150,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
   useEffect(() => {
     if (currentCompanyId) {
-      setIsLoading(true);
+      const hasData = (bills && bills.length > 0);
+      if (!hasData) setIsLoading(true);
+
       const options = {
         storeId: filterByStoreId,
         search: debouncedSearchTerm,
@@ -161,7 +163,9 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
       };
       fetchBillsPaginated(currentCompanyId, currentPage, 50, options).finally(() => setIsLoading(false));
     }
-  }, [currentCompanyId, currentPage, debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams, fetchBillsPaginated]);
+  }, [currentCompanyId, currentPage, debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams, fetchBillsPaginated, bills?.length]);
+
+  const showLoading = isLoading && (!bills || bills.length === 0);
 
   useEffect(() => { setCurrentPage(1); }, [debouncedSearchTerm, billTypeFilter, filterByStoreId, dateParams]);
 
@@ -270,7 +274,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     return res;
   }, [bills, sortConfig]);
 
-  if (isLoading) return (<div className="flex-1 flex items-center justify-center p-12"><LoadingSpinner context="billing" text="Retrieving transaction ledger..." /></div>);
+  if (showLoading) return (<div className="flex-1 flex items-center justify-center p-12"><LoadingSpinner context="billing" text="Retrieving transaction ledger..." /></div>);
   if (!currentCompanyId && !isLoading) return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found.</div>;
 
   return (

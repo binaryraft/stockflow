@@ -41,9 +41,9 @@ export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
   }, [userProfile.companyCurrency]);
 
   const chartData = dashboardAnalytics?.timeSeriesData || [];
-  const isLoading = !dashboardAnalytics;
+  const hasData = chartData.length > 0;
 
-  if (isLoading) {
+  if (!hasData) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <AIInsightLoading context="sales" />

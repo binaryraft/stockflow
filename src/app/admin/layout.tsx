@@ -24,7 +24,10 @@ export default function AdminLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { fetchCompanyProfile } = useInventoryStore();
+  const { fetchCompanyProfile, userProfile } = useInventoryStore(state => ({
+    fetchCompanyProfile: state.fetchCompanyProfile,
+    userProfile: state.userProfile
+  }));
   const { toast } = useToast();
 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
@@ -65,8 +68,8 @@ export default function AdminLayout({
     router.replace('/');
   }, [router, toast]);
 
-  const checkAuthAndSubscription = useCallback(async () => {
-    setIsLoadingAuth(true);
+  const checkAuthAndSubscription = useCallback(async (isSilent = false) => {
+    if (!isSilent) setIsLoadingAuth(true);
     setShowRecoveryDialog(false);
     const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
     const userRole = localStorage.getItem('userRole');
@@ -102,8 +105,10 @@ export default function AdminLayout({
         }
       } else {
         console.error("AdminLayout: Failed to fetch company profile for auth check. Showing recovery dialog.");
-        setIsAuthenticated(false);
-        setShowRecoveryDialog(true);
+        if (!isSilent) {
+          setIsAuthenticated(false);
+          setShowRecoveryDialog(true);
+        }
       }
     } else {
       setIsAuthenticated(false);
@@ -114,9 +119,19 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (hasMounted) {
-      checkAuthAndSubscription();
+      const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
+      const companyId = localStorage.getItem('companyId');
+      const hasStoredProfile = userProfile.companyName && userProfile.companyName !== "EcBills Solutions";
+
+      if (token && companyId && hasStoredProfile) {
+        setIsAuthenticated(true);
+        setIsLoadingAuth(false);
+        checkAuthAndSubscription(true); // Silent refresh
+      } else {
+        checkAuthAndSubscription();
+      }
     }
-  }, [hasMounted, checkAuthAndSubscription]);
+  }, [hasMounted, checkAuthAndSubscription, userProfile.companyName]);
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">

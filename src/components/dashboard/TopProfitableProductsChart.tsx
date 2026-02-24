@@ -77,9 +77,9 @@ export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
     revenue: p.revenue,
     cogs: p.revenue - (p.profit || 0),
   }));
-  const isLoading = !dashboardAnalytics;
+  const hasData = chartData.length > 0;
 
-  if (isLoading) {
+  if (!hasData && !dashboardAnalytics) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <AIInsightLoading context="dashboard" />
