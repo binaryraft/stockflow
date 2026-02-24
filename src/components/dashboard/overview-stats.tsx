@@ -83,14 +83,14 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
         value={stats.sales}
         icon={DollarSign}
         description={`${stats.transactions} ${periodDescriptionMap[period]}`}
-        isLoading={isLoading}
+        isLoading={showLoading}
       />
       <StatCard
         title={`${periodTextMap[period]} Gross Profit`}
         value={stats.grossProfit}
         icon={TrendingUp}
         description="Sales minus Cost of Goods Sold"
-        isLoading={isLoading}
+        isLoading={showLoading}
         valueClassName={stats.grossProfitValue >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}
       />
       <StatCard
@@ -98,14 +98,14 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
         value={stats.purchases}
         icon={ShoppingCart}
         description={`Total cost of purchases`}
-        isLoading={isLoading}
+        isLoading={showLoading}
       />
       <StatCard
         title="Low Stock Products"
         value={stats.lowStock}
         icon={Archive}
         description={`Products below ${LOW_STOCK_THRESHOLD} units`}
-        isLoading={isLoading}
+        isLoading={showLoading}
         valueClassName={stats.lowStock > 0 ? "text-destructive" : undefined}
       />
     </div>

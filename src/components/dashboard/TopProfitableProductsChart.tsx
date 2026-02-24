@@ -67,19 +67,26 @@ export function TopProfitableProductsChart({ period }: { period: TimePeriod }) {
   }));
 
   const [currencySymbol, setCurrencySymbol] = useState('₹');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
+
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [period]);
 
   const chartData = (dashboardAnalytics?.topProducts || []).map(p => ({
     name: p.name,
     revenue: p.revenue,
     cogs: p.revenue - (p.profit || 0),
   }));
-  const hasData = chartData.length > 0;
+  const showLoading = isLoading && chartData.length === 0;
 
-  if (!hasData && !dashboardAnalytics) {
+  if (showLoading) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <AIInsightLoading context="dashboard" />

@@ -5,11 +5,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
-import type { Bill } from '@/types'; 
+import type { Bill } from '@/types';
 import { format } from 'date-fns';
 import { CheckCircle, AlertCircle, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getCurrencySymbol } from '@/lib/utils';
+
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 interface ExpenseBillWithCoverage extends Bill {
   totalCost: number;
@@ -18,22 +20,31 @@ interface ExpenseBillWithCoverage extends Bill {
 }
 
 export function ExpenseTrackerCard() {
-  const getRecentExpenseBills = useInventoryStore((state) => state.getRecentExpenseBillsWithPotentialCoverage);
-  const userProfile = useInventoryStore((state) => state.userProfile);
+  const { getRecentExpenseBills, userProfile, bills } = useInventoryStore((state) => ({
+    getRecentExpenseBills: state.getRecentExpenseBillsWithPotentialCoverage,
+    userProfile: state.userProfile,
+    bills: state.bills
+  }));
   const [expenseBills, setExpenseBills] = useState<ExpenseBillWithCoverage[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
   useEffect(() => {
     setHasMounted(true);
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
+
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
   }, [userProfile.companyCurrency]);
 
   useEffect(() => {
-    if (hasMounted) {
-      setExpenseBills(getRecentExpenseBills(7)); 
+    if (hasMounted && !isLoading) {
+      setExpenseBills(getRecentExpenseBills(7));
     }
-  }, [hasMounted, getRecentExpenseBills]);
+  }, [hasMounted, isLoading, getRecentExpenseBills]);
+
+  const showLoading = isLoading && bills.length === 0;
 
   return (
     <Card className="shadow-md hover:shadow-lg transition-shadow border-t-2 border-t-destructive">
@@ -45,8 +56,12 @@ export function ExpenseTrackerCard() {
         <CardDescription>Overview of recent expenses and their potential revenue coverage.</CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
-        <ScrollArea className="h-[300px] pr-3"> 
-          { !hasMounted || expenseBills.length === 0 ? (
+        <ScrollArea className="h-[300px] pr-3">
+          {showLoading ? (
+            <div className="flex flex-col items-center justify-center h-48">
+              <LoadingSpinner context="billing" minimal />
+            </div>
+          ) : !hasMounted || expenseBills.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">No recent expense bills to display.</p>
           ) : (
             <div className="space-y-3">
@@ -58,11 +73,11 @@ export function ExpenseTrackerCard() {
                       <p className="text-xs text-muted-foreground">{format(new Date(bill.date), 'MMM dd, yyyy - p')}</p>
                     </div>
                     <div className={cn(
-                        "flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-semibold",
-                        bill.coverageStatus === 'Covered' 
-                          ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600" 
-                          : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border border-red-300 dark:border-red-600"
-                      )}
+                      "flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-semibold",
+                      bill.coverageStatus === 'Covered'
+                        ? "bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border border-green-300 dark:border-green-600"
+                        : "bg-red-100 text-red-700 dark:bg-red-700/20 dark:text-red-300 border border-red-300 dark:border-red-600"
+                    )}
                     >
                       {bill.coverageStatus === 'Covered' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
                       {bill.coverageStatus}

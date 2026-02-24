@@ -17,6 +17,8 @@ interface ProfitLossStatementProps {
   config?: ExportConfig;
 }
 
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
+
 export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossStatementProps) {
   const { fetchAccountingReport, accountingReport, accountingLoading, userProfile } = useInventoryStore(state => ({
     fetchAccountingReport: state.fetchAccountingReport,
@@ -45,11 +47,13 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
     return `${currencySymbol}${(value || 0).toFixed(2)}`;
   };
 
-  if (accountingLoading) {
+  const showLoading = accountingLoading && (!accountingReport || !Array.isArray(accountingReport));
+
+  if (showLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground font-medium">Crunching financial data...</p>
+      <div className="flex flex-col items-center justify-center p-12 min-h-[300px]">
+        <AIInsightLoading context="dashboard" />
+        <p className="text-sm text-muted-foreground font-medium mt-2">Crunching financial data...</p>
       </div>
     );
   }

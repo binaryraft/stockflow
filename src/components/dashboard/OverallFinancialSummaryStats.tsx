@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils';
 import type { FinancialSummary, TimePeriod } from '@/types';
 import { getCurrencySymbol } from '@/lib/utils';
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+
 interface OverallFinancialSummaryStatsProps {
   period: TimePeriod;
 }
@@ -20,6 +22,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   }));
 
   const [currencySymbol, setCurrencySymbol] = useState('₹');
+  const [isLoading, setIsLoading] = useState(true);
 
   const periodTextMap: Record<TimePeriod, string> = {
     daily: "Today's",
@@ -32,6 +35,12 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
 
+  useEffect(() => {
+    setIsLoading(true);
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
+  }, [period]);
+
   const summary = dashboardAnalytics ? {
     totalRevenue: dashboardAnalytics.summary.totalRevenue,
     totalCOGS: dashboardAnalytics.summary.totalRevenue - dashboardAnalytics.summary.grossProfit,
@@ -40,15 +49,15 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
     netProfit: dashboardAnalytics.summary.grossProfit - dashboardAnalytics.summary.totalExpenses,
   } : null;
 
-  const hasMounted = !!dashboardAnalytics;
+  const showLoading = isLoading && !summary;
 
   const cardTitle = `Financial Summary (${periodTextMap[period]})`;
   const cardDescription = `Financial performance metrics for the selected period.`;
 
 
-  if (!hasMounted || !summary) {
+  if (showLoading) {
     return (
-      <Card className="shadow-md hover:shadow-lg transition-shadow">
+      <Card className="shadow-md hover:shadow-lg transition-shadow border-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-primary">
             <BarChart className="h-5 w-5" />
@@ -56,12 +65,14 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
           </CardTitle>
           <CardDescription>{cardDescription}</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Loading financial summary...</p>
+        <CardContent className="h-48 flex items-center justify-center">
+          <LoadingSpinner context="dashboard" text="Synthesizing financial metrics..." />
         </CardContent>
       </Card>
     );
   }
+
+  if (!summary) return null;
 
   const summaryItems = [
     {
@@ -102,7 +113,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
   const isProfitable = netProfit >= 0;
 
   return (
-    <Card className="overflow-hidden border-none shadow-xl bg-gradient-to-br from-card to-muted/30">
+    <Card className="overflow-hidden border-none shadow-xl bg-gradient-to-br from-card to-muted/30 animate-in fade-in slide-in-from-bottom-2 duration-500">
       <CardHeader className="pb-2">
         <div className="flex justify-between items-center">
           <div>

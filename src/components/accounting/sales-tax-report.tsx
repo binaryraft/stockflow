@@ -106,6 +106,8 @@ const TaxReportTable: React.FC<{
 };
 
 
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
+
 export function GstReport({ startDate, endDate, storeId, config }: GstReportProps) {
   const { fetchAccountingReport, accountingReport, accountingLoading, userProfile } = useInventoryStore(state => ({
     fetchAccountingReport: state.fetchAccountingReport,
@@ -130,11 +132,13 @@ export function GstReport({ startDate, endDate, storeId, config }: GstReportProp
 
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
-  if (accountingLoading) {
+  const showLoading = accountingLoading && (!accountingReport || !accountingReport.summary);
+
+  if (showLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 space-y-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <p className="text-sm text-muted-foreground font-medium">Generating standard GST report...</p>
+      <div className="flex flex-col items-center justify-center p-12 min-h-[300px]">
+        <AIInsightLoading context="dashboard" />
+        <p className="text-sm text-muted-foreground font-medium mt-2">Generating standard GST report...</p>
       </div>
     );
   }

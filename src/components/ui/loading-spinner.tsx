@@ -7,6 +7,7 @@ interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   className?: string
   text?: string
   context?: string
+  minimal?: boolean
 }
 
 export function LoadingSpinner({
@@ -14,19 +15,25 @@ export function LoadingSpinner({
   className,
   text,
   context = 'general',
+  minimal = false,
   ...props
 }: LoadingSpinnerProps) {
   // If a text is provided, we can show it below the AI insight
   return (
     <div
-      className={cn("flex flex-col items-center justify-center min-h-[200px] w-full animate-in fade-in duration-300", className)}
+      className={cn(
+        "flex flex-col items-center justify-center w-full animate-in fade-in duration-300",
+        minimal ? "min-h-0" : "min-h-[200px]",
+        className
+      )}
       {...props}
     >
       <AIInsightLoading
         context={context as any}
         size={size > 60 ? 'lg' : 'md'}
+        minimal={minimal}
       />
-      {text && (
+      {text && !minimal && (
         <p className="text-muted-foreground text-xs font-mono mt-2 animate-pulse uppercase tracking-wider">
           {text}
         </p>

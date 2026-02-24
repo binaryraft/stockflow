@@ -26,9 +26,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 type SortableLedgerColumns = keyof Omit<ProductLedgerEntry, 'productId' | 'category'> | 'category' | 'productName';
 
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+
 export function InventoryLedgerTable() {
-  const getProductLedgerSummary = useInventoryStore(state => state.getProductLedgerSummary);
-  const getProductById = useInventoryStore(state => state.getProductById); // To fetch image URL
+  const { getProductLedgerSummary, getProductById, products, bills } = useInventoryStore(state => ({
+    getProductLedgerSummary: state.getProductLedgerSummary,
+    getProductById: state.getProductById,
+    products: state.products,
+    bills: state.bills
+  }));
   const pathname = usePathname();
   const isLocal = pathname.startsWith('/local');
   const basePath = isLocal ? '/local' : '/admin';
@@ -37,16 +43,22 @@ export function InventoryLedgerTable() {
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableLedgerColumns; direction: 'ascending' | 'descending' } | null>({ key: 'productName', direction: 'ascending' });
   const [hasMounted, setHasMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     setHasMounted(true);
+    // Artificial delay to show AI loading experience
+    const timer = setTimeout(() => setIsLoading(false), 800);
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    if (hasMounted) {
+    if (hasMounted && !isLoading) {
       setLedgerEntries(getProductLedgerSummary());
     }
-  }, [hasMounted, getProductLedgerSummary]);
+  }, [hasMounted, isLoading, getProductLedgerSummary]);
+
+  const showLoading = isLoading || (products.length === 0 && bills.length === 0);
 
 
   const filteredAndSortedEntries = useMemo(() => {
@@ -132,7 +144,13 @@ export function InventoryLedgerTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedEntries.length > 0 ? (
+            {showLoading ? (
+              <TableRow>
+                <TableCell colSpan={9} className="h-64 text-center">
+                  <LoadingSpinner context="inventory" text="Synthesizing ledger history..." />
+                </TableCell>
+              </TableRow>
+            ) : filteredAndSortedEntries.length > 0 ? (
               filteredAndSortedEntries.map((entry) => {
                 const productDetails = getProductById(entry.productId);
                 return (
@@ -184,8 +202,8 @@ export function InventoryLedgerTable() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={9} className="h-24 text-center py-3 px-4">
-                  No product ledger data found.
+                <TableCell colSpan={9} className="h-24 text-center py-3 px-4 font-mono text-muted-foreground">
+                  NO LEDGER DATA RECORDED IN CURRENT SYSTEM STATE.
                 </TableCell>
               </TableRow>
             )}
@@ -195,7 +213,11 @@ export function InventoryLedgerTable() {
 
       {/* Mobile Card View */}
       <div className="md:hidden space-y-3">
-        {filteredAndSortedEntries.length > 0 ? (
+        {showLoading ? (
+          <div className="h-48 border border-dashed rounded-lg flex items-center justify-center bg-muted/20">
+            <LoadingSpinner context="inventory" minimal />
+          </div>
+        ) : filteredAndSortedEntries.length > 0 ? (
           filteredAndSortedEntries.map((entry) => {
             const productDetails = getProductById(entry.productId);
             return (
@@ -250,8 +272,8 @@ export function InventoryLedgerTable() {
             )
           })
         ) : (
-          <div className="text-center py-10 text-muted-foreground">
-            No product ledger data found.
+          <div className="text-center py-10 text-muted-foreground font-mono bg-muted/10 border border-dashed rounded-lg">
+            NO LEDGER DATA RECORDED.
           </div>
         )}
       </div>

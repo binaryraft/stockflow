@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -21,6 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type SortableStaffColumns = keyof Pick<Staff, 'name' | 'email' | 'phone'>;
 
@@ -32,6 +33,17 @@ export function StaffTable() {
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableStaffColumns; direction: 'ascending' | 'descending' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const companyId = localStorage.getItem('companyId');
+    if (companyId) {
+      if (staffs.length === 0) setIsLoading(true);
+      fetchStaff(companyId).finally(() => setIsLoading(false));
+    }
+  }, [fetchStaff, staffs.length]);
+
+  const showLoading = isLoading && staffs.length === 0;
 
   const stores = getAllStores();
   const activePlan = getActiveSubscriptionPlan();
@@ -177,7 +189,13 @@ export function StaffTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedStaff.length > 0 ? (
+            {showLoading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="h-48 text-center">
+                  <LoadingSpinner context="staff" text="Gathering personnel data..." />
+                </TableCell>
+              </TableRow>
+            ) : filteredAndSortedStaff.length > 0 ? (
               filteredAndSortedStaff.map((staff) => (
                 <TableRow key={staff.id}>
                   <TableCell className="font-medium py-3 px-4">{staff.name}</TableCell>

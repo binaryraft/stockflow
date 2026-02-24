@@ -7,6 +7,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { formatCurrency } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, PieChart, Activity, AlertCircle } from 'lucide-react';
 import { startOfDay, endOfDay, isWithinInterval } from 'date-fns';
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
 
 interface AccountingSummaryCardsProps {
     startDate?: Date;
@@ -27,7 +28,7 @@ export function AccountingSummaryCards({ startDate, endDate, storeId }: Accounti
     React.useEffect(() => {
         const loadOverview = async () => {
             if (!companyId) return;
-            setLoading(true);
+            if (!overviewData) setLoading(true);
             try {
                 const response = await fetch(`/api/accounting?companyId=${companyId}&reportType=overview&storeId=${storeId}&startDate=${startDate?.toISOString() || ''}&endDate=${endDate?.toISOString() || ''}`);
                 const result = await response.json();
@@ -65,11 +66,19 @@ export function AccountingSummaryCards({ startDate, endDate, storeId }: Accounti
         };
     }, [overviewData]);
 
-    if (loading || !metrics) {
-        return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 animate-pulse">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-32 bg-muted/40 rounded-xl"></div>)}
+    const showLoading = loading && !overviewData;
+
+    if (showLoading) {
+        return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-32 border border-primary/10 rounded-xl flex items-center justify-center bg-card/50 overflow-hidden">
+                    <AIInsightLoading context="dashboard" minimal className="scale-90" />
+                </div>
+            ))}
         </div>;
     }
+
+    if (!metrics) return null;
 
     const cards = [
         {

@@ -57,6 +57,20 @@ export const INSIGHT_MAP: Record<string, string[]> = {
         "Checking security headers and CSP...",
         "Initializing user environment profile...",
         "Auditing access logs for suspicious activity...",
+    ],
+    staff: [
+        "Analyzing personnel productivity metrics...",
+        "Synchronizing permission matrices...",
+        "Optimizing shift distribution patterns...",
+        "Validating employee access credentials...",
+        "Evaluating team performance clusters...",
+    ],
+    stores: [
+        "Mapping regional performance nodes...",
+        "Synchronizing multi-store inventory sync...",
+        "Optimizing node-to-node data routing...",
+        "Analyzing local market demand trends...",
+        "Verifying store-specific geometric constraints...",
     ]
 };
 

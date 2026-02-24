@@ -22,6 +22,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useTranslation } from 'react-i18next';
 
 
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
+
+
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
   if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Expense' };
   if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-green-50 bg-green-600', name: 'Sales' };
@@ -30,14 +33,16 @@ function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boo
 };
 
 export default function DashboardPage() {
-  const { dashboardAnalytics, fetchDashboardAnalytics, userProfile } = useInventoryStore((state) => ({
+  const { dashboardAnalytics, fetchDashboardAnalytics, userProfile, bills } = useInventoryStore((state) => ({
     dashboardAnalytics: state.dashboardAnalytics,
     fetchDashboardAnalytics: state.fetchDashboardAnalytics,
     userProfile: state.userProfile,
+    bills: state.bills
   }));
   const { t } = useTranslation();
 
   const [hasMounted, setHasMounted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
   const [timePeriod, setTimePeriod] = useState<TimePeriod>('daily');
 
@@ -49,11 +54,16 @@ export default function DashboardPage() {
   useEffect(() => {
     const companyId = localStorage.getItem('companyId');
     if (companyId) {
+      setIsLoading(true);
       fetchDashboardAnalytics(companyId, timePeriod);
+      // Artificial delay for summary calculation
+      const timer = setTimeout(() => setIsLoading(false), 800);
+      return () => clearTimeout(timer);
     }
   }, [fetchDashboardAnalytics, timePeriod]);
 
   const recentBills = dashboardAnalytics?.recentBills || [];
+  const showLoading = isLoading && bills.length === 0;
 
   return (
     <div className="flex flex-col gap-8 page-transition">
@@ -156,7 +166,11 @@ export default function DashboardPage() {
             <CardDescription>{t('dashboard.recentActivityDesc')}</CardDescription>
           </CardHeader>
           <CardContent className="pt-4 space-y-3">
-            {!hasMounted || recentBills.length === 0 ? (
+            {showLoading ? (
+              <div className="flex flex-col items-center justify-center py-6">
+                <LoadingSpinner context="billing" minimal text="Fetching recent activities..." />
+              </div>
+            ) : !hasMounted || recentBills.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">No recent bills to display.</p>
             ) : (
               recentBills.map(bill => {

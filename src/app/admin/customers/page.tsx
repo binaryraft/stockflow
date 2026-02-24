@@ -11,7 +11,10 @@ import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 function CustomersContent() {
-  const fetchCustomers = useInventoryStore((state) => state.fetchCustomers);
+  const { fetchCustomers, customers } = useInventoryStore((state) => ({
+    fetchCustomers: state.fetchCustomers,
+    customers: state.customers
+  }));
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
@@ -22,17 +25,20 @@ function CustomersContent() {
       setCompanyId(storedCompanyId);
     } else {
       console.error("Company ID not found in localStorage for CustomersPage.");
-      toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot load customers."});
+      toast({ variant: "destructive", title: "Error", description: "Company context missing. Cannot load customers." });
       setIsLoading(false);
     }
   }, [toast]);
 
   useEffect(() => {
     if (companyId) {
-      setIsLoading(true);
+      const hasData = customers.length > 0;
+      if (!hasData) setIsLoading(true);
       fetchCustomers(companyId).finally(() => setIsLoading(false));
     }
-  }, [companyId, fetchCustomers]);
+  }, [companyId, fetchCustomers, customers.length]);
+
+  const showLoading = isLoading && customers.length === 0;
 
   // Placeholder for Add Customer button action
   const handleAddCustomer = () => {
@@ -41,11 +47,11 @@ function CustomersContent() {
       description: "Manually adding customers will be available in a future update.",
     });
   };
-  
-  if (isLoading && companyId) {
+
+  if (showLoading && companyId) {
     return (
       <div className="flex-1 flex items-center justify-center p-12">
-        <LoadingSpinner text="Fetching customer data..." />
+        <LoadingSpinner context="customers" text="Fetching customer data..." />
       </div>
     );
   }
@@ -55,9 +61,9 @@ function CustomersContent() {
 
   return (
     <>
-      <PageTitle 
-        title="Customers" 
-        icon={Contact} 
+      <PageTitle
+        title="Customers"
+        icon={Contact}
         actions={
           <Button onClick={handleAddCustomer} disabled>
             <PlusCircle className="mr-2 h-4 w-4" /> Add Customer (Soon)

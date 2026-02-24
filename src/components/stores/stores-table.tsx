@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -22,17 +22,29 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import Link from 'next/link';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 type SortableStoreColumns = keyof Pick<Store, 'name' | 'username' | 'location' | 'email' | 'phone'>;
 
 export function StoresTable() {
-  const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan, getStaffDetailsByIds } = useInventoryStore();
+  const { stores, deleteStore, getAllStaff, getActiveSubscriptionPlan, getStaffDetailsByIds, fetchStores } = useInventoryStore();
   const { toast } = useToast();
 
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [editingStore, setEditingStore] = useState<Store | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [sortConfig, setSortConfig] = useState<{ key: SortableStoreColumns; direction: 'ascending' | 'descending' } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const companyId = localStorage.getItem('companyId');
+    if (companyId) {
+      if (stores.length === 0) setIsLoading(true);
+      fetchStores(companyId).finally(() => setIsLoading(false));
+    }
+  }, [fetchStores, stores.length]);
+
+  const showLoading = isLoading && stores.length === 0;
 
   const staffMembers = getAllStaff();
   const activePlan = getActiveSubscriptionPlan();
@@ -184,7 +196,13 @@ export function StoresTable() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredAndSortedStores.length > 0 ? (
+            {showLoading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <LoadingSpinner context="stores" text="Calibrating regional nodes..." />
+                </TableCell>
+              </TableRow>
+            ) : filteredAndSortedStores.length > 0 ? (
               filteredAndSortedStores.map((store) => {
                 const allowedStaff = getStaffDetailsByIds(store.allowedStaffIds);
                 return (
@@ -266,7 +284,7 @@ export function StoresTable() {
               })
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="h-24 text-center">
+                <TableCell colSpan={8} className="h-24 text-center">
                   No stores found. {isAdminOnlyPlan && "Store management is not available on your current plan."}
                 </TableCell>
               </TableRow>
