@@ -174,7 +174,7 @@ export function ProductsTable() {
     : "Add New Product";
 
 
-  if (!hasMounted) return <div className="p-12"><LoadingSpinner /></div>;
+  if (!hasMounted) return <div className="p-12"><LoadingSpinner context="products" /></div>;
 
   return (
     <TooltipProvider>
@@ -232,7 +232,7 @@ export function ProductsTable() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={9} className="h-48 text-center"><LoadingSpinner text="Loading products..." /></TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="h-48 text-center"><LoadingSpinner context="products" text="Analyzing catalog..." /></TableCell></TableRow>
             ) : products.length > 0 ? (
               products.map((product) => {
                 const isVariantProduct = product.variants && product.variants.length > 0;

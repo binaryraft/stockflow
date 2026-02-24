@@ -11,6 +11,7 @@ import { CompanyRecoveryDialog } from '@/components/auth/CompanyRecoveryDialog';
 import type { PaymentStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -119,8 +120,9 @@ export default function AdminLayout({
 
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
-      <BrandLogo size={90} glow className="mb-8 animate-pulse rounded-3xl p-3 bg-primary/5 border border-primary/20" />
-      <LoadingSpinner text={message} size={60} />
+      <BrandLogo size={90} glow className="mb-4 rounded-3xl p-3 bg-primary/5 border border-primary/20" />
+      <AIInsightLoading size="lg" context="auth" />
+      <p className="mt-4 text-xs text-muted-foreground font-mono animate-pulse uppercase tracking-[0.2em]">{message}</p>
     </div>
   );
 

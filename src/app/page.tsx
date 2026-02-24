@@ -15,6 +15,7 @@ import { DownloadSection } from '@/components/landing/DownloadSection';
 import { AdminLoginEmbedded } from '@/components/auth/AdminLoginEmbedded';
 import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
@@ -79,11 +80,8 @@ export default function HomePage() {
   if (!hasMounted || isRedirecting) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
-        <BrandLogo size={100} glow className="mb-6 animate-pulse rounded-3xl p-3 bg-primary/5 border border-primary/20" />
-        <div className="flex items-center gap-2 text-lg text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading Application...</span>
-        </div>
+        <BrandLogo size={100} glow className="mb-4 rounded-3xl p-3 bg-primary/5 border border-primary/20" />
+        <AIInsightLoading size="lg" context="general" />
       </div>
     );
   }

@@ -1,38 +1,33 @@
+
 import { cn } from "@/lib/utils"
-import { Loader2 } from "lucide-react"
+import { AIInsightLoading } from "@/components/common/AIInsightLoading"
 
 interface LoadingSpinnerProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: number
   className?: string
   text?: string
+  context?: string
 }
 
-export function LoadingSpinner({ 
-  size = 48, 
-  className, 
+export function LoadingSpinner({
+  size = 48,
+  className,
   text,
-  ...props 
+  context = 'general',
+  ...props
 }: LoadingSpinnerProps) {
+  // If a text is provided, we can show it below the AI insight
   return (
-    <div 
-      className={cn("flex flex-col items-center justify-center gap-4 min-h-[200px] w-full animate-in fade-in duration-300", className)} 
+    <div
+      className={cn("flex flex-col items-center justify-center min-h-[200px] w-full animate-in fade-in duration-300", className)}
       {...props}
     >
-      <div className="relative">
-        <div 
-          className="absolute inset-0 rounded-full border-4 border-primary/20" 
-          style={{ width: size, height: size }}
-        />
-        <div 
-          className="rounded-full border-4 border-primary border-t-transparent animate-spin"
-          style={{ width: size, height: size }}
-        />
-        <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-2 w-2 bg-primary rounded-full animate-pulse" />
-        </div>
-      </div>
+      <AIInsightLoading
+        context={context as any}
+        size={size > 60 ? 'lg' : 'md'}
+      />
       {text && (
-        <p className="text-muted-foreground text-sm font-medium animate-pulse">
+        <p className="text-muted-foreground text-xs font-mono mt-2 animate-pulse uppercase tracking-wider">
           {text}
         </p>
       )}

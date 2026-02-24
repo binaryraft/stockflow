@@ -9,20 +9,9 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { TodaysFinancialSummary, TimePeriod } from '@/types';
 import { getCurrencySymbol } from '@/lib/utils';
-import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AIInsightLoading } from '@/components/common/AIInsightLoading';
 
 const LOW_STOCK_THRESHOLD = 5;
-
-interface DailyStats {
-  totalProducts: number;
-  totalCustomers: number;
-  salesToday: string;
-  purchasesToday: string;
-  transactionsToday: number;
-  defectivesToday: number;
-  lowStockCount: number;
-  grossProfitToday: string;
-}
 
 export function OverviewStats({ period }: { period: TimePeriod }) {
   const {
@@ -51,7 +40,6 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     yearly: `transactions this year`,
   };
 
-
   useEffect(() => {
     setCurrencySymbol(getCurrencySymbol(userProfile.companyCurrency));
   }, [userProfile.companyCurrency]);
@@ -77,8 +65,8 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 col-span-4">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="h-32 border rounded-xl flex items-center justify-center bg-card">
-            <LoadingSpinner size={24} />
+          <div key={i} className="h-32 border border-primary/10 rounded-xl flex items-center justify-center bg-card/50 overflow-hidden">
+            <AIInsightLoading context="dashboard" minimal className="scale-90" />
           </div>
         ))}
       </div>

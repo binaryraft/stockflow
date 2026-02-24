@@ -270,7 +270,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
     return res;
   }, [bills, sortConfig]);
 
-  if (isLoading) return (<div className="flex-1 flex items-center justify-center p-12"><LoadingSpinner text="Loading bill history..." /></div>);
+  if (isLoading) return (<div className="flex-1 flex items-center justify-center p-12"><LoadingSpinner context="billing" text="Retrieving transaction ledger..." /></div>);
   if (!currentCompanyId && !isLoading) return <div className="flex-1 flex items-center justify-center p-6 text-destructive">Error: Company ID not found.</div>;
 
   return (
