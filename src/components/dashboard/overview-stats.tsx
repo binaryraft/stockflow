@@ -54,12 +54,12 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
   }, [fetchDashboardAnalytics, period, dashboardAnalytics]);
 
   const stats = {
-    sales: `${currencySymbol}${(dashboardAnalytics?.summary.totalRevenue || 0).toFixed(2)}`,
-    purchases: `${currencySymbol}${(dashboardAnalytics?.summary.totalExpenses || 0).toFixed(2)}`,
-    transactions: dashboardAnalytics?.summary.transactionsToday || 0,
-    lowStock: dashboardAnalytics?.summary.lowStockCount || 0,
-    grossProfit: `${currencySymbol}${(dashboardAnalytics?.summary.grossProfit || 0).toFixed(2)}`,
-    grossProfitValue: dashboardAnalytics?.summary.grossProfit || 0,
+    sales: `${currencySymbol}${(dashboardAnalytics?.summary?.totalRevenue || 0).toFixed(2)}`,
+    purchases: `${currencySymbol}${(dashboardAnalytics?.summary?.totalExpenses || 0).toFixed(2)}`,
+    transactions: dashboardAnalytics?.summary?.transactionsToday || 0,
+    lowStock: dashboardAnalytics?.summary?.lowStockCount || 0,
+    grossProfit: `${currencySymbol}${(dashboardAnalytics?.summary?.grossProfit || 0).toFixed(2)}`,
+    grossProfitValue: dashboardAnalytics?.summary?.grossProfit || 0,
   };
 
   const showLoading = isLoading && !dashboardAnalytics;
