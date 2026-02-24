@@ -39,7 +39,7 @@ export function BrandLogo({ className, size = 40, glow = false }: BrandLogoProps
                 alt="ECBills Logo"
                 width={size}
                 height={size}
-                className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(22,101,52,0.45)] transition-transform duration-300 hover:scale-110"
+                className="w-full h-full object-contain drop-shadow-[0_2px_8px_rgba(34,197,94,0.45)] transition-transform duration-300 hover:scale-110"
                 priority
             />
         </div>
