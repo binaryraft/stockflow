@@ -14,6 +14,12 @@ export interface AIResponse {
     requiresConfirmation?: boolean;
 }
 
+/**
+ * INTELLIGENCE EXPANSION GUIDE:
+ * 1. Create a new handler in ./intents/ (e.g., ./intents/inventory.ts)
+ * 2. Add the trigger pattern in analyzeIntent() below
+ * 3. Update FlowType/StepType in @/types/ai if a multi-step flow is needed
+ */
 export const analyzeIntent = (prompt: string): AIResponse => {
     const p = prompt.toLowerCase().trim();
 
