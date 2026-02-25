@@ -142,7 +142,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                 </span>
                             )}
                             {currentSkuSellPrice !== null && (
-                                <span className="block italic">Price: ₹{currentSkuSellPrice.toFixed(2)}</span>
+                                <span className="block italic">Price: ₹{(currentSkuSellPrice || 0).toFixed(2)}</span>
                             )}
                             {mode === 'sell' && currentProductForSelection.hsnCode && (
                                 <span className="block text-primary/80 font-medium">HSN: {currentProductForSelection.hsnCode}</span>

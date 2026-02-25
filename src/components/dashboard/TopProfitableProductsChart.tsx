@@ -44,14 +44,14 @@ const CustomTooltip = ({ active, payload, label, chartData, currencySymbol }: an
               <span className="text-muted-foreground">{entry.dataKey === 'cogs' ? 'Total Cost (COGS)' : 'Total Revenue'}:</span>
             </span>
             <span className={cn("font-semibold", entry.dataKey === 'cogs' ? 'text-red-600' : 'text-green-600')}>
-              {currencySymbol}{Number(entry.value).toFixed(2)}
+              {currencySymbol}{(Number(entry.value) || 0).toFixed(2)}
             </span>
           </div>
         ))}
         <div className="mt-2 pt-2 border-t border-border/50 flex justify-between items-center">
           <span className="text-muted-foreground">Net Profit:</span>
           <span className={cn("font-bold", profit >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive")}>
-            {currencySymbol}{profit.toFixed(2)}
+            {currencySymbol}{(profit || 0).toFixed(2)}
           </span>
         </div>
       </div>

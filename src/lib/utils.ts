@@ -26,11 +26,11 @@ export function formatCurrency(
 ): string {
   const resolvedCurrencyCode = currencyCode || 'INR'; // Default to INR if not provided
   const symbol = getCurrencySymbol(resolvedCurrencyCode);
-  
+
   // Basic formatting, can be expanded with Intl.NumberFormat for full locale support
   // For now, we'll just prepend the symbol.
   // Note: Intl.NumberFormat would be better for production for proper decimal/grouping by locale.
-  
+
   // A more robust formatting:
   try {
     return new Intl.NumberFormat(undefined, { // Use browser's default locale for formatting
@@ -42,6 +42,6 @@ export function formatCurrency(
     }).format(value);
   } catch (e) {
     // Fallback for unsupported currency codes in Intl.NumberFormat
-    return `${symbol}${value.toFixed(2)}`;
+    return `${symbol}${(value || 0).toFixed(2)}`;
   }
 }

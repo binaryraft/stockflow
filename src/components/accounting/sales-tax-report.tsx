@@ -78,8 +78,8 @@ const TaxReportTable: React.FC<{
                     <TableCell className={cn("text-right", config?.compactMode ? "py-1 font-mono" : "")}>{currencySymbol}{(bill.subTotal || 0).toFixed(2)}</TableCell>
                     <TableCell className={cn("text-right", config?.compactMode ? "py-1" : "")}>{currencySymbol}{(bill.totalSGST || 0).toFixed(2)}</TableCell>
                     <TableCell className={cn("text-right", config?.compactMode ? "py-1" : "")}>{currencySymbol}{(bill.totalCGST || 0).toFixed(2)}</TableCell>
-                    <TableCell className={cn("text-right font-medium", config?.compactMode ? "py-1" : "")}>{currencySymbol}{totalTaxOnBill.toFixed(2)}</TableCell>
-                    <TableCell className={cn("text-right font-semibold", titleColor, config?.compactMode ? "py-1" : "")}>{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-medium", config?.compactMode ? "py-1" : "")}>{currencySymbol}{(totalTaxOnBill || 0).toFixed(2)}</TableCell>
+                    <TableCell className={cn("text-right font-semibold", titleColor, config?.compactMode ? "py-1" : "")}>{currencySymbol}{(bill.totalAmount || 0).toFixed(2)}</TableCell>
                   </TableRow>
                 );
               }) : (
@@ -91,11 +91,11 @@ const TaxReportTable: React.FC<{
             <TableFooter>
               <TableRow className="bg-muted font-bold text-base">
                 <TableCell colSpan={3}>Totals</TableCell>
-                <TableCell className="text-right">{currencySymbol}{totals.subTotal.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currencySymbol}{totals.totalSGST.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currencySymbol}{totals.totalCGST.toFixed(2)}</TableCell>
-                <TableCell className="text-right">{currencySymbol}{(totals.totalSGST + totals.totalCGST).toFixed(2)}</TableCell>
-                <TableCell className={cn("text-right", titleColor)}>{currencySymbol}{totals.totalAmount.toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currencySymbol}{(totals.subTotal || 0).toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currencySymbol}{(totals.totalSGST || 0).toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currencySymbol}{(totals.totalCGST || 0).toFixed(2)}</TableCell>
+                <TableCell className="text-right">{currencySymbol}{((totals.totalSGST || 0) + (totals.totalCGST || 0)).toFixed(2)}</TableCell>
+                <TableCell className={cn("text-right", titleColor)}>{currencySymbol}{(totals.totalAmount || 0).toFixed(2)}</TableCell>
               </TableRow>
             </TableFooter>
           </Table>
@@ -192,17 +192,17 @@ export function GstReport({ startDate, endDate, storeId, config }: GstReportProp
         <CardContent className="space-y-3 text-lg">
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Total Output Tax (A)</span>
-            <span className="font-medium text-foreground">{currencySymbol}{outputTaxTotal.toFixed(2)}</span>
+            <span className="font-medium text-foreground">{currencySymbol}{(outputTaxTotal || 0).toFixed(2)}</span>
           </div>
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Less: Input Tax Credit (B)</span>
-            <span className="font-medium text-foreground">({currencySymbol}{inputTaxTotal.toFixed(2)})</span>
+            <span className="font-medium text-foreground">({currencySymbol}{(inputTaxTotal || 0).toFixed(2)})</span>
           </div>
           <Separator className="my-2" />
           <div className="flex justify-between items-center font-bold text-xl p-4 rounded-md bg-tertiary">
             <span>Net GST Payable (A - B)</span>
             <span className={netGstPayable >= 0 ? "text-green-600" : "text-destructive"}>
-              {currencySymbol}{netGstPayable.toFixed(2)}
+              {currencySymbol}{(netGstPayable || 0).toFixed(2)}
             </span>
           </div>
         </CardContent>

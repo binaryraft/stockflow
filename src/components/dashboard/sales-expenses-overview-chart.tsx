@@ -94,7 +94,7 @@ export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
             formatter={(value, name) => (
               <div className="flex flex-col">
                 <span className="capitalize">{name}</span>
-                <span>{currencySymbol}{Number(value).toFixed(2)}</span>
+                <span>{currencySymbol}{(Number(value) || 0).toFixed(2)}</span>
               </div>
             )}
           />}

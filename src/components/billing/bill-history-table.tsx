@@ -610,16 +610,16 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                         {item.isAdditionalCharge && <span className="text-xs text-primary ml-1">(Additional Charge)</span>}
                                         {sku && skuDetails && typeof skuDetails.totalStock === 'number' && !item.isAdditionalCharge && (
                                           <div className="text-xs text-muted-foreground mt-0.5">
-                                            Current Total SKU Stock: {skuDetails.totalStock.toFixed(2)}
+                                            Current Total SKU Stock: {(skuDetails.totalStock || 0).toFixed(2)}
                                           </div>
                                         )}
                                       </TableCell>
-                                      <TableCell className="text-right py-2 align-top">{purchasedQty.toFixed(2)}</TableCell>
-                                      <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{soldQty.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top font-semibold">{remainingQty.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{costPrice.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{sellPriceSet.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right font-medium py-2 align-top">₹{(item.quantity * costPrice).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top">{(purchasedQty || 0).toFixed(2)}</TableCell>
+                                      <TableCell className={cn("text-right py-2 align-top font-medium", soldQty > 0 && "text-green-600 dark:text-green-500")}>{(soldQty || 0).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top font-semibold">{(remainingQty || 0).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top">₹{(costPrice || 0).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top">₹{(sellPriceSet || 0).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right font-medium py-2 align-top">₹{((item.quantity || 0) * (costPrice || 0)).toFixed(2)}</TableCell>
                                     </TableRow>
                                   );
                                 })}
@@ -668,15 +668,15 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                                           <Badge className="text-xs mt-1 bg-green-100 text-green-700 dark:bg-green-700/20 dark:text-green-300 border-green-300 dark:border-green-600 hover:bg-green-200/80 dark:hover:bg-green-700/30">Restocked</Badge>
                                         )}
                                       </TableCell>
-                                      <TableCell className="text-right py-2 align-top">{item.quantity.toFixed(2)}</TableCell>
-                                      <TableCell className="text-right py-2 align-top">₹{sellPrice.toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top">{(item.quantity || 0).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right py-2 align-top">₹{(sellPrice || 0).toFixed(2)}</TableCell>
                                       {selectedBill.type === 'sell' && !selectedBill.isEstimate && selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_')) && (
                                         <>
-                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemSgst.toFixed(2)}` : '-'}</TableCell>
-                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${itemCgst.toFixed(2)}` : '-'}</TableCell>
+                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${(itemSgst || 0).toFixed(2)}` : '-'}</TableCell>
+                                          <TableCell className="text-right py-2 align-top">{showItemTaxCols ? `₹${(itemCgst || 0).toFixed(2)}` : '-'}</TableCell>
                                         </>
                                       )}
-                                      <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols && !item.isAdditionalCharge ? itemTotalWithTax : itemPreTaxSubtotal).toFixed(2)}</TableCell>
+                                      <TableCell className="text-right font-medium py-2 align-top">₹{(showItemTaxCols && !item.isAdditionalCharge ? (itemTotalWithTax || 0) : (itemPreTaxSubtotal || 0)).toFixed(2)}</TableCell>
                                     </TableRow>
                                   )
                                 })}
@@ -715,7 +715,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     {selectedBill.type === 'buy' && (
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">Total Cost (Expense Bill):</span>
-                        <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
+                        <span className="font-semibold text-destructive">₹{(selectedBill.totalAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
                     {(selectedBill.type === 'sell' || selectedBill.type === 'return') && !selectedBill.isEstimate && ((selectedBill.totalSGST ?? 0) > 0 || (selectedBill.totalCGST ?? 0) > 0 || selectedBill.items.some(i => !i.isAdditionalCharge && !i.productId.startsWith('SERVICE_ITEM_'))) && (
@@ -737,7 +737,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     )}
                     <div className="flex justify-between font-semibold text-lg">
                       <span>{selectedBill.type === 'sell' && selectedBill.isEstimate ? 'Estimate Total:' : 'Grand Total:'}</span>
-                      <span className={getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor}>₹{selectedBill.totalAmount.toFixed(2)}</span>
+                      <span className={getBillTypeIconAndColor(selectedBill.type, selectedBill.items, selectedBill.isEstimate).titleColor}>₹{(selectedBill.totalAmount || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -895,7 +895,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             <div className="flex gap-2 items-center">
               <div className="mr-4 text-right">
                 <span className="text-xs text-muted-foreground block">Total Items: {quickAddItems.length}</span>
-                <span className="text-lg font-bold text-emerald-700">₹{quickAddItems.reduce((acc, item) => acc + (item.sellPrice * item.quantity), 0).toFixed(2)}</span>
+                <span className="text-lg font-bold text-emerald-700">₹{quickAddItems.reduce((acc, item) => acc + ((item.sellPrice || 0) * (item.quantity || 0)), 0).toFixed(2)}</span>
               </div>
               <Button onClick={handleSaveQuickBill} className="bg-emerald-600 hover:bg-emerald-700 text-white w-48 shadow-md h-10 text-md font-semibold">
                 <Save className="mr-2 h-4 w-4" /> Save New Bill
@@ -1007,7 +1007,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                       {bill.customerPhone && <div className="text-xs text-muted-foreground">{bill.customerPhone}</div>}
                     </TableCell>
                     <TableCell className="text-right py-3 px-4 w-[70px]">{bill.items.length}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[110px]">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary py-3 px-4 w-[110px]">₹{(bill.totalAmount || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-center py-3 px-4 w-[100px]">
                       {(bill.type === 'sell' || bill.type === 'buy') && bill.paymentStatus && !bill.isEstimate ? (
                         <Badge
@@ -1152,7 +1152,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                 <CardFooter className="p-4 bg-muted/30 flex justify-between items-center">
                   <p className="text-lg font-bold">
                     <span className={cn(billDisplayInfo.titleColor === 'text-destructive' ? 'text-destructive' : 'text-primary')}>
-                      ₹{bill.totalAmount.toFixed(2)}
+                      ₹{(bill.totalAmount || 0).toFixed(2)}
                     </span>
                   </p>
                   <DropdownMenu>

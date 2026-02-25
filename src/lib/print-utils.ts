@@ -186,34 +186,34 @@ export const generateBillPrintContent = (
           ${(billToPrint.totalDiscount || 0) > 0 ? `
             <div class="totals-row">
               <span>Discount</span>
-              <span>-${currencySymbol}${billToPrint.totalDiscount.toFixed(2)}</span>
+              <span>-${currencySymbol}${(billToPrint.totalDiscount || 0).toFixed(2)}</span>
             </div>
           ` : ''}
 
           ${(billToPrint.totalSGST || 0) > 0 ? `
             <div class="totals-row">
               <span>SGST</span>
-              <span>${currencySymbol}${billToPrint.totalSGST.toFixed(2)}</span>
+              <span>${currencySymbol}${(billToPrint.totalSGST || 0).toFixed(2)}</span>
             </div>
           ` : ''}
 
           ${(billToPrint.totalCGST || 0) > 0 ? `
             <div class="totals-row">
               <span>CGST</span>
-              <span>${currencySymbol}${billToPrint.totalCGST.toFixed(2)}</span>
+              <span>${currencySymbol}${(billToPrint.totalCGST || 0).toFixed(2)}</span>
             </div>
           ` : ''}
 
           ${(billToPrint.totalIGST || 0) > 0 ? `
              <div class="totals-row">
                <span>IGST</span>
-               <span>${currencySymbol}${billToPrint.totalIGST.toFixed(2)}</span>
+               <span>${currencySymbol}${(billToPrint.totalIGST || 0).toFixed(2)}</span>
              </div>
            ` : ''}
 
           <div class="totals-row grand-total">
             <span>TOTAL</span>
-            <span>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</span>
+            <span>${currencySymbol}${(billToPrint.totalAmount || 0).toFixed(2)}</span>
           </div>
            <div class="totals-row">
              <span>Status</span>

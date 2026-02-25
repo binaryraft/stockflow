@@ -175,7 +175,7 @@ export function BillItemRow({
               disabled={item.isAdditionalCharge}
             />
           ) : (
-            <span className="text-sm text-right px-2">{item.sellPrice.toFixed(2)}</span>
+            <span className="text-sm text-right px-2">{(item.sellPrice || 0).toFixed(2)}</span>
           )}
 
           {showTaxColumns && (
@@ -206,15 +206,15 @@ export function BillItemRow({
               {/* Tax Columns */}
               {isInterState ? (
                 <span className="text-xs text-muted-foreground text-right flex items-center justify-end h-8 px-1 truncate bg-muted/20 rounded-sm">
-                  {item.igstAmount ? `₹${item.igstAmount.toFixed(2)}` : '-'}
+                  {item.igstAmount ? `₹${(item.igstAmount || 0).toFixed(2)}` : '-'}
                 </span>
               ) : (
                 <>
                   <span className="text-xs text-muted-foreground text-right flex items-center justify-end h-8 px-1 truncate bg-muted/20 rounded-sm">
-                    {item.sgstAmount ? `₹${item.sgstAmount.toFixed(2)}` : '-'}
+                    {item.sgstAmount ? `₹${(item.sgstAmount || 0).toFixed(2)}` : '-'}
                   </span>
                   <span className="text-xs text-muted-foreground text-right flex items-center justify-end h-8 px-1 truncate bg-muted/20 rounded-sm">
-                    {item.cgstAmount ? `₹${item.cgstAmount.toFixed(2)}` : '-'}
+                    {item.cgstAmount ? `₹${(item.cgstAmount || 0).toFixed(2)}` : '-'}
                   </span>
                 </>
               )}
@@ -222,7 +222,7 @@ export function BillItemRow({
           )}
 
           <span className="text-sm font-semibold text-right flex items-center justify-end h-8 px-2 truncate">
-            ₹{itemTotalWithTax.toFixed(2)}
+            ₹{(itemTotalWithTax || 0).toFixed(2)}
           </span>
         </>
       )}

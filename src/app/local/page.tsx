@@ -220,7 +220,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end">
-                      <span className={cn("font-semibold", amountColor)}>{currencySymbol}{bill.totalAmount.toFixed(2)}</span>
+                      <span className={cn("font-semibold", amountColor)}>{currencySymbol}{(bill.totalAmount || 0).toFixed(2)}</span>
                       <span className="text-xs text-muted-foreground">{format(new Date(bill.date), 'PP p')}</span>
                     </div>
                   </div>

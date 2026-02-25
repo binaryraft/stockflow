@@ -46,28 +46,28 @@ export function ProductSummaryCard({ analytics, currencySymbol }: ProductSummary
         <div className={cn("p-4 rounded-lg text-center", analytics.grossProfit >= 0 ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30')}>
           <p className={cn("text-sm font-medium", profitColor)}>{profitLabel}</p>
           <p className={cn("text-3xl font-bold", profitColor)}>
-            {currencySymbol}{analytics.grossProfit.toFixed(2)}
+            {currencySymbol}{(analytics.grossProfit || 0).toFixed(2)}
           </p>
         </div>
         <div className="space-y-3 pt-2">
-          <StatRow 
-            icon={TrendingUp} 
-            label="Lifetime Revenue" 
-            value={`${currencySymbol}${analytics.totalRevenue.toFixed(2)}`} 
+          <StatRow
+            icon={TrendingUp}
+            label="Lifetime Revenue"
+            value={`${currencySymbol}${(analytics.totalRevenue || 0).toFixed(2)}`}
           />
-          <StatRow 
-            icon={TrendingDown} 
-            label="Lifetime COGS" 
-            value={`${currencySymbol}${analytics.totalCostOfGoodsSold.toFixed(2)}`} 
+          <StatRow
+            icon={TrendingDown}
+            label="Lifetime COGS"
+            value={`${currencySymbol}${(analytics.totalCostOfGoodsSold || 0).toFixed(2)}`}
           />
-          <StatRow 
-            icon={ShoppingCart} 
-            label="Units Sold" 
-            value={analytics.totalSold} 
+          <StatRow
+            icon={ShoppingCart}
+            label="Units Sold"
+            value={analytics.totalSold}
           />
-          <StatRow 
-            icon={RotateCcw} 
-            label="Units Returned" 
+          <StatRow
+            icon={RotateCcw}
+            label="Units Returned"
             value={analytics.totalReturned}
             valueClassName={analytics.totalReturned > 0 ? "text-amber-600 dark:text-amber-500" : ""}
           />

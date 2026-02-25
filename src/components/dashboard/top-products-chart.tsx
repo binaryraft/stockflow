@@ -25,7 +25,7 @@ const CustomTooltip = ({ active, payload, label, currencySymbol }: any) => {
       <div className="p-3 bg-background border border-border rounded-lg shadow-lg text-xs">
         <p className="font-bold mb-2 text-sm text-foreground">{data.name}</p>
         <p className="text-muted-foreground">
-          Revenue: <span className="font-semibold text-foreground">{currencySymbol}{data.revenue.toFixed(2)}</span>
+          Revenue: <span className="font-semibold text-foreground">{currencySymbol}{(data.revenue || 0).toFixed(2)}</span>
         </p>
         <p className="text-muted-foreground">
           Quantity Sold: <span className="font-semibold text-foreground">{data.quantity}</span>

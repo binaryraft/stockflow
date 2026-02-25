@@ -127,7 +127,7 @@ export function BillingExcelView({
             }
 
             if (totalRequested > stockAvailable) {
-                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockAvailable.toFixed(2)} available.` });
+                toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${(stockAvailable || 0).toFixed(2)} available.` });
                 if (updates.quantity !== undefined) return;
             }
         }
@@ -354,7 +354,7 @@ export function BillingExcelView({
 
                 {!isEstimate && (
                     <div className="w-20 p-1 border-r bg-muted/5 flex items-center justify-end text-[10px] text-muted-foreground px-2">
-                        {isNew ? '' : tax.toFixed(2)}
+                        {isNew ? '' : (tax || 0).toFixed(2)}
                     </div>
                 )}
 
@@ -362,7 +362,7 @@ export function BillingExcelView({
                     <Input
                         type="number"
                         className="h-9 text-xs border-none shadow-none text-right font-bold bg-emerald-50/10"
-                        value={isNew ? '' : total.toFixed(2)}
+                        value={isNew ? '' : (total || 0).toFixed(2)}
                         onChange={(e) => {
                             const val = parseFloat(e.target.value) || 0;
                             if (total > 0) updateItem(index, { sellPrice: item!.sellPrice * (val / total) });

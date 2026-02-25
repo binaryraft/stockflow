@@ -42,8 +42,8 @@ export function ProductPerformanceChart({ analytics, currencySymbol }: ProductPe
               axisLine={false}
               hide
             />
-            <XAxis 
-              type="number" 
+            <XAxis
+              type="number"
               tickFormatter={(value) => `${currencySymbol}${value}`}
               axisLine={false}
               tickLine={false}
@@ -54,8 +54,8 @@ export function ProductPerformanceChart({ analytics, currencySymbol }: ProductPe
                 if (active && payload && payload.length) {
                   return (
                     <div className="p-2 bg-background border rounded-md shadow-sm text-sm">
-                      <p className="font-bold text-primary">Revenue: {currencySymbol}{payload[0].value?.toFixed(2)}</p>
-                      <p className="font-bold text-destructive">COGS: {currencySymbol}{payload[1].value?.toFixed(2)}</p>
+                      <p className="font-bold text-primary">Revenue: {currencySymbol}{(Number(payload[0].value) || 0).toFixed(2)}</p>
+                      <p className="font-bold text-destructive">COGS: {currencySymbol}{(Number(payload[1].value) || 0).toFixed(2)}</p>
                     </div>
                   );
                 }

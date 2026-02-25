@@ -36,7 +36,7 @@ export function BalanceSheet({ storeId }: { storeId?: string }) {
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
   const formatValue = (value: number) => {
-    return `${currencySymbol}${value.toFixed(2)}`;
+    return `${currencySymbol}${(value || 0).toFixed(2)}`;
   };
 
   const totalAssets = summary.accountsReceivable + summary.inventoryValue;

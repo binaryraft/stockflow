@@ -40,7 +40,7 @@ export function CashFlowStatement({ startDate, endDate, storeId }: CashFlowState
   const currencySymbol = getCurrencySymbol(userProfile.companyCurrency);
 
   const formatValue = (value: number) => {
-    return `${currencySymbol}${value.toFixed(2)}`;
+    return `${currencySymbol}${(value || 0).toFixed(2)}`;
   };
 
   return (

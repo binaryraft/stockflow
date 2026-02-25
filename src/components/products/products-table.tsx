@@ -160,8 +160,8 @@ export function ProductsTable() {
     if (validPrices.length === 0) return "N/A";
     const minPrice = Math.min(...validPrices);
     const maxPrice = Math.max(...validPrices);
-    if (minPrice === maxPrice) return `${currencySymbol}${minPrice.toFixed(2)}`;
-    return `${currencySymbol}${minPrice.toFixed(2)} - ${currencySymbol}${maxPrice.toFixed(2)}`;
+    if (minPrice === maxPrice) return `${currencySymbol}${(Number(minPrice) || 0).toFixed(2)}`;
+    return `${currencySymbol}${(Number(minPrice) || 0).toFixed(2)} - ${currencySymbol}${(Number(maxPrice) || 0).toFixed(2)}`;
   };
 
   const canAddProducts = useMemo(() => {

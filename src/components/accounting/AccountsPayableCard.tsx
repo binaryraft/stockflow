@@ -51,7 +51,7 @@ export function AccountsPayableCard({ storeId }: { storeId?: string }) {
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Total Due</p>
             <p className={cn("text-2xl font-bold text-destructive", showLoading && "animate-pulse opacity-50")}>
-              {showLoading ? "..." : `${currencySymbol}${totalPayable.toFixed(2)}`}
+              {showLoading ? "..." : `${currencySymbol}${(totalPayable || 0).toFixed(2)}`}
             </p>
           </div>
         </div>
@@ -76,7 +76,7 @@ export function AccountsPayableCard({ storeId }: { storeId?: string }) {
                     {topUnpaidBills.map(bill => (
                       <TableRow key={bill.id}>
                         <TableCell className="text-sm py-1.5">{bill.vendorOrCustomerName || 'N/A'}</TableCell>
-                        <TableCell className="text-sm py-1.5 text-right font-semibold">{currencySymbol}{bill.totalAmount.toFixed(2)}</TableCell>
+                        <TableCell className="text-sm py-1.5 text-right font-semibold">{currencySymbol}{(bill.totalAmount || 0).toFixed(2)}</TableCell>
                         <TableCell className="text-sm py-1.5 text-right">{format(new Date(bill.date), 'PP')}</TableCell>
                       </TableRow>
                     ))}

@@ -51,36 +51,36 @@ export const BillingSummary: React.FC<BillingSummaryProps> = ({
                 <div className="md:col-span-1 space-y-2 text-sm bg-muted/30 p-4 rounded-lg border">
                     <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span className="font-medium">₹{totals.subTotal.toFixed(2)}</span>
+                        <span className="font-medium">₹{(totals.subTotal || 0).toFixed(2)}</span>
                     </div>
                     {totals.totalDiscount > 0 && (
                         <div className="flex justify-between text-green-600">
                             <span>Discount:</span>
-                            <span>-₹{totals.totalDiscount.toFixed(2)}</span>
+                            <span>-₹{(totals.totalDiscount || 0).toFixed(2)}</span>
                         </div>
                     )}
                     {totals.totalSGST > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                             <span>SGST:</span>
-                            <span>₹{totals.totalSGST.toFixed(2)}</span>
+                            <span>₹{(totals.totalSGST || 0).toFixed(2)}</span>
                         </div>
                     )}
                     {totals.totalCGST > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                             <span>CGST:</span>
-                            <span>₹{totals.totalCGST.toFixed(2)}</span>
+                            <span>₹{(totals.totalCGST || 0).toFixed(2)}</span>
                         </div>
                     )}
                     {totals.totalIGST > 0 && (
                         <div className="flex justify-between text-muted-foreground">
                             <span>IGST:</span>
-                            <span>₹{totals.totalIGST.toFixed(2)}</span>
+                            <span>₹{(totals.totalIGST || 0).toFixed(2)}</span>
                         </div>
                     )}
                     <Separator className="my-2" />
                     <div className="flex justify-between text-lg font-bold text-primary">
                         <span>Total:</span>
-                        <span>₹{totals.grandTotal.toFixed(2)}</span>
+                        <span>₹{(totals.grandTotal || 0).toFixed(2)}</span>
                     </div>
 
                     <Button onClick={onSave} disabled={isSaving} className="w-full mt-4 h-12 text-lg shadow-lg">

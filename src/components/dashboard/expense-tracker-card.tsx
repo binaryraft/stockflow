@@ -87,11 +87,11 @@ export function ExpenseTrackerCard() {
                   <div className="mt-1.5 pt-1.5 border-t border-dashed grid grid-cols-2 gap-x-2 text-sm">
                     <div>
                       <span className="text-muted-foreground">Cost: </span>
-                      <span className="font-semibold text-destructive">{currencySymbol}{bill.totalCost.toFixed(2)}</span>
+                      <span className="font-semibold text-destructive">{currencySymbol}{(bill.totalCost || 0).toFixed(2)}</span>
                     </div>
                     <div className="text-right">
                       <span className="text-muted-foreground">Pot. Revenue: </span>
-                      <span className="font-semibold text-primary">{currencySymbol}{bill.potentialRevenue.toFixed(2)}</span>
+                      <span className="font-semibold text-primary">{currencySymbol}{(bill.potentialRevenue || 0).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>

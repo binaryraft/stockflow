@@ -86,25 +86,25 @@ export function ExpenseSummaryStats() {
           <StatItem
             icon={<CheckCircle className="text-green-500" />}
             label="Covered Expense Cost"
-            value={`${currencySymbol}${summary.totalCoveredExpenseValue.toFixed(2)}`}
+            value={`${currencySymbol}${(summary.totalCoveredExpenseValue || 0).toFixed(2)}`}
             description={`${summary.coveredBillCount} bill(s)`}
           />
           <StatItem
             icon={<XCircle className="text-red-500" />}
             label="Uncovered Expense Cost"
-            value={`${currencySymbol}${summary.totalUncoveredExpenseValue.toFixed(2)}`}
+            value={`${currencySymbol}${(summary.totalUncoveredExpenseValue || 0).toFixed(2)}`}
             description={`${summary.uncoveredBillCount} bill(s)`}
           />
           <StatItem
             icon={<TrendingUp className="text-green-500" />}
             label="Pot. Profit (Covered)"
-            value={`${currencySymbol}${summary.totalPotentialProfitOnCoveredExpenses.toFixed(2)}`}
+            value={`${currencySymbol}${(summary.totalPotentialProfitOnCoveredExpenses || 0).toFixed(2)}`}
             description="From covered bills"
           />
           <StatItem
             icon={<TrendingDown className="text-red-500" />}
             label="Outstanding (Uncovered)"
-            value={`${currencySymbol}${summary.totalOutstandingCostOnUncoveredExpenses.toFixed(2)}`}
+            value={`${currencySymbol}${(summary.totalOutstandingCostOnUncoveredExpenses || 0).toFixed(2)}`}
             description="Cost yet to be covered"
           />
         </div>
@@ -115,7 +115,7 @@ export function ExpenseSummaryStats() {
               "font-bold text-lg ml-1.5",
               overallPotentialNet >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"
             )}>
-              {currencySymbol}{overallPotentialNet.toFixed(2)}
+              {currencySymbol}{(overallPotentialNet || 0).toFixed(2)}
             </span>
           </p>
           <p className="text-xs text-muted-foreground mt-0.5">

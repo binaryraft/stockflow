@@ -129,7 +129,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
               : "bg-destructive/10 border-destructive/20 text-destructive"
           )}>
             <span className="text-[10px] font-bold uppercase tracking-widest opacity-70">Net {isProfitable ? 'Profit' : 'Loss'}</span>
-            <span className="text-2xl font-black tabular-nums">{currencySymbol}{Math.abs(netProfit).toFixed(2)}</span>
+            <span className="text-2xl font-black tabular-nums">{currencySymbol}{(Math.abs(netProfit) || 0).toFixed(2)}</span>
           </div>
         </div>
       </CardHeader>
@@ -153,7 +153,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
               <div className="space-y-1">
                 <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">{item.label}</p>
                 <div className="flex items-baseline gap-1">
-                  <span className="text-2xl font-bold tracking-tight text-foreground">{currencySymbol}{item.value.toFixed(2)}</span>
+                  <span className="text-2xl font-bold tracking-tight text-foreground">{currencySymbol}{(item.value || 0).toFixed(2)}</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground/80 font-medium leading-none">{item.description}</p>
               </div>

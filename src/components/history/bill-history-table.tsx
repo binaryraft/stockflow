@@ -355,8 +355,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                             <TableRow key={item.id}>
                               <TableCell>{item.productName}</TableCell>
                               <TableCell className="text-right">{item.quantity}</TableCell>
-                              <TableCell className="text-right">₹{item.sellPrice.toFixed(2)}</TableCell>
-                              <TableCell className="text-right font-medium">₹{(item.quantity * item.sellPrice).toFixed(2)}</TableCell>
+                              <TableCell className="text-right">₹{(item.sellPrice || 0).toFixed(2)}</TableCell>
+                              <TableCell className="text-right font-medium">₹{((item.quantity || 0) * (item.sellPrice || 0)).toFixed(2)}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
@@ -365,7 +365,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                   </AccordionItem>
                 </Accordion>
                 <div className="p-4 border rounded-md bg-card shadow-sm text-right">
-                  <span className="text-lg font-bold">Total: ₹{selectedBill.totalAmount.toFixed(2)}</span>
+                  <span className="text-lg font-bold">Total: ₹{(selectedBill.totalAmount || 0).toFixed(2)}</span>
                 </div>
               </div>
             </ScrollArea>
@@ -429,7 +429,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                     <TableCell className="font-medium">{format(new Date(bill.date), 'dd/MM/yy')}</TableCell>
                     <TableCell><Badge className={cn("gap-1.5", info.className)}>{info.icon}{info.name}</Badge></TableCell>
                     <TableCell>{bill.vendorOrCustomerName || 'Walk-in'}</TableCell>
-                    <TableCell className="text-right font-semibold text-primary">₹{bill.totalAmount.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-semibold text-primary">₹{(bill.totalAmount || 0).toFixed(2)}</TableCell>
                     <TableCell className="text-center">
                       <Badge variant={bill.paymentStatus === 'paid' ? 'default' : 'destructive'}>{bill.paymentStatus || 'unpaid'}</Badge>
                     </TableCell>
@@ -572,8 +572,8 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                         )}
                       </div>
                       <div className="w-20 p-2 border-r text-right font-mono px-3">{item.quantity}</div>
-                      <div className="w-24 p-2 border-r text-right font-mono px-3">₹{item.sellPrice.toFixed(2)}</div>
-                      <div className="w-28 p-2 text-right font-mono font-bold px-3 text-emerald-700">₹{(item.quantity * item.sellPrice).toFixed(2)}</div>
+                      <div className="w-24 p-2 border-r text-right font-mono px-3">₹{(item.sellPrice || 0).toFixed(2)}</div>
+                      <div className="w-28 p-2 text-right font-mono font-bold px-3 text-emerald-700">₹{((item.quantity || 0) * (item.sellPrice || 0)).toFixed(2)}</div>
                       <div className="w-10 p-2"></div>
                     </div>
                   ))}
@@ -597,7 +597,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
           <Card key={bill.id} className="shadow-sm">
             <CardHeader className="p-4 flex flex-row justify-between items-center">
               <CardTitle className="text-sm">{getBillTypeName(bill)}</CardTitle>
-              <Badge>₹{bill.totalAmount.toFixed(2)}</Badge>
+              <Badge>₹{(bill.totalAmount || 0).toFixed(2)}</Badge>
             </CardHeader>
             <CardFooter className="p-4 pt-0 text-xs text-muted-foreground">
               {format(new Date(bill.date), 'PPpp')}

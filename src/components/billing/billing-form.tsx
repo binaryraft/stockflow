@@ -471,7 +471,7 @@ export function BillingForm({
           displayInfo: {
             name: skuDetails.skuIdentifier || product.name,
             stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-            price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+            price: skuDetails.currentSellPrice !== null ? `₹${(skuDetails.currentSellPrice || 0).toFixed(2)}` : 'N/A',
           }
         };
         handleProductSelectFromSearch(suggestionForNewProduct);
@@ -583,7 +583,7 @@ export function BillingForm({
         .reduce((sum, item) => sum + item.quantity, 0);
 
       if (stockToCheck < (currentQuantity + existingQuantityInBill)) {
-        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${stockToCheck.toFixed(2)} of ${itemProductNameForBill} available at this store. You already have ${existingQuantityInBill} in bill.` });
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${(stockToCheck || 0).toFixed(2)} of ${itemProductNameForBill} available at this store. You already have ${existingQuantityInBill} in bill.` });
         return;
       }
     }
@@ -746,7 +746,7 @@ export function BillingForm({
         displayInfo: {
           name: isGenericProductSelection ? `${foundProduct.name} (Select Variants)` : (skuDetails.skuIdentifier || foundProduct.name),
           stock: foundProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-          price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+          price: skuDetails.currentSellPrice !== null ? `₹${(skuDetails.currentSellPrice || 0).toFixed(2)}` : 'N/A',
         }
       };
       handleProductSelectFromSearch(suggestion);
@@ -916,7 +916,7 @@ export function BillingForm({
               toast({
                 variant: "destructive",
                 title: "Insufficient Stock",
-                description: `Only ${stockAvailable.toFixed(2)} available. You have ${otherItemsQuantity} already in bill + ${qty} requested.`
+                description: `Only ${(stockAvailable || 0).toFixed(2)} available. You have ${otherItemsQuantity} already in bill + ${qty} requested.`
               });
               return prevItems;
             }
@@ -1285,7 +1285,7 @@ export function BillingForm({
       displayInfo: {
         name: skuDetails.skuIdentifier || newProduct.name,
         stock: newProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-        price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+        price: skuDetails.currentSellPrice !== null ? `₹${(skuDetails.currentSellPrice || 0).toFixed(2)}` : 'N/A',
       },
     };
     handleProductSelectFromSearch(suggestion);
@@ -1705,15 +1705,15 @@ export function BillingForm({
               <>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Subtotal (Before Tax):</span>
-                  <span className="font-medium text-foreground">₹{billTotals.subTotal.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{(billTotals.subTotal || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Total SGST:</span>
-                  <span className="font-medium text-foreground">₹{billTotals.totalSGST.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{(billTotals.totalSGST || 0).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between w-full max-w-xs">
                   <span className="text-muted-foreground">Total CGST:</span>
-                  <span className="font-medium text-foreground">₹{billTotals.totalCGST.toFixed(2)}</span>
+                  <span className="font-medium text-foreground">₹{(billTotals.totalCGST || 0).toFixed(2)}</span>
                 </div>
                 <Separator className="my-1.5 w-full max-w-xs" />
               </>
@@ -1721,13 +1721,13 @@ export function BillingForm({
             {mode === 'buy' && (
               <div className="flex justify-between w-full max-w-xs">
                 <span className="text-muted-foreground">Total Cost:</span>
-                <span className="font-semibold text-destructive">₹{billTotals.grandTotal.toFixed(2)}</span>
+                <span className="font-semibold text-destructive">₹{(billTotals.grandTotal || 0).toFixed(2)}</span>
               </div>
             )}
             {(mode === 'sell' || mode === 'return') && (
               <div className="flex justify-between w-full max-w-xs text-lg font-semibold text-primary">
                 <span>{isEstimateMode && mode === 'sell' ? 'Estimate Total:' : 'Grand Total:'}</span>
-                <span>₹{billTotals.grandTotal.toFixed(2)}</span>
+                <span>₹{(billTotals.grandTotal || 0).toFixed(2)}</span>
               </div>
             )}
           </div>

@@ -104,9 +104,9 @@ export function ProductSearchInput({
                 sku,
                 layer,
                 displayInfo: {
-                  name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
+                  name: `${baseSkuIdentifier} - Sell @ ₹${(layer.sellPrice || 0).toFixed(2)}`,
                   stock: layer.quantity,
-                  price: `₹${layer.sellPrice.toFixed(2)}`,
+                  price: `₹${(layer.sellPrice || 0).toFixed(2)}`,
                   category: product.category,
                 },
               });
@@ -132,7 +132,7 @@ export function ProductSearchInput({
             displayInfo: {
               name: `${baseSkuIdentifier}${outOfStockLabel}`,
               stock: product.trackQuantity ? (skuDetails.totalStock ?? 0) : 'N/A',
-              price: skuDetails.currentSellPrice !== null ? `₹${skuDetails.currentSellPrice.toFixed(2)}` : 'N/A',
+              price: skuDetails.currentSellPrice !== null ? `₹${(skuDetails.currentSellPrice || 0).toFixed(2)}` : 'N/A',
               category: product.category,
             },
           });
