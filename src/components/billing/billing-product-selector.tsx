@@ -132,20 +132,30 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                         )}
                     </div>
 
-                    {/* Product Info Display */}
                     {currentProductForSelection && (
                         <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
-                            <span>{currentProductForSelection.name}</span>
+                            <span className="font-medium text-foreground block">{currentProductForSelection.name}</span>
                             {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
-                                <span className="block font-medium text-foreground">
-                                    {isDisplayingLayerStock && mode === 'sell' ? `Available Batch Stock: ${currentSkuStock}` : `Total Stock: ${currentSkuStock}`}
-                                </span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                    <div className="px-2 py-0.5 rounded-full bg-secondary/10 border border-secondary/20 text-secondary font-bold text-[10px] uppercase tracking-wider">
+                                        Stock
+                                    </div>
+                                    <span className="font-semibold text-foreground text-sm">
+                                        {isDisplayingLayerStock && mode === 'sell' ? `${currentSkuStock}` : `${currentSkuStock}`}
+                                    </span>
+                                </div>
                             )}
                             {currentSkuSellPrice !== null && (
-                                <span className="block italic">Price: ₹{(currentSkuSellPrice || 0).toFixed(2)}</span>
+                                <div className="flex items-center gap-1.5 mt-1">
+                                    <div className="px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-bold text-[10px] uppercase tracking-wider">
+                                        Price
+                                    </div>
+                                    <span className="font-semibold text-secondary-highlight text-sm">₹{(currentSkuSellPrice || 0).toFixed(2)}</span>
+                                </div>
                             )}
+
                             {mode === 'sell' && currentProductForSelection.hsnCode && (
-                                <span className="block text-primary/80 font-medium">HSN: {currentProductForSelection.hsnCode}</span>
+                                <span className="block text-primary/80 font-medium mt-1">HSN: {currentProductForSelection.hsnCode}</span>
                             )}
                             {mode === 'sell' && currentProductForSelection.sgstRate !== undefined && currentProductForSelection.cgstRate !== undefined && (
                                 <span className="block text-primary/70">Tax: SGST {currentProductForSelection.sgstRate}% + CGST {currentProductForSelection.cgstRate}%</span>
@@ -210,68 +220,70 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
             </div>
 
             {/* Variants */}
-            {currentProductForSelection?.variants && currentProductForSelection.variants.length > 0 && (
-                <div className="grid md:grid-cols-3 gap-4 mt-3">
-                    {currentProductForSelection.variants.map((variant, index) => {
-                        if (!variant || !variant.id) return null;
-                        if (!variantSelectRefs.current[variant.id]) {
-                            variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
-                        }
-                        return (
-                            <div key={variant.id} className="space-y-1.5">
-                                <Label>{variant.name}</Label>
-                                <Select
-                                    open={variantDropdownOpenState[variant.id] || false}
-                                    onOpenChange={(isOpen) => {
-                                        setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
-                                    }}
-                                    value={selectedVariantOptions[variant.name] || ""}
-                                    onValueChange={(val) => {
-                                        const newOptions = { ...selectedVariantOptions, [variant.name]: val };
-                                        setSelectedVariantOptions(newOptions);
-                                        // We don't close immediately to allow visual confirmation, or do we? 
-                                        // Actually better to keep it open briefly or just move focus?
-                                        // Closing it is standard behavior for Select.
+            {
+                currentProductForSelection?.variants && currentProductForSelection.variants.length > 0 && (
+                    <div className="grid md:grid-cols-3 gap-4 mt-3">
+                        {currentProductForSelection.variants.map((variant, index) => {
+                            if (!variant || !variant.id) return null;
+                            if (!variantSelectRefs.current[variant.id]) {
+                                variantSelectRefs.current[variant.id] = React.createRef<HTMLButtonElement>();
+                            }
+                            return (
+                                <div key={variant.id} className="space-y-1.5">
+                                    <Label>{variant.name}</Label>
+                                    <Select
+                                        open={variantDropdownOpenState[variant.id] || false}
+                                        onOpenChange={(isOpen) => {
+                                            setVariantDropdownOpenState((prev) => ({ ...prev, [variant.id]: isOpen }));
+                                        }}
+                                        value={selectedVariantOptions[variant.name] || ""}
+                                        onValueChange={(val) => {
+                                            const newOptions = { ...selectedVariantOptions, [variant.name]: val };
+                                            setSelectedVariantOptions(newOptions);
+                                            // We don't close immediately to allow visual confirmation, or do we? 
+                                            // Actually better to keep it open briefly or just move focus?
+                                            // Closing it is standard behavior for Select.
 
-                                        // Find current index
-                                        const currentIndex = currentProductForSelection.variants?.findIndex(v => v?.id === variant.id) ?? -1;
+                                            // Find current index
+                                            const currentIndex = currentProductForSelection.variants?.findIndex(v => v?.id === variant.id) ?? -1;
 
-                                        if (currentIndex !== -1 && currentProductForSelection.variants && currentIndex < currentProductForSelection.variants.length - 1) {
-                                            // Move to next variant
-                                            const nextVariant = currentProductForSelection.variants[currentIndex + 1];
-                                            if (nextVariant) {
-                                                // Use a slight delay to allow the current select to close properly
+                                            if (currentIndex !== -1 && currentProductForSelection.variants && currentIndex < currentProductForSelection.variants.length - 1) {
+                                                // Move to next variant
+                                                const nextVariant = currentProductForSelection.variants[currentIndex + 1];
+                                                if (nextVariant) {
+                                                    // Use a slight delay to allow the current select to close properly
+                                                    setTimeout(() => {
+                                                        setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false, [nextVariant.id]: true }));
+                                                    }, 100);
+                                                }
+                                            } else {
+                                                // Last variant, move to quantity
                                                 setTimeout(() => {
-                                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false, [nextVariant.id]: true }));
+                                                    setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
+                                                    quantityInputRef.current?.focus();
+                                                    quantityInputRef.current?.select();
                                                 }, 100);
                                             }
-                                        } else {
-                                            // Last variant, move to quantity
-                                            setTimeout(() => {
-                                                setVariantDropdownOpenState(prev => ({ ...prev, [variant.id]: false }));
-                                                quantityInputRef.current?.focus();
-                                                quantityInputRef.current?.select();
-                                            }, 100);
-                                        }
-                                    }}
-                                >
-                                    <SelectTrigger
-                                        id={`variant-trigger-${variant.id}`}
-                                        ref={variantSelectRefs.current[variant.id]}
+                                        }}
                                     >
-                                        <SelectValue placeholder={`Select ${variant.name}`} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {variant.options?.map(opt => (
-                                            <SelectItem key={opt.id} value={opt.value}>{opt.value}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        );
-                    })}
-                </div>
-            )}
-        </div>
+                                        <SelectTrigger
+                                            id={`variant-trigger-${variant.id}`}
+                                            ref={variantSelectRefs.current[variant.id]}
+                                        >
+                                            <SelectValue placeholder={`Select ${variant.name}`} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {variant.options?.map(opt => (
+                                                <SelectItem key={opt.id} value={opt.value}>{opt.value}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )
+            }
+        </div >
     );
 };

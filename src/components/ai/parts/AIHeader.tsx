@@ -21,12 +21,12 @@ export function AIHeader({ isLocalMode, onClose }: AIHeaderProps) {
                 </button>
                 <div>
                     <div className="flex items-center gap-3">
-                        <h1 className="text-base sm:text-xl font-black text-white tracking-widest italic uppercase">Personal Assistant <span className="text-emerald-500">v8</span></h1>
-                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] sm:text-[10px] uppercase font-black px-1.5 py-0 rounded">Active</span>
+                        <h1 className="text-base sm:text-xl font-black text-white tracking-widest italic uppercase">ECBILLS AI Assistant</h1>
+                        <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-[8px] sm:text-[10px] uppercase font-black px-1.5 py-0 rounded">V8 STORM-X</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1 opacity-40">
                         <Network className="w-3 h-3 text-white" />
-                        <span className="text-[9px] sm:text-[10px] text-white font-bold uppercase tracking-[0.2em]">{isLocalMode ? 'Mesh Local' : 'Global Cloud'}</span>
+                        <span className="text-[9px] sm:text-[10px] text-white font-bold uppercase tracking-[0.2em]">Model: EB-V8 / STORM-X</span>
                     </div>
                 </div>
             </div>

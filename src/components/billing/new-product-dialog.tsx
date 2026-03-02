@@ -23,7 +23,7 @@ import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { Product, ProductVariant as ProductVariantType, ProductOption as ProductOptionType, AdditionalChargeDefinition } from '@/types';
 import { CategorySearchInput } from './category-search-input';
-import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins, Info } from 'lucide-react';
+import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins, Info, ShoppingBag } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
@@ -622,33 +622,37 @@ export function NewProductDialog({
 
                 {/* Main Pricing & Stock Section */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-costPrice">Cost Price (₹)</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-1.5 p-3 bg-secondary/10 border border-secondary/20 rounded-lg transition-all hover:bg-secondary/15">
+                    <Label htmlFor="dialog-costPrice" className="text-secondary-highlight flex items-center gap-1.5 underline underline-offset-4 decoration-secondary/30">
+                      <DollarSign className="h-3.5 w-3.5" /> Cost Price (₹)*
+                    </Label>
+                    <div className="relative mt-1">
+                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-secondary/60" />
                       <Input
                         id="dialog-costPrice"
                         type="number"
                         step="0.01"
                         {...register("costPrice")}
                         placeholder="0.00"
-                        className="pl-8"
+                        className="pl-8 border-secondary/30 focus:border-secondary focus:ring-secondary/20"
                       />
                     </div>
                     {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
                   </div>
 
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-sellPrice">Sell Price (₹)</Label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <div className="space-y-1.5 p-3 bg-secondary/10 border border-secondary/20 rounded-lg transition-all hover:bg-secondary/15">
+                    <Label htmlFor="dialog-sellPrice" className="text-secondary-highlight flex items-center gap-1.5 underline underline-offset-4 decoration-secondary/30">
+                      <ShoppingBag className="h-3.5 w-3.5" /> Sell Price (₹)*
+                    </Label>
+                    <div className="relative mt-1">
+                      <DollarSign className="absolute left-2 top-2.5 h-4 w-4 text-secondary/60" />
                       <Input
                         id="dialog-sellPrice"
                         type="number"
                         step="0.01"
                         {...register("sellPrice")}
                         placeholder="0.00"
-                        className="pl-8"
+                        className="pl-8 border-secondary/30 focus:border-secondary focus:ring-secondary/20"
                       />
                     </div>
                     {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}

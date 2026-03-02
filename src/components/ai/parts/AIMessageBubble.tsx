@@ -1,7 +1,7 @@
 "use client"
 
 import React from 'react'
-import { Bot, User, Play, X, ArrowRight } from 'lucide-react'
+import { Bot, User, Play, X, ArrowRight, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { AIMessage } from '@/types/ai'
 
@@ -10,9 +10,18 @@ interface AIMessageBubbleProps {
     index: number;
     onExecute: (index: number) => void;
     onRemove: (index: number) => void;
+    isEditing: boolean;
+    onStartEdit: (index: number) => void;
+    onSaveEdit: (index: number, data: any) => void;
+    onCancelEdit: () => void;
 }
 
-export function AIMessageBubble({ message, index, onExecute, onRemove }: AIMessageBubbleProps) {
+export function AIMessageBubble({ message, index, onExecute, onRemove, isEditing, onStartEdit, onSaveEdit, onCancelEdit }: AIMessageBubbleProps) {
+    const [editData, setEditData] = React.useState<any>(message.data || {})
+
+    React.useEffect(() => {
+        if (isEditing) setEditData(message.data || {})
+    }, [isEditing, message.data])
     return (
         <div className={cn(
             "flex flex-col w-full animate-in slide-in-from-bottom-6 fade-in duration-700",
@@ -69,30 +78,82 @@ export function AIMessageBubble({ message, index, onExecute, onRemove }: AIMessa
                         <div className="grid grid-cols-2 gap-4 mb-8">
                             <div className="bg-white/[0.03] p-5 rounded-3xl border border-white/5">
                                 <span className="text-[9px] text-white/20 font-black uppercase tracking-widest block mb-1">Target</span>
-                                <p className="text-sm font-black text-white truncate italic">{message.data?.productName}</p>
+                                {isEditing ? (
+                                    <input
+                                        className="bg-transparent border-b border-emerald-500/50 text-white text-sm font-black w-full focus:outline-none"
+                                        value={editData.productName}
+                                        onChange={e => setEditData({ ...editData, productName: e.target.value })}
+                                    />
+                                ) : (
+                                    <p className="text-sm font-black text-white truncate italic">{message.data?.productName}</p>
+                                )}
                             </div>
                             <div className="bg-white/[0.03] p-5 rounded-3xl border border-white/5">
                                 <span className="text-[9px] text-white/20 font-black uppercase tracking-widest block mb-1">Impact</span>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold text-white/60">x{message.data?.qty}</span>
-                                    <span className="text-xs font-black text-emerald-400">₹{message.data?.price}</span>
+                                <div className="flex items-center justify-between gap-2">
+                                    {isEditing ? (
+                                        <>
+                                            <input
+                                                className="bg-transparent border-b border-emerald-500/50 text-white text-[10px] font-black w-10 focus:outline-none"
+                                                value={editData.qty}
+                                                type="number"
+                                                onChange={e => setEditData({ ...editData, qty: parseInt(e.target.value) })}
+                                            />
+                                            <input
+                                                className="bg-transparent border-b border-emerald-500/50 text-white text-[10px] font-black w-16 focus:outline-none"
+                                                value={editData.price}
+                                                type="number"
+                                                onChange={e => setEditData({ ...editData, price: parseFloat(e.target.value) })}
+                                            />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span className="text-xs font-bold text-white/60">x{message.data?.qty}</span>
+                                            <span className="text-xs font-black text-emerald-400">₹{message.data?.price}</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex gap-3">
-                            <button
-                                onClick={() => onExecute(index)}
-                                className="flex-1 h-14 flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg shadow-emerald-500/20 group/exec"
-                            >
-                                Sync & Execute <ArrowRight className="w-5 h-5 group-hover/exec:translate-x-1 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => onRemove(index)}
-                                className="w-14 h-14 flex items-center justify-center bg-white/5 hover:bg-red-500/10 hover:text-red-500 text-white/30 rounded-[1.5rem] transition-all active:scale-95"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
+                            {isEditing ? (
+                                <>
+                                    <button
+                                        onClick={() => onSaveEdit(index, editData)}
+                                        className="flex-1 h-14 bg-emerald-600 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-[10px] transition-all"
+                                    >
+                                        Save Changes
+                                    </button>
+                                    <button
+                                        onClick={onCancelEdit}
+                                        className="w-14 h-14 bg-white/5 text-white/40 rounded-[1.5rem] flex items-center justify-center"
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    <button
+                                        onClick={() => onExecute(index)}
+                                        className="flex-1 h-14 flex items-center justify-center gap-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-[1.5rem] font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg shadow-emerald-500/20 group/exec"
+                                    >
+                                        Sync & Execute <ArrowRight className="w-5 h-5 group-hover/exec:translate-x-1 transition-transform" />
+                                    </button>
+                                    <button
+                                        onClick={() => onStartEdit(index)}
+                                        className="w-14 h-14 flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/30 rounded-[1.5rem] transition-all"
+                                    >
+                                        <Info className="w-5 h-5 text-white/40" />
+                                    </button>
+                                    <button
+                                        onClick={() => onRemove(index)}
+                                        className="w-14 h-14 flex items-center justify-center bg-white/5 hover:bg-red-500/10 hover:text-red-500 text-white/30 rounded-[1.5rem] transition-all active:scale-95"
+                                    >
+                                        <X className="w-6 h-6" />
+                                    </button>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}

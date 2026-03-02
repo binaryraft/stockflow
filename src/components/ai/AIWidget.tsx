@@ -67,6 +67,13 @@ export function AIWidget({ isOpen, onClose }: AIWidgetProps) {
                                 index={i}
                                 onExecute={chat.executeAction}
                                 onRemove={(idx) => chat.setMessages(prev => prev.filter((_, i) => i !== idx))}
+                                isEditing={chat.editingMsgIndex === i}
+                                onStartEdit={(idx) => chat.setEditingMsgIndex(idx)}
+                                onSaveEdit={(idx, data) => {
+                                    chat.updateMessageData(idx, data);
+                                    chat.setEditingMsgIndex(null);
+                                }}
+                                onCancelEdit={() => chat.setEditingMsgIndex(null)}
                             />
                         ))}
 

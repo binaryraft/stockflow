@@ -12,8 +12,8 @@ interface BrandLogoProps {
 }
 
 /**
- * ECBills Brand Logo - Uses the actual uploaded minimal 2D clean green "E" logo.
- * Upscaled and embedded with premium animation effects.
+ * ECBills Brand Logo - Uses the custom inverted-C negative-space-E design.
+ * Scalable and embedded with premium animation effects.
  */
 export function BrandLogo({ className, size = 40, glow = false }: BrandLogoProps) {
     return (
@@ -29,7 +29,7 @@ export function BrandLogo({ className, size = 40, glow = false }: BrandLogoProps
             {glow && (
                 <span
                     aria-hidden="true"
-                    className="absolute inset-0 rounded-full bg-green-500/20 blur-lg animate-pulse pointer-events-none"
+                    className="absolute inset-0 rounded-full pointer-events-none"
                 />
             )}
 

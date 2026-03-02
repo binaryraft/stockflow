@@ -321,11 +321,16 @@ export function ProductSearchInput({
                 >
                   <div className="flex justify-between items-center">
                     <span className="truncate mr-2 font-medium">{suggestion.displayInfo.name}</span>
-                    <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap text-right">
-                      {suggestion.displayInfo.stock !== 'N/A' ? `Qty: ${suggestion.displayInfo.stock}` : ""}
-                      {" "}
-                      {suggestion.displayInfo.price}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {suggestion.displayInfo.stock !== 'N/A' && (
+                        <span className="px-1.5 py-0.5 rounded bg-secondary/10 text-secondary font-bold text-[10px]">
+                          Qty: {suggestion.displayInfo.stock}
+                        </span>
+                      )}
+                      <span className="text-sm font-semibold text-secondary-highlight whitespace-nowrap">
+                        {suggestion.displayInfo.price}
+                      </span>
+                    </div>
                   </div>
                   {suggestion.displayInfo.category && <div className="text-[10px] text-muted-foreground uppercase tracking-wider">{suggestion.displayInfo.category}</div>}
                 </li>

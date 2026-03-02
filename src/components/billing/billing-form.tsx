@@ -139,6 +139,20 @@ export function BillingForm({
   const [isVerifyEmployeeDialogOpen, setIsVerifyEmployeeDialogOpen] = useState(false);
   const [pendingBillPayload, setPendingBillPayload] = useState<PendingBillPayload | null>(null);
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
+
+  // Shortcut Key: Ctrl + Enter to Save Bill
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (currentBillItems.length > 0 && !isVerifyEmployeeDialogOpen && !isNewProductDialogOpen) {
+          e.preventDefault();
+          handleSaveBill();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [currentBillItems.length, isVerifyEmployeeDialogOpen, isNewProductDialogOpen]);
   const [newProductDialogInitialValues, setNewProductDialogInitialValues] = useState<{ name: string; quantity?: string; costPrice?: string; sellPrice?: string; } | null>(null);
 
   const [serviceDescription, setServiceDescription] = useState('');
