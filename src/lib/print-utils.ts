@@ -282,12 +282,25 @@ export const generateReportPrintContent = (
 
 
 export const triggerPrint = (content: string) => {
-  const printWindow = window.open('', '_blank', 'height=800,width=600');
+  const printWindow = window.open('', '', 'width=1200,height=800,menubar=no,toolbar=no');
   if (printWindow) {
-    printWindow.document.write(content);
+    const printScript = `
+      <script>
+        window.addEventListener('load', function () {
+          setTimeout(function () {
+            window.focus();
+            window.print();
+          }, 100);
+        });
+      </script>
+    `;
+    const printableContent = content.includes('</body>')
+      ? content.replace('</body>', `${printScript}</body>`)
+      : `${content}${printScript}`;
+
+    printWindow.document.open();
+    printWindow.document.write(printableContent);
     printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
   } else {
     alert("Please allow popups to print the bill.");
   }

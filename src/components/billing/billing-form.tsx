@@ -121,6 +121,15 @@ export function BillingForm({
     setActivePlan(getActiveSubscriptionPlan());
   }, [getAllStores, getActiveSubscriptionPlan]);
 
+  // Initialize mode from initialModeProp if provided and allowed
+  useEffect(() => {
+    if (initialModeProp) {
+      if (!allowedModes || allowedModes.includes(initialModeProp)) {
+        setMode(initialModeProp);
+      }
+    }
+  }, [initialModeProp, allowedModes]);
+
   const finalStoreIdForSkuDetails = useMemo(() => {
     return isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
   }, [isAdminContext, selectedStoreIdForAdmin, storeIdFromProp]);
@@ -131,10 +140,11 @@ export function BillingForm({
   }, [currentBillItems, mode, isEstimateMode, taxType]);
 
   // Product Selection Helpers
-  const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU) => {
-    if (skuToUse && currentProductForSelection) {
+  const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU, productForSku?: Product | null) => {
+    const productForDisplay = productForSku ?? currentProductForSelection;
+    if (skuToUse && productForDisplay) {
       const details = getSkuDetails(skuToUse, finalStoreIdForSkuDetails);
-      setCurrentSkuStock(currentProductForSelection.trackQuantity ? details.totalStock : null);
+      setCurrentSkuStock(productForDisplay.trackQuantity ? details.totalStock : null);
       setIsDisplayingLayerStock(false);
       setCurrentSkuSellPrice(details.currentSellPrice);
       if (mode === 'sell' || mode === 'return') {
@@ -168,12 +178,12 @@ export function BillingForm({
         setCurrentSkuSellPrice(layer.sellPrice);
         setSellPrice(layer.sellPrice.toString());
       } else {
-        updateSkuDisplayInfo(sku);
+        updateSkuDisplayInfo(sku, product);
       }
     } else {
       setProductNameQuery(product.name);
       setSelectedVariantOptions({});
-      updateSkuDisplayInfo(undefined);
+      updateSkuDisplayInfo(undefined, product);
     }
     setProductNotFoundHint('');
     // Focus logic can be handled inside the selector component or here if complex
@@ -297,9 +307,40 @@ export function BillingForm({
   };
 
   const handleProductNameSubmit = (val: string) => {
-    // barcode logic
-    // if not found set hint
-    setProductNotFoundHint(val);
+    const trimmedValue = val.trim();
+    if (!trimmedValue) {
+      return;
+    }
+
+    setNewProductDialogInitialValues({
+      name: trimmedValue,
+      quantity: quantity ? String(quantity) : undefined,
+      costPrice: costPrice !== '' ? String(costPrice) : undefined,
+      sellPrice: sellPrice !== '' ? String(sellPrice) : undefined,
+    });
+    setProductNotFoundHint('');
+    setIsNewProductDialogOpen(true);
+  };
+
+  const handleQuickProductAdded = (newProduct: Product) => {
+    const defaultSku = newProduct.productSKUs?.[0] || {
+      id: `${newProduct.id}_defaultSKU`,
+      optionValues: {},
+      stockLayers: [],
+      skuIdentifier: newProduct.name,
+    };
+    const skuDetails = getSkuDetails(defaultSku, finalStoreIdForSkuDetails);
+
+    setCurrentProductForSelection(newProduct);
+    setProductNameQuery(defaultSku.skuIdentifier || newProduct.name);
+    setSelectedVariantOptions(defaultSku.optionValues || {});
+    setCurrentSkuStock(newProduct.trackQuantity ? (skuDetails.totalStock ?? 0) : null);
+    setIsDisplayingLayerStock(false);
+    setCurrentSkuSellPrice(skuDetails.currentSellPrice);
+    if (skuDetails.currentSellPrice !== null) {
+      setSellPrice(String(skuDetails.currentSellPrice));
+    }
+    setProductNotFoundHint('');
   };
 
   return (
@@ -342,6 +383,13 @@ export function BillingForm({
           }}
         />
       )}
+
+      <NewProductDialog
+        isOpen={isNewProductDialogOpen}
+        onOpenChange={setIsNewProductDialogOpen}
+        initialValues={newProductDialogInitialValues}
+        onProductAdded={handleQuickProductAdded}
+      />
 
       {/* Main UI */}
       <BillingHeader

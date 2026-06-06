@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage, type PersistOptions } from 'zustand/middleware';
-import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, StockLayer, BillMode } from '@/types';
+import type { Product, Bill, BillItem, Category, User, Store, UserProfile, SubscriptionPlan, ProductSKU, ProductVariant, ChatMessage, Company, Customer, DateRangeReportSummary, ProductAnalytics, AccountsReceivableSummary, AccountsPayableSummary, MonthlyProductFinancials, CashFlowSummary, BalanceSheetSummary, TimePeriod, ProductRevenueData, Staff, FinancialSummary, TodaysFinancialSummary, ProductLedgerEntry, StockLayer, BillMode } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, endOfDay, isToday, isThisWeek, isThisMonth, isThisYear, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
@@ -118,7 +118,7 @@ interface InventoryState {
 
   // Analytics & Reporting Getters (Client-side calculations)
   getLowStockProductCount: (threshold: number, companyId?: string) => number;
-  getRecentBills: (limit: number) => Bill[];
+  getRecentBills: (limit: number, companyId?: string) => Bill[];
   getBillsForProduct: (productId: string) => Bill[];
   getDailySalesAndExpenses: (period: TimePeriod, companyId?: string) => Array<{ date: string; sales: number; expenses: number }>;
   getTopSellingProductsByRevenue: (limit: number, period: TimePeriod, companyId?: string) => Array<{ name: string; revenue: number; quantity: number; }>;
@@ -163,6 +163,46 @@ const storeInitialState = {
 };
 // #endregion
 
+const LOCAL_COMPANY_ID = 'comp_local_default';
+const LOCAL_STORE_ID = 'store_local_main';
+const LOCAL_ADMIN_ID = 'user_local_admin';
+const isLocalCompany = (companyId?: string | null) => companyId === LOCAL_COMPANY_ID || companyId?.startsWith('comp_local_');
+
+const createLocalCompany = (profile: UserProfile): Company => ({
+  id: LOCAL_COMPANY_ID,
+  name: profile.companyName || DEFAULT_COMPANY_NAME,
+  token: 'LOCAL_ONLY_TOKEN',
+  activeSubscriptionId: profile.activeSubscriptionId || SUBSCRIPTION_PLAN_IDS.PRO,
+  logoUrl: profile.companyLogoUrl || '',
+  slogan: profile.companySlogan || '',
+  phone: profile.companyPhone || '',
+  address: profile.companyAddress || '',
+  gstNo: profile.companyGstNo || '',
+  defaultBillNotes: profile.defaultBillNotes,
+  defaultSalesPaymentStatus: profile.defaultSalesPaymentStatus,
+  defaultPurchasePaymentStatus: profile.defaultPurchasePaymentStatus,
+  currency: profile.companyCurrency || DEFAULT_CURRENCY_CODE,
+  subscriptionType: 'monthly',
+  paymentStatus: 'paid',
+  creationDate: new Date().toISOString(),
+  subscriptionStartDate: new Date().toISOString(),
+  subscriptionExpiryDate: null,
+});
+
+const createLocalStore = (): Store => ({
+  id: LOCAL_STORE_ID,
+  companyId: LOCAL_COMPANY_ID,
+  name: 'Main Store',
+  username: 'local-main-store',
+  location: 'Local',
+  phone: '0000000000',
+  email: 'local-store@ecbills.in',
+  accessCode: 'LOCAL',
+  passkey: '123456',
+  allowedStaffIds: [],
+  allowedOperations: ['buy', 'sell', 'return'],
+});
+
 export const useInventoryStore = create<InventoryState>()(
   persist(
     (set, get) => ({
@@ -172,8 +212,12 @@ export const useInventoryStore = create<InventoryState>()(
       // --- Product Actions ---
       fetchProducts: async (companyId) => {
         if (!companyId) return console.warn("fetchProducts: companyId is required");
-        // Preloading check: If we have products, don't fetch again unless forced interaction (user can reload page)
-        if (get().products.length > 0) return;
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ products: state.products.filter(product => product.companyId === companyId) }));
+          return;
+        }
+        const cachedProducts = get().products;
+        if (cachedProducts.length > 0 && cachedProducts.every(product => product.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/products?companyId=${companyId}`);
@@ -187,6 +231,76 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addProduct: async (productData, companyId) => {
+        if (isLocalCompany(companyId)) {
+          const now = new Date();
+          const newProductId = uuidv4();
+          const newProduct: Product = {
+            ...(productData as any),
+            id: newProductId,
+            companyId,
+            imageUrl: (productData as any).imageUrl || null,
+            productSKUs: [],
+          };
+
+          const makeLayer = (quantity: number, costPrice: number, sellPrice: number): StockLayer[] => {
+            if (!newProduct.trackQuantity || quantity <= 0) return [];
+            return [{
+              id: uuidv4(),
+              purchaseBillId: `LOCAL_INIT_${newProductId.slice(0, 8)}`,
+              purchaseDate: now.toISOString(),
+              initialQuantity: quantity,
+              quantity,
+              costPrice,
+              sellPrice,
+              storeId: LOCAL_STORE_ID,
+            }];
+          };
+
+          if (!newProduct.variants || newProduct.variants.length === 0) {
+            const initialStock = Number((productData as any).initialStock || 0);
+            const costPrice = Number((productData as any).costPrice || (productData as any).costPriceForNonTracked || 0);
+            const sellPrice = Number((productData as any).sellPrice || (productData as any).sellPriceForNonTracked || 0);
+            newProduct.productSKUs = [{
+              id: uuidv4(),
+              optionValues: {},
+              skuIdentifier: newProduct.name,
+              stockLayers: makeLayer(initialStock, costPrice, sellPrice),
+            }];
+          } else {
+            const buildCombinations = (variants: ProductVariant[]): Array<{ optionValues: Record<string, string>; option: any }> => {
+              if (variants.length === 0) return [{ optionValues: {}, option: {} }];
+              const [first, ...rest] = variants;
+              const restCombinations = buildCombinations(rest);
+              return first.options.flatMap((option: any) =>
+                restCombinations.map((combo) => ({
+                  optionValues: { [first.name]: option.value, ...combo.optionValues },
+                  option: { ...combo.option, ...option },
+                }))
+              );
+            };
+
+            newProduct.productSKUs = buildCombinations(newProduct.variants).map(({ optionValues, option }) => {
+              const costPrice = Number(option.costPrice ?? (productData as any).costPrice ?? 0);
+              const sellPrice = Number(option.sellPrice ?? (productData as any).sellPrice ?? 0);
+              const initialStock = Number(option.initialStock ?? 0);
+              return {
+                id: uuidv4(),
+                optionValues,
+                skuIdentifier: `${newProduct.name} (${Object.values(optionValues).join(' - ')})`,
+                stockLayers: makeLayer(initialStock, costPrice, sellPrice),
+              };
+            });
+          }
+
+          set((state) => ({
+            products: [...state.products.filter(product => product.companyId !== companyId || product.id !== newProduct.id), newProduct],
+            categories: productData.category && !state.categories.some(category => category.companyId === companyId && category.name.toLowerCase() === productData.category?.toLowerCase())
+              ? [...state.categories, { id: uuidv4(), name: productData.category, companyId }]
+              : state.categories,
+          }));
+          return newProduct;
+        }
+
         try {
           const response = await fetch('/api/products', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -204,6 +318,18 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateProduct: async (productId, productData, companyId) => {
+        if (isLocalCompany(companyId)) {
+          let updatedProduct: Product | null = null;
+          set((state) => ({
+            products: state.products.map(product => {
+              if (product.id !== productId || product.companyId !== companyId) return product;
+              updatedProduct = { ...product, ...(productData as any), id: product.id, companyId: product.companyId };
+              return updatedProduct;
+            }),
+          }));
+          return updatedProduct;
+        }
+
         try {
           const response = await fetch(`/api/products/${productId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -221,6 +347,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       archiveProduct: async (productId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ products: state.products.map(product => product.id === productId && product.companyId === companyId ? { ...product, isArchived: true } : product) }));
+          return true;
+        }
+
         try {
           const response = await fetch(`/api/products/${productId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -234,6 +365,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       unarchiveProduct: async (productId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ products: state.products.map(product => product.id === productId && product.companyId === companyId ? { ...product, isArchived: false } : product) }));
+          return true;
+        }
+
         try {
           const response = await fetch(`/api/products/${productId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -256,7 +392,12 @@ export const useInventoryStore = create<InventoryState>()(
       // --- Bill Actions ---
       fetchBills: async (companyId) => {
         if (!companyId) return console.warn("fetchBills: companyId is required");
-        if (get().bills.length > 0) return; // Cache hit
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ bills: state.bills.filter(bill => bill.companyId === companyId).sort((a, b) => b.timestamp - a.timestamp) }));
+          return;
+        }
+        const cachedBills = get().bills;
+        if (cachedBills.length > 0 && cachedBills.every(bill => bill.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/bills?companyId=${companyId}`);
@@ -270,6 +411,129 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addBill: async (billData, itemsData) => {
+        if (isLocalCompany(billData?.companyId)) {
+          const companyId = billData.companyId;
+          const localBillType = (billData.billType || billData.type || 'sell') as BillMode;
+          const localStoreId = billData.storeIdForBill || billData.storeId || LOCAL_STORE_ID;
+
+          if (!['sell', 'buy', 'return'].includes(localBillType)) {
+            throw new Error(`Invalid local bill type: ${localBillType}`);
+          }
+
+          const currentDate = billData.date ? new Date(billData.date) : new Date();
+          const newBillId = `LOCAL_${currentDate.getTime()}_${Math.random().toString(36).slice(2, 6)}`;
+          let billSubTotal = 0;
+          let totalSGST = 0;
+          let totalCGST = 0;
+          let totalIGST = 0;
+          let totalDiscount = 0;
+
+          const productsToUpdate = get().products.map(product => ({ ...product, productSKUs: product.productSKUs.map(sku => ({ ...sku, stockLayers: [...sku.stockLayers] })) }));
+          const processedItems: BillItem[] = itemsData.map((item: any) => {
+            const product = productsToUpdate.find(p => p.id === item.productId && p.companyId === companyId);
+            const sku = product?.productSKUs.find(s => JSON.stringify(Object.entries(s.optionValues || {}).sort()) === JSON.stringify(Object.entries(item.selectedVariantOptions || {}).sort())) || product?.productSKUs[0];
+            let costPrice = Number(item.costPrice || 0);
+            const sellPrice = Number(item.sellPrice || 0);
+
+            if (product && sku && product.trackQuantity) {
+              if (localBillType === 'buy') {
+                sku.stockLayers.push({
+                  id: uuidv4(),
+                  purchaseBillId: newBillId,
+                  purchaseDate: currentDate.toISOString(),
+                  initialQuantity: item.quantity,
+                  quantity: item.quantity,
+                  costPrice,
+                  sellPrice,
+                  storeId: localStoreId,
+                });
+              } else if (localBillType === 'sell' && !billData.isEstimate) {
+                let quantityToSell = item.quantity;
+                let cogs = 0;
+                const layers = sku.stockLayers.filter(layer => layer.quantity > 0).sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+                const available = layers.reduce((sum, layer) => sum + layer.quantity, 0);
+                if (available < quantityToSell) throw new Error(`Insufficient stock for ${sku.skuIdentifier || product.name}.`);
+                for (const layer of layers) {
+                  const sold = Math.min(quantityToSell, layer.quantity);
+                  cogs += sold * layer.costPrice;
+                  layer.quantity -= sold;
+                  quantityToSell -= sold;
+                  if (quantityToSell <= 0) break;
+                }
+                costPrice = item.quantity > 0 ? cogs / item.quantity : 0;
+              } else if (localBillType === 'return' && !item.isDefective) {
+                sku.stockLayers.push({
+                  id: uuidv4(),
+                  purchaseBillId: newBillId,
+                  purchaseDate: currentDate.toISOString(),
+                  initialQuantity: item.quantity,
+                  quantity: item.quantity,
+                  costPrice,
+                  sellPrice,
+                  storeId: localStoreId,
+                });
+              }
+            }
+
+            const lineTotal = (localBillType === 'buy' ? costPrice : sellPrice) * item.quantity;
+            const discountAmount = item.discountValue
+              ? item.discountType === 'percentage' ? (lineTotal * item.discountValue) / 100 : item.discountValue * item.quantity
+              : 0;
+            const taxableValue = Math.max(0, lineTotal - discountAmount);
+            const sgstAmount = billData.taxType === 'inter-state' ? 0 : (taxableValue * (product?.sgstRate || 0)) / 100;
+            const cgstAmount = billData.taxType === 'inter-state' ? 0 : (taxableValue * (product?.cgstRate || 0)) / 100;
+            const igstAmount = billData.taxType === 'inter-state' ? (taxableValue * (product?.igstRate || 0)) / 100 : 0;
+
+            billSubTotal += lineTotal;
+            totalDiscount += discountAmount;
+            totalSGST += sgstAmount;
+            totalCGST += cgstAmount;
+            totalIGST += igstAmount;
+
+            return {
+              ...item,
+              id: uuidv4(),
+              productName: sku?.skuIdentifier || item.productName || product?.name || 'Service/Charge',
+              costPrice,
+              sellPrice,
+              sgstAmount,
+              cgstAmount,
+              igstAmount,
+              discountAmount,
+            };
+          });
+
+          const store = get().stores.find(s => s.id === localStoreId) || createLocalStore();
+          const newBill: Bill = {
+            id: newBillId,
+            type: localBillType,
+            date: currentDate.toISOString(),
+            timestamp: currentDate.getTime(),
+            vendorOrCustomerName: billData.vendorOrCustomerName,
+            customerPhone: billData.customerPhone,
+            items: processedItems,
+            subTotal: billSubTotal,
+            totalSGST,
+            totalCGST,
+            totalIGST,
+            totalDiscount,
+            totalAmount: billData.isEstimate ? billSubTotal - totalDiscount : billSubTotal - totalDiscount + totalSGST + totalCGST + totalIGST,
+            isEstimate: !!billData.isEstimate,
+            notes: billData.notes || get().userProfile.defaultBillNotes,
+            paymentStatus: billData.paymentStatus,
+            storeId: store.id,
+            storeName: store.name,
+            companyId,
+            taxType: billData.taxType,
+          };
+
+          set((state) => ({
+            products: productsToUpdate,
+            bills: [newBill, ...state.bills.filter(bill => bill.companyId !== companyId || bill.id !== newBill.id)].sort((a, b) => b.timestamp - a.timestamp),
+          }));
+          return newBill;
+        }
+
         try {
           const response = await fetch('/api/bills', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -308,6 +572,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteBill: async (billId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ bills: state.bills.filter(bill => !(bill.id === billId && bill.companyId === companyId)) }));
+          return true;
+        }
+
         try {
           const response = await fetch(`/api/bills/${billId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -323,6 +592,18 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateBillNonCriticalDetails: async (billId, details, companyId) => {
+        if (isLocalCompany(companyId)) {
+          let updatedBill: Bill | null = null;
+          set((state) => ({
+            bills: state.bills.map(bill => {
+              if (bill.id !== billId || bill.companyId !== companyId) return bill;
+              updatedBill = { ...bill, ...details };
+              return updatedBill;
+            }),
+          }));
+          return updatedBill;
+        }
+
         try {
           const response = await fetch(`/api/bills/${billId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -342,7 +623,12 @@ export const useInventoryStore = create<InventoryState>()(
       // --- Other Fetch & CUD Actions (Staff, Stores, etc.) ---
       fetchCategories: async (companyId) => {
         if (!companyId) return console.warn("fetchCategories: companyId is required");
-        if (get().categories.length > 0) return;
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ categories: state.categories.filter(category => category.companyId === companyId) }));
+          return;
+        }
+        const cachedCategories = get().categories;
+        if (cachedCategories.length > 0 && cachedCategories.every(category => category.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/categories?companyId=${companyId}`);
@@ -356,6 +642,16 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addCategory: async (categoryName, companyId) => {
+        if (isLocalCompany(companyId)) {
+          const trimmedName = categoryName.trim();
+          if (!trimmedName) return null;
+          const existing = get().categories.find(category => category.companyId === companyId && category.name.toLowerCase() === trimmedName.toLowerCase());
+          if (existing) return existing;
+          const newCategory: Category = { id: uuidv4(), name: trimmedName, companyId };
+          set((state) => ({ categories: [...state.categories, newCategory].sort((a, b) => a.name.localeCompare(b.name)) }));
+          return newCategory;
+        }
+
         try {
           const response = await fetch('/api/categories', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -373,7 +669,27 @@ export const useInventoryStore = create<InventoryState>()(
       },
       fetchCustomers: async (companyId) => {
         if (!companyId) return console.warn("fetchCustomers: companyId is required");
-        if (get().customers.length > 0) return;
+        if (isLocalCompany(companyId)) {
+          const customersByPhone = new Map<string, Customer>();
+          get().bills
+            .filter(bill => bill.companyId === companyId && bill.customerPhone)
+            .forEach((bill) => {
+              const phone = bill.customerPhone || '';
+              const existing = customersByPhone.get(phone);
+              customersByPhone.set(phone, {
+                id: existing?.id || `cust_local_${phone}`,
+                companyId,
+                name: bill.vendorOrCustomerName || existing?.name || 'Walk-in Customer',
+                phone,
+                firstSeen: existing?.firstSeen || bill.date,
+                lastSeen: bill.date,
+              });
+            });
+          set({ customers: Array.from(customersByPhone.values()) });
+          return;
+        }
+        const cachedCustomers = get().customers;
+        if (cachedCustomers.length > 0 && cachedCustomers.every(customer => customer.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/customers?companyId=${companyId}`);
@@ -388,6 +704,19 @@ export const useInventoryStore = create<InventoryState>()(
       },
       fetchStaff: async (companyId) => {
         if (!companyId) return console.warn("fetchStaff: companyId is required");
+        if (isLocalCompany(companyId)) {
+          set({
+            staffs: [{
+              id: LOCAL_ADMIN_ID,
+              companyId,
+              name: 'Local Admin',
+              role: 'employee',
+              employeeId: 'local-admin',
+              assignedStoreIds: [LOCAL_STORE_ID],
+            }],
+          });
+          return;
+        }
         // Removed cache check to ensure we get fresh data (passwords) when revisiting the page
         // if (get().staffs.length > 0) return; 
 
@@ -449,7 +778,16 @@ export const useInventoryStore = create<InventoryState>()(
       },
       fetchStores: async (companyId) => {
         if (!companyId) return console.warn("fetchStores: companyId is required");
-        if (get().stores.length > 0) return;
+        if (isLocalCompany(companyId)) {
+          set((state) => ({
+            stores: state.stores.some(store => store.companyId === companyId)
+              ? state.stores.filter(store => store.companyId === companyId)
+              : [createLocalStore()],
+          }));
+          return;
+        }
+        const cachedStores = get().stores;
+        if (cachedStores.length > 0 && cachedStores.every(store => store.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/stores?companyId=${companyId}`);
@@ -463,6 +801,19 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addStore: async (storeData, companyId) => {
+        if (isLocalCompany(companyId)) {
+          const newStore: Store = {
+            ...storeData,
+            id: uuidv4(),
+            companyId,
+            accessCode: (storeData as any).accessCode || 'LOCAL',
+            allowedOperations: storeData.allowedOperations || ['buy', 'sell', 'return'],
+            allowedStaffIds: storeData.allowedStaffIds || [],
+          };
+          set((state) => ({ stores: [...state.stores.filter(store => store.companyId !== companyId || store.id !== newStore.id), newStore] }));
+          return newStore;
+        }
+
         try {
           const response = await fetch('/api/stores', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -479,6 +830,18 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateStore: async (storeId, storeData, companyId) => {
+        if (isLocalCompany(companyId)) {
+          let updatedStore: Store | null = null;
+          set((state) => ({
+            stores: state.stores.map(store => {
+              if (store.id !== storeId || store.companyId !== companyId) return store;
+              updatedStore = { ...store, ...storeData, id: store.id, companyId: store.companyId };
+              return updatedStore;
+            }),
+          }));
+          return updatedStore;
+        }
+
         try {
           const response = await fetch(`/api/stores/${storeId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -495,6 +858,12 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       deleteStore: async (storeId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          if (storeId === LOCAL_STORE_ID) return false;
+          set((state) => ({ stores: state.stores.filter(store => !(store.id === storeId && store.companyId === companyId)) }));
+          return true;
+        }
+
         try {
           const response = await fetch(`/api/stores/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -512,6 +881,27 @@ export const useInventoryStore = create<InventoryState>()(
           console.warn("fetchCompanyProfile called without companyId.");
           set({ userProfile: { ...defaultUserProfile, dataMode: 'local' } });
           return null;
+        }
+        if (isLocalCompany(companyId)) {
+          let localCompany: Company;
+          set((state) => {
+            const nextProfile: UserProfile = {
+              ...state.userProfile,
+              companyName: !state.userProfile.companyName || state.userProfile.companyName === DEFAULT_COMPANY_NAME
+                ? 'My Local Company'
+                : state.userProfile.companyName,
+              activeSubscriptionId: SUBSCRIPTION_PLAN_IDS.PRO,
+              dataMode: 'local',
+              paymentStatus: 'paid',
+              subscriptionExpiryDate: null,
+            };
+            localCompany = createLocalCompany(nextProfile);
+            return {
+              userProfile: nextProfile,
+              stores: state.stores.some(store => store.companyId === companyId) ? state.stores : [createLocalStore()],
+            };
+          });
+          return localCompany!;
         }
         try {
           const response = await fetch(`/api/companies/${companyId}`);
@@ -541,6 +931,31 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       updateUserProfileFields: async (data, companyId) => {
+        if (isLocalCompany(companyId)) {
+          let updatedCompany: Company;
+          set((state) => {
+            const nextProfile: UserProfile = {
+              ...state.userProfile,
+              companyName: data.name ?? state.userProfile.companyName,
+              companyLogoUrl: data.logoUrl ?? state.userProfile.companyLogoUrl,
+              companySlogan: data.slogan ?? state.userProfile.companySlogan,
+              companyPhone: data.phone ?? state.userProfile.companyPhone,
+              companyAddress: data.address ?? state.userProfile.companyAddress,
+              companyGstNo: data.gstNo ?? state.userProfile.companyGstNo,
+              activeSubscriptionId: data.activeSubscriptionId ?? state.userProfile.activeSubscriptionId,
+              defaultBillNotes: data.defaultBillNotes ?? state.userProfile.defaultBillNotes,
+              defaultSalesPaymentStatus: data.defaultSalesPaymentStatus ?? state.userProfile.defaultSalesPaymentStatus,
+              defaultPurchasePaymentStatus: data.defaultPurchasePaymentStatus ?? state.userProfile.defaultPurchasePaymentStatus,
+              companyCurrency: data.currency ?? state.userProfile.companyCurrency,
+              dataMode: 'local',
+              paymentStatus: 'paid',
+            };
+            updatedCompany = createLocalCompany(nextProfile);
+            return { userProfile: nextProfile };
+          });
+          return updatedCompany!;
+        }
+
         try {
           const response = await fetch(`/api/companies/${companyId}`, {
             method: 'PUT', headers: { 'Content-Type': 'application/json' },
@@ -558,6 +973,11 @@ export const useInventoryStore = create<InventoryState>()(
       },
 
       fetchMessagesForStore: async (storeId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ messagesByStore: { ...state.messagesByStore, [storeId]: state.messagesByStore[storeId] || [] } }));
+          return;
+        }
+
         try {
           const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch messages: ${response.statusText}`);
@@ -573,6 +993,20 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       addChatMessage: async (storeId, senderId, senderName, text, companyId) => {
+        if (isLocalCompany(companyId)) {
+          const newMessage: ChatMessage = {
+            id: uuidv4(),
+            storeId,
+            companyId,
+            senderId,
+            senderName,
+            text,
+            timestamp: Date.now(),
+          };
+          set((state) => ({ messagesByStore: { ...state.messagesByStore, [storeId]: [...(state.messagesByStore[storeId] || []), newMessage] } }));
+          return;
+        }
+
         try {
           const response = await fetch(`/api/chat/${storeId}`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -589,6 +1023,11 @@ export const useInventoryStore = create<InventoryState>()(
         }
       },
       clearChatForStore: async (storeId, companyId) => {
+        if (isLocalCompany(companyId)) {
+          set((state) => ({ messagesByStore: { ...state.messagesByStore, [storeId]: [] } }));
+          return true;
+        }
+
         try {
           const response = await fetch(`/api/chat/${storeId}?companyId=${companyId}`, { method: 'DELETE' });
           const result = await response.json();
@@ -747,7 +1186,10 @@ export const useInventoryStore = create<InventoryState>()(
           return count;
         }, 0);
       },
-      getRecentBills: (limit) => [...get().bills].slice(0, limit), // Assumes bills are pre-sorted by timestamp
+      getRecentBills: (limit, companyId) => {
+        const bills = companyId ? get().bills.filter(bill => bill.companyId === companyId) : get().bills;
+        return [...bills].slice(0, limit);
+      },
       getBillsForProduct: (productId) => get().bills.filter(b => b.items.some(i => i.productId === productId)),
       // All other complex getters (`getDailySalesAndExpenses`, `getTopSellingProductsByRevenue`, etc.) are left as is,
       // as they now operate on server-fetched, reliable data. Their internal logic remains the same.

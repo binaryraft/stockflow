@@ -71,6 +71,14 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
     const variantSelectRefs = useRef<Record<string, React.RefObject<HTMLButtonElement>>>({});
     const [variantDropdownOpenState, setVariantDropdownOpenState] = useState<Record<string, boolean>>({});
 
+    const handleSearchProductSelect = (suggestion: ProductSearchSuggestion) => {
+        handleProductSelectFromSearch(suggestion);
+        setTimeout(() => {
+            quantityInputRef.current?.focus();
+            quantityInputRef.current?.select();
+        }, 0);
+    };
+
     const handleEnterNavigation = (currentField: 'quantity' | 'costPrice' | 'sellPrice') => {
         if (currentField === 'quantity') {
             if (mode === 'buy') {
@@ -103,7 +111,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                                 setProductNameQuery(v);
                                 if (!v) setCurrentProductForSelection(null);
                             }}
-                            onProductSelect={handleProductSelectFromSearch}
+                            onProductSelect={handleSearchProductSelect}
                             onEnterWithoutSelection={handleProductNameSubmit}
                             placeholder={mode === 'return' ? 'Scan or type product...' : 'Scan barcode, or type product...'}
                             id="productNameGlobal"

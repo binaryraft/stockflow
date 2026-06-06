@@ -75,7 +75,9 @@ export function OverviewStats({ period }: { period: TimePeriod }) {
     
     const companyId = localStorage.getItem('companyId') || undefined;
     const periodFinancials = getPeriodFinancialSummary(period, companyId);
-    const totalTrackedProducts = Array.isArray(products) ? products.filter(p => p.trackQuantity).length : 0;
+    const totalTrackedProducts = Array.isArray(products)
+      ? products.filter(p => p.trackQuantity && (!companyId || p.companyId === companyId)).length
+      : 0;
     const totalCustomers = getAllCustomers(companyId).length;
 
     let lowStock = 0;

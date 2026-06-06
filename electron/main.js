@@ -56,7 +56,7 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
         },
-        title: "StockFlow",
+        title: "ecbills.in",
         icon: path.join(__dirname, '../public/logo.svg')
     });
 

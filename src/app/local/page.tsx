@@ -31,6 +31,9 @@ function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boo
 export default function DashboardPage() {
   const getRecentBillsFromStore = useInventoryStore((state) => state.getRecentBills);
   const userProfile = useInventoryStore((state) => state.userProfile);
+  const fetchProducts = useInventoryStore((state) => state.fetchProducts);
+  const fetchBills = useInventoryStore((state) => state.fetchBills);
+  const fetchCustomers = useInventoryStore((state) => state.fetchCustomers);
   
   const [hasMounted, setHasMounted] = useState(false);
   const [recentBills, setRecentBills] = useState<Bill[]>([]);
@@ -43,8 +46,18 @@ export default function DashboardPage() {
   }, [userProfile.companyCurrency]);
 
   useEffect(() => {
+    if (!hasMounted) return;
+    const companyId = localStorage.getItem('companyId') || undefined;
+    if (!companyId) return;
+    fetchProducts(companyId);
+    fetchBills(companyId);
+    fetchCustomers(companyId);
+  }, [hasMounted, fetchProducts, fetchBills, fetchCustomers]);
+
+  useEffect(() => {
     if (hasMounted) {
-      setRecentBills(getRecentBillsFromStore(5)); 
+      const companyId = localStorage.getItem('companyId') || undefined;
+      setRecentBills(getRecentBillsFromStore(5, companyId));
     }
   }, [hasMounted, getRecentBillsFromStore]);
 

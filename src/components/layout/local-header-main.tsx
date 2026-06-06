@@ -3,11 +3,11 @@
 
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; 
-import { Menu, UserCircle, LogOut, Settings as SettingsIcon, Package2 } from 'lucide-react';
+import { Menu, UserCircle, LogOut, Settings as SettingsIcon } from 'lucide-react';
 import { LOCAL_NAV_LINKS } from './local-sidebar-nav';
-import { APP_NAME } from '@/lib/constants';
 import Link from 'next/link';
 import { ThemeToggle } from './theme-toggle';
+import { BrandMark } from '@/components/common/brand-mark';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,13 +41,7 @@ export function LocalHeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0 w-[280px] bg-sidebar text-sidebar-foreground border-r-sidebar-border">
               <SheetHeader className="p-4 border-b border-sidebar-border">
                 <SheetTitle asChild>
-                  <Link
-                    href="/local"
-                    className="flex items-center gap-2.5 text-lg font-semibold text-primary hover:opacity-90"
-                  >
-                    <Package2 className="h-7 w-7" />
-                    <span className="">{APP_NAME} (Local)</span>
-                  </Link>
+                  <BrandMark href="/local" preferCompanyBrand showLocalBadge textClassName="text-lg" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="grid gap-2 text-base font-medium p-4">

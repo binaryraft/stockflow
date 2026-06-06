@@ -2,12 +2,12 @@
   "companies": [
     {
       "id": "comp_default_001",
-      "name": "StockFlow Solutions Inc.",
-      "token": "COMPANY_SECRET_STOCKFLOW_INC",
+      "name": "ecbills.in",
+      "token": "COMPANY_SECRET_ECBILLS_IN",
       "activeSubscriptionId": "plan_growth",
-      "logoUrl": "https://placehold.co/150x50.png?text=StockFlow+Inc.",
+      "logoUrl": "https://placehold.co/150x50.png?text=ecbills.in",
       "slogan": "Inventory, Simplified.",
-      "phone": "+1-555-STOCKFL",
+      "phone": "+1-555-ECBILLS",
       "address": "123 Inventory Lane, Business City, BS 12345",
       "gstNo": "29DEFAULTGST1Z5",
       "defaultBillNotes": "Thank you for your business!",
@@ -60,12 +60,12 @@
   ],
   "users": [
     {
-      "id": "user_admin_stockflow",
+      "id": "user_admin_ecbills",
       "companyId": "comp_default_001",
-      "email": "admin@stockflow.app",
+      "email": "admin@ecbills.in",
       "password": "$2a$10$V8.GZ/Y7.Y.S.U6Z.H.O.e.u.S.Q.W.Z.X.Y.Z.0.1.2.3.4.5.6",
       "role": "admin",
-      "name": "StockFlow Admin"
+      "name": "ecbills.in Admin"
     },
     {
       "id": "user_emp_001",
@@ -74,7 +74,7 @@
       "password": "$2a$10$N0.P.Q.R.S.T.U.V.W.X.Y.Z.a.b.c.d.e.f.g.h.i.j.k.l.m",
       "role": "employee",
       "name": "John Doe",
-      "email": "john.doe@stockflow.app",
+      "email": "john.doe@ecbills.in",
       "phone": "555-0011",
       "assignedStoreIds": [
         "store_main_001",
@@ -88,7 +88,7 @@
       "password": "$2a$10$A.B.C.D.E.F.G.H.I.J.K.L.M.N.O.P.Q.R.S.T.U.V.W.X.Y.Z",
       "role": "employee",
       "name": "Jane Smith",
-      "email": "jane.smith@stockflow.app",
+      "email": "jane.smith@ecbills.in",
       "phone": "555-0022",
       "assignedStoreIds": [
         "store_main_001"

@@ -356,7 +356,7 @@ export default function ProfilePage() {
               <CardFooter>
                 {plan.price === -1 ? (
                     <Button asChild className="w-full bg-secondary hover:bg-secondary/90 text-secondary-foreground">
-                        <a href="mailto:sales@stockflow.app" target="_blank" rel="noopener noreferrer"> 
+                        <a href="mailto:sales@ecbills.in" target="_blank" rel="noopener noreferrer"> 
                             <Mail className="mr-2 h-4 w-4" /> Contact Sales <ExternalLink className="ml-1 h-3 w-3 opacity-70"/>
                         </a>
                     </Button>

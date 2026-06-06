@@ -104,7 +104,14 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
         <p className="mt-16 text-base text-muted-foreground animate-fadeInUp delay-700 flex items-center justify-center gap-2">
           <ShieldCheck size={18} className="text-green-500" /> Empowering businesses with intuitive tools for <span className="font-semibold text-foreground">sustainable growth</span>.
         </p>
+        <p className="mt-8 text-sm text-muted-foreground animate-fadeInUp delay-700">
+          Try demo{' '}
+          <Link href="/local" className="font-medium text-primary hover:underline">
+            Click here
+          </Link>
+        </p>
       </div>
+
       <style jsx global>{`
         @keyframes pulse-slow {
           0%, 100% { opacity: 0.08; transform: scale(1); }

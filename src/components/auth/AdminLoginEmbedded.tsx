@@ -58,6 +58,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
         localStorage.setItem('userName', data.user.name || 'Admin');
         localStorage.setItem('userRole', data.user.role || 'admin');
         localStorage.setItem('companyId', data.user.companyId);
+        localStorage.setItem('stockflowDataMode', 'cloud');
 
         // Fetch company profile right after successful login to populate userProfile in store
         await fetchCompanyProfile(data.user.companyId);

@@ -4,14 +4,15 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { NAV_LINK_GROUPS, APP_NAME, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
+import { NAV_LINK_GROUPS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
 import { Sidebar, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarHeader, SidebarContent, useSidebar, SidebarSeparator } from '@/components/ui/sidebar';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Package2, ChevronRight, PanelLeftOpen, ChevronLeft } from 'lucide-react';
+import { ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import React, { useState, useEffect } from 'react';
+import { BrandMark } from '@/components/common/brand-mark';
 
 export function SidebarNav() {
   const pathname = usePathname();
@@ -37,10 +38,7 @@ export function SidebarNav() {
       <SidebarHeader className="h-16">
         <div className={cn("flex items-center h-full", sidebarState === 'expanded' ? "justify-between pl-3 pr-2" : "justify-center")}>
           {sidebarState === 'expanded' ? (
-            <Link href="/admin" className="flex items-center gap-2.5 font-bold text-xl text-primary hover:opacity-80 transition-opacity">
-              <Package2 className="h-7 w-7" />
-              <span className="truncate">{APP_NAME}</span>
-            </Link>
+            <BrandMark href="/admin" preferCompanyBrand textClassName="text-xl" />
           ) : (
              <Tooltip>
               <TooltipTrigger asChild>

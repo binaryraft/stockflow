@@ -1,5 +1,10 @@
-# Firebase Studio
+# INTRODUCTION
+This project is visioned to lead inventory systems easier as possible.
 
-This is a NextJS starter in Firebase Studio.
-
-To get started, take a look at src/app/page.tsx.
+# MODULES
+ADMIN 
+STAFF
+STORE
+BILLING
+ACCOUNTING
+REPORTS

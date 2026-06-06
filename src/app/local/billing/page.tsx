@@ -46,8 +46,8 @@ function BillingContent() {
   const [activeBillingView, setActiveBillingView] = useState<BillingView>(currentViewFromUrl || 'history');
   const [hasMounted, setHasMounted] = useState(false);
   
-  // Local mode always treats usage as Admin/Owner but restricted to local context
-  const isAdminContext = true; 
+  // Local mode does NOT have admin context - it's restricted to local store only
+  const isAdminContext = false; 
 
   const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('thisMonth');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
@@ -116,8 +116,9 @@ function BillingContent() {
         <PageTitle title={title} icon={icon} actions={newBillPageTitleActions} />
         <BillingForm
           key={`new-bill-form-${effectiveModeForTitle}`} 
-          initialModeProp={modeFromUrl}
-          isAdminContext={true}
+          initialModeProp={effectiveModeForTitle}
+          isAdminContext={false}
+          allowedModes={['sell']}
           redirectBasePath="/local/billing"
           preselectedStoreId={allStoresState.length > 0 ? allStoresState[0].id : undefined}
         />

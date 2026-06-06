@@ -90,6 +90,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
             localStorage.setItem('userName', data.user.name || 'Admin');
             localStorage.setItem('userRole', data.user.role || 'admin');
             localStorage.setItem('companyId', data.user.companyId);
+            localStorage.setItem('stockflowDataMode', 'cloud');
             await fetchCompanyProfile(data.user.companyId);
         }
         onSignupSuccess(); 

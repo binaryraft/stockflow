@@ -4,9 +4,8 @@
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet'; 
 import { Menu, UserCircle, LogOut, Settings as SettingsIcon, User as UserIcon, ChevronDown } from 'lucide-react';
-import { NAV_LINK_GROUPS, APP_NAME } from '@/lib/constants';
+import { NAV_LINK_GROUPS } from '@/lib/constants';
 import Link from 'next/link';
-import { Package2 } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import {
   DropdownMenu,
@@ -18,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { BrandMark } from '@/components/common/brand-mark';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 
@@ -112,13 +111,7 @@ export function HeaderMain() {
             <SheetContent side="left" className="flex flex-col p-0 w-[280px] bg-sidebar text-sidebar-foreground border-r-sidebar-border">
               <SheetHeader className="p-4 border-b border-sidebar-border">
                 <SheetTitle asChild>
-                  <Link
-                    href={userRole === 'admin' ? "/admin" : "/"}
-                    className="flex items-center gap-2.5 text-lg font-semibold text-primary hover:opacity-90"
-                  >
-                    <Package2 className="h-7 w-7" />
-                    <span className="">{APP_NAME}</span>
-                  </Link>
+                  <BrandMark href={userRole === 'admin' ? "/admin" : "/"} preferCompanyBrand textClassName="text-lg" />
                 </SheetTitle>
               </SheetHeader>
               <nav className="grid gap-2 text-base font-medium p-4">

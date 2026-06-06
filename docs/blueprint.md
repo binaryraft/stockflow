@@ -1,4 +1,4 @@
-# **App Name**: StockFlow
+# **App Name**: ecbills.in
 
 ## Core Features:
 

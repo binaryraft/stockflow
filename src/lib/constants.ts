@@ -49,15 +49,15 @@ export const NAV_LINK_GROUPS: NavLinkGroup[] = [
 ];
 
 
-export const APP_NAME = "StockFlow";
+export const APP_NAME = "ecbills.in";
 
 export const DEFAULT_CATEGORIES: string[] = [
   "Electronics", "Groceries", "Clothing", "Books", "Home Goods", "Toys", "Sports", "Automotive", "Health", "Beauty", "Services", "Other"
 ];
 
-export const DEFAULT_COMPANY_NAME = "StockFlow Solutions";
+export const DEFAULT_COMPANY_NAME = "ecbills.in";
 export const COMPANY_ADDRESS = "123 Commerce Way, Business City, ST 54321";
-export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@stockflow.app";
+export const COMPANY_CONTACT = "Phone: (555) 123-4567 | Email: support@ecbills.in";
 
 
 export const SUBSCRIPTION_PLAN_IDS = {

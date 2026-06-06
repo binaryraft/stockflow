@@ -8,10 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { APP_NAME } from '@/lib/constants';
 import { KeyRound, LogIn, Loader2, Building, Fingerprint } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
+import { BrandMark } from '@/components/common/brand-mark';
 
 export function StoreLoginPageClient() {
   const router = useRouter();
@@ -100,14 +99,7 @@ export function StoreLoginPageClient() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-background">
       <div className="flex flex-col items-center mb-8">
-        <Image
-          src="/logo.svg"
-          alt={`${APP_NAME} Logo`}
-          width={64}
-          height={64}
-          className="mb-3 animate-pulse"
-        />
-        <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
+        <BrandMark logoClassName="h-16 w-16 mb-3 animate-pulse" textClassName="text-3xl" />
         <p className="text-muted-foreground">Store Terminal Access</p>
       </div>
       <Card className="w-full max-w-md shadow-xl border-t-4 border-t-primary">

@@ -1,11 +1,11 @@
-# StockFlow v4: Enterprise Retail Edition - Upgrade Master Plan
+# ecbills.in v4: Enterprise Retail Edition - Upgrade Master Plan
 
 **Current Version:** 1.1.3
 **Target Version:** 4.0.0
 **Code Name:** Enterprise Prime
 
 ## 1. Executive Summary
-The v4 upgrade focuses on transforming StockFlow into a highly scalable, secure, and feature-rich "Enterprise-Grade" Retail Operating System. This release prioritizes performance for large datasets, strict security standards, and advanced deterministic business logic (CRM, Loyalty) without relying on generative AI or experimental features.
+The v4 upgrade focuses on transforming ecbills.in into a highly scalable, secure, and feature-rich "Enterprise-Grade" Retail Operating System. This release prioritizes performance for large datasets, strict security standards, and advanced deterministic business logic (CRM, Loyalty) without relying on generative AI or experimental features.
 
 ## 2. Core Pillars
 

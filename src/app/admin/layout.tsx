@@ -15,6 +15,8 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
 const THEME_STORAGE_KEY = "app-color-theme";
+const LOCAL_ONLY_AUTH_TOKEN = "LOCAL_ONLY_AUTH_TOKEN";
+const isLocalCompanyId = (companyId?: string | null) => companyId === 'comp_local_default' || companyId?.startsWith('comp_local_');
 
 export default function AdminLayout({
   children,
@@ -70,6 +72,14 @@ export default function AdminLayout({
     const token = localStorage.getItem(SHARED_AUTH_TOKEN_KEY);
     const userRole = localStorage.getItem('userRole');
     const companyId = localStorage.getItem('companyId');
+    const dataMode = localStorage.getItem('stockflowDataMode');
+
+    if (token === LOCAL_ONLY_AUTH_TOKEN || dataMode === 'local' || isLocalCompanyId(companyId)) {
+      setIsAuthenticated(false);
+      handleLogout('auth');
+      setIsLoadingAuth(false);
+      return;
+    }
 
     if (token && userRole === ADMIN_ROLE && companyId) {
       const companyProfile = await fetchCompanyProfile(companyId);

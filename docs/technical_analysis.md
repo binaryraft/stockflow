@@ -1,7 +1,7 @@
-# StockFlow - Technical Analysis & Documentation
+# ecbills.in - Technical Analysis & Documentation
 
 ## 1. Project Overview
-StockFlow is a web-based Inventory Management and Point of Sale (POS) system designed for multi-store businesses. It features rapid billing, inventory tracking (including variants and expiration), financial reporting, and AI-powered insights. The application is built as a SaaS platform where companies can subscribe to manage multiple stores and employees.
+ecbills.in is a web-based Inventory Management and Point of Sale (POS) system designed for multi-store businesses. It features rapid billing, inventory tracking (including variants and expiration), financial reporting, and AI-powered insights. The application is built as a SaaS platform where companies can subscribe to manage multiple stores and employees.
 
 ## 2. Technology Stack
 

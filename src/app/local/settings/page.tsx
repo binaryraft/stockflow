@@ -8,10 +8,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
 import type { UserProfile, Company, CurrencyOption } from '@/types';
-import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Save, StickyNote, Palette, Info, Globe, Languages, Check, Building, Image as ImageIcon } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
@@ -96,6 +97,8 @@ export default function SettingsPage() {
   const [defaultSalesPaymentStatus, setDefaultSalesPaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [defaultPurchasePaymentStatus, setDefaultPurchasePaymentStatus] = useState<'paid' | 'unpaid'>('paid');
   const [selectedCurrency, setSelectedCurrency] = useState<string>(DEFAULT_CURRENCY_CODE);
+  const [companyName, setCompanyName] = useState('');
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
   
   const [hasMounted, setHasMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -125,11 +128,13 @@ export default function SettingsPage() {
       setDefaultSalesPaymentStatus(userProfile.defaultSalesPaymentStatus || 'paid');
       setDefaultPurchasePaymentStatus(userProfile.defaultPurchasePaymentStatus || 'paid');
       setSelectedCurrency(userProfile.companyCurrency || DEFAULT_CURRENCY_CODE);
+      setCompanyName(userProfile.companyName || '');
+      setCompanyLogoUrl(userProfile.companyLogoUrl || '');
     }
   }, [hasMounted, isLoading, userProfile]);
 
   const handleSaveSetting = async (
-    field: keyof Pick<Company, 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus' | 'currency'>, 
+    field: keyof Pick<Company, 'name' | 'logoUrl' | 'defaultBillNotes' | 'defaultSalesPaymentStatus' | 'defaultPurchasePaymentStatus' | 'currency'>,
     value: any, 
     successMessage: string
   ) => {
@@ -157,6 +162,57 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageTitle title="Local Settings" icon={SettingsIcon} />
+
+      <Card className="shadow-md border-t-2 border-t-primary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Building className="h-5 w-5 text-primary"/>Company Branding</CardTitle>
+          <CardDescription>Set the name and logo used in the local app shell, invoices, and reports.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label htmlFor="companyName">Company Name</Label>
+            <Input
+              id="companyName"
+              value={companyName}
+              onChange={(event) => setCompanyName(event.target.value)}
+              placeholder="Your company name"
+              className="h-11"
+            />
+            <Button
+              size="sm"
+              onClick={() => handleSaveSetting('name', companyName.trim(), 'Company name updated.')}
+              className="mt-2"
+              disabled={!companyName.trim()}
+            >
+              <Save className="mr-2 h-4 w-4"/> Save Company Name
+            </Button>
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="companyLogoUrl" className="flex items-center gap-1.5">
+              <ImageIcon className="h-4 w-4 text-muted-foreground"/> Company Logo URL
+            </Label>
+            <Input
+              id="companyLogoUrl"
+              type="url"
+              value={companyLogoUrl}
+              onChange={(event) => setCompanyLogoUrl(event.target.value)}
+              placeholder="https://example.com/logo.png"
+              className="h-11"
+            />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Button
+                size="sm"
+                onClick={() => handleSaveSetting('logoUrl', companyLogoUrl.trim(), 'Company logo updated.')}
+              >
+                <Save className="mr-2 h-4 w-4"/> Save Logo
+              </Button>
+              {companyLogoUrl.trim() && (
+                <img src={companyLogoUrl.trim()} alt="Company logo preview" className="h-12 w-12 rounded-lg border bg-background object-contain p-1" />
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
