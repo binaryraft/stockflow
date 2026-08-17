@@ -9,8 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-
-export const SELECTED_PRINTER_STORAGE_KEY = 'ecbills_selected_printer';
+import { SELECTED_PRINTER_STORAGE_KEY } from '@/lib/printer-settings';
 
 const DEFAULT_PRINTER_VALUE = '__ecbills_default_printer__';
 

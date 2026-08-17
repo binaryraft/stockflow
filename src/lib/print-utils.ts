@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import type { Bill, BillItem, ProductSKU, Product, UserProfile } from '@/types';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { getCurrencySymbol } from './utils'; // Import the new helper
+import { SELECTED_PRINTER_STORAGE_KEY } from '@/lib/printer-settings';
 
 // Helper function to get SKU details - simplified, assumes product and SKU exist
 const getProductSkuForPrint = (
@@ -281,22 +282,50 @@ export const generateReportPrintContent = (
 };
 
 
-export const triggerPrint = (content: string) => {
+const openBrowserPrintWindow = (content: string) => {
   const printWindow = window.open('', '', 'width=1200,height=800,menubar=no,toolbar=no');
   if (printWindow) {
+    const printControls = `
+      <div class="no-print" style="position: sticky; top: 0; z-index: 9999; display: flex; justify-content: flex-end; gap: 8px; padding: 10px; background: #ffffff; border-bottom: 1px solid #e5e7eb;">
+        <button onclick="window.print()" style="height: 36px; padding: 0 14px; border: 0; border-radius: 6px; background: #16a34a; color: #ffffff; font: 600 13px Arial, sans-serif; cursor: pointer;">Print</button>
+      </div>
+    `;
     const printScript = `
       <script>
-        window.addEventListener('load', function () {
-          setTimeout(function () {
-            window.focus();
-            window.print();
-          }, 100);
-        });
+        (function () {
+          function printWhenReady() {
+            if (window.__ecbillsPrintStarted) return;
+            window.__ecbillsPrintStarted = true;
+            setTimeout(function () {
+              window.focus();
+              window.print();
+            }, 250);
+          }
+
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            printWhenReady();
+          } else {
+            window.addEventListener('load', printWhenReady, { once: true });
+          }
+        })();
       </script>
     `;
-    const printableContent = content.includes('</body>')
-      ? content.replace('</body>', `${printScript}</body>`)
-      : `${content}${printScript}`;
+    const printStyles = `
+      <style>
+        @media print {
+          .no-print { display: none !important; }
+        }
+      </style>
+    `;
+    const contentWithControls = content.includes('<body>')
+      ? content.replace('<body>', `<body>${printControls}`)
+      : `${printControls}${content}`;
+    const contentWithStyles = contentWithControls.includes('</head>')
+      ? contentWithControls.replace('</head>', `${printStyles}</head>`)
+      : `${printStyles}${contentWithControls}`;
+    const printableContent = contentWithStyles.includes('</body>')
+      ? contentWithStyles.replace('</body>', `${printScript}</body>`)
+      : `${contentWithStyles}${printScript}`;
 
     printWindow.document.open();
     printWindow.document.write(printableContent);
@@ -304,4 +333,27 @@ export const triggerPrint = (content: string) => {
   } else {
     alert("Please allow popups to print the bill.");
   }
+};
+
+export const triggerPrint = (content: string) => {
+  const selectedPrinter =
+    typeof window !== 'undefined' ? localStorage.getItem(SELECTED_PRINTER_STORAGE_KEY) || undefined : undefined;
+
+  if (window.ecbillsPrinter) {
+    window.ecbillsPrinter
+      .printHtml(content, selectedPrinter)
+      .then((result) => {
+        if (!result.success) {
+          console.warn('[ecbills.in] Desktop print failed, opening browser print window:', result.error);
+          openBrowserPrintWindow(content);
+        }
+      })
+      .catch((error) => {
+        console.warn('[ecbills.in] Desktop print failed, opening browser print window:', error);
+        openBrowserPrintWindow(content);
+      });
+    return;
+  }
+
+  openBrowserPrintWindow(content);
 };

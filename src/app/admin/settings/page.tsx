@@ -14,6 +14,7 @@ import type { UserProfile, Company, CurrencyOption } from '@/types';
 import { Settings as SettingsIcon, Save, StickyNote, CreditCard, Palette, Info, Globe, Languages, Check } from 'lucide-react';
 import { useTheme } from "next-themes";
 import { ThemeToggle } from '@/components/layout/theme-toggle';
+import { PrinterSettingsCard } from '@/components/settings/printer-settings-card';
 import { SUPPORTED_CURRENCIES, DEFAULT_CURRENCY_CODE } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -157,6 +158,8 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageTitle title="Application Settings" icon={SettingsIcon} />
+
+      <PrinterSettingsCard />
 
       <Card className="shadow-md border-t-2 border-t-primary">
         <CardHeader>
