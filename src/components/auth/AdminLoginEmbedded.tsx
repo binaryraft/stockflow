@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,19 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+          renderButton: (parent: HTMLElement, config: { theme?: string; size?: string; text?: string; shape?: string; width?: number }) => void;
+        };
+      };
+    };
+  }
+}
 
 interface AdminLoginEmbeddedProps {
   onLoginSuccess: () => void;
@@ -29,10 +42,89 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
   const [hasMounted, setHasMounted] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const googleButtonRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  const handleGoogleCallback = useCallback(async (response: { credential: string }) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success && data.token && data.user) {
+        localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
+        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('userName', data.user.name || 'Admin');
+        localStorage.setItem('userRole', data.user.role || 'admin');
+        localStorage.setItem('companyId', data.user.companyId);
+        localStorage.setItem('stockflowDataMode', 'cloud');
+
+        await fetchCompanyProfile(data.user.companyId);
+
+        toast({ title: "Login Successful", description: `Welcome, ${data.user.name || 'Admin'}!` });
+        onLoginSuccess();
+      } else {
+        toast({ variant: "destructive", title: "Google Login Failed", description: data.message || "Could not authenticate with Google." });
+      }
+    } catch (error) {
+      console.error("Google login error:", error);
+      toast({ variant: "destructive", title: "Google Login Error", description: "Could not connect to the server." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [fetchCompanyProfile, toast, onLoginSuccess]);
+
+  useEffect(() => {
+    if (!hasMounted || !googleButtonRef.current) return;
+
+    const loadGoogleScript = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+          callback: handleGoogleCallback,
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current!, {
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'rectangular',
+          width: 350,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.google) {
+          window.google.accounts.id.initialize({
+            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+            callback: handleGoogleCallback,
+          });
+          window.google.accounts.id.renderButton(googleButtonRef.current!, {
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+            width: 350,
+          });
+        }
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleScript();
+  }, [hasMounted, handleGoogleCallback]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,6 +237,13 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
               {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
               {isSubmitting ? 'Logging In...' : 'Login as Admin'}
             </Button>
+            <div className="relative w-full flex items-center justify-center my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <span className="relative px-2 text-xs text-muted-foreground bg-card">or continue with</span>
+            </div>
+            <div ref={googleButtonRef} className="w-full flex justify-center" />
             <Button variant="link" size="sm" onClick={onSwitchToSignup} className="text-xs" disabled={isSubmitting}>
               New user? Sign up
             </Button>

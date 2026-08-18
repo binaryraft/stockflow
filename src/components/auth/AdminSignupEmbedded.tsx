@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { APP_NAME, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
@@ -17,6 +17,19 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: { client_id: string; callback: (response: { credential: string }) => void }) => void;
+          renderButton: (parent: HTMLElement, config: { theme?: string; size?: string; text?: string; shape?: string; width?: number }) => void;
+        };
+      };
+    };
+  }
+}
+
 interface AdminSignupEmbeddedProps {
   onSignupSuccess: () => void;
   onCancel: () => void;
@@ -31,6 +44,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [step, setStep] = useState(1);
+  const googleButtonRef = useRef<HTMLDivElement>(null);
   
   // Step 1 state
   const [companyName, setCompanyName] = useState('');
@@ -48,6 +62,84 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
   useEffect(() => {
     setHasMounted(true);
   }, []);
+
+  const handleGoogleCallback = useCallback(async (response: { credential: string }) => {
+    setIsSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success && data.token && data.user) {
+        toast({ title: "Account Created!", description: `Welcome, ${data.user.name}! Your account is ready.` });
+        
+        localStorage.setItem(SHARED_AUTH_TOKEN_KEY, data.token);
+        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('userName', data.user.name || 'Admin');
+        localStorage.setItem('userRole', data.user.role || 'admin');
+        localStorage.setItem('companyId', data.user.companyId);
+        localStorage.setItem('stockflowDataMode', 'cloud');
+        await fetchCompanyProfile(data.user.companyId);
+
+        onSignupSuccess();
+      } else {
+        toast({ variant: "destructive", title: "Google Signup Failed", description: data.message || "Could not authenticate with Google." });
+      }
+    } catch (error) {
+      console.error("Google signup error:", error);
+      toast({ variant: "destructive", title: "Google Signup Error", description: "Could not connect to the server." });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [fetchCompanyProfile, toast, onSignupSuccess]);
+
+  useEffect(() => {
+    if (!hasMounted || !googleButtonRef.current) return;
+
+    const loadGoogleScript = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+          callback: handleGoogleCallback,
+        });
+        window.google.accounts.id.renderButton(googleButtonRef.current!, {
+          theme: 'outline',
+          size: 'large',
+          text: 'signup_with',
+          shape: 'rectangular',
+          width: 350,
+        });
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://accounts.google.com/gsi/client';
+      script.async = true;
+      script.defer = true;
+      script.onload = () => {
+        if (window.google) {
+          window.google.accounts.id.initialize({
+            client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
+            callback: handleGoogleCallback,
+          });
+          window.google.accounts.id.renderButton(googleButtonRef.current!, {
+            theme: 'outline',
+            size: 'large',
+            text: 'signup_with',
+            shape: 'rectangular',
+            width: 350,
+          });
+        }
+      };
+      document.head.appendChild(script);
+    };
+
+    loadGoogleScript();
+  }, [hasMounted, handleGoogleCallback]);
 
   const handleStep1Submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +229,13 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
           </CardContent>
           <CardFooter className="flex-col gap-3">
             <Button type="submit" className="w-full">Next: Choose Plan <ArrowRight className="ml-2 h-4 w-4"/></Button>
+            <div className="relative w-full flex items-center justify-center my-2">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <span className="relative px-2 text-xs text-muted-foreground bg-card">or continue with</span>
+            </div>
+            <div ref={googleButtonRef} className="w-full flex justify-center" />
             <Button variant="link" size="sm" onClick={onSwitchToLogin} className="text-xs">Already have an account? Login</Button>
           </CardFooter>
         </form>
