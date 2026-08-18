@@ -4,7 +4,6 @@ import { connectToDatabase } from '@/lib/mongodb';
 import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company, User, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, startOfDay } from 'date-fns';
-import { Collection } from 'mongodb';
 
 const routeNamePrefix = "[API_BILLS_COLLECTION /api/bills]";
 
