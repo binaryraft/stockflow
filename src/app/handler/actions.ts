@@ -1,7 +1,7 @@
 
 'use server';
 
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/db';
 import type { Company, SubscriptionType, User } from '@/types';
 import { add } from 'date-fns';
 import dotenv from 'dotenv';

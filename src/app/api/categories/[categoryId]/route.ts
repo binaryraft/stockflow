@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/db';
 import type { Category, Product } from '@/types';
 
 const routeNamePrefix = "[API_CATEGORIES_SINGLE /api/categories/[categoryId]]";

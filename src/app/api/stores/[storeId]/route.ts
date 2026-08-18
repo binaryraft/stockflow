@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/db';
 import type { Store, User } from '@/types';
 
 const routeNamePrefix = "[API_STORES_SINGLE /api/stores/[storeId]]";

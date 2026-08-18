@@ -3,7 +3,47 @@ import { supabaseAdmin } from './supabase';
 /**
  * Supabase adapter that mimics the MongoDB collection API used throughout the codebase.
  * This allows all existing routes to work with minimal changes — just replace the import.
+ *
+ * Automatically converts camelCase ↔ snake_case so existing routes keep using camelCase
+ * while Supabase PostgreSQL tables store snake_case columns.
  */
+
+function toSnakeCase(str: string): string {
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+}
+
+function toCamelCase(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+}
+
+function convertKeysToSnake(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(convertKeysToSnake);
+  if (typeof obj !== 'object') return obj;
+
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip MongoDB-specific operators ($set, $unset, $pull, $push, etc.)
+    if (key.startsWith('$')) {
+      result[key] = value;
+    } else {
+      result[toSnakeCase(key)] = convertKeysToSnake(value);
+    }
+  }
+  return result;
+}
+
+function convertKeysToCamel(obj: any): any {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) return obj.map(convertKeysToCamel);
+  if (typeof obj !== 'object') return obj;
+
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[toCamelCase(key)] = convertKeysToCamel(value);
+  }
+  return result;
+}
 
 function convertFilter(filter: any): string {
   // Returns a Supabase-compatible filter string
@@ -49,9 +89,10 @@ function convertSort(sortObj: any): { column: string; ascending: boolean }[] {
 }
 
 function buildQuery(tableName: string, filter: any, sort?: any, offset?: number, limit?: number) {
+  const snakeFilter = convertKeysToSnake(filter);
   let query = supabaseAdmin.from(tableName).select('*');
 
-  const filterStr = convertFilter(filter);
+  const filterStr = convertFilter(snakeFilter);
   if (filterStr) {
     query = query.or(filterStr);
   }
@@ -139,8 +180,9 @@ function applySupabaseFilters(query: any, filter: any) {
 function collectionShim(tableName: string) {
   return {
     async find(filter: any = {}, options?: any) {
+      const snakeFilter = convertKeysToSnake(filter);
       let query = supabaseAdmin.from(tableName).select('*');
-      query = applySupabaseFilters(query, filter);
+      query = applySupabaseFilters(query, snakeFilter);
 
       return {
         sort: (sortObj: any) => {
@@ -155,31 +197,31 @@ function collectionShim(tableName: string) {
                 limit: (n: number) => {
                   query = query.limit(n);
                   return {
-                    toArray: async () => {
-                      const { data } = await query;
-                      return data || [];
-                    },
-                  };
-                },
                 toArray: async () => {
                   const { data } = await query;
-                  return data || [];
-                },
-              };
-            },
-            limit: (n: number) => {
-              query = query.limit(n);
-              return {
-                toArray: async () => {
-                  const { data } = await query;
-                  return data || [];
+                  return (data || []).map(convertKeysToCamel);
                 },
               };
             },
             toArray: async () => {
               const { data } = await query;
-              return data || [];
+              return (data || []).map(convertKeysToCamel);
             },
+          };
+        },
+        limit: (n: number) => {
+          query = query.limit(n);
+          return {
+            toArray: async () => {
+              const { data } = await query;
+              return (data || []).map(convertKeysToCamel);
+            },
+          };
+        },
+        toArray: async () => {
+          const { data } = await query;
+          return (data || []).map(convertKeysToCamel);
+        },
           };
         },
         toArray: async () => {
@@ -190,48 +232,54 @@ function collectionShim(tableName: string) {
     },
 
     async findOne(filter: any = {}) {
+      const snakeFilter = convertKeysToSnake(filter);
       let query = supabaseAdmin.from(tableName).select('*').limit(1);
-      query = applySupabaseFilters(query, filter);
+      query = applySupabaseFilters(query, snakeFilter);
       const { data } = await query;
-      return data && data.length > 0 ? data[0] : null;
+      if (!data || data.length === 0) return null;
+      return convertKeysToCamel(data[0]);
     },
 
     async countDocuments(filter: any = {}) {
+      const snakeFilter = convertKeysToSnake(filter);
       let query = supabaseAdmin.from(tableName).select('*', { count: 'exact', head: true });
-      query = applySupabaseFilters(query, filter);
+      query = applySupabaseFilters(query, snakeFilter);
       const { count } = await query;
       return count || 0;
     },
 
     async insertOne(doc: any) {
-      const { data, error } = await supabaseAdmin.from(tableName).insert(doc).select().single();
+      const snakeDoc = convertKeysToSnake(doc);
+      const { data, error } = await supabaseAdmin.from(tableName).insert(snakeDoc).select().single();
       if (error) throw new Error(error.message);
       return { insertedId: doc.id || data?.id, ops: [data] };
     },
 
     async insertMany(docs: any[]) {
-      const { data, error } = await supabaseAdmin.from(tableName).insert(docs).select();
+      const snakeDocs = docs.map(convertKeysToSnake);
+      const { data, error } = await supabaseAdmin.from(tableName).insert(snakeDocs).select();
       if (error) throw new Error(error.message);
       return { insertedCount: docs.length, insertedIds: docs.map(d => d.id) };
     },
 
     async updateOne(filter: any, update: any) {
+      const snakeFilter = convertKeysToSnake(filter);
       const updateData = update.$set || update;
       const filterParts: string[] = [];
       const filterValues: any = {};
 
       // For Supabase, we need to find the record first, then update by id
       let selectQuery = supabaseAdmin.from(tableName).select('id').limit(1);
-      selectQuery = applySupabaseFilters(selectQuery, filter);
+      selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
       const { data: existing } = await selectQuery;
 
       if (!existing || existing.length === 0) {
         // Handle upsert case
         if (update.$set) {
-          const newDoc = { ...update.$set, ...filter };
+          const newDoc = convertKeysToSnake({ ...update.$set, ...snakeFilter });
           if (update.$unset) {
             for (const key of Object.keys(update.$unset)) {
-              newDoc[key] = null;
+              newDoc[toSnakeCase(key)] = null;
             }
           }
           const { data, error } = await supabaseAdmin.from(tableName).upsert(newDoc, { onConflict: 'id' }).select();
@@ -245,14 +293,14 @@ function collectionShim(tableName: string) {
       let setPayload: any = {};
 
       if (update.$set) {
-        setPayload = { ...update.$set };
+        setPayload = convertKeysToSnake({ ...update.$set });
       } else {
-        setPayload = { ...update };
+        setPayload = convertKeysToSnake({ ...update });
       }
 
       if (update.$unset) {
         for (const key of Object.keys(update.$unset)) {
-          setPayload[key] = null;
+          setPayload[toSnakeCase(key)] = null;
         }
       }
 
@@ -268,8 +316,9 @@ function collectionShim(tableName: string) {
     },
 
     async updateMany(filter: any, update: any) {
+      const snakeFilter = convertKeysToSnake(filter);
       let selectQuery = supabaseAdmin.from(tableName).select('id');
-      selectQuery = applySupabaseFilters(selectQuery, filter);
+      selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
       const { data: records } = await selectQuery;
 
       if (!records || records.length === 0) {
@@ -278,19 +327,20 @@ function collectionShim(tableName: string) {
 
       let updateData: any = {};
       if (update.$set) {
-        updateData = update.$set;
+        updateData = convertKeysToSnake(update.$set);
       } else if (update.$pull) {
         // For $pull on arrays, we need to handle each record
         for (const record of records) {
           for (const [field, value] of Object.entries(update.$pull)) {
-            const currentArray = record[field] || [];
+            const snakeField = toSnakeCase(field);
+            const currentArray = record[snakeField] || [];
             const newArray = currentArray.filter((v: any) => v !== value);
-            await supabaseAdmin.from(tableName).update({ [field]: newArray }).eq('id', record.id);
+            await supabaseAdmin.from(tableName).update({ [snakeField]: newArray }).eq('id', record.id);
           }
         }
         return { matchedCount: records.length, modifiedCount: records.length };
       } else {
-        updateData = update;
+        updateData = convertKeysToSnake(update);
       }
 
       // Update all matching records
@@ -303,16 +353,18 @@ function collectionShim(tableName: string) {
     },
 
     async deleteOne(filter: any) {
+      const snakeFilter = convertKeysToSnake(filter);
       let query = supabaseAdmin.from(tableName).delete().limit(1);
-      query = applySupabaseFilters(query, filter);
+      query = applySupabaseFilters(query, snakeFilter);
       const { error, count } = await query;
       if (error) throw new Error(error.message);
       return { deletedCount: 1 };
     },
 
     async deleteMany(filter: any) {
+      const snakeFilter = convertKeysToSnake(filter);
       let query = supabaseAdmin.from(tableName).delete();
-      query = applySupabaseFilters(query, filter);
+      query = applySupabaseFilters(query, snakeFilter);
       const { error } = await query;
       if (error) throw new Error(error.message);
       return { deletedCount: 1 };

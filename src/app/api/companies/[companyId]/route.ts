@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/db';
 import type { Company } from '@/types';
 import { SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, SUPPORTED_CURRENCIES } from '@/lib/constants';
 

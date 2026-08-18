@@ -1,6 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { connectToDatabase } from '@/lib/mongodb';
+import { connectToDatabase } from '@/lib/db';
 import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company, User, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, startOfDay } from 'date-fns';
