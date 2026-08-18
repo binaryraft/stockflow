@@ -9,6 +9,7 @@ import { LogIn, Building, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 interface HeroSectionProps {
   onAdminLoginClick: () => void;
@@ -21,6 +22,7 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
   const router = useRouter();
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const themeLogo = useThemeLogo();
 
   useEffect(() => {
     setHasMounted(true);
@@ -67,7 +69,7 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
         <div className="flex flex-col items-center mb-12 md:mb-16">
           <div className="animate-fadeInDown delay-100 mb-10 transform transition-transform duration-500 hover:scale-105">
             <Image
-              src="/logo.svg"
+              src={themeLogo}
               alt={`${APP_NAME} Logo`}
               width={160}
               height={160}

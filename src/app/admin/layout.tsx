@@ -11,6 +11,7 @@ import { CompanyRecoveryDialog } from '@/components/auth/CompanyRecoveryDialog';
 import type { PaymentStatus } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 const ADMIN_ROLE = "admin";
@@ -27,6 +28,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const { fetchCompanyProfile } = useInventoryStore();
   const { toast } = useToast();
+  const themeLogo = useThemeLogo();
 
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -130,7 +132,7 @@ export default function AdminLayout({
   const loadingScreen = (message: string) => (
     <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4">
       <Image
-        src="/logo.svg"
+        src={themeLogo}
         alt={`${APP_NAME} Logo`}
         width={80}
         height={80}

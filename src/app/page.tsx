@@ -17,6 +17,7 @@ import { AdminSignupEmbedded } from '@/components/auth/AdminSignupEmbedded';
 import Image from 'next/image';
 import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 type UIMode = 'landing' | 'adminLogin' | 'adminSignup';
 
@@ -28,6 +29,7 @@ export default function HomePage() {
   const [uiMode, setUiMode] = useState<UIMode>('landing');
   const [hasMounted, setHasMounted] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(true);
+  const themeLogo = useThemeLogo();
 
   useEffect(() => {
     setHasMounted(true);
@@ -77,7 +79,7 @@ export default function HomePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image
-          src="/logo.svg"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={80}
           height={80}

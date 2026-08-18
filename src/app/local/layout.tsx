@@ -7,6 +7,7 @@ import { APP_NAME } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 import { LocalAppShell } from '@/components/layout/local-app-shell';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 const LOCAL_CREDS_KEY = "stockflow_local_creds";
 const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
@@ -22,6 +23,7 @@ export default function LocalLayout({
   const [initStatus, setInitStatus] = useState("Initializing Local Mode...");
   const fetchCompanyProfile = useInventoryStore((state) => state.fetchCompanyProfile);
   const fetchStores = useInventoryStore((state) => state.fetchStores);
+  const themeLogo = useThemeLogo();
 
   useEffect(() => {
     const setupLocalEnv = async () => {
@@ -68,7 +70,7 @@ export default function LocalLayout({
     return (
       <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground p-4 text-center">
         <Image
-          src="/logo.svg"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={80}
           height={80}

@@ -7,6 +7,7 @@ import { APP_NAME } from '@/lib/constants';
 import { CreditCard, LogOut, ShieldAlert } from 'lucide-react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 interface AppBlockerProps {
   reason: 'pending' | 'expired';
@@ -14,6 +15,7 @@ interface AppBlockerProps {
 
 export function AppBlocker({ reason }: AppBlockerProps) {
   const router = useRouter();
+  const themeLogo = useThemeLogo();
 
   const handleLogout = () => {
     // A more robust logout would involve a global function, but for simplicity:
@@ -35,7 +37,7 @@ export function AppBlocker({ reason }: AppBlockerProps) {
     <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-background/95 backdrop-blur-sm">
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="/logo.svg"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { APP_NAME } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 interface BrandMarkProps {
   href?: string;
@@ -26,7 +27,8 @@ export function BrandMark({
   const companyLogo = preferCompanyBrand ? userProfile.companyLogoUrl : undefined;
   const companyName = preferCompanyBrand ? userProfile.companyName : undefined;
   const displayName = companyName?.trim() || APP_NAME;
-  const logoSrc = companyLogo?.trim() || '/logo.svg';
+  const themeLogo = useThemeLogo();
+  const logoSrc = companyLogo?.trim() || themeLogo;
 
   const content = (
     <>
@@ -37,8 +39,8 @@ export function BrandMark({
           className="h-full w-full object-contain"
           onError={(event) => {
             const image = event.currentTarget;
-            if (image.src.endsWith('/logo.svg')) return;
-            image.src = '/logo.svg';
+            if (image.src.endsWith('/logo.svg') || image.src.endsWith('/logofornight.svg')) return;
+            image.src = themeLogo;
           }}
         />
       </span>
