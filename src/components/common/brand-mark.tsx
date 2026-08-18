@@ -30,7 +30,7 @@ export function BrandMark({
 
   const content = (
     <>
-      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-background shadow-sm ring-1 ring-border", logoClassName)}>
+      <span className={cn("flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden", logoClassName)}>
         <img
           src={logoSrc}
           alt={`${displayName} logo`}
@@ -42,8 +42,9 @@ export function BrandMark({
           }}
         />
       </span>
-      <span className={cn("min-w-0 truncate font-bold text-primary", textClassName)}>
-        {displayName}
+      <span className={cn("min-w-0 truncate text-sm text-primary-dark", textClassName)}>
+        {/* {displayName} */}
+        Hello!
         {showLocalBadge && <span className="ml-1 text-xs font-normal text-muted-foreground">(Local)</span>}
       </span>
     </>

@@ -14,8 +14,8 @@ interface LandingHeaderProps {
 
 export function LandingHeader({ onAdminLoginClick, onStoreLoginClick }: LandingHeaderProps) {
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/60 bg-background/90 backdrop-blur-lg shadow-sm">
-      <div className="section-container flex h-20 items-center justify-between">
+    <header className="sticky top-0 z-40 w-full border-b border-border/60 bg-background/90 backdrop-blur-lg">
+      <div className="section-container flex h-14 items-center justify-between">
         <BrandMark href="/" textClassName="text-2xl" logoClassName="h-8 w-8 group-hover:scale-105 transition-transform" />
         <nav className="hidden items-center gap-8 text-sm md:flex">
           {[
@@ -40,14 +40,14 @@ export function LandingHeader({ onAdminLoginClick, onStoreLoginClick }: LandingH
               variant="outline"
               size="default"
               onClick={onStoreLoginClick}
-              className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg shadow-sm hover:shadow-md"
+              className="border-secondary text-secondary hover:bg-secondary/10 hover:text-secondary hover:border-secondary/70 transition-all-fast rounded-lg"
             >
               <StoreIcon className="mr-2 h-4 w-4" /> Store Login
             </Button>
             <Button
               size="default"
               onClick={onAdminLoginClick}
-              className="bg-primary hover:bg-primary/85 text-primary-foreground transition-all-fast rounded-lg shadow-md hover:shadow-lg"
+              className="bg-primary hover:bg-primary/85 text-primary-foreground transition-all-fast rounded-lg"
             >
               <LogIn className="mr-2 h-4 w-4" /> Admin Login
             </Button>

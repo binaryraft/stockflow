@@ -71,12 +71,12 @@ export function HeroSection({ onAdminLoginClick, onStoreLoginClick }: HeroSectio
               alt={`${APP_NAME} Logo`}
               width={160}
               height={160}
-              className="rounded-3xl shadow-2xl border-4 border-card/80 bg-background"
+              className="bg-background"
               priority
             />
           </div>
           <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter text-foreground animate-fadeInDown delay-300">
-            Manage Your Business with <span className="text-gradient-primary">{APP_NAME}</span>
+            Intelligent Inventory and Billing from Del<span className="text-gradient-primary">V</span>are
           </h1>
           <p className="mt-8 max-w-3xl text-lg md:text-xl text-muted-foreground animate-fadeInDown delay-500 leading-relaxed">
             The ultimate solution for modern inventory management, seamless billing, staff, and multi-store operations. Streamline with efficiency and insight, beautifully.

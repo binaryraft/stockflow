@@ -85,7 +85,7 @@ export function HeaderMain() {
 
   if (!hasMounted) {
     return (
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-md px-4 md:px-6 shadow-sm">
+      <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-md">
         <div className="flex w-full items-center justify-end gap-2 md:ml-auto">
           <div className="h-9 w-9 rounded-full bg-muted animate-pulse"></div>
           <div className="h-9 w-9 rounded-full bg-muted animate-pulse"></div>
@@ -97,7 +97,7 @@ export function HeaderMain() {
 
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-md px-4 md:px-6 shadow-sm">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/95 backdrop-blur-md">
         <div className="md:hidden">
            <Sheet>
             <SheetTrigger asChild>

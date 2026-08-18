@@ -35,7 +35,7 @@ export function LocalSidebarNav() {
   const { state: sidebarState, toggleSidebar } = useSidebar();
 
   return (
-    <Sidebar className="border-r border-sidebar-border shadow-md" collapsible="icon">
+    <Sidebar className="border-r border-sidebar-border" collapsible="icon">
       <SidebarHeader className="h-16">
         <div className={cn("flex items-center h-full", sidebarState === 'expanded' ? "justify-between pl-3 pr-2" : "justify-center")}>
           {sidebarState === 'expanded' ? (

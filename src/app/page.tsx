@@ -85,7 +85,7 @@ export default function HomePage() {
         />
         <div className="flex items-center gap-2 text-lg text-muted-foreground">
           <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading Application...</span>
+          <span>Loading...</span>
         </div>
       </div>
     );

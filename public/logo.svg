@@ -1,26 +1,19 @@
-<svg width="128" height="128" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ecbills.in logo">
-  <rect width="128" height="128" rx="30" fill="#052E2B"/>
-  <rect x="10" y="10" width="108" height="108" rx="26" fill="url(#bg)"/>
-
-  <!-- E monogram -->
-  <path
-    d="M38 35C38 30.5817 41.5817 27 46 27H89C92.866 27 96 30.134 96 34C96 37.866 92.866 41 89 41H54V57H83C86.866 57 90 60.134 90 64C90 67.866 86.866 71 83 71H54V87H89C92.866 87 96 90.134 96 94C96 97.866 92.866 101 89 101H46C41.5817 101 38 97.4183 38 93V35Z"
-    fill="white"
-  />
-
-  <!-- Reversed C inside the E -->
-  <path
-    d="M67 48C83 48 92 55.1634 92 64C92 72.8366 83 80 67 80"
-    stroke="#0EA5E9"
-    stroke-width="11"
-    stroke-linecap="round"
-  />
-
-  <defs>
-    <linearGradient id="bg" x1="18" y1="18" x2="110" y2="110" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#10B981"/>
-      <stop offset="0.48" stop-color="#059669"/>
-      <stop offset="1" stop-color="#2563EB"/>
-    </linearGradient>
-  </defs>
+<?xml version="1.0" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 20010904//EN"
+ "http://www.w3.org/TR/2001/REC-SVG-20010904/DTD/svg10.dtd">
+<svg version="1.0" xmlns="http://www.w3.org/2000/svg"
+ width="300.000000pt" height="300.000000pt" viewBox="0 0 300.000000 300.000000"
+ preserveAspectRatio="xMidYMid meet">
+<g transform="translate(0.000000,300.000000) scale(0.100000,-0.100000)"
+fill="#004d0f" stroke="none">
+<path d="M2550 2882 l0 -112 -1230 0 -1230 0 0 -840 0 -840 130 0 129 0 -2
+618 -2 617 1103 3 1102 2 0 -116 0 -115 218 221 c119 122 218 225 220 229 1 3
+-97 105 -218 226 l-220 220 0 -113z"/>
+<path d="M817 1943 c-2 -5 -5 -63 -6 -130 l-2 -123 680 0 681 0 0 130 0 130
+-674 0 c-371 0 -677 -3 -679 -7z"/>
+<path d="M1292 1233 l3 -128 705 -1 705 -2 3 -216 2 -216 -1130 0 -1130 0 0
+111 c0 61 -3 109 -7 107 -5 -2 -105 -101 -223 -221 l-214 -217 222 -223 222
+-222 0 113 0 112 1262 0 1261 0 -6 332 c-4 182 -7 436 -7 565 l0 233 -835 0
+-836 0 3 -127z"/>
+</g>
 </svg>
