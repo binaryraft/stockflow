@@ -68,5 +68,8 @@ screenshot-*.png
 # backup / legacy
 usr/
 
+# secrets
+adminsecret/
+
 # genkit
 .genkit/
