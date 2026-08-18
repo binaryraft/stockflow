@@ -115,13 +115,9 @@ export function DownloadSection() {
                             <p className="text-muted-foreground text-sm mb-6 flex-grow leading-relaxed px-2">{platform.description}</p>
 
                             <div className="w-full mt-auto space-y-4">
-                                <Button
-                                    variant="default"
-                                    className={cn("w-full shadow-md font-medium transition-all hover:scale-[1.02] active:scale-[0.98]", platform.btnClass)}
-                                    onClick={() => handleDownload(platform.key)}
-                                >
-                                    <Download className="mr-2 h-4 w-4" /> Download
-                                </Button>
+                                <div className="w-full text-center text-sm font-medium text-muted-foreground py-2">
+                                    Coming Soon...
+                                </div>
                             </div>
                         </div>
                     ))}

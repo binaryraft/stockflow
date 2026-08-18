@@ -16,6 +16,7 @@ import type { SubscriptionType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 declare global {
   interface Window {
@@ -41,6 +42,7 @@ const SHARED_AUTH_TOKEN_KEY = "appAuthToken";
 export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin }: AdminSignupEmbeddedProps) {
   const { toast } = useToast();
   const { fetchCompanyProfile } = useInventoryStore(); 
+  const themeLogo = useThemeLogo();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [step, setStep] = useState(1);
@@ -347,7 +349,7 @@ export function AdminSignupEmbedded({ onSignupSuccess, onCancel, onSwitchToLogin
         <Button variant="ghost" size="icon" onClick={onCancel} aria-label="Close signup"><XCircle className="h-6 w-6 text-muted-foreground hover:text-foreground" /></Button>
       </div>
       <div className="w-full flex flex-col items-center pt-8 pb-6">
-        <Image src="https://placehold.co/128x128.png" alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" data-ai-hint="logo company" />
+        <Image src={themeLogo} alt={`${APP_NAME} Logo`} width={64} height={64} className="mb-3 rounded-lg shadow-md" />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Admin & Company Registration</p>
       </div>

@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 declare global {
   interface Window {
@@ -38,6 +39,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
   const router = useRouter();
   const { toast } = useToast();
   const { fetchCompanyProfile } = useInventoryStore();
+  const themeLogo = useThemeLogo();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
   const [email, setEmail] = useState('');
@@ -172,7 +174,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
     return (
       <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-muted/40 backdrop-blur-sm">
         <Loader2 className="h-10 w-10 text-primary animate-spin mb-3" />
-        <p className="text-muted-foreground">Loading Admin Login...</p>
+        <p className="text-muted-foreground">Loading Admin...</p>
       </div>
     );
   }
@@ -186,7 +188,7 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
       </div>
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="https://placehold.co/128x128.png"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}

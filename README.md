@@ -8,3 +8,6 @@ STORE
 BILLING
 ACCOUNTING
 REPORTS
+
+# supabase for database: registeded under delvaresoftwares@gmail.com
+# resend for emails: registered under delvaresoftwares@gmail.com

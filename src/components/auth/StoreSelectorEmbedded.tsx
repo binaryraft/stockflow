@@ -12,6 +12,7 @@ import type { Store } from '@/types';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
 import { XCircle, Building, LogIn } from 'lucide-react';
+import { useThemeLogo } from '@/hooks/use-theme-logo';
 
 interface StoreSelectorEmbeddedProps {
   onCancel: () => void;
@@ -20,6 +21,7 @@ interface StoreSelectorEmbeddedProps {
 export function StoreSelectorEmbedded({ onCancel }: StoreSelectorEmbeddedProps) {
   const router = useRouter();
   const { getAllStores } = useInventoryStore();
+  const themeLogo = useThemeLogo();
   const [stores, setStores] = useState<Store[]>([]);
   const [hasMounted, setHasMounted] = useState(false);
 
@@ -32,12 +34,11 @@ export function StoreSelectorEmbedded({ onCancel }: StoreSelectorEmbeddedProps) 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-muted/40">
         <Image
-          src="https://placehold.co/128x128.png"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}
           className="mb-3 rounded-lg shadow-md animate-pulse"
-          data-ai-hint="logo company"
         />
         <p className="text-muted-foreground">Loading Store Selector...</p>
       </div>
@@ -53,12 +54,11 @@ export function StoreSelectorEmbedded({ onCancel }: StoreSelectorEmbeddedProps) 
       </div>
       <div className="flex flex-col items-center mb-8">
         <Image
-          src="https://placehold.co/128x128.png"
+          src={themeLogo}
           alt={`${APP_NAME} Logo`}
           width={64}
           height={64}
           className="mb-3 rounded-lg shadow-md"
-          data-ai-hint="logo company"
         />
         <h1 className="text-3xl font-bold text-primary">{APP_NAME}</h1>
         <p className="text-muted-foreground">Store Terminal Access</p>
