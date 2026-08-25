@@ -190,7 +190,17 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    await db.collection<Product>('products').insertOne(newProduct);
+    try {
+      await db.collection<Product>('products').insertOne(newProduct);
+    } catch (insertError: any) {
+      // Graceful degradation if the `unit` column hasn't been added yet (migration 003).
+      if (String(insertError?.message || '').includes("'unit'")) {
+        const { unit: _unitOmitted, ...productWithoutUnit } = newProduct as any;
+        await db.collection<Product>('products').insertOne(productWithoutUnit);
+      } else {
+        throw insertError;
+      }
+    }
 
     // Create Initial Purchase Bill if items exist
     if (initialBillItems.length > 0 && initialBillId) {

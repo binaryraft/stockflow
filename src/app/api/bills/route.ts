@@ -4,6 +4,7 @@ import { connectToDatabase } from '@/lib/db';
 import type { Bill, Product, ProductSKU, StockLayer, BillItem, Company, User, Store } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, startOfDay } from 'date-fns';
+import { roundMoney, roundQuantity } from '@/lib/units';
 
 const routeNamePrefix = "[API_BILLS_COLLECTION /api/bills]";
 
@@ -66,11 +67,20 @@ export async function POST(req: NextRequest) {
   try {
     const { db } = await connectToDatabase();
     const body = await req.json();
-    const { billData, itemsData } = body;
+    const billData = body?.billData;
+    const itemsData = body?.itemsData;
 
-    const { companyId, storeId, type: billType, isEstimate, billedByStaffId, taxType, date: providedDate } = billData;
+    // Accept both canonical (`type`, `storeId`) and legacy (`billType`,
+    // `storeIdForBill`) field names — older clients send the latter.
+    const companyId = billData?.companyId;
+    const storeId = billData?.storeId || billData?.storeIdForBill;
+    const billType = billData?.type || billData?.billType;
+    const isEstimate = billData?.isEstimate;
+    const billedByStaffId = billData?.billedByStaffId;
+    const taxType = billData?.taxType;
+    const providedDate = billData?.date;
 
-    if (!companyId || !billType || !itemsData || !Array.isArray(itemsData) || itemsData.length === 0) {
+    if (!companyId || !billType || !Array.isArray(itemsData) || itemsData.length === 0) {
       return NextResponse.json({ success: false, message: 'Company ID, bill type, and at least one item are required.' }, { status: 400 });
     }
     if (!['sell', 'buy', 'return'].includes(billType)) {
@@ -138,8 +148,8 @@ export async function POST(req: NextRequest) {
             if (quantityToSell <= 0) break;
             const sellFromThisLayer = Math.min(quantityToSell, layer.quantity);
             costOfGoodsSoldThisItem += sellFromThisLayer * layer.costPrice;
-            layer.quantity -= sellFromThisLayer;
-            quantityToSell -= sellFromThisLayer;
+            layer.quantity = roundQuantity(layer.quantity - sellFromThisLayer);
+            quantityToSell = roundQuantity(quantityToSell - sellFromThisLayer);
           }
           itemCostPrice = item.quantity > 0 ? costOfGoodsSoldThisItem / item.quantity : 0;
         }
@@ -171,9 +181,9 @@ export async function POST(req: NextRequest) {
         if ((billType === 'sell' || billType === 'return')) {
           if (item.discountValue && item.discountValue > 0) {
             if (item.discountType === 'percentage') {
-              itemDiscountAmount = ((itemSellPrice * item.quantity) * item.discountValue) / 100;
+              itemDiscountAmount = roundMoney(((itemSellPrice * item.quantity) * item.discountValue) / 100);
             } else {
-              itemDiscountAmount = item.discountValue * item.quantity;
+              itemDiscountAmount = roundMoney(item.discountValue * item.quantity);
             }
           }
         }
@@ -185,10 +195,10 @@ export async function POST(req: NextRequest) {
 
         if (taxType === 'inter-state') {
           const rate = product.igstRate !== undefined ? product.igstRate : ((product.sgstRate || 0) + (product.cgstRate || 0));
-          itemIgstAmount = (taxableValue * rate) / 100;
+          itemIgstAmount = roundMoney((taxableValue * rate) / 100);
         } else {
-          itemSgstAmount = (taxableValue * (product.sgstRate || 0)) / 100;
-          itemCgstAmount = (taxableValue * (product.cgstRate || 0)) / 100;
+          itemSgstAmount = roundMoney((taxableValue * (product.sgstRate || 0)) / 100);
+          itemCgstAmount = roundMoney((taxableValue * (product.cgstRate || 0)) / 100);
         }
       } else if (!isEstimate && isServiceOrCharge && billType === 'sell') {
         // Basic tax logic for services if they had rates, but currently assuming 0 or explicit charges.
@@ -224,10 +234,10 @@ export async function POST(req: NextRequest) {
     const newBill: Bill = {
       id: newBillId, type: billType, date: currentDate.toISOString(), timestamp: currentDate.getTime(),
       vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
-      items: processedBillItems, subTotal: billSubTotal, totalSGST: isEstimate ? 0 : billTotalSGST,
-      totalCGST: isEstimate ? 0 : billTotalCGST, totalIGST: isEstimate ? 0 : billTotalIGST,
-      totalDiscount: billTotalDiscount,
-      totalAmount: isEstimate ? (billSubTotal - billTotalDiscount) : ((billSubTotal - billTotalDiscount) + billTotalSGST + billTotalCGST + billTotalIGST),
+      items: processedBillItems, subTotal: roundMoney(billSubTotal), totalSGST: isEstimate ? 0 : roundMoney(billTotalSGST),
+      totalCGST: isEstimate ? 0 : roundMoney(billTotalCGST), totalIGST: isEstimate ? 0 : roundMoney(billTotalIGST),
+      totalDiscount: roundMoney(billTotalDiscount),
+      totalAmount: isEstimate ? roundMoney(billSubTotal - billTotalDiscount) : roundMoney((billSubTotal - billTotalDiscount) + billTotalSGST + billTotalCGST + billTotalIGST),
       isEstimate: !!isEstimate, notes: billData.notes || company.defaultBillNotes || '',
       paymentStatus: billData.paymentStatus, billedByStaffId: staffUser?.id,
       billedByStaffName: staffUser?.name, storeId: storeDetails?.id, storeName: storeDetails?.name,

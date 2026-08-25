@@ -168,6 +168,8 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                         id="quantityGlobal"
                         ref={quantityInputRef}
                         type="number"
+                        step="any"
+                        min="0"
                         value={quantity}
                         onChange={(e) => setQuantity(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleEnterNavigation('quantity'))}

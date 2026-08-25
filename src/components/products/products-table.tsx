@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
+import { formatQuantity } from '@/lib/units';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -204,7 +205,7 @@ export function ProductsTable() {
   const getProductStockDisplay = (product: Product): string | number | JSX.Element => {
     if (!product.trackQuantity) return <span className="text-xs text-muted-foreground">N/A</span>;
     const totalStock = product.productSKUs.reduce((sum, sku) => sum + (getSkuDetails(sku).totalStock ?? 0), 0);
-    return totalStock;
+    return formatQuantity(totalStock, product.unit);
   };
 
   const getProductPriceDisplay = (product: Product, field: 'averageCostPrice' | 'currentSellPrice'): string => {

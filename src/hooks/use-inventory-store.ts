@@ -7,6 +7,7 @@ import type { Product, Bill, BillItem, Category, User, Store, UserProfile, Subsc
 import { v4 as uuidv4 } from 'uuid';
 import { format, subDays, startOfDay, endOfDay, isToday, isThisWeek, isThisMonth, isThisYear, startOfMonth, endOfMonth, startOfYear, endOfYear, subMonths, subYears } from 'date-fns';
 import { DEFAULT_CATEGORIES, SUBSCRIPTION_PLANS, SUBSCRIPTION_PLAN_IDS, DEFAULT_COMPANY_NAME, DEFAULT_CURRENCY_CODE, LOW_STOCK_THRESHOLD } from '@/lib/constants';
+import { roundMoney, roundQuantity } from '@/lib/units';
 import { toast } from './use-toast';
 
 // Re-export types for convenience in other files
@@ -323,8 +324,9 @@ export const useInventoryStore = create<InventoryState>()(
           set((state) => ({
             products: state.products.map(product => {
               if (product.id !== productId || product.companyId !== companyId) return product;
-              updatedProduct = { ...product, ...(productData as any), id: product.id, companyId: product.companyId };
-              return updatedProduct;
+              const next: Product = { ...product, ...(productData as any), id: product.id, companyId: product.companyId };
+              updatedProduct = next;
+              return next;
             }),
           }));
           return updatedProduct;
@@ -456,8 +458,8 @@ export const useInventoryStore = create<InventoryState>()(
                 for (const layer of layers) {
                   const sold = Math.min(quantityToSell, layer.quantity);
                   cogs += sold * layer.costPrice;
-                  layer.quantity -= sold;
-                  quantityToSell -= sold;
+                  layer.quantity = roundQuantity(layer.quantity - sold);
+                  quantityToSell = roundQuantity(quantityToSell - sold);
                   if (quantityToSell <= 0) break;
                 }
                 costPrice = item.quantity > 0 ? cogs / item.quantity : 0;
@@ -477,12 +479,12 @@ export const useInventoryStore = create<InventoryState>()(
 
             const lineTotal = (localBillType === 'buy' ? costPrice : sellPrice) * item.quantity;
             const discountAmount = item.discountValue
-              ? item.discountType === 'percentage' ? (lineTotal * item.discountValue) / 100 : item.discountValue * item.quantity
+              ? item.discountType === 'percentage' ? roundMoney((lineTotal * item.discountValue) / 100) : roundMoney(item.discountValue * item.quantity)
               : 0;
             const taxableValue = Math.max(0, lineTotal - discountAmount);
-            const sgstAmount = billData.taxType === 'inter-state' ? 0 : (taxableValue * (product?.sgstRate || 0)) / 100;
-            const cgstAmount = billData.taxType === 'inter-state' ? 0 : (taxableValue * (product?.cgstRate || 0)) / 100;
-            const igstAmount = billData.taxType === 'inter-state' ? (taxableValue * (product?.igstRate || 0)) / 100 : 0;
+            const sgstAmount = billData.taxType === 'inter-state' ? 0 : roundMoney((taxableValue * (product?.sgstRate || 0)) / 100);
+            const cgstAmount = billData.taxType === 'inter-state' ? 0 : roundMoney((taxableValue * (product?.cgstRate || 0)) / 100);
+            const igstAmount = billData.taxType === 'inter-state' ? roundMoney((taxableValue * (product?.igstRate || 0)) / 100) : 0;
 
             billSubTotal += lineTotal;
             totalDiscount += discountAmount;
@@ -512,12 +514,12 @@ export const useInventoryStore = create<InventoryState>()(
             vendorOrCustomerName: billData.vendorOrCustomerName,
             customerPhone: billData.customerPhone,
             items: processedItems,
-            subTotal: billSubTotal,
-            totalSGST,
-            totalCGST,
-            totalIGST,
-            totalDiscount,
-            totalAmount: billData.isEstimate ? billSubTotal - totalDiscount : billSubTotal - totalDiscount + totalSGST + totalCGST + totalIGST,
+            subTotal: roundMoney(billSubTotal),
+            totalSGST: roundMoney(totalSGST),
+            totalCGST: roundMoney(totalCGST),
+            totalIGST: roundMoney(totalIGST),
+            totalDiscount: roundMoney(totalDiscount),
+            totalAmount: billData.isEstimate ? roundMoney(billSubTotal - totalDiscount) : roundMoney(billSubTotal - totalDiscount + totalSGST + totalCGST + totalIGST),
             isEstimate: !!billData.isEstimate,
             notes: billData.notes || get().userProfile.defaultBillNotes,
             paymentStatus: billData.paymentStatus,

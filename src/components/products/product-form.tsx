@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
@@ -22,6 +22,8 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/comp
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useRouter, useSearchParams as useNextSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PRODUCT_UNITS, DEFAULT_UNIT_VALUE, getUnit } from '@/lib/units';
 import { v4 as uuidv4 } from 'uuid';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -44,9 +46,17 @@ const additionalChargeDefinitionSchema = z.object({
   path: ["value"],
 });
 
+const optionalNumber = () => z.preprocess(
+  (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
+  z.number().optional()
+);
+
 const productOptionSchema = z.object({
   id: z.string().optional(),
   value: z.string().min(1, "Option value cannot be empty"),
+  costPrice: optionalNumber(),
+  sellPrice: optionalNumber(),
+  initialStock: optionalNumber(),
 });
 
 const productVariantFormSchema = z.object({
@@ -60,6 +70,7 @@ const productFormSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
+  unit: z.string().optional(),
   sku: z.string().optional(),
   expiryDate: z.string().optional(),
   costPrice: z.preprocess(
@@ -106,6 +117,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   });
 
   const variantName = watch(`variants.${variantIndex}.name`);
+  const trackQuantity = watch('trackQuantity');
 
   const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, currentOptionIndex: number) => {
     if (e.key === 'Enter') {
@@ -155,28 +167,68 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
       />
       {errors.variants?.[variantIndex]?.name && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.name?.message}</p>}
 
-      <Label className="text-sm text-muted-foreground mt-2 block">Options for {variantName || `Variant Type ${variantIndex + 1}`}</Label>
+      <Label className="text-sm text-muted-foreground mt-2 block">
+        Options for {variantName || `Variant Type ${variantIndex + 1}`}
+        <span className="text-xs ml-2">{trackQuantity ? "(price & quantity per option)" : "(price per option)"}</span>
+      </Label>
       <div className="space-y-2">
         {optionFields.map((optionValueField, optionIndex) => (
-          <div key={optionValueField.id} className="flex items-center gap-2">
-            <Input
-              {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
-              placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
-              aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
-              onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
-            />
-            {optionFields.length > 1 && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
-                      <Trash2 className="h-3 w-3 text-destructive" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Remove this option value</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+          <div key={optionValueField.id} className="p-3 bg-background border rounded-md space-y-3">
+            <div className="flex items-center gap-2">
+              <Input
+                {...register(`variants.${variantIndex}.options.${optionIndex}.value`)}
+                placeholder={`Option ${optionIndex + 1} Value (e.g. Red, Small)`}
+                aria-label={`Variant ${variantIndex + 1} Option ${optionIndex + 1} Value`}
+                onKeyDown={(e) => handleOptionEnter(e, optionIndex)}
+              />
+              {optionFields.length > 1 && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(optionIndex)} className="h-8 w-8" aria-label="Remove Option Value">
+                        <Trash2 className="h-3 w-3 text-destructive" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Remove this option value</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+            </div>
+
+            <div className={trackQuantity ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">Cost (â‚¹)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.costPrice` as any)}
+                  placeholder="Cost"
+                  className="h-9 text-sm bg-muted/20"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">Sell (â‚¹)</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register(`variants.${variantIndex}.options.${optionIndex}.sellPrice` as any)}
+                  placeholder="Sell"
+                  className="h-9 text-sm bg-muted/20"
+                />
+              </div>
+              {trackQuantity && (
+                <div className="space-y-1">
+                  <Label className="text-[11px] text-muted-foreground uppercase tracking-wider">Qty</Label>
+                  <Input
+                    type="number"
+                    step="any"
+                    {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock` as any)}
+                    placeholder="Qty"
+                    className="h-9 text-sm bg-muted/20"
+                  />
+                </div>
+              )}
+            </div>
           </div>
         ))}
         {errors.variants?.[variantIndex]?.options?.root && <p className="text-sm text-destructive mt-1">{errors.variants[variantIndex]?.options?.root?.message}</p>}
@@ -303,7 +355,7 @@ const AdditionalChargesFormSection: React.FC<AdditionalChargesFormSectionProps> 
               <div className="flex items-end gap-2 md:col-span-2">
                 <div className="space-y-1.5 flex-grow">
                   <Label htmlFor={`additionalChargeDefinitions.${index}.value`}>
-                    {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
+                    {chargeType === 'fixed' ? 'Price (â‚¹)*' : 'Rate (%)*'}
                   </Label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -417,7 +469,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     if (!hasMounted || !currentCompanyId) return;
 
     let defaults: ProductFormData = {
-      name: '', description: '', category: '', trackQuantity: true, sku: '',
+      name: '', description: '', category: '', trackQuantity: true, unit: DEFAULT_UNIT_VALUE, sku: '',
       costPrice: undefined, sellPrice: undefined, initialStock: undefined,
       expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
       additionalChargeDefinitions: [],
@@ -435,6 +487,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         description: initialData.description || '',
         category: initialData.category || '',
         trackQuantity: currentTrackQuantity,
+        unit: initialData.unit || DEFAULT_UNIT_VALUE,
         sku: initialData.sku || '',
         costPrice: !currentTrackQuantity ? defaultSkuDetails.averageCostPrice ?? undefined : undefined,
         sellPrice: !currentTrackQuantity ? defaultSkuDetails.currentSellPrice ?? undefined : undefined,
@@ -444,7 +497,12 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
         hsnCode: initialData.hsnCode || '',
         variants: initialData.variants?.map(v => ({
           id: v.id, name: v.name,
-          options: v.options.map(o => ({ id: o.id, value: o.value }))
+          options: v.options.map(o => ({
+            id: o.id, value: o.value,
+            costPrice: (o as any).costPrice,
+            sellPrice: (o as any).sellPrice,
+            initialStock: (o as any).initialStock,
+          }))
         })) || [],
         additionalChargeDefinitions: initialData.additionalChargeDefinitions?.map(ac => ({
           id: ac.id || uuidv4(),
@@ -456,7 +514,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
     } else if (!isEditing && routeSearchParamsProp && Object.keys(routeSearchParamsProp).length > 0) {
       defaults = {
         name: typeof routeSearchParamsProp.name === 'string' ? routeSearchParamsProp.name : '',
-        description: '', category: '', trackQuantity: true, sku: '',
+        description: '', category: '', trackQuantity: true, unit: DEFAULT_UNIT_VALUE, sku: '',
         costPrice: routeSearchParamsProp.costPrice ? parseFloat(routeSearchParamsProp.costPrice as string) : undefined,
         sellPrice: routeSearchParamsProp.sellPrice ? parseFloat(routeSearchParamsProp.sellPrice as string) : undefined,
         expiryDate: '', sgstRate: undefined, cgstRate: undefined, variants: [],
@@ -481,16 +539,25 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
       await addCategoryToStore(data.category!, currentCompanyId);
     }
 
-    const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & { costPriceForNonTracked?: number, sellPriceForNonTracked?: number } = {
+    const productPayload: Omit<Product, 'id' | 'imageUrl' | 'productSKUs' | 'companyId'> & {
+      costPriceForNonTracked?: number,
+      sellPriceForNonTracked?: number,
+      costPrice?: number,
+      sellPrice?: number,
+      initialStock?: number,
+    } = {
       name: data.name, description: data.description, category: data.category,
-      trackQuantity: data.trackQuantity, sku: data.sku, expiryDate: data.expiryDate,
+      trackQuantity: data.trackQuantity, unit: data.unit || DEFAULT_UNIT_VALUE, sku: data.sku, expiryDate: data.expiryDate,
       sgstRate: data.sgstRate, cgstRate: data.cgstRate, hsnCode: data.hsnCode,
       variants: (data.variants || []).map(v_form => ({
         id: v_form.id || `variant-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         name: v_form.name,
         options: v_form.options.map(opt_form => ({
           id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
-          value: opt_form.value
+          value: opt_form.value,
+          costPrice: opt_form.costPrice,
+          sellPrice: opt_form.sellPrice,
+          initialStock: opt_form.initialStock,
         }))
       })),
       additionalChargeDefinitions: data.additionalChargeDefinitions?.map(ac => ({
@@ -627,15 +694,45 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                 <CardDescription>Manage stock tracking and pricing for this product.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center space-x-3 pt-2 pb-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center pt-2 pb-2">
+                  <div className="flex items-center space-x-3">
+                    <Controller
+                      name="trackQuantity"
+                      control={control}
+                      render={({ field }) => (
+                        <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
+                      )}
+                    />
+                    <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
+                  </div>
                   <Controller
-                    name="trackQuantity"
+                    name="unit"
                     control={control}
-                    render={({ field }) => (
-                      <Checkbox id="trackQuantity" checked={field.value} onCheckedChange={field.onChange} />
-                    )}
+                    render={({ field }) => {
+                      const selected = getUnit(field.value) ?? getUnit(DEFAULT_UNIT_VALUE)!;
+                      const Icon = selected.icon;
+                      return (
+                        <Select value={field.value ?? DEFAULT_UNIT_VALUE} onValueChange={field.onChange}>
+                          <SelectTrigger id="product-unit" aria-label="Unit of measure">
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon className="h-4 w-4 text-primary shrink-0" />
+                              <SelectValue placeholder="Unit" />
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRODUCT_UNITS.map(u => (
+                              <SelectItem key={u.value} value={u.value}>
+                                <span className="flex items-center gap-2">
+                                  <u.icon className="h-4 w-4 text-muted-foreground" />
+                                  {u.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
                   />
-                  <Label htmlFor="trackQuantity" className="font-normal text-sm">Track inventory quantity for this product</Label>
                 </div>
 
                 {trackQuantityValue ? (
@@ -651,7 +748,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                           <Label htmlFor="initialStock">Initial Quantity</Label>
-                          <Input id="initialStock" type="number" {...register("initialStock")} placeholder="0" />
+                          <Input id="initialStock" type="number" step="any" {...register("initialStock")} placeholder="0" />
                         </div>
                         <div className="space-y-1.5">
                           <Label htmlFor="costPrice">Unit Cost Price</Label>
@@ -694,7 +791,7 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
                   <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={20} className="shrink-0 mt-0.5 text-primary" />
                     <span>
-                      For non-tracked products with variants (e.g., different service tiers), pricing is typically managed per specific variant combination. This form does not currently support direct price entry for non-tracked variants; prices may be inferred or need to be set during billing or via a future dedicated SKU pricing interface.
+                      This product has variants and quantity tracking is off â€” set the standard cost &amp; sell price for each option in its variant section below.
                     </span>
                   </div>
                 )}

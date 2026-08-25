@@ -281,6 +281,8 @@ export function BillingForm({
     try {
       const savedBill = await addBill({
         ...payload,
+        type: payload.billType,
+        storeId: payload.storeIdForBill,
         companyId: companyId,
         billedByStaffId: staffId
       } as any, payload.items); // Type assertions/conversions as needed

@@ -1,4 +1,4 @@
-
+﻿
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -27,6 +27,8 @@ import { PlusCircle, Trash2, Percent, DollarSign, BadgePercent, HandCoins, Info 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PRODUCT_UNITS, DEFAULT_UNIT_VALUE, getUnit } from '@/lib/units';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { v4 as uuidv4 } from 'uuid';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -71,6 +73,7 @@ const newProductDialogSchema = z.object({
   description: z.string().optional(),
   category: z.string().optional().default(''),
   trackQuantity: z.boolean().default(true),
+  unit: z.string().optional(),
   costPrice: z.preprocess(
     (val) => (val === "" || val === undefined || val === null ? undefined : parseFloat(String(val))),
     z.number({ invalid_type_error: "Cost price must be a number" }).optional()
@@ -185,7 +188,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
 
             <div className={trackQuantity ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Cost (₹)</Label>
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Cost (â‚¹)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -196,7 +199,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Sell (₹)</Label>
+                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Sell (â‚¹)</Label>
                 <Input
                   type="number"
                   step="0.01"
@@ -211,6 +214,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
                   <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty</Label>
                   <Input
                     type="number"
+                    step="any"
                     {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock` as any)}
                     placeholder="Qty"
                     className="h-8 text-xs bg-muted/20"
@@ -334,7 +338,7 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
                   >
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="fixed" id={`ac-type-fixed-${index}`} />
-                      <Label htmlFor={`ac-type-fixed-${index}`} className={cn("text-xs cursor-pointer", value === 'fixed' && "text-primary font-semibold")}>Fixed (₹)</Label>
+                      <Label htmlFor={`ac-type-fixed-${index}`} className={cn("text-xs cursor-pointer", value === 'fixed' && "text-primary font-semibold")}>Fixed (â‚¹)</Label>
                     </div>
                     <div className="flex items-center space-x-1.5">
                       <RadioGroupItem value="percentage" id={`ac-type-percentage-${index}`} />
@@ -347,7 +351,7 @@ const AdditionalChargesDialogSection: React.FC<AdditionalChargesDialogSectionPro
 
             <div className="relative">
               <Label htmlFor={`additionalChargeDefinitions.${index}.value`} className="text-xs">
-                {chargeType === 'fixed' ? 'Price (₹)*' : 'Rate (%)*'}
+                {chargeType === 'fixed' ? 'Price (â‚¹)*' : 'Rate (%)*'}
               </Label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -422,6 +426,7 @@ export function NewProductDialog({
       description: '',
       category: '',
       trackQuantity: initialValues?.quantity ? true : true,
+      unit: DEFAULT_UNIT_VALUE,
       costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
       sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
       initialStock: initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
@@ -465,6 +470,7 @@ export function NewProductDialog({
         description: '',
         category: '',
         trackQuantity: defaultTrackQuantity,
+        unit: DEFAULT_UNIT_VALUE,
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
@@ -505,6 +511,7 @@ export function NewProductDialog({
       description: data.description,
       category: data.category,
       trackQuantity: data.trackQuantity,
+      unit: data.unit || DEFAULT_UNIT_VALUE,
       variants: productVariantsPayload,
       sgstRate: data.sgstRate,
       cgstRate: data.cgstRate,
@@ -580,6 +587,38 @@ export function NewProductDialog({
                 </div>
 
                 <div className="space-y-1.5">
+                  <Label htmlFor="dialog-unit">Unit</Label>
+                  <Controller
+                    name="unit"
+                    control={control}
+                    render={({ field }) => {
+                      const selected = getUnit(field.value) ?? getUnit(DEFAULT_UNIT_VALUE)!;
+                      const Icon = selected.icon;
+                      return (
+                        <Select value={field.value ?? DEFAULT_UNIT_VALUE} onValueChange={field.onChange}>
+                          <SelectTrigger id="dialog-unit" aria-label="Unit of measure">
+                            <span className="flex items-center gap-2 min-w-0">
+                              <Icon className="h-4 w-4 text-primary shrink-0" />
+                              <SelectValue placeholder="Unit" />
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PRODUCT_UNITS.map(u => (
+                              <SelectItem key={u.value} value={u.value}>
+                                <span className="flex items-center gap-2">
+                                  <u.icon className="h-4 w-4 text-muted-foreground" />
+                                  {u.label}
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      );
+                    }}
+                  />
+                </div>
+
+                <div className="space-y-1.5">
                   <Label htmlFor="dialog-description">Description</Label>
                   <Textarea id="dialog-description" {...register("description")} placeholder="Enter product description (optional)" rows={2} />
                 </div>
@@ -604,32 +643,35 @@ export function NewProductDialog({
                   </div>
                 </div>
 
-                {/* Main Cost/Sell Price Defaults - Always Visible */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-costPrice">Cost Price (Default)</Label>
-                    <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
-                    {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
+                {/* Main Cost/Sell Price - only for products WITHOUT variants.
+                    Variant products ask prices per option below instead. */}
+                {!hasVariants && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-costPrice">Cost Price</Label>
+                      <Input id="dialog-costPrice" type="number" step="0.01" {...register("costPrice")} placeholder="0.00" />
+                      {errors.costPrice && <p className="text-xs text-destructive mt-1">{errors.costPrice.message}</p>}
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dialog-sellPrice">Sell Price</Label>
+                      <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
+                      {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
+                    </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="dialog-sellPrice">Sell Price (Default)</Label>
-                    <Input id="dialog-sellPrice" type="number" step="0.01" {...register("sellPrice")} placeholder="0.00" />
-                    {errors.sellPrice && <p className="text-xs text-destructive mt-1">{errors.sellPrice.message}</p>}
-                  </div>
-                </div>
+                )}
 
-                {trackQuantityValue && hasVariants && (
+                {hasVariants && (
                   <div className="text-xs text-muted-foreground italic p-3 border border-dashed rounded-md bg-tertiary/30 flex items-start gap-2">
                     <Info size={16} className="shrink-0 mt-0.5 text-primary" />
                     <span>
-                      Default prices above will be used for variants unless overridden below.
+                      This product has variants â€” set the price (and quantity, if tracked) for each option in its variant section below.
                     </span>
                   </div>
                 )}
                 {!hasVariants && trackQuantityValue && (
                   <div className="space-y-1.5 mt-2">
                     <Label htmlFor="dialog-initialStock">Initial Stock Quantity</Label>
-                    <Input id="dialog-initialStock" type="number" {...register("initialStock")} placeholder="0" />
+                    <Input id="dialog-initialStock" type="number" step="any" {...register("initialStock")} placeholder="0" />
                     {errors.initialStock && <p className="text-xs text-destructive mt-1">{errors.initialStock.message}</p>}
                   </div>
                 )}

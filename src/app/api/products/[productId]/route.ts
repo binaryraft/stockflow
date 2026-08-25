@@ -101,10 +101,24 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
 
     const { id, ...dataToSet } = updateableData;
 
-    const result = await db.collection<Product>('products').updateOne(
-      { id: productId, companyId: companyId },
-      { $set: dataToSet }
-    );
+    let result;
+    try {
+      result = await db.collection<Product>('products').updateOne(
+        { id: productId, companyId: companyId },
+        { $set: dataToSet }
+      );
+    } catch (updateError: any) {
+      // Graceful degradation if the `unit` column hasn't been added yet (migration 003).
+      if (String(updateError?.message || '').includes("'unit'")) {
+        const { unit: _unitOmitted, ...setDataWithoutUnit } = dataToSet as any;
+        result = await db.collection<Product>('products').updateOne(
+          { id: productId, companyId: companyId },
+          { $set: setDataWithoutUnit }
+        );
+      } else {
+        throw updateError;
+      }
+    }
 
     if (result.matchedCount === 0) return NextResponse.json({ success: false, message: 'Product not found during update operation.' }, { status: 404 });
 

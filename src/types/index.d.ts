@@ -1,4 +1,4 @@
-// This is a declaration file, it should not contain implementation details.
+﻿// This is a declaration file, it should not contain implementation details.
 // It is used for providing type information for the project.
 
 export interface ProductOption {
@@ -42,6 +42,7 @@ export interface Product {
   name: string;
   category?: string;
   trackQuantity: boolean;
+  unit?: string | null;
   sku?: string;
   expiryDate?: string;
   imageUrl?: string | null;

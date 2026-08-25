@@ -40,6 +40,7 @@ export interface Product {
   name: string;
   category?: string;
   trackQuantity: boolean;
+  unit?: string | null;
   sku?: string;
   hsnCode?: string;
   expiryDate?: string;

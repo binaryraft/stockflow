@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Product, ProductSKU, StockLayer } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { cn } from '@/lib/utils';
+import { formatQuantity } from '@/lib/units';
 
 export interface ProductSearchSuggestion {
   product: Product;
@@ -79,7 +80,7 @@ export function ProductSearchInput({
                   sku,
                   layer,
                   displayInfo: {
-                    name: `${baseSkuIdentifier} - Sell @ ₹${layer.sellPrice.toFixed(2)}`,
+                    name: baseSkuIdentifier,
                     stock: layer.quantity,
                     price: `₹${layer.sellPrice.toFixed(2)}`,
                     category: product.category,
@@ -268,17 +269,20 @@ export function ProductSearchInput({
                       handleSelectSuggestion(suggestion);
                     }}
                   >
-                    <div className="flex justify-between items-center">
-                      <span className="truncate mr-2">{suggestion.displayInfo.name}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap text-right">
-                        {suggestion.displayInfo.stock !== 'N/A'
-                          ? `Qty: ${suggestion.displayInfo.stock}`
-                          : ""}
-                        {(suggestion.displayInfo.stock !== 'N/A' && suggestion.displayInfo.stock !== null && suggestion.displayInfo.price !== 'N/A') ? " " : ""}
-                        {suggestion.displayInfo.price}
-                      </span>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="truncate font-medium">{suggestion.displayInfo.name}</span>
+                      {suggestion.product.trackQuantity && suggestion.displayInfo.stock !== 'N/A' && (
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          Qty: {formatQuantity(suggestion.displayInfo.stock as number, suggestion.product.unit)}
+                        </span>
+                      )}
                     </div>
-                    {suggestion.displayInfo.category && <div className="text-xs text-muted-foreground">{suggestion.displayInfo.category}</div>}
+                    <div className="flex justify-between items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                      <span className="truncate">{suggestion.displayInfo.category || '\u00A0'}</span>
+                      {suggestion.displayInfo.price !== 'N/A' && (
+                        <span className="whitespace-nowrap font-medium text-foreground">{suggestion.displayInfo.price}</span>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
