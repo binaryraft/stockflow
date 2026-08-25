@@ -90,7 +90,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { storeId: 
 
     // Remove this storeId from any staff member's assignedStoreIds
     await db.collection<User>('users').updateMany(
-      { companyId: companyId, assignedStoreIds: storeId },
+      { companyId: companyId, assignedStoreIds: { $contains: storeId } },
       { $pull: { assignedStoreIds: storeId } }
     );
 

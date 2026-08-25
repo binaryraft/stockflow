@@ -82,7 +82,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { staffId: 
 
     // Also remove from any store's allowedStaffIds
     await db.collection<Store>('stores').updateMany(
-      { companyId: companyId, allowedStaffIds: staffId },
+      { companyId: companyId, allowedStaffIds: { $contains: staffId } },
       { $pull: { allowedStaffIds: staffId } }
     );
 

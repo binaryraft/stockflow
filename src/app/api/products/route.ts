@@ -52,8 +52,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: `Product limit reached for your current plan.` }, { status: 403 });
     }
 
+    // Strip transient fields that have no corresponding DB columns.
+    // initialStock/costPrice/sellPrice are consumed below for the initial purchase bill only.
+    const { initialStock: _is, costPrice: _cp, sellPrice: _sp, ...productFields } = productData;
+
     const newProduct: Product = {
-      ...productData,
+      ...productFields,
       id: generateId(),
       companyId: companyId,
       productSKUs: [],

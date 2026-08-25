@@ -67,6 +67,8 @@ CREATE TABLE IF NOT EXISTS products (
   sgst_rate NUMERIC,
   cgst_rate NUMERIC,
   igst_rate NUMERIC,
+  cost_price_for_non_tracked NUMERIC,
+  sell_price_for_non_tracked NUMERIC,
   additional_charge_definitions JSONB DEFAULT '[]',
   is_archived BOOLEAN DEFAULT false
 );

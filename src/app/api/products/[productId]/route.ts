@@ -40,7 +40,8 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
     const existingProduct = await db.collection<Product>('products').findOne({ id: productId, companyId: companyId });
     if (!existingProduct) return NextResponse.json({ success: false, message: 'Product not found.' }, { status: 404 });
 
-    const { costPriceForNonTracked, sellPriceForNonTracked, ...updateableData } = productData;
+    // Strip fields that have no corresponding DB columns
+    const { costPriceForNonTracked, sellPriceForNonTracked, initialStock: _is, costPrice: _cp, sellPrice: _sp, ...updateableData } = productData;
 
     // Handle price updates for non-tracked, single-SKU products
     if (productData.trackQuantity === false && (!productData.variants || productData.variants.length === 0)) {

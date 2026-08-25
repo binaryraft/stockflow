@@ -8,16 +8,37 @@ import { getSupabaseAdmin } from './supabase';
  * while Supabase PostgreSQL tables store snake_case columns.
  */
 
+// Keys containing acronym runs (consecutive capitals) that the generic
+// algorithm would mangle — e.g. "productSKUs" -> "product_s_k_us".
+const CAMEL_TO_SNAKE_OVERRIDES: Record<string, string> = {
+  productSKUs: 'product_skus',
+  totalSGST: 'total_sgst',
+  totalCGST: 'total_cgst',
+  totalIGST: 'total_igst',
+};
+
+const SNAKE_TO_CAMEL_OVERRIDES: Record<string, string> = Object.fromEntries(
+  Object.entries(CAMEL_TO_SNAKE_OVERRIDES).map(([camel, snake]) => [snake, camel])
+);
+
 function toSnakeCase(str: string): string {
-  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+  const override = CAMEL_TO_SNAKE_OVERRIDES[str];
+  if (override) return override;
+  return str
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z\d])([A-Z])/g, '$1_$2')
+    .toLowerCase();
 }
 
 function toCamelCase(str: string): string {
+  const override = SNAKE_TO_CAMEL_OVERRIDES[str];
+  if (override) return override;
   return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
 function convertKeysToSnake(obj: any): any {
   if (obj === null || obj === undefined) return obj;
+  if (obj instanceof RegExp) return obj;
   if (Array.isArray(obj)) return obj.map(convertKeysToSnake);
   if (typeof obj !== 'object') return obj;
 
@@ -35,6 +56,7 @@ function convertKeysToSnake(obj: any): any {
 
 function convertKeysToCamel(obj: any): any {
   if (obj === null || obj === undefined) return obj;
+  if (obj instanceof RegExp) return obj;
   if (Array.isArray(obj)) return obj.map(convertKeysToCamel);
   if (typeof obj !== 'object') return obj;
 
@@ -45,41 +67,6 @@ function convertKeysToCamel(obj: any): any {
   return result;
 }
 
-function convertFilter(filter: any): string {
-  // Returns a Supabase-compatible filter string
-  if (!filter || Object.keys(filter).length === 0) return '';
-
-  const parts: string[] = [];
-  for (const [key, value] of Object.entries(filter)) {
-    if (value === null) {
-      parts.push(`${key}.is.null`);
-    } else if (typeof value === 'object' && value !== null) {
-      const v = value as any;
-      if ('$in' in v) {
-        parts.push(`${key}.in.(${v.$in.join(',')})`);
-      } else if ('$ne' in v) {
-        parts.push(`${key}.neq.${v.$ne}`);
-      } else if ('$gte' in v) {
-        parts.push(`${key}.gte.${v.$gte}`);
-      } else if ('$lte' in v) {
-        parts.push(`${key}.lte.${v.$lte}`);
-      } else if ('$gt' in v) {
-        parts.push(`${key}.gt.${v.$gt}`);
-      } else if ('$lt' in v) {
-        parts.push(`${key}.lt.${v.$lt}`);
-      } else if ('$regex' in v) {
-        // PostgreSQL ilike for case-insensitive regex
-        parts.push(`${key}.ilike.%${v.$regex}%`);
-      } else if ('$ne' in v) {
-        parts.push(`${key}.neq.${v.$ne}`);
-      }
-    } else {
-      parts.push(`${key}.eq.${value}`);
-    }
-  }
-  return parts.join(',');
-}
-
 function convertSort(sortObj: any): { column: string; ascending: boolean }[] {
   if (!sortObj) return [];
   return Object.entries(sortObj).map(([key, val]) => ({
@@ -88,75 +75,23 @@ function convertSort(sortObj: any): { column: string; ascending: boolean }[] {
   }));
 }
 
-function buildQuery(tableName: string, filter: any, sort?: any, offset?: number, limit?: number) {
-  const snakeFilter = convertKeysToSnake(filter);
-  let query = getSupabaseAdmin().from(tableName).select('*');
-
-  const filterStr = convertFilter(snakeFilter);
-  if (filterStr) {
-    query = query.or(filterStr);
-  }
-
-  if (sort) {
-    const sorts = convertSort(sort);
-    for (const s of sorts) {
-      query = query.order(s.column, { ascending: s.ascending });
-    }
-  }
-
-  if (offset && offset > 0) {
-    query = query.range(offset, offset + (limit || 1000) - 1);
-  } else if (limit && limit > 0) {
-    query = query.limit(limit);
-  }
-
-  return query;
-}
-
-function buildFilterObject(filter: any): any {
-  // Build a more precise filter for Supabase using individual eq() calls
-  if (!filter || Object.keys(filter).length === 0) return {};
-
-  const result: any = {};
-  for (const [key, value] of Object.entries(filter)) {
-    if (value === null) {
-      result[key] = null;
-    } else if (typeof value === 'object' && value !== null) {
-      const v = value as any;
-      if ('$in' in v) {
-        result[key] = v.$in;
-      } else if ('$ne' in v) {
-        result[key] = { neq: v.$ne };
-      } else if ('$gte' in v) {
-        result[key] = { gte: v.$gte };
-      } else if ('$lte' in v) {
-        result[key] = { lte: v.$lte };
-      } else if ('$gt' in v) {
-        result[key] = { gt: v.$gt };
-      } else if ('$lt' in v) {
-        result[key] = { lt: v.$lt };
-      } else if ('$regex' in v) {
-        result[key] = { ilike: `%${v.$regex}%` };
-      } else if ('$ne' in v) {
-        result[key] = { neq: v.$ne };
-      }
-    } else {
-      result[key] = value;
-    }
-  }
-  return result;
-}
-
 function applySupabaseFilters(query: any, filter: any) {
   if (!filter || Object.keys(filter).length === 0) return query;
 
   for (const [key, value] of Object.entries(filter)) {
     if (value === null) {
       query = query.is(key, null);
+    } else if (value instanceof RegExp) {
+      // Case-insensitive exact match (Mongo-style anchored regex)
+      const source = value.source.replace(/^\^/, '').replace(/\$$/, '');
+      query = query.ilike(key, source);
     } else if (typeof value === 'object' && value !== null) {
       const v = value as any;
       if ('$in' in v) {
         query = query.in(key, v.$in);
+      } else if ('$contains' in v) {
+        // Postgres array column contains element(s)
+        query = query.contains(key, Array.isArray(v.$contains) ? v.$contains : [v.$contains]);
       } else if ('$ne' in v) {
         query = query.neq(key, v.$ne);
       } else if ('$gte' in v) {
@@ -168,7 +103,10 @@ function applySupabaseFilters(query: any, filter: any) {
       } else if ('$lt' in v) {
         query = query.lt(key, v.$lt);
       } else if ('$regex' in v) {
-        query = query.ilike(key, `%${v.$regex}%`);
+        const source = typeof v.$regex === 'string'
+          ? v.$regex.replace(/^\^/, '').replace(/\$$/, '')
+          : String(v.$regex);
+        query = query.ilike(key, `%${source}%`);
       }
     } else {
       query = query.eq(key, value);
@@ -280,12 +218,9 @@ function collectionShim(tableName: string) {
 
     async updateOne(filter: any, update: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      const updateData = update.$set || update;
-      const filterParts: string[] = [];
-      const filterValues: any = {};
 
       // For Supabase, we need to find the record first, then update by id
-      let selectQuery = getSupabaseAdmin().from(tableName).select('id').limit(1);
+      let selectQuery: any = getSupabaseAdmin().from(tableName).select('id').limit(1);
       selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
       const { data: existing } = await selectQuery;
 
@@ -333,7 +268,8 @@ function collectionShim(tableName: string) {
 
     async updateMany(filter: any, update: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      let selectQuery = getSupabaseAdmin().from(tableName).select('id');
+      // Select full rows so $pull can read and rewrite array columns
+      let selectQuery: any = getSupabaseAdmin().from(tableName).select('*');
       selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
       const { data: records } = await selectQuery;
 
@@ -370,20 +306,20 @@ function collectionShim(tableName: string) {
 
     async deleteOne(filter: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query = getSupabaseAdmin().from(tableName).delete().limit(1);
+      let query: any = getSupabaseAdmin().from(tableName).delete();
       query = applySupabaseFilters(query, snakeFilter);
-      const { error, count } = await query;
+      const { data, error } = await query.select('id');
       if (error) throw new Error(error.message);
-      return { deletedCount: 1 };
+      return { deletedCount: (data || []).length };
     },
 
     async deleteMany(filter: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query = getSupabaseAdmin().from(tableName).delete();
+      let query: any = getSupabaseAdmin().from(tableName).delete();
       query = applySupabaseFilters(query, snakeFilter);
-      const { error } = await query;
+      const { data, error } = await query.select('id');
       if (error) throw new Error(error.message);
-      return { deletedCount: 1 };
+      return { deletedCount: (data || []).length };
     },
   };
 }

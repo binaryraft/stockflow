@@ -38,6 +38,20 @@ export async function PUT(req: NextRequest, { params }: { params: { companyId: s
 
     const { id, token, creationDate, ...updateableData } = companyDataToUpdate;
 
+    // Whitelist columns that exist in the companies table to avoid schema errors
+    const allowedColumns = [
+      'name', 'activeSubscriptionId', 'logoUrl', 'slogan', 'phone', 'address', 'gstNo',
+      'defaultBillNotes', 'defaultSalesPaymentStatus', 'defaultPurchasePaymentStatus',
+      'currency', 'subscriptionType', 'paymentStatus',
+      'subscriptionStartDate', 'subscriptionExpiryDate', 'pendingSubscriptionId',
+    ] as const;
+    for (const key of Object.keys(updateableData)) {
+      if (!allowedColumns.includes(key as any)) delete updateableData[key as keyof typeof updateableData];
+    }
+    if (Object.keys(updateableData).length === 0) {
+      return NextResponse.json({ success: false, message: 'No valid fields to update.' }, { status: 400 });
+    }
+
     // Validation
     if (updateableData.name !== undefined && (typeof updateableData.name !== 'string' || updateableData.name.trim() === '')) {
         return NextResponse.json({ success: false, message: 'Company name cannot be empty.' }, { status: 400 });

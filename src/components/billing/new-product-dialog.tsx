@@ -435,6 +435,8 @@ export function NewProductDialog({
   const trackQuantityValue = watch('trackQuantity');
   const currentVariants = watch('variants');
   const hasVariants = Array.isArray(currentVariants) && currentVariants.length > 0;
+  const mainCostPrice = watch('costPrice');
+  const mainSellPrice = watch('sellPrice');
 
   const { fields: variantFields, append: appendVariant, remove: removeVariant } = useFieldArray({
     control,
@@ -463,7 +465,6 @@ export function NewProductDialog({
         costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
         sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
         initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
-        agstRate: undefined, // Typo in original file? No it was cgstRate
         sgstRate: undefined,
         cgstRate: undefined,
         hsnCode: '',
