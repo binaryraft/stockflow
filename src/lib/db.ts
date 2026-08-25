@@ -177,58 +177,74 @@ function applySupabaseFilters(query: any, filter: any) {
   return query;
 }
 
-function collectionShim(tableName: string) {
-  return {
-    async find(filter: any = {}, options?: any) {
-      const snakeFilter = convertKeysToSnake(filter);
-      let query = getSupabaseAdmin().from(tableName).select('*');
-      query = applySupabaseFilters(query, snakeFilter);
+function createCursor(tableName: string, filter: any = {}) {
+  const snakeFilter = convertKeysToSnake(filter);
+  let query = getSupabaseAdmin().from(tableName).select('*');
+  query = applySupabaseFilters(query, snakeFilter);
 
+  let offsetVal = 0;
+  let limitVal: number | null = null;
+  let executed: Promise<any[]> | null = null;
+
+  const exec = (): Promise<any[]> => {
+    if (!executed) {
+      let finalQuery = query;
+      if (limitVal !== null && limitVal > 0) {
+        finalQuery = finalQuery.range(offsetVal, offsetVal + limitVal - 1);
+      } else if (offsetVal > 0) {
+        finalQuery = finalQuery.range(offsetVal, undefined as any);
+      }
+      const run = async () => {
+        const { data }: any = await finalQuery;
+        return (data || []).map(convertKeysToCamel);
+      };
+      executed = run();
+    }
+    return executed;
+  };
+
+  const cursor: any = {
+    sort(sortObj: any) {
+      if (sortObj) {
+        for (const s of convertSort(sortObj)) {
+          query = query.order(s.column, { ascending: s.ascending });
+        }
+      }
+      return cursor;
+    },
+    skip(n: number) {
+      offsetVal = n;
+      return cursor;
+    },
+    limit(n: number) {
+      limitVal = n;
+      return cursor;
+    },
+    toArray() {
+      return exec();
+    },
+    [Symbol.asyncIterator]() {
+      let items: any[] | null = null;
+      let index = 0;
       return {
-        sort: (sortObj: any) => {
-          const sorts = convertSort(sortObj);
-          for (const s of sorts) {
-            query = query.order(s.column, { ascending: s.ascending });
+        async next(): Promise<IteratorResult<any>> {
+          if (items === null) items = await exec();
+          if (index < items.length) {
+            return { value: items[index++], done: false };
           }
-          return {
-            skip: (n: number) => {
-              query = query.range(n, n + 9999);
-              return {
-                limit: (n: number) => {
-                  query = query.limit(n);
-                  return {
-                toArray: async () => {
-                  const { data } = await query;
-                  return (data || []).map(convertKeysToCamel);
-                },
-              };
-            },
-            toArray: async () => {
-              const { data } = await query;
-              return (data || []).map(convertKeysToCamel);
-            },
-          };
-        },
-        limit: (n: number) => {
-          query = query.limit(n);
-          return {
-            toArray: async () => {
-              const { data } = await query;
-              return (data || []).map(convertKeysToCamel);
-            },
-          };
-        },
-        toArray: async () => {
-          const { data } = await query;
-          return (data || []).map(convertKeysToCamel);
-        },
-          };
-        },
-        toArray: async () => {
-          const { data } = await query;
-          return data || [];
+          return { value: undefined as any, done: true };
         },
       };
+    },
+  };
+
+  return cursor;
+}
+
+function collectionShim(tableName: string) {
+  return {
+    find(filter: any = {}) {
+      return createCursor(tableName, filter);
     },
 
     async findOne(filter: any = {}) {
