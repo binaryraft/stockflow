@@ -15,7 +15,6 @@ import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { MoreHorizontal, Edit3, Trash2, PlusCircle, ArrowUpDown, PackageSearch, ExternalLink, Archive, ArchiveRestore } from 'lucide-react';
-import Image from 'next/image';
 import type { Product, ProductSKU } from '@/types';
 import { useInventoryStore } from '@/hooks/use-inventory-store';
 import { useToast } from '@/hooks/use-toast';
@@ -306,7 +305,6 @@ export function ProductsTable() {
         <Table>
           <TableHeader className="bg-muted/50">
             <TableRow>
-              <TableHead className="w-[80px] py-3 px-4">Image</TableHead>
               <TableHead onClick={() => requestSort('name')} className="cursor-pointer hover:bg-muted/80 py-3 px-4">
                 <Tooltip>
                   <TooltipTrigger className="flex items-center">Name <ArrowUpDown className="ml-1.5 h-4 w-4 opacity-70" /></TooltipTrigger>
@@ -353,17 +351,6 @@ export function ProductsTable() {
                 const isVariantProduct = product.variants && product.variants.length > 0;
                 return (
                 <TableRow key={product.id} className={cn("hover:bg-muted/30", product.isArchived && "bg-secondary/10 opacity-60 hover:opacity-100")}>
-                  <TableCell className="py-3 px-4">
-                    <Image
-                      src={product.imageUrl || `https://placehold.co/64x64.png?text=${product.name.charAt(0)}`}
-                      alt={product.name}
-                      width={52}
-                      height={52}
-                      className="rounded-lg object-cover aspect-square border border-border shadow-sm"
-                      data-ai-hint="product item generic"
-                      onError={(e) => { (e.target as HTMLImageElement).src = `https://placehold.co/64x64.png?text=${product.name.charAt(0)}&font=roboto`; }}
-                    />
-                  </TableCell>
                   <TableCell className="font-semibold py-3 px-4 align-top text-foreground">
                     <div>{product.name}</div>
                     {product.isArchived && <Badge variant="destructive" className="mt-1">Archived</Badge>}
@@ -450,7 +437,7 @@ export function ProductsTable() {
               )})
             ) : (
               <TableRow>
-                <TableCell colSpan={10} className="h-48 text-center">
+                <TableCell colSpan={8} className="h-48 text-center">
                   {isLoading ? <LoadingSpinner text="Loading products..." size={40} /> : (companyId ? (searchTerm ? "No products match your search." : "No products found. Add some to get started!") : "Company ID not available.")}
                 </TableCell>
               </TableRow>
@@ -467,13 +454,6 @@ export function ProductsTable() {
             return (
               <Card key={`mobile-${product.id}`} className={cn("shadow-md border-t-2 border-t-primary overflow-hidden", product.isArchived && "bg-secondary/10 opacity-70")}>
                  <CardHeader className="p-3 flex flex-row items-center gap-3 bg-muted/30">
-                  <Image
-                    src={product.imageUrl || `https://placehold.co/48x48.png?text=${product.name.charAt(0)}`}
-                    alt={product.name}
-                    width={40}
-                    height={40}
-                    className="rounded-md object-cover aspect-square border"
-                  />
                   <div className="flex-1">
                     <CardTitle className="text-sm font-semibold">{product.name}</CardTitle>
                     {product.category && <Badge variant="secondary" className="text-xs mt-0.5">{product.category}</Badge>}

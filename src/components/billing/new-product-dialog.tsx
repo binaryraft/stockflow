@@ -117,6 +117,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
   const variantName = watch(`variants.${variantIndex}.name`);
   const mainCostPrice = watch('costPrice');
   const mainSellPrice = watch('sellPrice');
+  const trackQuantity = watch('trackQuantity');
 
   const handleOptionEnter = (e: React.KeyboardEvent<HTMLInputElement>, currentOptionIndex: number) => {
     if (e.key === 'Enter') {
@@ -182,7 +183,7 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
               </Button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            <div className={trackQuantity ? "grid grid-cols-3 gap-2" : "grid grid-cols-2 gap-2"}>
               <div className="space-y-1">
                 <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Cost (₹)</Label>
                 <Input
@@ -205,15 +206,17 @@ const VariantFormSection: React.FC<VariantFormSectionProps> = ({
                   className="h-8 text-xs bg-muted/20"
                 />
               </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty</Label>
-                <Input
-                  type="number"
-                  {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock` as any)}
-                  placeholder="Qty"
-                  className="h-8 text-xs bg-muted/20"
-                />
-              </div>
+              {trackQuantity && (
+                <div className="space-y-1">
+                  <Label className="text-[10px] text-muted-foreground uppercase tracking-wider">Qty</Label>
+                  <Input
+                    type="number"
+                    {...register(`variants.${variantIndex}.options.${optionIndex}.initialStock` as any)}
+                    placeholder="Qty"
+                    className="h-8 text-xs bg-muted/20"
+                  />
+                </div>
+              )}
             </div>
           </div>
         ))}

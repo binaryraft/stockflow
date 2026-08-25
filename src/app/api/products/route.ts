@@ -54,7 +54,8 @@ export async function POST(req: NextRequest) {
 
     // Strip transient fields that have no corresponding DB columns.
     // initialStock/costPrice/sellPrice are consumed below for the initial purchase bill only.
-    const { initialStock: _is, costPrice: _cp, sellPrice: _sp, ...productFields } = productData;
+    const { initialStock: mainInitialStock, costPrice: mainCostPrice, sellPrice: mainSellPrice, ...productFields } = productData;
+    const numOrUndef = (v: any) => (v === '' || v === null || v === undefined ? undefined : Number(v));
 
     const newProduct: Product = {
       ...productFields,
@@ -65,6 +66,7 @@ export async function POST(req: NextRequest) {
     };
 
     const initialBillItems: BillItem[] = [];
+    const skuCombinations: { sku: ProductSKU; cost: number; sell: number; stock: number }[] = [];
 
     if (!productData.variants || productData.variants.length === 0) {
       const skuId = generateId();
@@ -75,14 +77,14 @@ export async function POST(req: NextRequest) {
         stockLayers: [],
       });
       // Handle single product initial stock
-      if (productData.trackQuantity && productData.initialStock && productData.initialStock > 0) {
+      if (productData.trackQuantity && numOrUndef(mainInitialStock) !== undefined && numOrUndef(mainInitialStock)! > 0) {
         initialBillItems.push({
           id: uuidv4(),
           productId: newProduct.id,
           productName: newProduct.name,
-          quantity: productData.initialStock,
-          costPrice: productData.costPrice || 0,
-          sellPrice: productData.sellPrice || 0,
+          quantity: numOrUndef(mainInitialStock)!,
+          costPrice: numOrUndef(mainCostPrice) || 0,
+          sellPrice: numOrUndef(mainSellPrice) || 0,
           selectedVariantOptions: {}
         });
       }
@@ -121,9 +123,9 @@ export async function POST(req: NextRequest) {
 
       newProduct.productSKUs = combinations.map(combination => {
         const skuId = generateId();
-        const skuCost = combination.metadata.costPrice !== undefined ? combination.metadata.costPrice : (productData.costPrice || 0);
-        const skuSell = combination.metadata.sellPrice !== undefined ? combination.metadata.sellPrice : (productData.sellPrice || 0);
-        const skuStock = combination.metadata.initialStock !== undefined ? combination.metadata.initialStock : 0; // Default to 0 if not set on variant
+        const skuCost = numOrUndef(combination.metadata.costPrice) ?? (numOrUndef(mainCostPrice) ?? 0);
+        const skuSell = numOrUndef(combination.metadata.sellPrice) ?? (numOrUndef(mainSellPrice) ?? 0);
+        const skuStock = numOrUndef(combination.metadata.initialStock) ?? 0;
 
         // Create bill item if this variant/SKU has stock
         if (productData.trackQuantity && skuStock > 0) {
@@ -138,21 +140,61 @@ export async function POST(req: NextRequest) {
           });
         }
 
-        return {
+        const sku: ProductSKU = {
           id: skuId,
           optionValues: combination.optionValues,
           skuIdentifier: `${newProduct.name} (${Object.values(combination.optionValues).join(' - ')})`,
-          stockLayers: [] // Stock layers are built from bills, so initially empty check for bill creation below
+          stockLayers: [] // Populated below so the response reflects prices/stock immediately
         };
+        skuCombinations.push({ sku, cost: skuCost, sell: skuSell, stock: skuStock });
+        return sku;
+      });
+    }
+
+    // Populate stockLayers BEFORE persisting so both the DB row and the response
+    // reflect prices/stock immediately (they are otherwise only rebuilt from bills
+    // on later purchases).
+    const initialBillId = initialBillItems.length > 0 ? `INIT_PURCHASE_${newProduct.id.slice(0, 8)}` : null;
+    const nowIso = new Date().toISOString();
+    const buildLayer = (billId: string, qty: number, cost: number | null, sell: number | null) => ({
+      id: uuidv4(),
+      purchaseBillId: billId,
+      purchaseDate: nowIso,
+      initialQuantity: qty,
+      quantity: qty,
+      costPrice: cost ?? 0,
+      sellPrice: sell ?? 0,
+    });
+
+    if (!productData.variants || productData.variants.length === 0) {
+      const sku = newProduct.productSKUs[0];
+      if (productData.trackQuantity) {
+        if (initialBillId) {
+          const item = initialBillItems[0];
+          sku.stockLayers = [buildLayer(initialBillId, item.quantity, item.costPrice || null, item.sellPrice || null)];
+        }
+      } else if (sku) {
+        const cost = numOrUndef((productData as any).costPriceForNonTracked) ?? numOrUndef(mainCostPrice) ?? null;
+        const sell = numOrUndef((productData as any).sellPriceForNonTracked) ?? numOrUndef(mainSellPrice) ?? null;
+        sku.stockLayers = [buildLayer('STANDARD_PRICE_LAYER', 0, cost, sell)];
+      }
+    } else {
+      skuCombinations.forEach(({ sku, cost, sell, stock }) => {
+        if (productData.trackQuantity) {
+          if (initialBillId && stock > 0) {
+            sku.stockLayers = [buildLayer(initialBillId, stock, cost || null, sell || null)];
+          }
+        } else {
+          sku.stockLayers = [buildLayer('STANDARD_PRICE_LAYER', 0, cost || null, sell || null)];
+        }
       });
     }
 
     await db.collection<Product>('products').insertOne(newProduct);
 
     // Create Initial Purchase Bill if items exist
-    if (initialBillItems.length > 0) {
+    if (initialBillItems.length > 0 && initialBillId) {
       const firstStore = await db.collection<Store>('stores').findOne({ companyId: companyId });
-      const initialBillId = `INIT_PURCHASE_${newProduct.id.slice(0, 8)}`;
       let totalAmount = 0;
       initialBillItems.forEach(item => {
         totalAmount += (item.quantity * item.costPrice);
@@ -174,7 +216,6 @@ export async function POST(req: NextRequest) {
       };
       await db.collection<Bill>('bills').insertOne(conceptualBill);
     }
-
 
     return NextResponse.json({ success: true, data: newProduct }, { status: 201 });
   } catch (error) {
