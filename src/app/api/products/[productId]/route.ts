@@ -42,25 +42,60 @@ export async function PUT(req: NextRequest, { params }: { params: { productId: s
 
     // Strip fields that have no corresponding DB columns
     const { costPriceForNonTracked, sellPriceForNonTracked, initialStock: _is, costPrice: _cp, sellPrice: _sp, ...updateableData } = productData;
+    const numOrUndef = (v: any) => (v === '' || v === null || v === undefined ? undefined : Number(v));
 
-    // Handle price updates for non-tracked, single-SKU products
-    if (productData.trackQuantity === false && (!productData.variants || productData.variants.length === 0)) {
-      let skuToUpdate = existingProduct.productSKUs[0];
-      if (skuToUpdate) {
-        if (!skuToUpdate.stockLayers || skuToUpdate.stockLayers.length === 0) {
-          skuToUpdate.stockLayers = [{
+    // Handle price updates for non-tracked products: their prices live in a
+    // STANDARD_PRICE_LAYER on each SKU rather than in stock/purchase bills.
+    if (productData.trackQuantity === false) {
+      const normKey = (v: unknown) => String(v ?? '').toLowerCase();
+      const findOptionPrice = (skuOptionValues: Record<string, string>) => {
+        for (const variant of productData.variants || []) {
+          for (const [optName, optValue] of Object.entries(skuOptionValues || {})) {
+            if (normKey(variant?.name) !== normKey(optName)) continue;
+            const option = (variant?.options || []).find((o: any) => normKey(o?.value) === normKey(optValue));
+            if (option && (option.costPrice !== undefined || option.sellPrice !== undefined)) {
+              return { cost: option.costPrice, sell: option.sellPrice };
+            }
+          }
+        }
+        return null;
+      };
+
+      updateableData.productSKUs = (existingProduct.productSKUs || []).map((sku) => {
+        const skuCopy: ProductSKU = { ...sku, stockLayers: [...(sku.stockLayers || [])] };
+        if (!skuCopy.stockLayers.length) {
+          skuCopy.stockLayers.push({
             id: uuidv4(),
             purchaseBillId: 'STANDARD_PRICE_LAYER',
             purchaseDate: new Date().toISOString(),
-            initialQuantity: 1000,
-            quantity: 1000,
+            initialQuantity: 0,
+            quantity: 0,
             costPrice: 0,
-            sellPrice: 0
-          }];
+            sellPrice: 0,
+          });
         }
-        if (costPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].costPrice = costPriceForNonTracked;
-        if (sellPriceForNonTracked !== undefined) skuToUpdate.stockLayers[0].sellPrice = sellPriceForNonTracked;
-        updateableData.productSKUs = [skuToUpdate];
+        const priceLayer = skuCopy.stockLayers[0];
+        if (!productData.variants || productData.variants.length === 0) {
+          const cost = numOrUndef(costPriceForNonTracked);
+          const sell = numOrUndef(sellPriceForNonTracked);
+          if (cost !== undefined) priceLayer.costPrice = cost;
+          if (sell !== undefined) priceLayer.sellPrice = sell;
+        } else {
+          const found = findOptionPrice(skuCopy.optionValues);
+          if (found) {
+            const cost = numOrUndef(found.cost);
+            const sell = numOrUndef(found.sell);
+            if (cost !== undefined) priceLayer.costPrice = cost;
+            if (sell !== undefined) priceLayer.sellPrice = sell;
+          }
+        }
+        return skuCopy;
+      });
+
+      // Keep the dedicated columns in sync for the single-SKU fallback path.
+      if (!productData.variants || productData.variants.length === 0) {
+        if (numOrUndef(costPriceForNonTracked) !== undefined) updateableData.costPriceForNonTracked = numOrUndef(costPriceForNonTracked);
+        if (numOrUndef(sellPriceForNonTracked) !== undefined) updateableData.sellPriceForNonTracked = numOrUndef(sellPriceForNonTracked);
       }
     }
 
