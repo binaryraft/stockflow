@@ -49,44 +49,24 @@ export function BillItemRow({
     const rawSubtotal = mode === 'buy' ? item.quantity * item.costPrice : item.quantity * item.sellPrice;
     if (mode === 'buy') return rawSubtotal;
 
+    // In estimate mode, show clean subtotal without discount/tax
+    if (isEstimateMode) return rawSubtotal;
+
     // Sell Mode Logic
     let discountAmount = 0;
     if (item.discountValue && item.discountValue > 0) {
       if (item.discountType === 'percentage') {
-        // Discount on unit price * quantity, i.e. on Line Subtotal
         discountAmount = (rawSubtotal * item.discountValue) / 100;
       } else {
-        // Fixed amount. Usually per-unit if entered in line? 
-        // "The input field decides the discount value". 
-        // Let's interpret as Total Discount on Line OR Unit Discount. 
-        // Common POS behavior: Unit Discount. User enters 10rs off per item.
-        // If user entered "Total Discount" for line, it's different.
-        // Let's assume Unit Discount for Fixed Amount too, consistent with Unit Price.
-        // Wait, usually "Discount" column is distinct. 
-        // Let's imply: Discount Amount is subtracted from (Price * Qty).
-        // If type 'amount', is it `value` or `value * qty`? 
-        // Let's implement as FLAT LINE DISCOUNT for 'amount' to be flexible, OR Unit Discount.
-        // Given "Like SGST/CGST", those are rates. 
-        // Let's go with: Percentage = Rate on Subtotal. Amount = Flat Amount on Subtotal (e.g. 50rs off on this line).
-        // Actually, usually in simple billing, Amount is "Per Unit" discount.
-        // I'll stick to: Percentage applied on subtotal. Amount is TOTAL deduction from line? No, let's treat 'amount' as per unit discount for consistency with price.
-        // Actually, the safest bet for a "Line" discount input is "Total Discount Amount" or "Percentage".
-        // Let's use: discountAmount = type=='percentage' ? (subtotal * val / 100) : (val * qty). (Treating val as unit discount).
-        // To be safe and "standard", I'll treat Fixed Amount as "Per Unit Discount".
         discountAmount = item.discountValue * item.quantity;
       }
     }
 
-    // Tax is applied on (Subtotal - Discount)
     const taxableValue = Math.max(0, rawSubtotal - discountAmount);
-
-    const sgst = item.sgstAmount || 0; // These are passed PRE-CALCULATED by parent usually.
+    const sgst = item.sgstAmount || 0;
     const cgst = item.cgstAmount || 0;
     const igst = item.igstAmount || 0;
 
-    // But wait, the parent calculates Tax Amounts based on updated discount.
-    // Here we just display what's passed in `item`.
-    // The parent must pass updated tax amounts.
     return taxableValue + sgst + cgst + igst;
   };
 

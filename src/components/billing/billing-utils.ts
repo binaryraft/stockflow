@@ -58,11 +58,13 @@ export const calculateBillTotals = (
         } else {
             // Sell or Return
             subTotal += item.sellPrice * item.quantity;
-            if (!isEstimateMode && !item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
-                totalSGST += item.sgstAmount || 0;
-                totalCGST += item.cgstAmount || 0;
-                totalIGST += item.igstAmount || 0;
+            if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
                 totalDiscount += item.discountAmount || 0;
+                if (!isEstimateMode) {
+                    totalSGST += item.sgstAmount || 0;
+                    totalCGST += item.cgstAmount || 0;
+                    totalIGST += item.igstAmount || 0;
+                }
             }
         }
     });
