@@ -17,7 +17,7 @@ import { EmployeePasskeyDialog } from './employee-passkey-dialog';
 import { NewProductDialog } from './new-product-dialog';
 import { UnifiedScannerModal } from '@/components/common/UnifiedScannerModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { generatePrintContent, triggerPrint } from '@/lib/print-utils';
 import { Printer } from 'lucide-react';
 import type { Product, BillItem, BillMode, ProductSKU, Store, Staff, Bill, PendingBillPayload } from '@/types';
 import { SUBSCRIPTION_PLAN_IDS } from '@/lib/constants';
@@ -418,7 +418,7 @@ export function BillingForm({
             <AlertDialogAction onClick={() => {
               setIsPrintConfirmDialogOpen(false);
               if (billToPotentiallyPrint) {
-                const content = generateBillPrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
+                const content = generatePrintContent(billToPotentiallyPrint, userProfile, allProductsStoreHook);
                 triggerPrint(content);
               }
             }}>Yes</AlertDialogAction>

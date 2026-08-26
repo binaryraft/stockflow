@@ -32,7 +32,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { generateBillPrintContent, triggerPrint } from '@/lib/print-utils';
+import { generatePrintContent, triggerPrint } from '@/lib/print-utils';
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 
@@ -329,7 +329,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
   const handlePrintSelectedBill = (bill: Bill | null) => {
     if (!bill || !userProfile) return;
-    const printContent = generateBillPrintContent(bill, userProfile, allProductsStore);
+    const printContent = generatePrintContent(bill, userProfile, allProductsStore);
     triggerPrint(printContent);
   };
 

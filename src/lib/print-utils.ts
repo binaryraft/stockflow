@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import type { Bill, BillItem, ProductSKU, Product, UserProfile } from '@/types';
 import { DEFAULT_COMPANY_NAME, COMPANY_ADDRESS, COMPANY_CONTACT } from '@/lib/constants';
 import { getCurrencySymbol } from './utils'; // Import the new helper
-import { SELECTED_PRINTER_STORAGE_KEY } from '@/lib/printer-settings';
+import { SELECTED_PRINTER_STORAGE_KEY, getPaperFormat, type PaperFormat } from '@/lib/printer-settings';
 
 // Helper function to get SKU details - simplified, assumes product and SKU exist
 const getProductSkuForPrint = (
@@ -232,6 +232,119 @@ export const generateBillPrintContent = (
   return content;
 };
 
+const HR = '----------------------------------------';
+const HR_DOUBLE = '========================================';
+
+const generateBillPrintContentThermal = (
+  billToPrint: Bill,
+  userProfile: UserProfile | undefined,
+  products: Product[],
+  paperWidth: 'thermal-80mm' | 'thermal-58mm'
+): string => {
+  const currencySymbol = getCurrencySymbol(userProfile?.companyCurrency);
+  const narrow = paperWidth === 'thermal-58mm';
+  const fontSize = narrow ? '10px' : '11px';
+  const containerStyle = narrow ? 'width: 48mm; padding: 2mm;' : 'width: 72mm; padding: 3mm;';
+
+  let r = '';
+  r += `<html><head><title>Receipt</title><style>`;
+  r += `* { margin: 0; padding: 0; box-sizing: border-box; }`;
+  r += `body { font-family: 'Courier New', Courier, monospace; font-size: ${fontSize}; line-height: 1.3; color: #000; }`;
+  r += `.receipt { ${containerStyle} }`;
+  r += `.c { text-align: center; }`;
+  r += `.r { text-align: right; }`;
+  r += `.b { font-weight: bold; }`;
+  r += `hr { border: none; border-top: 1px dashed #000; margin: 2mm 0; }`;
+  r += `.item-row { margin-bottom: 1mm; }`;
+  r += `.item-line { display: flex; justify-content: space-between; }`;
+  r += `.item-detail { font-size: ${narrow ? '9px' : '10px'}; color: #444; }`;
+  r += `.total-line { display: flex; justify-content: space-between; font-weight: bold; margin-top: 1mm; }`;
+  r += `.grand-total { font-size: ${narrow ? '12px' : '13px'}; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 1mm 0; margin-top: 1mm; }`;
+  r += `@page { size: ${narrow ? '58mm' : '80mm'} auto; margin: 0; }`;
+  r += `@media print { body { -webkit-print-color-adjust: exact; } }`;
+  r += `</style></head><body><div class="receipt">`;
+
+  // Header
+  r += `<div class="c b" style="font-size: ${narrow ? '11px' : '13px'};">${userProfile?.companyName || 'Bill'}</div>`;
+  if (userProfile?.companyAddress) r += `<div class="c" style="font-size: 9px;">${userProfile.companyAddress}</div>`;
+  if (userProfile?.companyPhone) r += `<div class="c" style="font-size: 9px;">Ph: ${userProfile.companyPhone}</div>`;
+  if (userProfile?.companyGstNo) r += `<div class="c" style="font-size: 9px;">GSTIN: ${userProfile.companyGstNo}</div>`;
+  r += `<hr>`;
+
+  // Bill type
+  const billTitle = billToPrint.type === 'buy' ? 'PURCHASE BILL' :
+    billToPrint.type === 'sell' && billToPrint.isEstimate ? 'ESTIMATE' :
+    billToPrint.type === 'sell' ? 'SALES BILL' :
+    billToPrint.type === 'return' ? 'RETURN' : 'BILL';
+  r += `<div class="c b">${billTitle}</div>`;
+
+  // Invoice info
+  r += `<div style="display:flex; justify-content:space-between; font-size: 9px; margin-top: 1mm;">`;
+  r += `<span>${billToPrint.invoiceNumber || billToPrint.id.slice(-8).toUpperCase()}</span>`;
+  r += `<span>${format(new Date(billToPrint.date), 'dd/MM/yy pp')}</span>`;
+  r += `</div>`;
+  if (billToPrint.vendorOrCustomerName) {
+    r += `<div style="font-size: 9px; margin-top: 1mm;"><span class="b">${billToPrint.vendorOrCustomerName}</span></div>`;
+  }
+  if (billToPrint.customerPhone) {
+    r += `<div style="font-size: 9px;">${billToPrint.customerPhone}</div>`;
+  }
+  if (billToPrint.paymentStatus && !billToPrint.isEstimate) {
+    const ps = billToPrint.paymentStatus.toUpperCase();
+    r += `<div style="font-size: 9px; margin-top: 1mm;" class="b">${ps}</div>`;
+  }
+  r += `<hr>`;
+
+  // Items
+  const showTax = billToPrint.type === 'sell' && !billToPrint.isEstimate && billToPrint.taxType;
+  billToPrint.items.forEach((item) => {
+    const price = billToPrint.type === 'buy' ? item.costPrice : item.sellPrice;
+    const lineTotal = price * item.quantity;
+    r += `<div class="item-row">`;
+    r += `<div class="item-line"><span class="b">${item.productName}</span></div>`;
+    r += `<div class="item-line item-detail"><span>  ${item.quantity} x ${currencySymbol}${price.toFixed(2)}</span><span>${currencySymbol}${lineTotal.toFixed(2)}</span></div>`;
+    if (item.discountAmount && item.discountAmount > 0) {
+      r += `<div class="item-line item-detail"><span>  Disc</span><span>-${currencySymbol}${item.discountAmount.toFixed(2)}</span></div>`;
+    }
+    if (showTax && !item.isAdditionalCharge) {
+      if (billToPrint.taxType === 'inter-state' && item.igstAmount) {
+        r += `<div class="item-line item-detail"><span>  IGST</span><span>${currencySymbol}${item.igstAmount.toFixed(2)}</span></div>`;
+      } else {
+        if (item.sgstAmount) r += `<div class="item-line item-detail"><span>  SGST</span><span>${currencySymbol}${item.sgstAmount.toFixed(2)}</span></div>`;
+        if (item.cgstAmount) r += `<div class="item-line item-detail"><span>  CGST</span><span>${currencySymbol}${item.cgstAmount.toFixed(2)}</span></div>`;
+      }
+    }
+    r += `</div>`;
+  });
+
+  r += `<hr>`;
+
+  // Totals
+  r += `<div class="item-line"><span>Subtotal</span><span>${currencySymbol}${(billToPrint.subTotal || 0).toFixed(2)}</span></div>`;
+  if (billToPrint.totalDiscount && billToPrint.totalDiscount > 0) {
+    r += `<div class="item-line" style="color:#059669;"><span>Discount</span><span>-${currencySymbol}${billToPrint.totalDiscount.toFixed(2)}</span></div>`;
+  }
+  if (showTax) {
+    if (billToPrint.taxType === 'inter-state') {
+      if (billToPrint.totalIGST) r += `<div class="item-line"><span>IGST</span><span>${currencySymbol}${billToPrint.totalIGST.toFixed(2)}</span></div>`;
+    } else {
+      if (billToPrint.totalSGST) r += `<div class="item-line"><span>SGST</span><span>${currencySymbol}${billToPrint.totalSGST.toFixed(2)}</span></div>`;
+      if (billToPrint.totalCGST) r += `<div class="item-line"><span>CGST</span><span>${currencySymbol}${billToPrint.totalCGST.toFixed(2)}</span></div>`;
+    }
+  }
+  r += `<div class="total-line grand-total"><span>TOTAL</span><span>${currencySymbol}${billToPrint.totalAmount.toFixed(2)}</span></div>`;
+
+  // Footer
+  r += `<hr>`;
+  if (billToPrint.notes) {
+    r += `<div class="c" style="font-size: 9px; margin-top: 1mm;">${billToPrint.notes}</div>`;
+  }
+  r += `<div class="c" style="font-size: 8px; margin-top: 2mm;">Thank you!</div>`;
+
+  r += `</div></body></html>`;
+  return r;
+};
+
 export const generateReportPrintContent = (
   reportHtml: string,
   reportTitle: string,
@@ -356,4 +469,16 @@ export const triggerPrint = (content: string) => {
   }
 
   openBrowserPrintWindow(content);
+};
+
+export const generatePrintContent = (
+  bill: Bill,
+  userProfile: UserProfile | undefined,
+  products: Product[]
+): string => {
+  const format = getPaperFormat();
+  if (format === 'thermal-80mm' || format === 'thermal-58mm') {
+    return generateBillPrintContentThermal(bill, userProfile, products, format);
+  }
+  return generateBillPrintContent(bill, userProfile, products);
 };

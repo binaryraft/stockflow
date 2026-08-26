@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { SELECTED_PRINTER_STORAGE_KEY } from '@/lib/printer-settings';
+import { SELECTED_PRINTER_STORAGE_KEY, PAPER_FORMAT_STORAGE_KEY, getPaperFormat, type PaperFormat } from '@/lib/printer-settings';
 
 const DEFAULT_PRINTER_VALUE = '__ecbills_default_printer__';
 
@@ -28,6 +28,7 @@ export function PrinterSettingsCard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
   const [hasMounted, setHasMounted] = useState(false);
+  const [paperFormat, setPaperFormatState] = useState<PaperFormat>('a4');
 
   const isDesktopPrintingAvailable = hasMounted && Boolean(window.ecbillsPrinter);
 
@@ -65,6 +66,7 @@ export function PrinterSettingsCard() {
 
   useEffect(() => {
     setHasMounted(true);
+    setPaperFormatState(getPaperFormat());
   }, []);
 
   useEffect(() => {
@@ -83,6 +85,16 @@ export function PrinterSettingsCard() {
     toast({
       title: 'Printer saved',
       description: selectedDeviceName ? 'Bills will print to the selected printer.' : 'Bills will use the system print dialog.',
+    });
+  };
+
+  const handlePaperFormatChange = (value: string) => {
+    const fmt = value as PaperFormat;
+    setPaperFormatState(fmt);
+    localStorage.setItem(PAPER_FORMAT_STORAGE_KEY, fmt);
+    toast({
+      title: 'Print format updated',
+      description: `Bills will now print in ${fmt === 'a4' ? 'A4/Letter' : fmt === 'thermal-80mm' ? '80mm Thermal' : '58mm Thermal'} format.`,
     });
   };
 
@@ -143,6 +155,23 @@ export function PrinterSettingsCard() {
         <CardDescription>Select the active printer used for bills on this computer.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="paperFormat">Print Format</Label>
+          <Select value={paperFormat} onValueChange={handlePaperFormatChange}>
+            <SelectTrigger id="paperFormat" className="select-trigger-class w-full md:w-2/3">
+              <SelectValue placeholder="Select format" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="a4">A4 / Letter (Standard)</SelectItem>
+              <SelectItem value="thermal-80mm">80mm Thermal (POS Receipt)</SelectItem>
+              <SelectItem value="thermal-58mm">58mm Thermal (Narrow Receipt)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">Choose receipt format for printing. Thermal formats use compact monospace layout.</p>
+        </div>
+
+        <div className="border-t pt-4" />
+
         {!isDesktopPrintingAvailable ? (
           <Alert>
             <AlertCircle className="h-4 w-4" />

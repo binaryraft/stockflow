@@ -405,7 +405,12 @@ export const useInventoryStore = create<InventoryState>()(
           const response = await fetch(`/api/bills?companyId=${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch bills: ${response.statusText}`);
           const result = await response.json();
-          if (result.success && Array.isArray(result.data)) set({ bills: result.data.sort((a: Bill, b: Bill) => b.timestamp - a.timestamp) });
+          if (result.success && Array.isArray(result.data)) {
+            const serverBills = result.data as Bill[];
+            const serverIds = new Set(serverBills.map(b => b.id));
+            const localOnly = get().bills.filter(b => b.companyId === companyId && !serverIds.has(b.id));
+            set({ bills: [...localOnly, ...serverBills].sort((a: Bill, b: Bill) => b.timestamp - a.timestamp) });
+          }
           else { console.error("Failed to fetch bills or data format incorrect:", result.message); set({ bills: [] }); }
         } catch (error) {
           console.error("Error in fetchBills:", error);
@@ -551,27 +556,8 @@ export const useInventoryStore = create<InventoryState>()(
           if (!result.success) throw new Error(result.message);
           const newBill = result.data as Bill;
           set((state) => ({ bills: [newBill, ...state.bills].sort((a, b) => b.timestamp - a.timestamp) }));
-          // Removed get().fetchProducts(billData.companyId); because we trust local optimisitc updates or manual refresh for now
-          // If we need to update products stock, we should ideally do it optimistically or force fetch
-          // But user wants "preload forever", so we avoid auto-refetching heavily.
-          // However, stock DOES change on bill add. 
-          // We can try to rely on the server response if it returned updated products, but it returns the bill.
-          // Let's Force fetch here but only if critical, or maybe we can skip it if the user is ok with loose consistency.
-          // Correct approach for "Preload Forever" is: Don't refetch, but update local state.
-          // Since updating local state is complex, we might force fetch here explicitly.
-          // But to solve "loading everytime", we should avoid it. 
-          // For now, I'll comment it out and assume the user wants speed.
-          // But wait, if stock doesn't update, validation will fail next time. 
-          // I will force fetch here but since fetchProducts now checks length, I need a way to bypass.
-          // I'll make fetchProducts logic: if (length > 0) return. 
-          // So I can't force it easily without changing signature.
-          // I'll leave it as is, meaning it won't fetch. This might satisfy "preload forever" but might desync stock.
-          // I'll compromise: Add a way to invalidate the cache or just rely on manual reload for stock updates if that's what they imply.
-          // actually, let's just create a private force fetch or clear the array.
-          // user said "instead of loading everytimne, preload forever". 
-          // This usually refers to initial load. 
-          // Let's stick to: actions invalidate cache IF necessary.
-          // set({ products: [] }); get().fetchProducts(billData.companyId); // This would refresh.
+          set({ products: [] });
+          get().fetchProducts(billData.companyId);
           return newBill;
         } catch (error: any) {
           console.error("Error adding bill:", error);
@@ -1074,7 +1060,12 @@ export const useInventoryStore = create<InventoryState>()(
 
         if (!sku || !product) return { totalStock: 0, currentSellPrice: null, averageCostPrice: null, skuIdentifier };
 
-        const relevantLayers = targetStoreId ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId) : sku.stockLayers;
+        let relevantLayers = targetStoreId ? sku.stockLayers.filter(layer => layer.storeId === targetStoreId) : sku.stockLayers;
+
+        const storeScopedStock = relevantLayers.reduce((sum, layer) => sum + layer.quantity, 0);
+        if (targetStoreId && storeScopedStock === 0) {
+          relevantLayers = sku.stockLayers;
+        }
 
         if (!product.trackQuantity) {
           // Fallback to product-level non-tracked prices if stock layers are missing
