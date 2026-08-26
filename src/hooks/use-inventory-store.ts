@@ -453,8 +453,13 @@ export const useInventoryStore = create<InventoryState>()(
               } else if (localBillType === 'sell' && !billData.isEstimate) {
                 let quantityToSell = item.quantity;
                 let cogs = 0;
-                const layers = sku.stockLayers.filter(layer => layer.quantity > 0).sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
-                const available = layers.reduce((sum, layer) => sum + layer.quantity, 0);
+                let layers = sku.stockLayers.filter(layer => layer.quantity > 0 && (layer.storeId === localStoreId || !layer.storeId)).sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+                let available = layers.reduce((sum, layer) => sum + layer.quantity, 0);
+                // Fallback: if filtering by storeId yielded nothing, try without storeId filter
+                if (available < quantityToSell) {
+                  layers = sku.stockLayers.filter(layer => layer.quantity > 0).sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+                  available = layers.reduce((sum, layer) => sum + layer.quantity, 0);
+                }
                 if (available < quantityToSell) throw new Error(`Insufficient stock for ${sku.skuIdentifier || product.name}.`);
                 for (const layer of layers) {
                   const sold = Math.min(quantityToSell, layer.quantity);

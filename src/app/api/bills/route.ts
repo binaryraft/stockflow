@@ -147,9 +147,15 @@ export async function POST(req: NextRequest) {
         if (product.trackQuantity) {
           let quantityToSell = item.quantity;
           let costOfGoodsSoldThisItem = 0;
-          const relevantLayers = (sku?.stockLayers || [])
+          let relevantLayers = (sku?.stockLayers || [])
             .filter(l => (l.storeId === storeId || !l.storeId || storeId === undefined) && l.quantity > 0)
             .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+          // Fallback: if filtering by storeId yielded nothing, try without storeId filter
+          if (relevantLayers.reduce((sum, l) => sum + l.quantity, 0) < quantityToSell) {
+            relevantLayers = (sku?.stockLayers || [])
+              .filter(l => l.quantity > 0)
+              .sort((a, b) => new Date(a.purchaseDate).getTime() - new Date(b.purchaseDate).getTime());
+          }
           if (relevantLayers.reduce((sum, l) => sum + l.quantity, 0) < quantityToSell) {
             return NextResponse.json({ success: false, message: `Insufficient stock for ${itemProductNameForBill}.` }, { status: 400 });
           }

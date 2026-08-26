@@ -93,6 +93,20 @@ export function BillingForm({
   // Items State
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
 
+  // Pending stock deductions (for real-time display before bill is saved)
+  const pendingStockDeductions = useMemo(() => {
+    const deductions: Record<string, number> = {};
+    if (mode === 'sell' && !isEstimateMode) {
+      currentBillItems.forEach(item => {
+        if (!item.isAdditionalCharge && !item.productId.startsWith('SERVICE_ITEM_')) {
+          const key = `${item.productId}_${JSON.stringify(item.selectedVariantOptions || {})}`;
+          deductions[key] = (deductions[key] || 0) + item.quantity;
+        }
+      });
+    }
+    return deductions;
+  }, [currentBillItems, mode, isEstimateMode]);
+
   // Dialogs & Process State
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
@@ -143,6 +157,36 @@ export function BillingForm({
   const billTotals = useMemo(() => {
     return calculateBillTotals(currentBillItems, mode, isEstimateMode, taxType);
   }, [currentBillItems, mode, isEstimateMode, taxType]);
+
+  // Helper: recalculate tax amounts & discount for a single bill item
+  const recalculateItemTaxes = useCallback((item: BillItem): BillItem => {
+    if (mode === 'buy' || item.isAdditionalCharge || item.productId.startsWith('SERVICE_ITEM_')) {
+      return item;
+    }
+    const product = getProductById(item.productId);
+    const { sgst, cgst, igst, discountAmount } = calculateItemTax(
+      item,
+      item.quantity,
+      item.sellPrice,
+      item.discountValue || 0,
+      item.discountType || 'amount',
+      taxType,
+      product
+    );
+    return {
+      ...item,
+      sgstAmount: sgst,
+      cgstAmount: cgst,
+      igstAmount: igst,
+      discountAmount,
+    };
+  }, [mode, taxType, getProductById]);
+
+  // Recalculate all items when taxType changes (e.g. toggling IGST on/off)
+  useEffect(() => {
+    if (mode !== 'sell') return;
+    setCurrentBillItems(prev => prev.map(item => recalculateItemTaxes(item)));
+  }, [taxType, mode, recalculateItemTaxes]);
 
   // Product Selection Helpers
   const updateSkuDisplayInfo = useCallback((skuToUse?: ProductSKU, productForSku?: Product | null) => {
@@ -206,22 +250,19 @@ export function BillingForm({
     const selectedOpts = (product.variants && product.variants.length > 0) ? selectedVariantOptions : {};
     const targetSkuFromStore = findOrCreateProductSKU(product.id, selectedOpts);
 
-    // ... validation logic ...
+    // Stock validation for sell mode
+    if (mode === 'sell' && product.trackQuantity && currentSkuStock !== null) {
+      const pendingKey = `${product.id}_${JSON.stringify(selectedOpts)}`;
+      const pendingQty = pendingStockDeductions[pendingKey] || 0;
+      const remaining = currentSkuStock - pendingQty;
+      if (currentQ > remaining) {
+        toast({ variant: "destructive", title: "Insufficient Stock", description: `Only ${remaining} units available (stock: ${currentSkuStock}, already in bill: ${pendingQty}).` });
+        return;
+      }
+    }
 
     let itemCostPrice = parseFloat(costPrice.toString()) || 0;
     let itemSellPrice = parseFloat(sellPrice.toString()) || currentSkuSellPrice || 0;
-
-    // Tax Calculation
-    let { sgst, cgst, igst } = calculateItemTax(
-      { productId: product.id } as BillItem, // partial item for calculation
-      currentQ,
-      itemSellPrice,
-      0, 'amount',
-      taxType,
-      product
-    );
-    // Note: calculateItemTax requires a partial item but we can just pass params if we refactor it or mock it.
-    // Actually I made it accept params.
 
     const newItem: BillItem = {
       id: uuidv4(),
@@ -232,13 +273,10 @@ export function BillingForm({
       sellPrice: itemSellPrice,
       isDefective: mode === 'return' ? returnItemIsDefective : undefined,
       selectedVariantOptions: selectedOpts,
-      sgstAmount: sgst,
-      cgstAmount: cgst,
-      igstAmount: igst,
       isAdditionalCharge: false
     };
 
-    setCurrentBillItems(prev => [...prev, newItem]);
+    setCurrentBillItems(prev => [...prev, recalculateItemTaxes(newItem)]);
 
     // Reset fields
     setProductNameQuery('');
@@ -437,6 +475,7 @@ export function BillingForm({
           costPrice={costPrice} setCostPrice={setCostPrice}
           sellPrice={sellPrice} setSellPrice={setSellPrice}
           currentSkuStock={currentSkuStock} currentSkuSellPrice={currentSkuSellPrice} isDisplayingLayerStock={isDisplayingLayerStock}
+          pendingStockDeductions={pendingStockDeductions}
           onAddProduct={handleAddNewItem}
           onScannerClick={() => setIsScannerOpen(true)}
           onEditProductClick={() => {
@@ -459,13 +498,28 @@ export function BillingForm({
           isEstimateMode={isEstimateMode}
           taxType={taxType}
           updateQuantity={(id, qty) => {
-            setCurrentBillItems(prev => prev.map(item => item.id === id ? { ...item, quantity: qty } : item));
+            setCurrentBillItems(prev => prev.map(item =>
+              item.id === id ? recalculateItemTaxes({ ...item, quantity: qty }) : item
+            ));
           }}
           updatePrice={(id, price, type) => {
-            setCurrentBillItems(prev => prev.map(item => item.id === id ? { ...item, [type === 'cost' ? 'costPrice' : 'sellPrice']: price } : item));
+            setCurrentBillItems(prev => prev.map(item => {
+              if (item.id !== id) return item;
+              const updated = type === 'cost'
+                ? { ...item, costPrice: price }
+                : { ...item, sellPrice: price };
+              return recalculateItemTaxes(updated);
+            }));
           }}
           updateDiscount={(id, val, type) => {
-            // handle discount update
+            setCurrentBillItems(prev => prev.map(item => {
+              if (item.id !== id) return item;
+              return recalculateItemTaxes({
+                ...item,
+                discountValue: val || 0,
+                discountType: type,
+              });
+            }));
           }}
           removeItem={(id) => setCurrentBillItems(prev => prev.filter(i => i.id !== id))}
           onEnterPress={() => productNameInputRef.current?.focus()}

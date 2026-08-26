@@ -37,6 +37,7 @@ interface BillingProductSelectorProps {
     currentSkuStock: number | null;
     currentSkuSellPrice: number | null;
     isDisplayingLayerStock: boolean;
+    pendingStockDeductions?: Record<string, number>;
 
     onAddProduct: () => void;
     onScannerClick: () => void;
@@ -58,7 +59,7 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
     currentProductForSelection, setCurrentProductForSelection,
     selectedVariantOptions, setSelectedVariantOptions,
     quantity, setQuantity, costPrice, setCostPrice, sellPrice, setSellPrice,
-    currentSkuStock, currentSkuSellPrice, isDisplayingLayerStock,
+    currentSkuStock, currentSkuSellPrice, isDisplayingLayerStock, pendingStockDeductions = {},
     onAddProduct, onScannerClick, onEditProductClick,
     productNotFoundHint, handleProductSelectFromSearch, handleProductNameSubmit,
     finalStoreIdForSkuDetails, returnItemIsDefective, setReturnItemIsDefective,
@@ -140,11 +141,19 @@ export const BillingProductSelector: React.FC<BillingProductSelectorProps> = ({
                     {currentProductForSelection && (
                         <div className="text-xs text-muted-foreground ml-1 space-y-0.5 mt-1">
                             <span>{currentProductForSelection.name}</span>
-                            {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
-                                <span className="block font-medium text-foreground">
-                                    {isDisplayingLayerStock && mode === 'sell' ? `Available Batch Stock: ${currentSkuStock}` : `Total Stock: ${currentSkuStock}`}
-                                </span>
-                            )}
+                    {currentProductForSelection.trackQuantity && currentSkuStock !== null && (
+                        <span className="block font-medium text-foreground">
+                            {(() => {
+                                const pendingKey = `${currentProductForSelection.id}_${JSON.stringify(selectedVariantOptions)}`;
+                                const pendingQty = pendingStockDeductions[pendingKey] || 0;
+                                const displayStock = currentSkuStock - pendingQty;
+                                if (isDisplayingLayerStock && mode === 'sell') {
+                                    return `Available Batch Stock: ${currentSkuStock}${pendingQty > 0 ? ` (${pendingQty} in bill)` : ''}`;
+                                }
+                                return `Total Stock: ${currentSkuStock}${pendingQty > 0 ? ` (${pendingQty} in bill)` : ''}`;
+                            })()}
+                        </span>
+                    )}
                             {currentSkuSellPrice !== null && (
                                 <span className="block">Price: ₹{currentSkuSellPrice.toFixed(2)}</span>
                             )}
