@@ -149,6 +149,13 @@ export function BillingForm({
     }
   }, [initialModeProp, allowedModes]);
 
+  // Initialize admin store selection from preselectedStoreId
+  useEffect(() => {
+    if (isAdminContext && preselectedStoreId) {
+      setSelectedStoreIdForAdmin(preselectedStoreId);
+    }
+  }, [isAdminContext, preselectedStoreId]);
+
   const finalStoreIdForSkuDetails = useMemo(() => {
     return isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp;
   }, [isAdminContext, selectedStoreIdForAdmin, storeIdFromProp]);
@@ -353,8 +360,19 @@ export function BillingForm({
     setCustomerPhone('');
     setGstin('');
     setNotes('');
+    setIsPaid(true);
+    setProductNameQuery('');
+    setQuantity(1);
+    setCostPrice('');
+    setSellPrice('');
+    setCurrentProductForSelection(null);
+    setCurrentSkuStock(null);
+    setCurrentSkuSellPrice(null);
+    setIsDisplayingLayerStock(false);
+    setSelectedVariantOptions({});
+    setReturnItemIsDefective(false);
+    setProductNotFoundHint('');
     newlyCreatedProductIdsRef.current.clear();
-    // ... reset others
   };
 
   const handleProductNameSubmit = (val: string) => {

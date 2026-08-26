@@ -217,18 +217,14 @@ export const useInventoryStore = create<InventoryState>()(
           set((state) => ({ products: state.products.filter(product => product.companyId === companyId) }));
           return;
         }
-        const cachedProducts = get().products;
-        if (cachedProducts.length > 0 && cachedProducts.every(product => product.companyId === companyId)) return;
-
         try {
           const response = await fetch(`/api/products?companyId=${companyId}`);
           if (!response.ok) throw new Error(`Failed to fetch products: ${response.statusText}`);
           const result = await response.json();
           if (result.success && Array.isArray(result.data)) set({ products: result.data || [] });
-          else { console.error("Failed to fetch products or data format incorrect:", result.message); set({ products: [] }); }
+          else { console.error("Failed to fetch products or data format incorrect:", result.message); }
         } catch (error) {
           console.error("Error in fetchProducts:", error);
-          set({ products: [] });
         }
       },
       addProduct: async (productData, companyId) => {
@@ -398,8 +394,6 @@ export const useInventoryStore = create<InventoryState>()(
           set((state) => ({ bills: state.bills.filter(bill => bill.companyId === companyId).sort((a, b) => b.timestamp - a.timestamp) }));
           return;
         }
-        const cachedBills = get().bills;
-        if (cachedBills.length > 0 && cachedBills.every(bill => bill.companyId === companyId)) return;
 
         try {
           const response = await fetch(`/api/bills?companyId=${companyId}`);
@@ -411,10 +405,9 @@ export const useInventoryStore = create<InventoryState>()(
             const localOnly = get().bills.filter(b => b.companyId === companyId && !serverIds.has(b.id));
             set({ bills: [...localOnly, ...serverBills].sort((a: Bill, b: Bill) => b.timestamp - a.timestamp) });
           }
-          else { console.error("Failed to fetch bills or data format incorrect:", result.message); set({ bills: [] }); }
+          else { console.error("Failed to fetch bills or data format incorrect:", result.message); }
         } catch (error) {
           console.error("Error in fetchBills:", error);
-          set({ bills: [] });
         }
       },
       addBill: async (billData, itemsData) => {
