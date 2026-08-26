@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
@@ -236,6 +237,32 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
 
     return processBills;
   }, [allBillsFromStore, searchTerm, sortConfig, billTypeFilter, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]);
+
+  const billTypeCounts = useMemo(() => {
+    let base = [...allBillsFromStore];
+    if (filterByStoreId) base = base.filter(b => b.storeId === filterByStoreId);
+    if (timePeriodFilter === 'today') base = base.filter(b => isToday(new Date(b.timestamp)));
+    else if (timePeriodFilter === 'thisWeek') base = base.filter(b => isThisWeek(new Date(b.timestamp), { weekStartsOn: 1 }));
+    else if (timePeriodFilter === 'thisMonth') base = base.filter(b => isThisMonth(new Date(b.timestamp)));
+    else if (timePeriodFilter === 'lastMonth') {
+      const t = new Date(); const s = startOfMonth(subMonths(t, 1)); const e = endOfMonth(subMonths(t, 1));
+      base = base.filter(b => isWithinInterval(new Date(b.timestamp), { start: s, end: e }));
+    } else if (timePeriodFilter === 'thisYear') base = base.filter(b => isThisYear(new Date(b.timestamp)));
+    else if (timePeriodFilter === 'lastYear') {
+      const t = new Date(); const s = startOfYear(subYears(t, 1)); const e = endOfYear(subYears(t, 1));
+      base = base.filter(b => isWithinInterval(new Date(b.timestamp), { start: s, end: e }));
+    } else if (timePeriodFilter === 'custom' && customStartDate && customEndDate) {
+      const s = startOfDay(customStartDate); const e = endOfDay(customEndDate);
+      if (isValid(s) && isValid(e) && e >= s) base = base.filter(b => isWithinInterval(new Date(b.timestamp), { start: s, end: e }));
+    }
+    return {
+      all: base.length,
+      sell: base.filter(b => b.type === 'sell' && !b.isEstimate).length,
+      estimate: base.filter(b => b.type === 'sell' && b.isEstimate).length,
+      buy: base.filter(b => b.type === 'buy').length,
+      return: base.filter(b => b.type === 'return').length,
+    };
+  }, [allBillsFromStore, filterByStoreId, timePeriodFilter, customStartDate, customEndDate]);
 
   const requestSort = (key: SortableBillColumns) => {
     let direction: 'ascending' | 'descending' = 'ascending';
@@ -697,25 +724,32 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
         </Dialog>
       )}
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 gap-4 p-4 border rounded-lg bg-muted/50 shadow">
+      <div className="flex flex-col gap-3 mb-4 p-4 border rounded-lg bg-muted/50 shadow">
         <Input
           placeholder="Search bills (ID, Name, Phone, Type, Date, Amount, Payment Status, Product, Staff, Store)..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-md w-full md:w-auto bg-background"
+          className="max-w-md w-full bg-background"
         />
-        <Select value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
-          <SelectTrigger className="w-full md:w-[180px] select-trigger-class bg-background">
-            <SelectValue placeholder="Filter by type" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Bill Types</SelectItem>
-            <SelectItem value="sell">Sales Invoices</SelectItem>
-            <SelectItem value="estimate">Estimates</SelectItem>
-            <SelectItem value="buy">Purchase Bills</SelectItem>
-            <SelectItem value="return">Return Bills</SelectItem>
-          </SelectContent>
-        </Select>
+        <Tabs value={billTypeFilter} onValueChange={(value) => setBillTypeFilter(value as BillTypeFilter)}>
+          <TabsList className="bg-background border w-full flex-wrap h-auto gap-1 p-1">
+            <TabsTrigger value="all" className="text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              All ({billTypeCounts.all})
+            </TabsTrigger>
+            <TabsTrigger value="sell" className="text-xs px-3 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+              <Send className="h-3 w-3 mr-1" /> Sales ({billTypeCounts.sell})
+            </TabsTrigger>
+            <TabsTrigger value="estimate" className="text-xs px-3 py-1.5 data-[state=active]:bg-blue-500 data-[state=active]:text-white">
+              Estimates ({billTypeCounts.estimate})
+            </TabsTrigger>
+            <TabsTrigger value="buy" className="text-xs px-3 py-1.5 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+              <ShoppingBag className="h-3 w-3 mr-1" /> Purchase ({billTypeCounts.buy})
+            </TabsTrigger>
+            <TabsTrigger value="return" className="text-xs px-3 py-1.5 data-[state=active]:bg-amber-500 data-[state=active]:text-amber-950">
+              <RotateCcw className="h-3 w-3 mr-1" /> Returns ({billTypeCounts.return})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       </div>
 
       {/* Desktop Table View */}
