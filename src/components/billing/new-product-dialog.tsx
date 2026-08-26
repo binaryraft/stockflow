@@ -466,7 +466,7 @@ export function NewProductDialog({
 
   useEffect(() => {
     if (isOpen) {
-      if (editingProduct) {
+    if (editingProduct) {
         const defaultSku = editingProduct.productSKUs?.[0];
         const layerStock = defaultSku?.stockLayers?.reduce((sum, l) => sum + (l.quantity || 0), 0);
         reset({
@@ -528,9 +528,9 @@ export function NewProductDialog({
       options: v_form.options.map((opt_form: any) => ({
         id: opt_form.id || `option-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
         value: opt_form.value,
-        costPrice: editingProduct ? opt_form.costPrice : undefined,
-        sellPrice: editingProduct ? opt_form.sellPrice : undefined,
-        initialStock: editingProduct ? opt_form.initialStock : undefined,
+        costPrice: opt_form.costPrice,
+        sellPrice: opt_form.sellPrice,
+        initialStock: opt_form.initialStock
       }))
     }));
 
@@ -557,9 +557,17 @@ export function NewProductDialog({
 
     const noVariants = !productVariantsPayload || productVariantsPayload.length === 0;
 
-    if (!data.trackQuantity && noVariants) {
-      productToSaveBase.costPriceForNonTracked = data.costPrice;
-      productToSaveBase.sellPriceForNonTracked = data.sellPrice;
+    if (noVariants) {
+      if (data.trackQuantity) {
+        // For tracked products, pass cost/sell/stock as transient fields
+        // (the API strips them and uses them for the initial stock layer)
+        (productToSaveBase as any).initialStock = data.initialStock;
+        (productToSaveBase as any).costPrice = data.costPrice;
+        (productToSaveBase as any).sellPrice = data.sellPrice;
+      } else {
+        productToSaveBase.costPriceForNonTracked = data.costPrice;
+        productToSaveBase.sellPriceForNonTracked = data.sellPrice;
+      }
     }
 
     if (editingProduct) {

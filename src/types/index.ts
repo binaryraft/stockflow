@@ -253,6 +253,7 @@ export interface PendingBillPayload {
   placeOfSupply?: string; // Added for GST compliance
   billingAddress?: string; // Added for GST compliance
   shippingAddress?: string; // Added for GST compliance
+  skipStockProductIds?: string[]; // Product IDs whose stock layers should not be created (used when product was just created)
 }
 
 export interface Customer {

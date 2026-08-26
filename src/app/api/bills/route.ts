@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     const billedByStaffId = billData?.billedByStaffId;
     const taxType = billData?.taxType;
     const providedDate = billData?.date;
+    const skipStockProductIds = new Set(billData?.skipStockProductIds || []);
 
     if (!companyId || !billType || !Array.isArray(itemsData) || itemsData.length === 0) {
       return NextResponse.json({ success: false, message: 'Company ID, bill type, and at least one item are required.' }, { status: 400 });
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest) {
           itemCostPrice = item.quantity > 0 ? costOfGoodsSoldThisItem / item.quantity : 0;
         }
       } else if (billType === 'buy' && product && sku) {
-        if (product.trackQuantity) {
+        if (product.trackQuantity && !skipStockProductIds.has(item.productId)) {
           const newLayer: StockLayer = {
             id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
             initialQuantity: item.quantity, quantity: item.quantity,
@@ -172,7 +173,7 @@ export async function POST(req: NextRequest) {
         }
       } else if (billType === 'return' && product && sku) {
         itemCostPrice = item.costPrice || sku?.stockLayers.find(sl => sl.quantity > 0)?.costPrice || 0;
-        if (product.trackQuantity && !item.isDefective) {
+        if (product.trackQuantity && !item.isDefective && !skipStockProductIds.has(item.productId)) {
           const returnLayer: StockLayer = {
             id: uuidv4(), purchaseBillId: newBillId, purchaseDate: currentDate.toISOString(),
             initialQuantity: item.quantity, quantity: item.quantity,

@@ -113,6 +113,9 @@ export function BillingForm({
   const [scannerPurpose, setScannerPurpose] = useState<'addItem' | 'updateProductSku' | null>(null);
   const [productToUpdateSkuFor, setProductToUpdateSkuFor] = useState<Product | null>(null);
 
+  // Track product IDs created during this billing session
+  const newlyCreatedProductIdsRef = useRef<Set<string>>(new Set());
+
   // Refs
   const productNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -265,6 +268,9 @@ export function BillingForm({
       date: billDate?.toISOString(),
       storeIdForBill: isAdminContext ? selectedStoreIdForAdmin : storeIdFromProp,
       paymentStatus: isPaid ? 'paid' : 'unpaid',
+      skipStockProductIds: newlyCreatedProductIdsRef.current.size > 0
+        ? Array.from(newlyCreatedProductIdsRef.current)
+        : undefined,
       // gstin: gstin // TODO: Add to payload type if needed for backend
     };
 
@@ -309,6 +315,7 @@ export function BillingForm({
     setCustomerPhone('');
     setGstin('');
     setNotes('');
+    newlyCreatedProductIdsRef.current.clear();
     // ... reset others
   };
 
@@ -329,6 +336,10 @@ export function BillingForm({
   };
 
   const handleQuickProductAdded = (newProduct: Product) => {
+    // Track that this product was created during this billing session
+    // so addBill won't create duplicate stock layers
+    newlyCreatedProductIdsRef.current.add(newProduct.id);
+
     const defaultSku = newProduct.productSKUs?.[0] || {
       id: `${newProduct.id}_defaultSKU`,
       optionValues: {},

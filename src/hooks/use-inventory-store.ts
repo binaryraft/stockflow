@@ -417,6 +417,7 @@ export const useInventoryStore = create<InventoryState>()(
           const companyId = billData.companyId;
           const localBillType = (billData.billType || billData.type || 'sell') as BillMode;
           const localStoreId = billData.storeIdForBill || billData.storeId || LOCAL_STORE_ID;
+          const skipStockProductIds = new Set(billData.skipStockProductIds || []);
 
           if (!['sell', 'buy', 'return'].includes(localBillType)) {
             throw new Error(`Invalid local bill type: ${localBillType}`);
@@ -438,7 +439,7 @@ export const useInventoryStore = create<InventoryState>()(
             const sellPrice = Number(item.sellPrice || 0);
 
             if (product && sku && product.trackQuantity) {
-              if (localBillType === 'buy') {
+              if (localBillType === 'buy' && !skipStockProductIds.has(item.productId)) {
                 sku.stockLayers.push({
                   id: uuidv4(),
                   purchaseBillId: newBillId,
@@ -463,7 +464,7 @@ export const useInventoryStore = create<InventoryState>()(
                   if (quantityToSell <= 0) break;
                 }
                 costPrice = item.quantity > 0 ? cogs / item.quantity : 0;
-              } else if (localBillType === 'return' && !item.isDefective) {
+              } else if (localBillType === 'return' && !item.isDefective && !skipStockProductIds.has(item.productId)) {
                 sku.stockLayers.push({
                   id: uuidv4(),
                   purchaseBillId: newBillId,
@@ -539,7 +540,7 @@ export const useInventoryStore = create<InventoryState>()(
         try {
           const response = await fetch('/api/bills', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ billData, itemsData }),
+            body: JSON.stringify({ billData: { ...billData, skipStockProductIds: billData.skipStockProductIds }, itemsData }),
           });
           const result = await response.json();
           if (!result.success) throw new Error(result.message);

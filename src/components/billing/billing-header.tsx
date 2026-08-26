@@ -160,7 +160,11 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
 
             {/* Toggles */}
             {mode === 'sell' && (
-                <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-2">
+                <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+                    <div className="flex items-center space-x-2 bg-secondary/30 px-3 py-1.5 rounded-md border text-sm">
+                        <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
+                        <Label htmlFor="estimate-mode" className="cursor-pointer">Estimate/Quotation</Label>
+                    </div>
                     {!isEstimateMode && (
                         <div className="flex items-center space-x-2 bg-secondary/30 px-3 py-1.5 rounded-md border text-sm">
                             <Switch
@@ -168,13 +172,9 @@ export const BillingHeader: React.FC<BillingHeaderProps> = ({
                                 checked={taxType === 'inter-state'}
                                 onCheckedChange={(c) => setTaxType(c ? 'inter-state' : 'intra-state')}
                             />
-                            <Label htmlFor="tax-mode" className="cursor-pointer">Inter-state (IGST)</Label>
+                            <Label htmlFor="tax-mode" className="cursor-pointer">IGST</Label>
                         </div>
                     )}
-                    <div className="flex items-center space-x-2 bg-secondary/30 px-3 py-1.5 rounded-md border text-sm">
-                        <Switch id="estimate-mode" checked={isEstimateMode} onCheckedChange={setIsEstimateMode} />
-                        <Label htmlFor="estimate-mode" className="cursor-pointer">Estimate/Quotation</Label>
-                    </div>
                 </div>
             )}
         </div>
