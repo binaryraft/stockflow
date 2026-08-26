@@ -20,6 +20,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, startOfWeek, endOfWeek, subMonths, subYears } from 'date-fns';
 import type { DateRange } from "react-day-picker";
 import { LoadingSpinner } from '@/components/ui/loading-spinner';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { StoreFormDialog } from '@/components/stores/store-form-dialog';
 
 
 type BillingView = 'history' | 'ledger' | 'new';
@@ -79,13 +81,17 @@ function BillingContent() {
     getActiveSubscriptionPlan, 
     fetchBills, 
     fetchStores, 
+    fetchStaff,
     stores: storesFromZustand, 
+    staffs: staffsFromZustand,
     companyId: currentCompanyIdFromStore, 
   } = useInventoryStore(state => ({
     getActiveSubscriptionPlan: state.getActiveSubscriptionPlan,
     fetchBills: state.fetchBills,
     fetchStores: state.fetchStores, 
+    fetchStaff: state.fetchStaff,
     stores: state.stores, 
+    staffs: state.staffs,
     companyId: localStorage.getItem('companyId') 
   }));
 
@@ -102,14 +108,18 @@ function BillingContent() {
   const [timePeriodFilter, setTimePeriodFilter] = useState<TimePeriodFilterOption>('thisMonth');
   const [customDateRange, setCustomDateRange] = useState<DateRange | undefined>(undefined);
 
+  const [showNoStoreAlertDialog, setShowNoStoreAlertDialog] = useState(false);
+  const [showStoreFormDialog, setShowStoreFormDialog] = useState(false);
+
 
   useEffect(() => {
     setHasMounted(true);
     if (currentCompanyIdFromStore) {
       fetchBills(currentCompanyIdFromStore);
       fetchStores(currentCompanyIdFromStore); 
+      fetchStaff(currentCompanyIdFromStore);
     }
-  }, [currentCompanyIdFromStore, fetchBills, fetchStores]); 
+  }, [currentCompanyIdFromStore, fetchBills, fetchStores, fetchStaff]); 
 
   useEffect(() => {
     if (hasMounted) {
@@ -183,10 +193,31 @@ function BillingContent() {
     else if (effectiveModeForTitle === 'return') { title = "New Return Entry"; icon = RotateCcw; }
 
     if (isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0) {
+      if (!showNoStoreAlertDialog) {
+        setShowNoStoreAlertDialog(true);
+      }
       return (
         <>
-          <PageTitle title="Cannot Create Bill" icon={Building} actions={<Button asChild variant="outline"><Link href="/admin/stores">Add Store</Link></Button>} />
-           <p className="text-center text-destructive">You need to add at least one store before creating bills. Please go to Store Management.</p>
+          <AlertDialog open={showNoStoreAlertDialog} onOpenChange={setShowNoStoreAlertDialog}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>No Store Found</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You don&apos;t have a store set up yet. Would you like to add one now?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => router.push('/admin/billing')}>No</AlertDialogCancel>
+                <AlertDialogAction onClick={() => { setShowNoStoreAlertDialog(false); setShowStoreFormDialog(true); }}>Yes</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <StoreFormDialog 
+            isOpen={showStoreFormDialog} 
+            onOpenChange={setShowStoreFormDialog} 
+            onFormSubmit={() => { if (currentCompanyIdFromStore) fetchStores(currentCompanyIdFromStore); }} 
+            allStaff={staffsFromZustand} 
+          />
         </>
       );
     }
@@ -294,10 +325,39 @@ function BillingContent() {
             {activeBillingView === 'history' ? <ListChecks className="mr-2 h-4 w-4" /> : <HistoryIcon className="mr-2 h-4 w-4" />}
             {activeBillingView === 'history' ? 'Inventory Ledger' : 'Bill History'}
         </Button>
-        <Button asChild disabled={isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0} className="w-full md:w-auto">
-            <Link href={newBillHrefPath}><PlusCircle className="mr-2 h-4 w-4" /> Create New Bill</Link>
+        <Button asChild className="w-full md:w-auto">
+            <Link 
+              href={newBillHrefPath}
+              onClick={(e) => {
+                if (isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0) {
+                  e.preventDefault();
+                  setShowNoStoreAlertDialog(true);
+                }
+              }}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" /> Create New Bill
+            </Link>
         </Button>
-        {isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0 && (<p className="text-xs text-muted-foreground text-center md:text-left">Add a store first</p>)}
+        <AlertDialog open={showNoStoreAlertDialog} onOpenChange={setShowNoStoreAlertDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>No Store Found</AlertDialogTitle>
+              <AlertDialogDescription>
+                You don&apos;t have a store set up yet. Would you like to add one now?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>No</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setShowNoStoreAlertDialog(false); setShowStoreFormDialog(true); }}>Yes</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+        <StoreFormDialog 
+          isOpen={showStoreFormDialog} 
+          onOpenChange={setShowStoreFormDialog} 
+          onFormSubmit={() => { if (currentCompanyIdFromStore) fetchStores(currentCompanyIdFromStore); }} 
+          allStaff={staffsFromZustand} 
+        />
     </>
   );
 
