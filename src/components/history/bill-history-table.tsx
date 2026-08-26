@@ -37,7 +37,7 @@ import { LoadingSpinner } from '@/components/ui/loading-spinner';
 
 const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEstimate?: boolean): { icon: JSX.Element; className: string; name: string, titleColor: string } => {
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
-  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Expense', titleColor: 'text-destructive' };
+  if (billType === 'buy') return { icon: <ShoppingBag />, className: 'bg-destructive text-destructive-foreground hover:bg-destructive/90', name: 'Purchase', titleColor: 'text-destructive' };
   if (billType === 'sell' && isEstimate) return { icon: <Send />, className: 'bg-blue-500 text-blue-50 hover:bg-blue-600 dark:bg-blue-600 dark:text-blue-50 dark:hover:bg-blue-700', name: 'Estimate', titleColor: 'text-blue-600 dark:text-blue-500' };
   if (billType === 'sell') return { icon: <Send />, className: 'bg-primary text-primary-foreground hover:bg-primary/90', name: 'Sales Invoice', titleColor: 'text-primary' };
   if (isDefectiveReturn) return { icon: <AlertTriangle className="text-destructive" />, className: 'bg-amber-400 text-amber-900 hover:bg-amber-500 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-600', name: 'Return (Defective)', titleColor: 'text-amber-600 dark:text-amber-500' };
@@ -605,7 +605,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                   <div className="space-y-1 text-sm">
                     {selectedBill.type === 'buy' && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Cost (Expense Bill):</span>
+                        <span className="text-muted-foreground">Total Cost (Purchase Bill):</span>
                         <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                       </div>
                     )}
@@ -712,7 +712,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             <SelectItem value="all">All Bill Types</SelectItem>
             <SelectItem value="sell">Sales Invoices</SelectItem>
             <SelectItem value="estimate">Estimates</SelectItem>
-            <SelectItem value="buy">Expense Bills</SelectItem>
+            <SelectItem value="buy">Purchase Bills</SelectItem>
             <SelectItem value="return">Return Bills</SelectItem>
           </SelectContent>
         </Select>

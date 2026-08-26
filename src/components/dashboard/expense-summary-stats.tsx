@@ -43,12 +43,12 @@ export function ExpenseSummaryStats() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <BarChartHorizontalBig className="h-5 w-5 text-primary" />
-            Expense Coverage Summary
+            Purchase Coverage Summary
           </CardTitle>
-          <CardDescription>Aggregated statistics about expense coverage.</CardDescription>
+          <CardDescription>Aggregated statistics about purchase coverage.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">Loading expense summary...</p>
+          <p className="text-sm text-muted-foreground">Loading purchase summary...</p>
         </CardContent>
       </Card>
     );
@@ -62,22 +62,22 @@ export function ExpenseSummaryStats() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-primary">
            <BarChartHorizontalBig className="h-5 w-5" />
-          Expense Coverage Summary
+          Purchase Coverage Summary
         </CardTitle>
-        <CardDescription>Financial overview of your expense bills based on potential revenue.</CardDescription>
+        <CardDescription>Financial overview of your purchase bills based on potential revenue.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-3">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
           
           <StatItem 
             icon={<CheckCircle className="text-green-500" />} 
-            label="Covered Expense Cost" 
+            label="Covered Purchase Cost" 
             value={`${currencySymbol}${summary.totalCoveredExpenseValue.toFixed(2)}`}
             description={`${summary.coveredBillCount} bill(s)`}
           />
           <StatItem 
             icon={<XCircle className="text-red-500" />} 
-            label="Uncovered Expense Cost" 
+            label="Uncovered Purchase Cost" 
             value={`${currencySymbol}${summary.totalUncoveredExpenseValue.toFixed(2)}`}
             description={`${summary.uncoveredBillCount} bill(s)`}
           />
@@ -96,7 +96,7 @@ export function ExpenseSummaryStats() {
         </div>
          <div className="pt-3 border-t border-dashed text-center">
             <p className="text-sm text-muted-foreground">
-                Overall Potential Net from All Processed Expenses: 
+                Overall Potential Net from All Processed Purchases: 
                 <span className={cn(
                     "font-bold text-lg ml-1.5",
                     overallPotentialNet >= 0 ? "text-green-600 dark:text-green-500" : "text-red-600 dark:text-red-500"
@@ -105,7 +105,7 @@ export function ExpenseSummaryStats() {
                 </span>
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">
-                (Based on sell prices set at the time of purchase for all items in expense bills)
+                (Based on sell prices set at the time of purchase for all items in purchase bills)
             </p>
         </div>
       </CardContent>

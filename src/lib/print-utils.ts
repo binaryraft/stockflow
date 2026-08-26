@@ -24,7 +24,7 @@ const getProductSkuForPrint = (
 
 
 const getBillTypeNameForPrint = (bill: Bill): string => {
-  if (bill.type === 'buy') return 'Expense Bill';
+  if (bill.type === 'buy') return 'Purchase Bill';
   if (bill.type === 'sell' && bill.isEstimate) return 'Estimate';
   if (bill.type === 'sell') return 'Tax Invoice';
   if (bill.type === 'return' && bill.items.some(item => item.isDefective)) return 'Return (Defective)';

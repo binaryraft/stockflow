@@ -40,14 +40,14 @@ export function ExpenseTrackerCard() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-destructive">
           <FileText className="h-5 w-5" />
-          Recent Expense Bills Tracker
+          Recent Purchase Bills Tracker
         </CardTitle>
-        <CardDescription>Overview of recent expenses and their potential revenue coverage.</CardDescription>
+        <CardDescription>Overview of recent purchases and their potential revenue coverage.</CardDescription>
       </CardHeader>
       <CardContent className="pt-2">
         <ScrollArea className="h-[300px] pr-3"> 
           { !hasMounted || expenseBills.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-10">No recent expense bills to display.</p>
+            <p className="text-sm text-muted-foreground text-center py-10">No recent purchase bills to display.</p>
           ) : (
             <div className="space-y-3">
               {expenseBills.map((bill) => (

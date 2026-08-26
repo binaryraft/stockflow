@@ -50,7 +50,7 @@ interface StoreFormDialogProps {
 
 const operationOptions: { id: BillMode; label: string, icon: React.ElementType }[] = [
   { id: 'sell', label: 'Sales Transactions', icon: Send },
-  { id: 'buy', label: 'Expense Transactions (Purchases)', icon: ShoppingBag },
+  { id: 'buy', label: 'Purchase Transactions', icon: ShoppingBag },
   { id: 'return', label: 'Returns Processing', icon: RotateCcw },
 ];
 

@@ -56,7 +56,7 @@ export function CashFlowStatement({ startDate, endDate, storeId }: CashFlowState
             <span className="text-muted-foreground">({formatValue(summary.cashOutflows)})</span>
           </div>
            <p className="text-xs text-muted-foreground pl-4 -mt-2">
-            (From expense bills marked as 'paid' in the selected period)
+            (From purchase bills marked as 'paid' in the selected period)
           </p>
           
           <Separator className="my-4" />

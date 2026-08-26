@@ -44,7 +44,7 @@ export function BillSaveAnimation({ show, billMode, isEstimate, onClose }: BillS
     }
   } else if (billMode === 'buy') {
     IconComponent = ShoppingBag;
-    text = "Expense Bill Saved!";
+    text = "Purchase Bill Saved!";
     iconColor = "text-red-600";
   } else if (billMode === 'return') {
     IconComponent = RotateCcw;

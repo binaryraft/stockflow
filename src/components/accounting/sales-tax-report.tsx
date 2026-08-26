@@ -141,7 +141,7 @@ export function GstReport({ startDate, endDate, storeId }: GstReportProps) {
       />
       <TaxReportTable 
         title="Input Tax Credit (on Purchases)"
-        description="Tax paid to suppliers on expense bills, available for credit."
+        description="Tax paid to suppliers on purchase bills, available for credit."
         bills={expenseBills}
         currencySymbol={currencySymbol}
         type="purchases"

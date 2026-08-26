@@ -95,7 +95,7 @@ function BillingContent() {
     let title = "New Sales Bill";
     let icon = Send;
 
-    if (effectiveModeForTitle === 'buy') { title = "New Expense Bill"; icon = ShoppingBag; }
+    if (effectiveModeForTitle === 'buy') { title = "New Purchase Bill"; icon = ShoppingBag; }
     else if (effectiveModeForTitle === 'return') { title = "New Return Entry"; icon = RotateCcw; }
     
     // In local mode, we assume a store is created. If not, the form will complain, but Layout should ensure it.

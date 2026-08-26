@@ -23,7 +23,7 @@ import { usePageTransition } from '@/hooks/use-page-transition';
 
 
 function getBillTypeIconAndColor(billType: Bill['type'], isDefectiveReturn?: boolean): { icon: JSX.Element; colorClass: string; name: string } {
-    if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Expense' };
+    if (billType === 'buy') return { icon: <ShoppingBag className="h-4 w-4" />, colorClass: 'text-red-50 bg-red-600', name: 'Purchase' };
     if (billType === 'sell') return { icon: <Send className="h-4 w-4" />, colorClass: 'text-green-50 bg-green-600', name: 'Sales' };
     if (isDefectiveReturn) return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return (Defective)' };
     return { icon: <RotateCcw className="h-4 w-4" />, colorClass: 'text-amber-900 bg-amber-400 dark:text-amber-50 dark:bg-amber-600', name: 'Return' };
@@ -88,9 +88,9 @@ export default function DashboardPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
                 <BarChart3 className="h-5 w-5 text-primary" />
-                Sales & Expenses
+                Sales & Purchases
             </CardTitle>
-            <CardDescription>Overview of sales and expenses for the selected period.</CardDescription>
+            <CardDescription>Overview of sales and purchases for the selected period.</CardDescription>
           </CardHeader>
           <CardContent className="h-[300px] pt-4">
             <SalesExpensesOverviewChart period={timePeriod} />
@@ -144,7 +144,7 @@ export default function DashboardPage() {
             </Button>
             <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">
               <Link href="/local/billing?mode=buy">
-                <ShoppingBag className="mr-2 h-4 w-4" /> New Expense Bill
+                <ShoppingBag className="mr-2 h-4 w-4" /> New Purchase Bill
               </Link>
             </Button>
              <Button asChild variant="outline" className="w-full justify-start text-base py-3 transition-all-fast hover:scale-[1.02] hover:bg-accent hover:border-primary/50">

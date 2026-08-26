@@ -17,7 +17,7 @@ const chartConfig = {
     color: "hsl(142.1 76.2% 36.3%)", // Green
   },
   expenses: {
-    label: "Expenses",
+    label: "Purchases",
     color: "hsl(0 72.2% 50.6%)", // Red
   },
 } satisfies ChartConfig;
@@ -55,7 +55,7 @@ export function SalesExpensesOverviewChart({ period }: { period: TimePeriod }) {
   }
 
   if (chartData.length === 0) {
-    return <div className="flex items-center justify-center h-full"><p>No sales or expense data available for the selected period.</p></div>;
+    return <div className="flex items-center justify-center h-full"><p>No sales or purchase data available for the selected period.</p></div>;
   }
 
   return (

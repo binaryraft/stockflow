@@ -10,7 +10,7 @@ const features = [
   {
     icon: ShoppingCart,
     title: "Seamless Billing",
-    description: "Create sales, expense, and return bills effortlessly with our intuitive interface, variant support, and payment tracking.",
+    description: "Create sales, purchase, and return bills effortlessly with our intuitive interface, variant support, and payment tracking.",
     color: "text-primary",
     bgColor: "bg-primary/10 dark:bg-primary/15",
     borderColor: "border-primary/30 dark:border-primary/40"
@@ -34,7 +34,7 @@ const features = [
   {
     icon: BarChartBig,
     title: "Insightful Dashboard",
-    description: "Get a clear overview of your business health with dynamic charts, expense tracking, and key performance indicators.",
+    description: "Get a clear overview of your business health with dynamic charts, purchase tracking, and key performance indicators.",
     color: "text-purple-600 dark:text-purple-400",
     bgColor: "bg-purple-600/10 dark:bg-purple-500/15",
     borderColor: "border-purple-600/30 dark:border-purple-500/40"

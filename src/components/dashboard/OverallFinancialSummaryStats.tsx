@@ -64,7 +64,7 @@ export function OverallFinancialSummaryStats({ period }: OverallFinancialSummary
     { label: "Total Sales Revenue", value: summary.totalRevenue, icon: <TrendingUp className="text-green-500" />, colorClass: "text-green-600 dark:text-green-500" },
     { label: "Total Cost of Goods Sold (COGS)", value: summary.totalCOGS, icon: <TrendingDown className="text-orange-500" />, colorClass: "text-orange-600 dark:text-orange-500" },
     { label: "Gross Profit", value: summary.grossProfit, icon: <DollarSign className={cn(summary.grossProfit >=0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.grossProfit >=0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
-    { label: "Total Operating Expenses", value: summary.totalExpenses, icon: <TrendingDown className="text-red-500" />, colorClass: "text-destructive" },
+    { label: "Total Operating Purchases", value: summary.totalExpenses, icon: <TrendingDown className="text-red-500" />, colorClass: "text-destructive" },
     { label: "Net Profit / (Loss)", value: summary.netProfit, icon: <AlertTriangle className={cn(summary.netProfit >=0 ? "text-green-600" : "text-destructive")} />, colorClass: summary.netProfit >=0 ? "text-green-600 dark:text-green-500" : "text-destructive" },
   ];
 

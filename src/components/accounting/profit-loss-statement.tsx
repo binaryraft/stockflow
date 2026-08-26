@@ -36,7 +36,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
       <CardHeader>
         <CardTitle>Profit &amp; Loss Statement</CardTitle>
         <CardDescription>
-          Summary of revenues, costs, and expenses during the selected period.
+          Summary of revenues, costs, and purchases during the selected period.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -79,7 +79,7 @@ export function ProfitLossStatement({ startDate, endDate, storeId }: ProfitLossS
 
           {/* Expenses Section */}
           <div className="flex justify-between items-center">
-            <span className="font-semibold text-foreground">Operating Expenses</span>
+            <span className="font-semibold text-foreground">Operating Purchases</span>
             <span></span>
           </div>
           <div className="flex justify-between items-center">

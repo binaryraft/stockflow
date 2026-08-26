@@ -39,7 +39,7 @@ const getBillTypeIconAndColor = (billType: Bill['type'], items: BillItem[], isEs
   const isDefectiveReturn = billType === 'return' && items.some(item => item.isDefective === true);
 
   if (billType === 'buy') {
-    return { icon: <ShoppingBag />, className: 'border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20', name: 'Expense', titleColor: 'text-destructive' };
+    return { icon: <ShoppingBag />, className: 'border-destructive/50 text-destructive bg-destructive/10 hover:bg-destructive/20', name: 'Purchase', titleColor: 'text-destructive' };
   }
   if (billType === 'sell' && isEstimate) {
     return { icon: <Send />, className: 'bg-accent text-accent-foreground hover:bg-accent/90', name: 'Estimate', titleColor: 'text-accent' };
@@ -639,7 +639,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
                   <div className="space-y-1 text-sm">
                     {selectedBill.type === 'buy' && (
                       <div className="flex justify-between">
-                        <span className="text-muted-foreground">Total Cost (Expense Bill):</span>
+                        <span className="text-muted-foreground">Total Cost (Purchase Bill):</span>
                         <span className="font-semibold text-destructive">₹{selectedBill.totalAmount.toFixed(2)}</span>
                       </div>
                     )}
@@ -746,7 +746,7 @@ export function BillHistoryTable({ filterByStoreId, timePeriodFilter, customStar
             <SelectItem value="all">All Bill Types</SelectItem>
             <SelectItem value="sell">Sales Invoices</SelectItem>
             <SelectItem value="estimate">Estimates</SelectItem>
-            <SelectItem value="buy">Expense Bills</SelectItem>
+            <SelectItem value="buy">Purchase Bills</SelectItem>
             <SelectItem value="return">Return Bills</SelectItem>
           </SelectContent>
         </Select>

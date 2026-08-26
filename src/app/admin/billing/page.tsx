@@ -189,7 +189,7 @@ function BillingContent() {
     let title = "New Sales Bill";
     let icon = Send;
 
-    if (effectiveModeForTitle === 'buy') { title = "New Expense Bill"; icon = ShoppingBag; }
+    if (effectiveModeForTitle === 'buy') { title = "New Purchase Bill"; icon = ShoppingBag; }
     else if (effectiveModeForTitle === 'return') { title = "New Return Entry"; icon = RotateCcw; }
 
     if (isAdminContext && allStoresState.length === 0 && activePlan && activePlan.maxStores > 0) {
