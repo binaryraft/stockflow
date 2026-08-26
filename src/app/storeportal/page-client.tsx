@@ -158,9 +158,9 @@ export function StoreLoginPageClient() {
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-3">
-            <Button type="submit" className="w-full h-11 text-base" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
-              {isSubmitting ? 'Verifying...' : 'Access Terminal'}
+            <Button type="submit" className="w-full h-11 text-base" isLoading={isSubmitting}>
+              <LogIn className="mr-2 h-5 w-5" />
+              Access Terminal
             </Button>
             <Button variant="link" asChild className="text-xs">
               <Link href="/">Back to Main Site</Link>

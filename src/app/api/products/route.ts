@@ -19,13 +19,17 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '0', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
+    // Run the page query and the count in parallel — each is a full network
+    // round trip to Supabase, so sequential execution doubles latency.
     let cursor = db.collection<Product>('products').find({ companyId });
-    const totalCount = await db.collection<Product>('products').countDocuments({ companyId });
-
     if (offset > 0) cursor = cursor.skip(offset);
     if (limit > 0) cursor = cursor.limit(limit);
 
-    const companyProducts = await cursor.toArray();
+    const [companyProducts, totalCount] = await Promise.all([
+      cursor.toArray(),
+      db.collection<Product>('products').countDocuments({ companyId }),
+    ]);
+
     return NextResponse.json({ success: true, data: companyProducts, totalCount, limit, offset });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'An internal server error occurred.';
@@ -43,11 +47,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Company ID and product data are required.' }, { status: 400 });
     }
 
-    const company = await db.collection<Company>('companies').findOne({ id: companyId });
+    const [company, companyProductsCount] = await Promise.all([
+      db.collection<Company>('companies').findOne({ id: companyId }),
+      db.collection<Product>('products').countDocuments({ companyId: companyId }),
+    ]);
     if (!company) return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
 
     const plan = SUBSCRIPTION_PLANS.find(p => p.id === company.activeSubscriptionId);
-    const companyProductsCount = await db.collection<Product>('products').countDocuments({ companyId: companyId });
     if (plan && companyProductsCount >= (plan.maxStores * 500)) { // Simplified limit
       return NextResponse.json({ success: false, message: `Product limit reached for your current plan.` }, { status: 403 });
     }

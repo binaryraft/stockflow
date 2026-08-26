@@ -407,6 +407,7 @@ interface NewProductDialogProps {
     costPrice?: string;
     sellPrice?: string;
   } | null;
+  editingProduct?: Product | null;
 }
 
 export function NewProductDialog({
@@ -414,8 +415,9 @@ export function NewProductDialog({
   onOpenChange,
   onProductAdded,
   initialValues,
+  editingProduct,
 }: NewProductDialogProps) {
-  const { addProduct, categories, addCategory: addCategoryToStore, fetchCategories } = useInventoryStore();
+  const { addProduct, updateProduct, categories, addCategory: addCategoryToStore, fetchCategories } = useInventoryStore();
   const { toast } = useToast();
   const [currentCompanyId, setCurrentCompanyId] = useState<string | null>(null);
 
@@ -464,25 +466,55 @@ export function NewProductDialog({
 
   useEffect(() => {
     if (isOpen) {
-      const defaultTrackQuantity = initialValues?.quantity ? true : true;
-      reset({
-        name: initialValues?.name || '',
-        description: '',
-        category: '',
-        trackQuantity: defaultTrackQuantity,
-        unit: DEFAULT_UNIT_VALUE,
-        costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
-        sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
-        initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
-        sgstRate: undefined,
-        cgstRate: undefined,
-        hsnCode: '',
-        variants: [],
-        additionalChargeDefinitions: [],
-      });
+      if (editingProduct) {
+        const defaultSku = editingProduct.productSKUs?.[0];
+        const layerStock = defaultSku?.stockLayers?.reduce((sum, l) => sum + (l.quantity || 0), 0);
+        reset({
+          name: editingProduct.name || '',
+          description: editingProduct.description || '',
+          category: editingProduct.category || '',
+          trackQuantity: editingProduct.trackQuantity ?? true,
+          unit: editingProduct.unit || DEFAULT_UNIT_VALUE,
+          costPrice: defaultSku?.stockLayers?.[0]?.costPrice ?? undefined,
+          sellPrice: defaultSku?.stockLayers?.[0]?.sellPrice ?? undefined,
+          initialStock: layerStock || undefined,
+          sgstRate: editingProduct.sgstRate ?? undefined,
+          cgstRate: editingProduct.cgstRate ?? undefined,
+          hsnCode: editingProduct.hsnCode || '',
+          variants: (editingProduct.variants || []).map(v => ({
+            id: v.id || '',
+            name: v.name,
+            options: (v.options || []).map((opt: any) => ({
+              id: opt.id || '',
+              value: opt.value,
+              costPrice: opt.costPrice ?? undefined,
+              sellPrice: opt.sellPrice ?? undefined,
+              initialStock: undefined,
+            })),
+          })),
+          additionalChargeDefinitions: editingProduct.additionalChargeDefinitions || [],
+        });
+      } else {
+        const defaultTrackQuantity = initialValues?.quantity ? true : true;
+        reset({
+          name: initialValues?.name || '',
+          description: '',
+          category: '',
+          trackQuantity: defaultTrackQuantity,
+          unit: DEFAULT_UNIT_VALUE,
+          costPrice: initialValues?.costPrice ? parseFloat(initialValues.costPrice) : undefined,
+          sellPrice: initialValues?.sellPrice ? parseFloat(initialValues.sellPrice) : undefined,
+          initialStock: defaultTrackQuantity && initialValues?.quantity ? parseFloat(initialValues.quantity) : undefined,
+          sgstRate: undefined,
+          cgstRate: undefined,
+          hsnCode: '',
+          variants: [],
+          additionalChargeDefinitions: [],
+        });
+      }
       setTimeout(() => setFocus('name'), 100);
     }
-  }, [isOpen, initialValues, reset, setFocus]);
+  }, [isOpen, initialValues, editingProduct, reset, setFocus]);
 
   const onSubmit = async (data: NewProductDialogFormData) => {
     if (!currentCompanyId) {
@@ -523,18 +555,37 @@ export function NewProductDialog({
       })) || [],
     };
 
-    if (!data.trackQuantity && (!productVariantsPayload || productVariantsPayload.length === 0)) {
+    const noVariants = !productVariantsPayload || productVariantsPayload.length === 0;
+
+    if (!data.trackQuantity && noVariants) {
       productToSaveBase.costPriceForNonTracked = data.costPrice;
       productToSaveBase.sellPriceForNonTracked = data.sellPrice;
     }
 
-    const newProduct = await addProduct(productToSaveBase, currentCompanyId);
-    if (newProduct) {
-      toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
-      onProductAdded(newProduct);
-      onOpenChange(false);
+    if (data.trackQuantity && noVariants) {
+      (productToSaveBase as any).initialStock = data.initialStock;
+      (productToSaveBase as any).costPrice = data.costPrice;
+      (productToSaveBase as any).sellPrice = data.sellPrice;
+    }
+
+    if (editingProduct) {
+      const updatedProduct = await updateProduct(editingProduct.id, productToSaveBase, currentCompanyId);
+      if (updatedProduct) {
+        toast({ title: "Product Updated", description: `${updatedProduct.name} has been updated.` });
+        onProductAdded(updatedProduct);
+        onOpenChange(false);
+      } else {
+        toast({ variant: "destructive", title: "Update Failed", description: "Could not update product via API." });
+      }
     } else {
-      toast({ variant: "destructive", title: "Add Failed", description: "Could not add product via API." });
+      const newProduct = await addProduct(productToSaveBase, currentCompanyId);
+      if (newProduct) {
+        toast({ title: "Product Added", description: `${newProduct.name} has been added.` });
+        onProductAdded(newProduct);
+        onOpenChange(false);
+      } else {
+        toast({ variant: "destructive", title: "Add Failed", description: "Could not add product via API." });
+      }
     }
   };
 
@@ -542,9 +593,9 @@ export function NewProductDialog({
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl flex flex-col max-h-[90vh] border-t-4 border-t-primary shadow-lg p-0">
         <DialogHeader className="p-6 pb-4 border-b">
-          <DialogTitle>Add New Product (Quick Add)</DialogTitle>
+          <DialogTitle>{editingProduct ? 'Edit Product' : 'Add New Product (Quick Add)'}</DialogTitle>
           <DialogDescription>
-            Quickly add a new product. For more detailed setup, use the main Products page.
+            {editingProduct ? 'Update product details.' : 'Quickly add a new product. For more detailed setup, use the main Products page.'}
           </DialogDescription>
         </DialogHeader>
         <FormProvider {...form}>
@@ -710,7 +761,7 @@ export function NewProductDialog({
               <DialogClose asChild>
                 <Button type="button" variant="outline">Cancel</Button>
               </DialogClose>
-              <Button type="submit" disabled={isSubmitting || !currentCompanyId}>{isSubmitting ? 'Adding...' : 'Add Product'}</Button>
+              <Button type="submit" isLoading={isSubmitting} disabled={!currentCompanyId}>{editingProduct ? 'Update Product' : 'Add Product'}</Button>
             </DialogFooter>
           </form>
         </FormProvider>

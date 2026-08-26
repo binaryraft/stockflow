@@ -235,9 +235,9 @@ export function AdminLoginEmbedded({ onLoginSuccess, onCancel, onSwitchToSignup 
             </div>
           </CardContent>
           <CardFooter className="flex-col gap-3">
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <LogIn className="mr-2 h-5 w-5" />}
-              {isSubmitting ? 'Logging In...' : 'Login as Admin'}
+            <Button type="submit" className="w-full" isLoading={isSubmitting}>
+              <LogIn className="mr-2 h-5 w-5" />
+              Login as Admin
             </Button>
             <div className="relative w-full flex items-center justify-center my-2">
               <div className="absolute inset-0 flex items-center">

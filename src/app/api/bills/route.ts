@@ -29,21 +29,17 @@ export async function GET(req: NextRequest) {
       query.storeId = storeIdFilter;
     }
 
+    // Page query and count run in parallel — each is a full round trip.
     let cursor = db.collection<Bill>('bills')
       .find(query)
       .sort({ timestamp: -1 });
+    if (offset > 0) cursor = cursor.skip(offset);
+    if (limit > 0) cursor = cursor.limit(limit);
 
-    // Get total matches before pagination
-    const totalCount = await db.collection<Bill>('bills').countDocuments(query);
-
-    if (offset > 0) {
-      cursor = cursor.skip(offset);
-    }
-    if (limit > 0) {
-      cursor = cursor.limit(limit);
-    }
-
-    const companyBills = await cursor.toArray();
+    const [companyBills, totalCount] = await Promise.all([
+      cursor.toArray(),
+      db.collection<Bill>('bills').countDocuments(query),
+    ]);
 
     // Attach metadata to response if pagination is active, otherwise keeping strict array shape might be safer for existing clients unless we know they handle extra props.
     // For now, we return the data array as is. If the client requested a limit, they get that many.
@@ -87,23 +83,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'Invalid bill type provided.' }, { status: 400 });
     }
 
-    const company = await db.collection<Company>('companies').findOne({ id: companyId });
+    const productsCollection = db.collection<Product>('products');
+    const productIds = itemsData.map((item: any) => item.productId).filter((id: string) => !id.startsWith('SERVICE_ITEM_') && !id.startsWith('CHARGE_ITEM_'));
+
+    const currentDate = providedDate ? new Date(providedDate) : new Date();
+    const datePrefix = format(currentDate, 'ddMMyy');
+
+    // These lookups are independent — run them in one parallel batch instead of
+    // four sequential network round trips to Supabase.
+    const [company, allBillsTodayCount, storeDetails, productsToUpdateRaw, staffUser] = await Promise.all([
+      db.collection<Company>('companies').findOne({ id: companyId }),
+      db.collection<Bill>('bills').countDocuments({
+        id: { $gte: datePrefix + '0000', $lt: datePrefix + '9999' }
+      }),
+      storeId
+        ? db.collection<Store>('stores').findOne({ id: storeId, companyId: companyId })
+        : Promise.resolve(null as Store | null),
+      productsCollection.find({ id: { $in: productIds }, companyId: companyId }).toArray(),
+      billedByStaffId
+        ? db.collection<User>('users').findOne({ id: billedByStaffId, companyId: companyId })
+        : Promise.resolve(null as User | null),
+    ]);
+    const productsToUpdate: Product[] = productsToUpdateRaw as Product[];
+
     if (!company) {
       return NextResponse.json({ success: false, message: 'Company not found.' }, { status: 404 });
     }
 
-    const productsCollection = db.collection<Product>('products');
-    const productIds = itemsData.map((item: any) => item.productId).filter((id: string) => !id.startsWith('SERVICE_ITEM_') && !id.startsWith('CHARGE_ITEM_'));
-    const productsToUpdate: Product[] = await productsCollection.find({ id: { $in: productIds }, companyId: companyId }).toArray();
-
-    const currentDate = providedDate ? new Date(providedDate) : new Date();
-    const datePrefix = format(currentDate, 'ddMMyy');
-    const billsTodayCount = await db.collection<Bill>('bills').countDocuments({
-      companyId: companyId,
-      date: { $gte: startOfDay(currentDate).toISOString() }
-    });
-    const newBillNumber = billsTodayCount + 1;
-    const newBillId = `${datePrefix}${newBillNumber.toString().padStart(4, '0')}`;
+    let newBillNumber = allBillsTodayCount + 1;
+    let newBillId = `${datePrefix}${newBillNumber.toString().padStart(4, '0')}`;
 
     let processedBillItems: BillItem[] = [];
     let billSubTotal = 0;
@@ -228,10 +236,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const staffUser = billedByStaffId ? await db.collection<User>('users').findOne({ id: billedByStaffId, companyId: companyId }) : null;
-    const storeDetails = storeId ? await db.collection<Store>('stores').findOne({ id: storeId, companyId: companyId }) : null;
-
-    const newBill: Bill = {
+    const newBill = {
       id: newBillId, type: billType, date: currentDate.toISOString(), timestamp: currentDate.getTime(),
       vendorOrCustomerName: billData.vendorOrCustomerName, customerPhone: billData.customerPhone,
       items: processedBillItems, subTotal: roundMoney(billSubTotal), totalSGST: isEstimate ? 0 : roundMoney(billTotalSGST),
@@ -244,13 +249,32 @@ export async function POST(req: NextRequest) {
       companyId: companyId, taxType: taxType,
     };
 
-    await db.collection<Bill>('bills').insertOne(newBill);
+    let insertedBill: Bill | null = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      newBill.id = newBillId;
+      try {
+        await db.collection<Bill>('bills').insertOne(newBill);
+        insertedBill = newBill;
+        break;
+      } catch (e: any) {
+        const msg = e?.message || '';
+        if (/duplicate key/i.test(msg)) {
+          newBillNumber++;
+          newBillId = `${datePrefix}${newBillNumber.toString().padStart(4, '0')}`;
+          continue;
+        }
+        throw e;
+      }
+    }
+    if (!insertedBill) {
+      return NextResponse.json({ success: false, message: 'Could not generate unique bill ID after retries.' }, { status: 500 });
+    }
     for (const product of productsToUpdate) {
       await productsCollection.updateOne({ id: product.id }, { $set: { productSKUs: product.productSKUs } });
     }
 
-    console.log(`${routeLogName} New bill (ID: ${newBillId}) created successfully for company ${companyId}.`);
-    return NextResponse.json({ success: true, data: newBill }, { status: 201 });
+    console.log(`${routeLogName} New bill (ID: ${insertedBill.id}) created successfully for company ${companyId}.`);
+    return NextResponse.json({ success: true, data: insertedBill }, { status: 201 });
 
   } catch (error) {
     console.error(`${routeNamePrefix} Error creating bill:`, error);

@@ -873,8 +873,8 @@ export function ProductForm({ initialData: initialProductProp, searchParams: rou
               <Button type="button" variant="outline" onClick={() => router.push('/admin/products')} disabled={isSubmitting || isLoading}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || isLoading || !currentCompanyId}>
-                {isSubmitting || isLoading ? (isEditing ? 'Saving...' : 'Adding...') : (isEditing ? 'Save Changes' : 'Add Product')}
+              <Button type="submit" isLoading={isSubmitting || isLoading} disabled={!currentCompanyId}>
+                {isEditing ? 'Save Changes' : 'Add Product'}
               </Button>
             </div>
           </div>

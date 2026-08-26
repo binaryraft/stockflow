@@ -202,13 +202,10 @@ export function EmployeePasskeyDialog({
               <Button
                 type="submit"
                 className={cn("flex-1 bg-primary text-primary-foreground hover:bg-primary/90")}
-                disabled={isLoading || employeePassword.length === 0}
+                isLoading={isLoading}
+                disabled={employeePassword.length === 0}
               >
-                {isLoading ? (
-                  <span className="animate-spin mr-2">⏳</span>
-                ) : (
-                  <LogIn className="w-4 h-4 mr-2" />
-                )}
+                <LogIn className="w-4 h-4 mr-2" />
                 Verify
               </Button>
             </div>

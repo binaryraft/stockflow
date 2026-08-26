@@ -1,15 +1,15 @@
-import { getSupabaseAdmin } from './supabase';
+﻿import { getSupabaseAdmin } from './supabase';
 
 /**
  * Supabase adapter that mimics the MongoDB collection API used throughout the codebase.
- * This allows all existing routes to work with minimal changes — just replace the import.
+ * This allows all existing routes to work with minimal changes â€” just replace the import.
  *
- * Automatically converts camelCase ↔ snake_case so existing routes keep using camelCase
+ * Automatically converts camelCase â†” snake_case so existing routes keep using camelCase
  * while Supabase PostgreSQL tables store snake_case columns.
  */
 
 // Keys containing acronym runs (consecutive capitals) that the generic
-// algorithm would mangle — e.g. "productSKUs" -> "product_s_k_us".
+// algorithm would mangle â€” e.g. "productSKUs" -> "product_s_k_us".
 const CAMEL_TO_SNAKE_OVERRIDES: Record<string, string> = {
   productSKUs: 'product_skus',
   totalSGST: 'total_sgst',
@@ -117,7 +117,7 @@ function applySupabaseFilters(query: any, filter: any) {
 
 function createCursor(tableName: string, filter: any = {}) {
   const snakeFilter = convertKeysToSnake(filter);
-  let query = getSupabaseAdmin().from(tableName).select('*');
+  let query = (getSupabaseAdmin() as any).from(tableName).select('*');
   query = applySupabaseFilters(query, snakeFilter);
 
   let offsetVal = 0;
@@ -187,7 +187,7 @@ function collectionShim(tableName: string) {
 
     async findOne(filter: any = {}) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query = getSupabaseAdmin().from(tableName).select('*').limit(1);
+      let query = (getSupabaseAdmin() as any).from(tableName).select('*').limit(1);
       query = applySupabaseFilters(query, snakeFilter);
       const { data } = await query;
       if (!data || data.length === 0) return null;
@@ -196,7 +196,7 @@ function collectionShim(tableName: string) {
 
     async countDocuments(filter: any = {}) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query = getSupabaseAdmin().from(tableName).select('*', { count: 'exact', head: true });
+      let query = (getSupabaseAdmin() as any).from(tableName).select('*', { count: 'exact', head: true });
       query = applySupabaseFilters(query, snakeFilter);
       const { count } = await query;
       return count || 0;
@@ -204,14 +204,14 @@ function collectionShim(tableName: string) {
 
     async insertOne(doc: any) {
       const snakeDoc = convertKeysToSnake(doc);
-      const { data, error } = await getSupabaseAdmin().from(tableName).insert(snakeDoc).select().single();
+      const { data, error } = await (getSupabaseAdmin() as any).from(tableName).insert(snakeDoc).select().single();
       if (error) throw new Error(error.message);
       return { insertedId: doc.id || data?.id, ops: [data] };
     },
 
     async insertMany(docs: any[]) {
       const snakeDocs = docs.map(convertKeysToSnake);
-      const { data, error } = await getSupabaseAdmin().from(tableName).insert(snakeDocs).select();
+      const { data, error } = await (getSupabaseAdmin() as any).from(tableName).insert(snakeDocs).select();
       if (error) throw new Error(error.message);
       return { insertedCount: docs.length, insertedIds: docs.map(d => d.id) };
     },
@@ -219,13 +219,24 @@ function collectionShim(tableName: string) {
     async updateOne(filter: any, update: any) {
       const snakeFilter = convertKeysToSnake(filter);
 
-      // For Supabase, we need to find the record first, then update by id
-      let selectQuery: any = getSupabaseAdmin().from(tableName).select('id').limit(1);
-      selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
-      const { data: existing } = await selectQuery;
+      // Build the update payload once
+      let setPayload: any = {};
+      if (update.$set) {
+        setPayload = convertKeysToSnake({ ...update.$set });
+      } else {
+        setPayload = convertKeysToSnake({ ...update });
+      }
+      if (update.$unset) {
+        for (const key of Object.keys(update.$unset)) {
+          setPayload[toSnakeCase(key)] = null;
+        }
+      }
+      // Remove undefined values
+      Object.keys(setPayload).forEach(key => {
+        if (setPayload[key] === undefined) delete setPayload[key];
+      });
 
-      if (!existing || existing.length === 0) {
-        // Handle upsert case
+      const upsertMissing = async () => {
         if (update.$set) {
           const newDoc = convertKeysToSnake({ ...update.$set, ...snakeFilter });
           if (update.$unset) {
@@ -233,35 +244,37 @@ function collectionShim(tableName: string) {
               newDoc[toSnakeCase(key)] = null;
             }
           }
-          const { data, error } = await getSupabaseAdmin().from(tableName).upsert(newDoc, { onConflict: 'id' }).select();
+          const { data, error } = await (getSupabaseAdmin() as any).from(tableName).upsert(newDoc, { onConflict: 'id' }).select();
           if (error) throw new Error(error.message);
           return { matchedCount: 1, modifiedCount: 1, upsertedId: newDoc.id };
         }
         return { matchedCount: 0, modifiedCount: 0 };
-      }
+      };
 
-      const recordId = existing[0].id;
-      let setPayload: any = {};
+      let recordId: string | undefined = snakeFilter?.id;
 
-      if (update.$set) {
-        setPayload = convertKeysToSnake({ ...update.$set });
-      } else {
-        setPayload = convertKeysToSnake({ ...update });
-      }
-
-      if (update.$unset) {
-        for (const key of Object.keys(update.$unset)) {
-          setPayload[toSnakeCase(key)] = null;
+      if (!recordId) {
+        // Non-id filter: find the record first, then update by id
+        let selectQuery: any = (getSupabaseAdmin() as any).from(tableName).select('id').limit(1);
+        selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
+        const { data: existing } = await selectQuery;
+        if (!existing || existing.length === 0) {
+          return upsertMissing();
         }
+        recordId = existing[0].id;
       }
 
-      // Remove undefined values
-      Object.keys(setPayload).forEach(key => {
-        if (setPayload[key] === undefined) delete setPayload[key];
-      });
-
-      const { error } = await getSupabaseAdmin().from(tableName).update(setPayload).eq('id', recordId);
+      // Single round trip: update by id and ask for the affected ids back.
+      const { data: updated, error } = await (getSupabaseAdmin() as any)
+        .from(tableName)
+        .update(setPayload)
+        .eq('id', recordId)
+        .select('id');
       if (error) throw new Error(error.message);
+
+      if (!updated || updated.length === 0) {
+        return upsertMissing();
+      }
 
       return { matchedCount: 1, modifiedCount: 1 };
     },
@@ -269,7 +282,7 @@ function collectionShim(tableName: string) {
     async updateMany(filter: any, update: any) {
       const snakeFilter = convertKeysToSnake(filter);
       // Select full rows so $pull can read and rewrite array columns
-      let selectQuery: any = getSupabaseAdmin().from(tableName).select('*');
+      let selectQuery: any = (getSupabaseAdmin() as any).from(tableName).select('*');
       selectQuery = applySupabaseFilters(selectQuery, snakeFilter);
       const { data: records } = await selectQuery;
 
@@ -287,7 +300,7 @@ function collectionShim(tableName: string) {
             const snakeField = toSnakeCase(field);
             const currentArray = record[snakeField] || [];
             const newArray = currentArray.filter((v: any) => v !== value);
-            await getSupabaseAdmin().from(tableName).update({ [snakeField]: newArray }).eq('id', record.id);
+            await (getSupabaseAdmin() as any).from(tableName).update({ [snakeField]: newArray }).eq('id', record.id);
           }
         }
         return { matchedCount: records.length, modifiedCount: records.length };
@@ -297,7 +310,7 @@ function collectionShim(tableName: string) {
 
       // Update all matching records
       for (const record of records) {
-        const { error } = await getSupabaseAdmin().from(tableName).update(updateData).eq('id', record.id);
+        const { error } = await (getSupabaseAdmin() as any).from(tableName).update(updateData).eq('id', record.id);
         if (error) throw new Error(error.message);
       }
 
@@ -306,7 +319,7 @@ function collectionShim(tableName: string) {
 
     async deleteOne(filter: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query: any = getSupabaseAdmin().from(tableName).delete();
+      let query: any = (getSupabaseAdmin() as any).from(tableName).delete();
       query = applySupabaseFilters(query, snakeFilter);
       const { data, error } = await query.select('id');
       if (error) throw new Error(error.message);
@@ -315,7 +328,7 @@ function collectionShim(tableName: string) {
 
     async deleteMany(filter: any) {
       const snakeFilter = convertKeysToSnake(filter);
-      let query: any = getSupabaseAdmin().from(tableName).delete();
+      let query: any = (getSupabaseAdmin() as any).from(tableName).delete();
       query = applySupabaseFilters(query, snakeFilter);
       const { data, error } = await query.select('id');
       if (error) throw new Error(error.message);

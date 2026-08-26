@@ -83,9 +83,9 @@ export const BillingSummary: React.FC<BillingSummaryProps> = ({
                         <span>₹{totals.grandTotal.toFixed(2)}</span>
                     </div>
 
-                    <Button onClick={onSave} disabled={isSaving} className="w-full mt-4 h-12 text-lg shadow-lg">
+                    <Button onClick={onSave} isLoading={isSaving} className="w-full mt-4 h-12 text-lg shadow-lg">
                         <Save className="mr-2 h-5 w-5" />
-                        {isSaving ? "Saving..." : "Save Bill"}
+                        Save Bill
                     </Button>
                 </div>
             </div>

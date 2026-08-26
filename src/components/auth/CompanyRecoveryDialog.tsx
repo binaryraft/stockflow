@@ -131,8 +131,8 @@ export function CompanyRecoveryDialog({ isOpen, onOpenChange, onSuccess }: Compa
             <Button type="button" variant="outline" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4"/> Logout
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+            <Button type="submit" isLoading={isSubmitting}>
+              <Save className="mr-2 h-4 w-4"/>
               Save and Retry
             </Button>
           </DialogFooter>

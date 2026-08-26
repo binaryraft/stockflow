@@ -94,6 +94,7 @@ export function BillingForm({
   const [currentBillItems, setCurrentBillItems] = useState<BillItem[]>([]);
 
   // Dialogs & Process State
+  const [isSaving, setIsSaving] = useState(false);
   const [isSavingAnimationVisible, setIsSavingAnimationVisible] = useState(false);
   const [lastSavedBillMode, setLastSavedBillMode] = useState<BillMode | null>(null);
   const [lastSavedBillIsEstimate, setLastSavedBillIsEstimate] = useState<boolean>(false);
@@ -103,6 +104,7 @@ export function BillingForm({
 
   const [isNewProductDialogOpen, setIsNewProductDialogOpen] = useState(false);
   const [newProductDialogInitialValues, setNewProductDialogInitialValues] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const [billToPotentiallyPrint, setBillToPotentiallyPrint] = useState<Bill | null>(null);
   const [isPrintConfirmDialogOpen, setIsPrintConfirmDialogOpen] = useState(false);
@@ -277,7 +279,7 @@ export function BillingForm({
   };
 
   const startSaveProcess = async (staffId: string, payload: PendingBillPayload) => {
-    // ... same save logic ...
+    setIsSaving(true);
     try {
       const savedBill = await addBill({
         ...payload,
@@ -296,6 +298,8 @@ export function BillingForm({
       }
     } catch (e) {
       toast({ variant: "destructive", title: "Error", description: "Failed to save bill." });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -388,9 +392,13 @@ export function BillingForm({
 
       <NewProductDialog
         isOpen={isNewProductDialogOpen}
-        onOpenChange={setIsNewProductDialogOpen}
+        onOpenChange={(open) => {
+          setIsNewProductDialogOpen(open);
+          if (!open) setEditingProduct(null);
+        }}
         initialValues={newProductDialogInitialValues}
         onProductAdded={handleQuickProductAdded}
+        editingProduct={editingProduct}
       />
 
       {/* Main UI */}
@@ -420,7 +428,12 @@ export function BillingForm({
           currentSkuStock={currentSkuStock} currentSkuSellPrice={currentSkuSellPrice} isDisplayingLayerStock={isDisplayingLayerStock}
           onAddProduct={handleAddNewItem}
           onScannerClick={() => setIsScannerOpen(true)}
-          onEditProductClick={() => { /* ... */ }}
+          onEditProductClick={() => {
+            if (currentProductForSelection) {
+              setEditingProduct(currentProductForSelection);
+              setIsNewProductDialogOpen(true);
+            }
+          }}
           productNotFoundHint={productNotFoundHint}
           handleProductSelectFromSearch={handleProductSelectFromSearch}
           handleProductNameSubmit={handleProductNameSubmit}
@@ -452,7 +465,7 @@ export function BillingForm({
           mode={mode}
           notes={notes} setNotes={setNotes}
           onSave={handleSaveBill}
-          isSaving={false} // Add loading state
+          isSaving={isSaving}
         />
       </div>
     </div>

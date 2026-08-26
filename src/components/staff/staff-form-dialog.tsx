@@ -232,7 +232,7 @@ export function StaffFormDialog({
             <DialogClose asChild>
               <Button type="button" variant="outline">Cancel</Button>
             </DialogClose>
-            <Button type="submit" disabled={isSubmitting}>{isSubmitting ? 'Saving...' : (editingStaff ? 'Save Changes' : 'Add Staff')}</Button>
+            <Button type="submit" isLoading={isSubmitting}>{editingStaff ? 'Save Changes' : 'Add Staff'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

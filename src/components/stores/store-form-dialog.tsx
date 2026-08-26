@@ -251,7 +251,7 @@ export function StoreFormDialog({
           </div>
           <DialogFooter className="p-6 pt-4 border-t bg-muted/30">
             <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
-            <Button type="submit" disabled={!currentCompanyId || isSubmitting}>{isSubmitting ? 'Saving...' : (editingStore ? 'Save Changes' : 'Add Store')}</Button>
+            <Button type="submit" disabled={!currentCompanyId} isLoading={isSubmitting}>{editingStore ? 'Save Changes' : 'Add Store'}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
